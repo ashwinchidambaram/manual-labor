@@ -1,0 +1,474 @@
+{
+  "blocks": [
+    {
+      "bbox": null,
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": false,
+      "heading_level": 1,
+      "hyphenated": false,
+      "index": 0,
+      "is_header_footer": false,
+      "numeric_specs": [],
+      "numeric_tokens": [
+        "1"
+      ],
+      "page": 1,
+      "raw_lines": [
+        "1. Overview"
+      ],
+      "section_number": "1",
+      "table": null,
+      "text": "1. Overview",
+      "type": "heading"
+    },
+    {
+      "bbox": null,
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 1,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "35 N·m"
+      ],
+      "numeric_tokens": [
+        "35"
+      ],
+      "page": 1,
+      "raw_lines": [
+        "Replace the bearing carrier if it shows any sign of deformation. Tighten the cooling fan bolts to 35 N·m in a cross pattern. Allow the unit to cool before touching the drive belt."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Replace the bearing carrier if it shows any sign of deformation. Tighten the cooling fan bolts to 35 N·m in a cross pattern. Allow the unit to cool before touching the drive belt.",
+      "type": "paragraph"
+    },
+    {
+      "bbox": null,
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": false,
+      "heading_level": 2,
+      "hyphenated": false,
+      "index": 2,
+      "is_header_footer": false,
+      "numeric_specs": [],
+      "numeric_tokens": [
+        "1.1"
+      ],
+      "page": 1,
+      "raw_lines": [
+        "1.1 Required Items"
+      ],
+      "section_number": "1.1",
+      "table": null,
+      "text": "1.1 Required Items",
+      "type": "heading"
+    },
+    {
+      "bbox": null,
+      "column": null,
+      "figure_refs": [
+        1
+      ],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 3,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "P/N 4471-A"
+      ],
+      "numeric_tokens": [
+        "4471",
+        "1"
+      ],
+      "page": 1,
+      "raw_lines": [
+        "Do not operate the unit while the coolant reservoir is removed. Compare the wiring harness against the reference illustration before refitting. Replace the drive belt with genuine part P/N 4471-A if wear is visible. The arrangement of the control board is shown in the illustration (see Figure 1)."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Do not operate the unit while the coolant reservoir is removed. Compare the wiring harness against the reference illustration before refitting. Replace the drive belt with genuine part P/N 4471-A if wear is visible. The arrangement of the control board is shown in the illustration (see Figure 1).",
+      "type": "paragraph"
+    },
+    {
+      "bbox": null,
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 4,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "M8"
+      ],
+      "numeric_tokens": [
+        "10",
+        "60",
+        "8"
+      ],
+      "page": 1,
+      "raw_lines": [
+        "• Torque wrench, 10 to 60 N·m",
+        "• Feeler gauge set",
+        "• Socket set with M8 socket",
+        "• Clean rags"
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Torque wrench, 10 to 60 N·m\nFeeler gauge set\nSocket set with M8 socket\nClean rags",
+      "type": "list"
+    },
+    {
+      "bbox": null,
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 5,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "35 N·m",
+        "M8"
+      ],
+      "numeric_tokens": [
+        "8",
+        "35",
+        "10",
+        "48",
+        "5",
+        "6"
+      ],
+      "page": 1,
+      "raw_lines": [
+        "Item Size Torque",
+        "Cover bolt M8 35 N·m",
+        "Bracket bolt M10 48 N·m",
+        "Fan bolt M5 6 N·m"
+      ],
+      "section_number": null,
+      "table": {
+        "bordered": true,
+        "caption": null,
+        "cells": [
+          {
+            "col": 0,
+            "col_span": 1,
+            "is_header": true,
+            "row": 0,
+            "row_span": 1,
+            "text": "Item"
+          },
+          {
+            "col": 1,
+            "col_span": 1,
+            "is_header": true,
+            "row": 0,
+            "row_span": 1,
+            "text": "Size"
+          },
+          {
+            "col": 2,
+            "col_span": 1,
+            "is_header": true,
+            "row": 0,
+            "row_span": 1,
+            "text": "Torque"
+          },
+          {
+            "col": 0,
+            "col_span": 1,
+            "is_header": false,
+            "row": 1,
+            "row_span": 1,
+            "text": "Cover bolt"
+          },
+          {
+            "col": 1,
+            "col_span": 1,
+            "is_header": false,
+            "row": 1,
+            "row_span": 1,
+            "text": "M8"
+          },
+          {
+            "col": 2,
+            "col_span": 1,
+            "is_header": false,
+            "row": 1,
+            "row_span": 1,
+            "text": "35 N·m"
+          },
+          {
+            "col": 0,
+            "col_span": 1,
+            "is_header": false,
+            "row": 2,
+            "row_span": 1,
+            "text": "Bracket bolt"
+          },
+          {
+            "col": 1,
+            "col_span": 1,
+            "is_header": false,
+            "row": 2,
+            "row_span": 1,
+            "text": "M10"
+          },
+          {
+            "col": 2,
+            "col_span": 1,
+            "is_header": false,
+            "row": 2,
+            "row_span": 1,
+            "text": "48 N·m"
+          },
+          {
+            "col": 0,
+            "col_span": 1,
+            "is_header": false,
+            "row": 3,
+            "row_span": 1,
+            "text": "Fan bolt"
+          },
+          {
+            "col": 1,
+            "col_span": 1,
+            "is_header": false,
+            "row": 3,
+            "row_span": 1,
+            "text": "M5"
+          },
+          {
+            "col": 2,
+            "col_span": 1,
+            "is_header": false,
+            "row": 3,
+            "row_span": 1,
+            "text": "6 N·m"
+          }
+        ],
+        "has_merged": false,
+        "n_cols": 3,
+        "n_rows": 4,
+        "ragged": false
+      },
+      "text": "Item | Size | Torque\nCover bolt | M8 | 35 N·m\nBracket bolt | M10 | 48 N·m\nFan bolt | M5 | 6 N·m",
+      "type": "table"
+    },
+    {
+      "bbox": null,
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": false,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 6,
+      "is_header_footer": false,
+      "numeric_specs": [],
+      "numeric_tokens": [],
+      "page": 1,
+      "raw_lines": [],
+      "section_number": null,
+      "table": null,
+      "text": "",
+      "type": "figure"
+    },
+    {
+      "bbox": null,
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": false,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 7,
+      "is_header_footer": false,
+      "numeric_specs": [],
+      "numeric_tokens": [
+        "1"
+      ],
+      "page": 1,
+      "raw_lines": [
+        "Figure 1. Drive belt routing around the idler pulley."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Figure 1. Drive belt routing around the idler pulley.",
+      "type": "caption"
+    },
+    {
+      "bbox": null,
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": false,
+      "heading_level": 1,
+      "hyphenated": false,
+      "index": 8,
+      "is_header_footer": false,
+      "numeric_specs": [],
+      "numeric_tokens": [
+        "2"
+      ],
+      "page": 2,
+      "raw_lines": [
+        "2. Maintenance"
+      ],
+      "section_number": "2",
+      "table": null,
+      "text": "2. Maintenance",
+      "type": "heading"
+    },
+    {
+      "bbox": null,
+      "column": null,
+      "figure_refs": [
+        2
+      ],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 9,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "12 V"
+      ],
+      "numeric_tokens": [
+        "12",
+        "2"
+      ],
+      "page": 2,
+      "raw_lines": [
+        "Clean the wiring harness with a lint-free cloth and allow it to dry completely. Keep the area around the idler pulley free of oil and debris. Keep the area around the fuel filter free of oil and debris. The control circuit runs from a 12 V supply, so disconnect it before servicing the control board. The arrangement of the idler pulley is shown in the illustration (see Figure 2)."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Clean the wiring harness with a lint-free cloth and allow it to dry completely. Keep the area around the idler pulley free of oil and debris. Keep the area around the fuel filter free of oil and debris. The control circuit runs from a 12 V supply, so disconnect it before servicing the control board. The arrangement of the idler pulley is shown in the illustration (see Figure 2).",
+      "type": "paragraph"
+    },
+    {
+      "bbox": null,
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": false,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 10,
+      "is_header_footer": false,
+      "numeric_specs": [],
+      "numeric_tokens": [],
+      "page": 2,
+      "raw_lines": [],
+      "section_number": null,
+      "table": null,
+      "text": "",
+      "type": "figure"
+    },
+    {
+      "bbox": null,
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": false,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 11,
+      "is_header_footer": false,
+      "numeric_specs": [],
+      "numeric_tokens": [
+        "2"
+      ],
+      "page": 2,
+      "raw_lines": [
+        "Figure 2. Idler pulley mounting positions."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Figure 2. Idler pulley mounting positions.",
+      "type": "caption"
+    },
+    {
+      "bbox": null,
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 12,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "2.5 L"
+      ],
+      "numeric_tokens": [
+        "2.5"
+      ],
+      "page": 2,
+      "raw_lines": [
+        "Refill the system with 2.5 L of the specified fluid after removing the cover plate. Inspect the mounting bracket for wear, cracks, and signs of overheating before continuing. Replace the fuel filter if it shows any sign of deformation."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Refill the system with 2.5 L of the specified fluid after removing the cover plate. Inspect the mounting bracket for wear, cracks, and signs of overheating before continuing. Replace the fuel filter if it shows any sign of deformation.",
+      "type": "paragraph"
+    }
+  ],
+  "derived_from": null,
+  "expected_slug": "manual",
+  "figures": [
+    {
+      "bbox": null,
+      "caption": "Figure 1. Drive belt routing around the idler pulley.",
+      "caption_block_index": 7,
+      "duplicate_of": null,
+      "expected_extraction": "native",
+      "expected_id": "FIG-manual-p001-01",
+      "near_duplicate": false,
+      "number": 1,
+      "page": 1,
+      "referenced_by": [
+        3
+      ],
+      "section_number": "1.1",
+      "source_image": {
+        "height": 600,
+        "sha256": "31ed90d4692bf113fa201712b1cf26b061ca266838a65ee14cfb272796d38645",
+        "width": 900
+      }
+    },
+    {
+      "bbox": null,
+      "caption": "Figure 2. Idler pulley mounting positions.",
+      "caption_block_index": 11,
+      "duplicate_of": null,
+      "expected_extraction": "native",
+      "expected_id": "FIG-manual-p002-01",
+      "near_duplicate": false,
+      "number": 2,
+      "page": 2,
+      "referenced_by": [
+        9
+      ],
+      "section_number": "2",
+      "source_image": {
+        "height": 600,
+        "sha256": "e7a364b7bb1003871974490d53b0e3dafc48a3dd64e43105dec47e7eaae35004",
+        "width": 900
+      }
+    }
+  ],
+  "file": "manual.docx",
+  "fixture": "manual",
+  "footer_template": null,
+  "header_text": null,
+  "kind": "docx",
+  "page_count": 2,
+  "page_size": null,
+  "product_model": "Acme X200",
+  "sha256": "c16ce46738507e01fb0808e67f9b8fa592f556b601cea4ffdabec4c05d0c8c6b",
+  "text_is_reference": false,
+  "title": "Acme X200 Service Manual"
+}

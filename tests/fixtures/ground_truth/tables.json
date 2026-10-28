@@ -1,0 +1,4046 @@
+{
+  "blocks": [
+    {
+      "bbox": [
+        72.0,
+        38.538,
+        183.042,
+        46.863
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": false,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 0,
+      "is_header_footer": true,
+      "numeric_specs": [],
+      "numeric_tokens": [
+        "200"
+      ],
+      "page": 1,
+      "raw_lines": [
+        "Acme X200 Service Manual"
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Acme X200 Service Manual",
+      "type": "header"
+    },
+    {
+      "bbox": [
+        72.0,
+        72.0,
+        183.136,
+        86.8
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": false,
+      "heading_level": 1,
+      "hyphenated": false,
+      "index": 1,
+      "is_header_footer": false,
+      "numeric_specs": [],
+      "numeric_tokens": [
+        "1"
+      ],
+      "page": 1,
+      "raw_lines": [
+        "1. Torque Data"
+      ],
+      "section_number": "1",
+      "table": null,
+      "text": "1. Torque Data",
+      "type": "heading"
+    },
+    {
+      "bbox": [
+        72.0,
+        94.8,
+        533.93,
+        146.05
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 2,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "35 N·m"
+      ],
+      "numeric_tokens": [
+        "35",
+        "1"
+      ],
+      "page": 1,
+      "raw_lines": [
+        "Keep the area around the drive belt free of oil and debris. Compare the wiring harness against the",
+        "reference illustration before refitting. Tighten the wiring harness bolts to 35 N·m in a cross pattern. Allow",
+        "the unit to cool before touching the gearbox housing. Allow the unit to cool before touching the drive belt.",
+        "The values for the control board are listed below (see Table 1)."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Keep the area around the drive belt free of oil and debris. Compare the wiring harness against the reference illustration before refitting. Tighten the wiring harness bolts to 35 N·m in a cross pattern. Allow the unit to cool before touching the gearbox housing. Allow the unit to cool before touching the drive belt. The values for the control board are listed below (see Table 1).",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        154.05,
+        229.572,
+        162.375
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": false,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 3,
+      "is_header_footer": false,
+      "numeric_specs": [],
+      "numeric_tokens": [
+        "1"
+      ],
+      "page": 1,
+      "raw_lines": [
+        "Table 1. Fastener torque specifications."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Table 1. Fastener torque specifications.",
+      "type": "caption"
+    },
+    {
+      "bbox": [
+        72.0,
+        166.375,
+        462.0,
+        292.375
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 4,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "35 N·m",
+        "M8"
+      ],
+      "numeric_tokens": [
+        "8",
+        "35",
+        "8.8",
+        "10",
+        "48",
+        "8.8",
+        "8",
+        "25",
+        "10.9",
+        "12",
+        "85",
+        "10.9",
+        "6",
+        "12",
+        "8.8",
+        "5",
+        "6",
+        "4.8"
+      ],
+      "page": 1,
+      "raw_lines": [
+        "Component Fastener Torque Grade",
+        "Cover plate M8 35 N·m 8.8",
+        "Mounting bracket M10 48 N·m 8.8",
+        "Idler pulley M8 25 N·m 10.9",
+        "Gearbox housing M12 85 N·m 10.9",
+        "Bearing carrier M6 12 N·m 8.8",
+        "Cooling fan M5 6 N·m 4.8"
+      ],
+      "section_number": null,
+      "table": {
+        "bordered": true,
+        "caption": "Table 1. Fastener torque specifications.",
+        "cells": [
+          {
+            "col": 0,
+            "col_span": 1,
+            "is_header": true,
+            "row": 0,
+            "row_span": 1,
+            "text": "Component"
+          },
+          {
+            "col": 1,
+            "col_span": 1,
+            "is_header": true,
+            "row": 0,
+            "row_span": 1,
+            "text": "Fastener"
+          },
+          {
+            "col": 2,
+            "col_span": 1,
+            "is_header": true,
+            "row": 0,
+            "row_span": 1,
+            "text": "Torque"
+          },
+          {
+            "col": 3,
+            "col_span": 1,
+            "is_header": true,
+            "row": 0,
+            "row_span": 1,
+            "text": "Grade"
+          },
+          {
+            "col": 0,
+            "col_span": 1,
+            "is_header": false,
+            "row": 1,
+            "row_span": 1,
+            "text": "Cover plate"
+          },
+          {
+            "col": 1,
+            "col_span": 1,
+            "is_header": false,
+            "row": 1,
+            "row_span": 1,
+            "text": "M8"
+          },
+          {
+            "col": 2,
+            "col_span": 1,
+            "is_header": false,
+            "row": 1,
+            "row_span": 1,
+            "text": "35 N·m"
+          },
+          {
+            "col": 3,
+            "col_span": 1,
+            "is_header": false,
+            "row": 1,
+            "row_span": 1,
+            "text": "8.8"
+          },
+          {
+            "col": 0,
+            "col_span": 1,
+            "is_header": false,
+            "row": 2,
+            "row_span": 1,
+            "text": "Mounting bracket"
+          },
+          {
+            "col": 1,
+            "col_span": 1,
+            "is_header": false,
+            "row": 2,
+            "row_span": 1,
+            "text": "M10"
+          },
+          {
+            "col": 2,
+            "col_span": 1,
+            "is_header": false,
+            "row": 2,
+            "row_span": 1,
+            "text": "48 N·m"
+          },
+          {
+            "col": 3,
+            "col_span": 1,
+            "is_header": false,
+            "row": 2,
+            "row_span": 1,
+            "text": "8.8"
+          },
+          {
+            "col": 0,
+            "col_span": 1,
+            "is_header": false,
+            "row": 3,
+            "row_span": 1,
+            "text": "Idler pulley"
+          },
+          {
+            "col": 1,
+            "col_span": 1,
+            "is_header": false,
+            "row": 3,
+            "row_span": 1,
+            "text": "M8"
+          },
+          {
+            "col": 2,
+            "col_span": 1,
+            "is_header": false,
+            "row": 3,
+            "row_span": 1,
+            "text": "25 N·m"
+          },
+          {
+            "col": 3,
+            "col_span": 1,
+            "is_header": false,
+            "row": 3,
+            "row_span": 1,
+            "text": "10.9"
+          },
+          {
+            "col": 0,
+            "col_span": 1,
+            "is_header": false,
+            "row": 4,
+            "row_span": 1,
+            "text": "Gearbox housing"
+          },
+          {
+            "col": 1,
+            "col_span": 1,
+            "is_header": false,
+            "row": 4,
+            "row_span": 1,
+            "text": "M12"
+          },
+          {
+            "col": 2,
+            "col_span": 1,
+            "is_header": false,
+            "row": 4,
+            "row_span": 1,
+            "text": "85 N·m"
+          },
+          {
+            "col": 3,
+            "col_span": 1,
+            "is_header": false,
+            "row": 4,
+            "row_span": 1,
+            "text": "10.9"
+          },
+          {
+            "col": 0,
+            "col_span": 1,
+            "is_header": false,
+            "row": 5,
+            "row_span": 1,
+            "text": "Bearing carrier"
+          },
+          {
+            "col": 1,
+            "col_span": 1,
+            "is_header": false,
+            "row": 5,
+            "row_span": 1,
+            "text": "M6"
+          },
+          {
+            "col": 2,
+            "col_span": 1,
+            "is_header": false,
+            "row": 5,
+            "row_span": 1,
+            "text": "12 N·m"
+          },
+          {
+            "col": 3,
+            "col_span": 1,
+            "is_header": false,
+            "row": 5,
+            "row_span": 1,
+            "text": "8.8"
+          },
+          {
+            "col": 0,
+            "col_span": 1,
+            "is_header": false,
+            "row": 6,
+            "row_span": 1,
+            "text": "Cooling fan"
+          },
+          {
+            "col": 1,
+            "col_span": 1,
+            "is_header": false,
+            "row": 6,
+            "row_span": 1,
+            "text": "M5"
+          },
+          {
+            "col": 2,
+            "col_span": 1,
+            "is_header": false,
+            "row": 6,
+            "row_span": 1,
+            "text": "6 N·m"
+          },
+          {
+            "col": 3,
+            "col_span": 1,
+            "is_header": false,
+            "row": 6,
+            "row_span": 1,
+            "text": "4.8"
+          }
+        ],
+        "has_merged": false,
+        "n_cols": 4,
+        "n_rows": 7,
+        "ragged": false
+      },
+      "text": "Component | Fastener | Torque | Grade\nCover plate | M8 | 35 N·m | 8.8\nMounting bracket | M10 | 48 N·m | 8.8\nIdler pulley | M8 | 25 N·m | 10.9\nGearbox housing | M12 | 85 N·m | 10.9\nBearing carrier | M6 | 12 N·m | 8.8\nCooling fan | M5 | 6 N·m | 4.8",
+      "type": "table"
+    },
+    {
+      "bbox": [
+        72.0,
+        300.375,
+        530.55,
+        337.625
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 5,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "P/N 4471-A"
+      ],
+      "numeric_tokens": [
+        "4471"
+      ],
+      "page": 1,
+      "raw_lines": [
+        "Compare the mounting bracket against the reference illustration before refitting. Replace the cooling fan",
+        "with genuine part P/N 4471-A if wear is visible. Inspect the control board for wear, cracks, and signs of",
+        "overheating before continuing."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Compare the mounting bracket against the reference illustration before refitting. Replace the cooling fan with genuine part P/N 4471-A if wear is visible. Inspect the control board for wear, cracks, and signs of overheating before continuing.",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        345.625,
+        522.76,
+        382.875
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 6,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "M8"
+      ],
+      "numeric_tokens": [
+        "8"
+      ],
+      "page": 1,
+      "raw_lines": [
+        "Replace the fuel filter if it shows any sign of deformation. Compare the drive belt against the reference",
+        "illustration before refitting. Use only M8 fasteners when refitting the drive belt. Clean the control board",
+        "with a lint-free cloth and allow it to dry completely."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Replace the fuel filter if it shows any sign of deformation. Compare the drive belt against the reference illustration before refitting. Use only M8 fasteners when refitting the drive belt. Clean the control board with a lint-free cloth and allow it to dry completely.",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        390.875,
+        528.89,
+        428.125
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 7,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "2.5 L"
+      ],
+      "numeric_tokens": [
+        "2.5"
+      ],
+      "page": 1,
+      "raw_lines": [
+        "Refill the system with 2.5 L of the specified fluid after removing the control board. Keep the area around",
+        "the coolant reservoir free of oil and debris. Compare the cover plate against the reference illustration",
+        "before refitting. Wear protective gloves when handling the gearbox housing."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Refill the system with 2.5 L of the specified fluid after removing the control board. Keep the area around the coolant reservoir free of oil and debris. Compare the cover plate against the reference illustration before refitting. Wear protective gloves when handling the gearbox housing.",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        436.125,
+        527.18,
+        487.375
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 8,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "P/N 4471-A"
+      ],
+      "numeric_tokens": [
+        "4471"
+      ],
+      "page": 1,
+      "raw_lines": [
+        "Support the pressure valve with a stand so that it does not fall during removal. Replace the idler pulley",
+        "with genuine part P/N 4471-A if wear is visible. Clean the idler pulley with a lint-free cloth and allow it to",
+        "dry completely. Wear protective gloves when handling the bearing carrier. Compare the wiring harness",
+        "against the reference illustration before refitting."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Support the pressure valve with a stand so that it does not fall during removal. Replace the idler pulley with genuine part P/N 4471-A if wear is visible. Clean the idler pulley with a lint-free cloth and allow it to dry completely. Wear protective gloves when handling the bearing carrier. Compare the wiring harness against the reference illustration before refitting.",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        495.375,
+        528.9,
+        546.625
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 9,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "35 N·m",
+        "2.5 L"
+      ],
+      "numeric_tokens": [
+        "35",
+        "2.5"
+      ],
+      "page": 1,
+      "raw_lines": [
+        "Tighten the cover plate bolts to 35 N·m in a cross pattern. Support the cover plate with a stand so that it",
+        "does not fall during removal. Refill the system with 2.5 L of the specified fluid after removing the wiring",
+        "harness. Clean the coolant reservoir with a lint-free cloth and allow it to dry completely. Record any",
+        "damage to the drive belt on the service log."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Tighten the cover plate bolts to 35 N·m in a cross pattern. Support the cover plate with a stand so that it does not fall during removal. Refill the system with 2.5 L of the specified fluid after removing the wiring harness. Clean the coolant reservoir with a lint-free cloth and allow it to dry completely. Record any damage to the drive belt on the service log.",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        554.625,
+        538.9,
+        605.875
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 10,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "P/N 4471-A"
+      ],
+      "numeric_tokens": [
+        "4471"
+      ],
+      "page": 1,
+      "raw_lines": [
+        "Do not operate the unit while the drive belt is removed. Compare the idler pulley against the reference",
+        "illustration before refitting. Wear protective gloves when handling the bearing carrier. Replace the cooling",
+        "fan with genuine part P/N 4471-A if wear is visible. Support the cover plate with a stand so that it does not",
+        "fall during removal."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Do not operate the unit while the drive belt is removed. Compare the idler pulley against the reference illustration before refitting. Wear protective gloves when handling the bearing carrier. Replace the cooling fan with genuine part P/N 4471-A if wear is visible. Support the cover plate with a stand so that it does not fall during removal.",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        613.875,
+        537.77,
+        665.125
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 11,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "P/N 4471-A"
+      ],
+      "numeric_tokens": [
+        "4471"
+      ],
+      "page": 1,
+      "raw_lines": [
+        "Do not operate the unit while the wiring harness is removed. Record any damage to the mounting bracket",
+        "on the service log. Replace the control board with genuine part P/N 4471-A if wear is visible. Allow the",
+        "unit to cool before touching the coolant reservoir. Support the gearbox housing with a stand so that it",
+        "does not fall during removal. Record any damage to the pressure valve on the service log."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Do not operate the unit while the wiring harness is removed. Record any damage to the mounting bracket on the service log. Replace the control board with genuine part P/N 4471-A if wear is visible. Allow the unit to cool before touching the coolant reservoir. Support the gearbox housing with a stand so that it does not fall during removal. Record any damage to the pressure valve on the service log.",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        745.538,
+        100.521,
+        753.863
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": false,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 12,
+      "is_header_footer": true,
+      "numeric_specs": [],
+      "numeric_tokens": [
+        "1"
+      ],
+      "page": 1,
+      "raw_lines": [
+        "Page 1"
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Page 1",
+      "type": "footer"
+    },
+    {
+      "bbox": [
+        72.0,
+        38.538,
+        183.042,
+        46.863
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": false,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 13,
+      "is_header_footer": true,
+      "numeric_specs": [],
+      "numeric_tokens": [
+        "200"
+      ],
+      "page": 2,
+      "raw_lines": [
+        "Acme X200 Service Manual"
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Acme X200 Service Manual",
+      "type": "header"
+    },
+    {
+      "bbox": [
+        72.0,
+        72.0,
+        200.064,
+        86.8
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": false,
+      "heading_level": 1,
+      "hyphenated": false,
+      "index": 14,
+      "is_header_footer": false,
+      "numeric_specs": [],
+      "numeric_tokens": [
+        "2"
+      ],
+      "page": 2,
+      "raw_lines": [
+        "2. Electrical Data"
+      ],
+      "section_number": "2",
+      "table": null,
+      "text": "2. Electrical Data",
+      "type": "heading"
+    },
+    {
+      "bbox": [
+        72.0,
+        94.8,
+        531.66,
+        146.05
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 15,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "M8"
+      ],
+      "numeric_tokens": [
+        "8",
+        "2"
+      ],
+      "page": 2,
+      "raw_lines": [
+        "Use only M8 fasteners when refitting the pressure valve. Keep the area around the idler pulley free of oil",
+        "and debris. Keep the area around the gearbox housing free of oil and debris. Record any damage to the",
+        "wiring harness on the service log. Compare the cooling fan against the reference illustration before",
+        "refitting. The values for the pressure valve are listed below (see Table 2)."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Use only M8 fasteners when refitting the pressure valve. Keep the area around the idler pulley free of oil and debris. Keep the area around the gearbox housing free of oil and debris. Record any damage to the wiring harness on the service log. Compare the cooling fan against the reference illustration before refitting. The values for the pressure valve are listed below (see Table 2).",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        154.05,
+        175.536,
+        162.375
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": false,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 16,
+      "is_header_footer": false,
+      "numeric_specs": [],
+      "numeric_tokens": [
+        "2"
+      ],
+      "page": 2,
+      "raw_lines": [
+        "Table 2. Electrical ratings."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Table 2. Electrical ratings.",
+      "type": "caption"
+    },
+    {
+      "bbox": [
+        72.0,
+        166.375,
+        462.0,
+        274.375
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 17,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "12 V",
+        "10 A"
+      ],
+      "numeric_tokens": [
+        "12",
+        "2.5",
+        "10",
+        "12",
+        "4.2",
+        "10",
+        "5",
+        "0.8",
+        "2",
+        "24",
+        "8.5",
+        "15",
+        "3.3",
+        "0.3",
+        "1"
+      ],
+      "page": 2,
+      "raw_lines": [
+        "Circuit Voltage Current Fuse",
+        "Control board 12 V 2.5 A 10 A",
+        "Cooling fan 12 V 4.2 A 10 A",
+        "Sensor bus 5 V 0.8 A 2 A",
+        "Heater element 24 V 8.5 A 15 A",
+        "Display 3.3 V 0.3 A 1 A"
+      ],
+      "section_number": null,
+      "table": {
+        "bordered": true,
+        "caption": "Table 2. Electrical ratings.",
+        "cells": [
+          {
+            "col": 0,
+            "col_span": 1,
+            "is_header": true,
+            "row": 0,
+            "row_span": 1,
+            "text": "Circuit"
+          },
+          {
+            "col": 1,
+            "col_span": 1,
+            "is_header": true,
+            "row": 0,
+            "row_span": 1,
+            "text": "Voltage"
+          },
+          {
+            "col": 2,
+            "col_span": 1,
+            "is_header": true,
+            "row": 0,
+            "row_span": 1,
+            "text": "Current"
+          },
+          {
+            "col": 3,
+            "col_span": 1,
+            "is_header": true,
+            "row": 0,
+            "row_span": 1,
+            "text": "Fuse"
+          },
+          {
+            "col": 0,
+            "col_span": 1,
+            "is_header": false,
+            "row": 1,
+            "row_span": 1,
+            "text": "Control board"
+          },
+          {
+            "col": 1,
+            "col_span": 1,
+            "is_header": false,
+            "row": 1,
+            "row_span": 1,
+            "text": "12 V"
+          },
+          {
+            "col": 2,
+            "col_span": 1,
+            "is_header": false,
+            "row": 1,
+            "row_span": 1,
+            "text": "2.5 A"
+          },
+          {
+            "col": 3,
+            "col_span": 1,
+            "is_header": false,
+            "row": 1,
+            "row_span": 1,
+            "text": "10 A"
+          },
+          {
+            "col": 0,
+            "col_span": 1,
+            "is_header": false,
+            "row": 2,
+            "row_span": 1,
+            "text": "Cooling fan"
+          },
+          {
+            "col": 1,
+            "col_span": 1,
+            "is_header": false,
+            "row": 2,
+            "row_span": 1,
+            "text": "12 V"
+          },
+          {
+            "col": 2,
+            "col_span": 1,
+            "is_header": false,
+            "row": 2,
+            "row_span": 1,
+            "text": "4.2 A"
+          },
+          {
+            "col": 3,
+            "col_span": 1,
+            "is_header": false,
+            "row": 2,
+            "row_span": 1,
+            "text": "10 A"
+          },
+          {
+            "col": 0,
+            "col_span": 1,
+            "is_header": false,
+            "row": 3,
+            "row_span": 1,
+            "text": "Sensor bus"
+          },
+          {
+            "col": 1,
+            "col_span": 1,
+            "is_header": false,
+            "row": 3,
+            "row_span": 1,
+            "text": "5 V"
+          },
+          {
+            "col": 2,
+            "col_span": 1,
+            "is_header": false,
+            "row": 3,
+            "row_span": 1,
+            "text": "0.8 A"
+          },
+          {
+            "col": 3,
+            "col_span": 1,
+            "is_header": false,
+            "row": 3,
+            "row_span": 1,
+            "text": "2 A"
+          },
+          {
+            "col": 0,
+            "col_span": 1,
+            "is_header": false,
+            "row": 4,
+            "row_span": 1,
+            "text": "Heater element"
+          },
+          {
+            "col": 1,
+            "col_span": 1,
+            "is_header": false,
+            "row": 4,
+            "row_span": 1,
+            "text": "24 V"
+          },
+          {
+            "col": 2,
+            "col_span": 1,
+            "is_header": false,
+            "row": 4,
+            "row_span": 1,
+            "text": "8.5 A"
+          },
+          {
+            "col": 3,
+            "col_span": 1,
+            "is_header": false,
+            "row": 4,
+            "row_span": 1,
+            "text": "15 A"
+          },
+          {
+            "col": 0,
+            "col_span": 1,
+            "is_header": false,
+            "row": 5,
+            "row_span": 1,
+            "text": "Display"
+          },
+          {
+            "col": 1,
+            "col_span": 1,
+            "is_header": false,
+            "row": 5,
+            "row_span": 1,
+            "text": "3.3 V"
+          },
+          {
+            "col": 2,
+            "col_span": 1,
+            "is_header": false,
+            "row": 5,
+            "row_span": 1,
+            "text": "0.3 A"
+          },
+          {
+            "col": 3,
+            "col_span": 1,
+            "is_header": false,
+            "row": 5,
+            "row_span": 1,
+            "text": "1 A"
+          }
+        ],
+        "has_merged": false,
+        "n_cols": 4,
+        "n_rows": 6,
+        "ragged": false
+      },
+      "text": "Circuit | Voltage | Current | Fuse\nControl board | 12 V | 2.5 A | 10 A\nCooling fan | 12 V | 4.2 A | 10 A\nSensor bus | 5 V | 0.8 A | 2 A\nHeater element | 24 V | 8.5 A | 15 A\nDisplay | 3.3 V | 0.3 A | 1 A",
+      "type": "table"
+    },
+    {
+      "bbox": [
+        72.0,
+        282.375,
+        527.74,
+        319.625
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 18,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "12 V"
+      ],
+      "numeric_tokens": [
+        "12"
+      ],
+      "page": 2,
+      "raw_lines": [
+        "The control circuit runs from a 12 V supply, so disconnect it before servicing the fuel filter. Compare the",
+        "bearing carrier against the reference illustration before refitting. Compare the cover plate against the",
+        "reference illustration before refitting."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "The control circuit runs from a 12 V supply, so disconnect it before servicing the fuel filter. Compare the bearing carrier against the reference illustration before refitting. Compare the cover plate against the reference illustration before refitting.",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        327.625,
+        534.98,
+        350.875
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 19,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "90°"
+      ],
+      "numeric_tokens": [
+        "90"
+      ],
+      "page": 2,
+      "raw_lines": [
+        "Do not operate the unit while the wiring harness is removed. Replace the drive belt if it shows any sign of",
+        "deformation. Rotate the pressure valve through 90° until it seats fully."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Do not operate the unit while the wiring harness is removed. Replace the drive belt if it shows any sign of deformation. Rotate the pressure valve through 90° until it seats fully.",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        358.875,
+        535.54,
+        410.125
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 20,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "2.5 L",
+        "10 A"
+      ],
+      "numeric_tokens": [
+        "10",
+        "2.5"
+      ],
+      "page": 2,
+      "raw_lines": [
+        "Wear protective gloves when handling the pressure valve. Protect the circuit that feeds the drive belt with",
+        "a 10 A fuse. Record any damage to the pressure valve on the service log. Replace the fuel filter if it",
+        "shows any sign of deformation. Refill the system with 2.5 L of the specified fluid after removing the",
+        "pressure valve."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Wear protective gloves when handling the pressure valve. Protect the circuit that feeds the drive belt with a 10 A fuse. Record any damage to the pressure valve on the service log. Replace the fuel filter if it shows any sign of deformation. Refill the system with 2.5 L of the specified fluid after removing the pressure valve.",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        418.125,
+        521.09,
+        455.375
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 21,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "M8",
+        "2.5 L"
+      ],
+      "numeric_tokens": [
+        "8",
+        "2.5"
+      ],
+      "page": 2,
+      "raw_lines": [
+        "Wear protective gloves when handling the mounting bracket. Use only M8 fasteners when refitting the",
+        "idler pulley. Refill the system with 2.5 L of the specified fluid after removing the cover plate. Clean the",
+        "mounting bracket with a lint-free cloth and allow it to dry completely."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Wear protective gloves when handling the mounting bracket. Use only M8 fasteners when refitting the idler pulley. Refill the system with 2.5 L of the specified fluid after removing the cover plate. Clean the mounting bracket with a lint-free cloth and allow it to dry completely.",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        463.375,
+        537.78,
+        500.625
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": false,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 22,
+      "is_header_footer": false,
+      "numeric_specs": [],
+      "numeric_tokens": [],
+      "page": 2,
+      "raw_lines": [
+        "Replace the cover plate if it shows any sign of deformation. Allow the unit to cool before touching the idler",
+        "pulley. Keep the area around the gearbox housing free of oil and debris. Support the pressure valve with",
+        "a stand so that it does not fall during removal. Record any damage to the fuel filter on the service log."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Replace the cover plate if it shows any sign of deformation. Allow the unit to cool before touching the idler pulley. Keep the area around the gearbox housing free of oil and debris. Support the pressure valve with a stand so that it does not fall during removal. Record any damage to the fuel filter on the service log.",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        508.625,
+        507.78,
+        545.875
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 23,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "35 N·m"
+      ],
+      "numeric_tokens": [
+        "35"
+      ],
+      "page": 2,
+      "raw_lines": [
+        "Allow the unit to cool before touching the fuel filter. Tighten the fuel filter bolts to 35 N·m in a cross",
+        "pattern. Support the pressure valve with a stand so that it does not fall during removal. Support the",
+        "control board with a stand so that it does not fall during removal."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Allow the unit to cool before touching the fuel filter. Tighten the fuel filter bolts to 35 N·m in a cross pattern. Support the pressure valve with a stand so that it does not fall during removal. Support the control board with a stand so that it does not fall during removal.",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        553.875,
+        539.96,
+        605.125
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 24,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "12 V"
+      ],
+      "numeric_tokens": [
+        "12"
+      ],
+      "page": 2,
+      "raw_lines": [
+        "Record any damage to the coolant reservoir on the service log. Keep the area around the cover plate free",
+        "of oil and debris. Wear protective gloves when handling the coolant reservoir. The control circuit runs from",
+        "a 12 V supply, so disconnect it before servicing the drive belt. Allow the unit to cool before touching the",
+        "bearing carrier."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Record any damage to the coolant reservoir on the service log. Keep the area around the cover plate free of oil and debris. Wear protective gloves when handling the coolant reservoir. The control circuit runs from a 12 V supply, so disconnect it before servicing the drive belt. Allow the unit to cool before touching the bearing carrier.",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        613.125,
+        535.0,
+        664.375
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 25,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "2.5 L"
+      ],
+      "numeric_tokens": [
+        "2.5"
+      ],
+      "page": 2,
+      "raw_lines": [
+        "Support the bearing carrier with a stand so that it does not fall during removal. Inspect the gearbox",
+        "housing for wear, cracks, and signs of overheating before continuing. Keep the area around the gearbox",
+        "housing free of oil and debris. Record any damage to the cooling fan on the service log. Refill the system",
+        "with 2.5 L of the specified fluid after removing the mounting bracket."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Support the bearing carrier with a stand so that it does not fall during removal. Inspect the gearbox housing for wear, cracks, and signs of overheating before continuing. Keep the area around the gearbox housing free of oil and debris. Record any damage to the cooling fan on the service log. Refill the system with 2.5 L of the specified fluid after removing the mounting bracket.",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        672.375,
+        536.67,
+        709.625
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 26,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "35 N·m",
+        "P/N 4471-A"
+      ],
+      "numeric_tokens": [
+        "4471",
+        "35"
+      ],
+      "page": 2,
+      "raw_lines": [
+        "Record any damage to the coolant reservoir on the service log. Replace the cooling fan with genuine part",
+        "P/N 4471-A if wear is visible. Tighten the coolant reservoir bolts to 35 N·m in a cross pattern. Allow the",
+        "unit to cool before touching the gearbox housing."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Record any damage to the coolant reservoir on the service log. Replace the cooling fan with genuine part P/N 4471-A if wear is visible. Tighten the coolant reservoir bolts to 35 N·m in a cross pattern. Allow the unit to cool before touching the gearbox housing.",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        745.538,
+        100.521,
+        753.863
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": false,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 27,
+      "is_header_footer": true,
+      "numeric_specs": [],
+      "numeric_tokens": [
+        "2"
+      ],
+      "page": 2,
+      "raw_lines": [
+        "Page 2"
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Page 2",
+      "type": "footer"
+    },
+    {
+      "bbox": [
+        72.0,
+        38.538,
+        183.042,
+        46.863
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": false,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 28,
+      "is_header_footer": true,
+      "numeric_specs": [],
+      "numeric_tokens": [
+        "200"
+      ],
+      "page": 3,
+      "raw_lines": [
+        "Acme X200 Service Manual"
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Acme X200 Service Manual",
+      "type": "header"
+    },
+    {
+      "bbox": [
+        72.0,
+        72.0,
+        162.704,
+        86.8
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": false,
+      "heading_level": 1,
+      "hyphenated": false,
+      "index": 29,
+      "is_header_footer": false,
+      "numeric_specs": [],
+      "numeric_tokens": [
+        "3"
+      ],
+      "page": 3,
+      "raw_lines": [
+        "3. Parts List"
+      ],
+      "section_number": "3",
+      "table": null,
+      "text": "3. Parts List",
+      "type": "heading"
+    },
+    {
+      "bbox": [
+        72.0,
+        94.8,
+        527.22,
+        132.05
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 30,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "12 V"
+      ],
+      "numeric_tokens": [
+        "12",
+        "3"
+      ],
+      "page": 3,
+      "raw_lines": [
+        "Compare the wiring harness against the reference illustration before refitting. Keep the area around the",
+        "cover plate free of oil and debris. The control circuit runs from a 12 V supply, so disconnect it before",
+        "servicing the fuel filter. The values for the cooling fan are listed below (see Table 3)."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Compare the wiring harness against the reference illustration before refitting. Keep the area around the cover plate free of oil and debris. The control circuit runs from a 12 V supply, so disconnect it before servicing the fuel filter. The values for the cooling fan are listed below (see Table 3).",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        140.05,
+        198.549,
+        148.375
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": false,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 31,
+      "is_header_footer": false,
+      "numeric_specs": [],
+      "numeric_tokens": [
+        "3"
+      ],
+      "page": 3,
+      "raw_lines": [
+        "Table 3. Replacement parts list."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Table 3. Replacement parts list.",
+      "type": "caption"
+    },
+    {
+      "bbox": [
+        72.0,
+        152.375,
+        472.0,
+        278.375
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 32,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "P/N 4471-A",
+        "10 A"
+      ],
+      "numeric_tokens": [
+        "4471",
+        "1",
+        "210",
+        "4472",
+        "2",
+        "145",
+        "5120",
+        "1",
+        "32",
+        "6008",
+        "6008",
+        "4",
+        "70",
+        "7731",
+        "10",
+        "5",
+        "2",
+        "8802",
+        "1",
+        "540"
+      ],
+      "page": 3,
+      "raw_lines": [
+        "Part number Description Qty Weight (g)",
+        "P/N 4471-A Drive belt 1 210",
+        "P/N 4472-B Idler pulley 2 145",
+        "P/N 5120-C Cover plate gasket 1 32",
+        "P/N 6008-D Bearing 6008 4 70",
+        "P/N 7731-E Fuse 10 A 5 2",
+        "P/N 8802-F Wiring harness 1 540"
+      ],
+      "section_number": null,
+      "table": {
+        "bordered": true,
+        "caption": "Table 3. Replacement parts list.",
+        "cells": [
+          {
+            "col": 0,
+            "col_span": 1,
+            "is_header": true,
+            "row": 0,
+            "row_span": 1,
+            "text": "Part number"
+          },
+          {
+            "col": 1,
+            "col_span": 1,
+            "is_header": true,
+            "row": 0,
+            "row_span": 1,
+            "text": "Description"
+          },
+          {
+            "col": 2,
+            "col_span": 1,
+            "is_header": true,
+            "row": 0,
+            "row_span": 1,
+            "text": "Qty"
+          },
+          {
+            "col": 3,
+            "col_span": 1,
+            "is_header": true,
+            "row": 0,
+            "row_span": 1,
+            "text": "Weight (g)"
+          },
+          {
+            "col": 0,
+            "col_span": 1,
+            "is_header": false,
+            "row": 1,
+            "row_span": 1,
+            "text": "P/N 4471-A"
+          },
+          {
+            "col": 1,
+            "col_span": 1,
+            "is_header": false,
+            "row": 1,
+            "row_span": 1,
+            "text": "Drive belt"
+          },
+          {
+            "col": 2,
+            "col_span": 1,
+            "is_header": false,
+            "row": 1,
+            "row_span": 1,
+            "text": "1"
+          },
+          {
+            "col": 3,
+            "col_span": 1,
+            "is_header": false,
+            "row": 1,
+            "row_span": 1,
+            "text": "210"
+          },
+          {
+            "col": 0,
+            "col_span": 1,
+            "is_header": false,
+            "row": 2,
+            "row_span": 1,
+            "text": "P/N 4472-B"
+          },
+          {
+            "col": 1,
+            "col_span": 1,
+            "is_header": false,
+            "row": 2,
+            "row_span": 1,
+            "text": "Idler pulley"
+          },
+          {
+            "col": 2,
+            "col_span": 1,
+            "is_header": false,
+            "row": 2,
+            "row_span": 1,
+            "text": "2"
+          },
+          {
+            "col": 3,
+            "col_span": 1,
+            "is_header": false,
+            "row": 2,
+            "row_span": 1,
+            "text": "145"
+          },
+          {
+            "col": 0,
+            "col_span": 1,
+            "is_header": false,
+            "row": 3,
+            "row_span": 1,
+            "text": "P/N 5120-C"
+          },
+          {
+            "col": 1,
+            "col_span": 1,
+            "is_header": false,
+            "row": 3,
+            "row_span": 1,
+            "text": "Cover plate gasket"
+          },
+          {
+            "col": 2,
+            "col_span": 1,
+            "is_header": false,
+            "row": 3,
+            "row_span": 1,
+            "text": "1"
+          },
+          {
+            "col": 3,
+            "col_span": 1,
+            "is_header": false,
+            "row": 3,
+            "row_span": 1,
+            "text": "32"
+          },
+          {
+            "col": 0,
+            "col_span": 1,
+            "is_header": false,
+            "row": 4,
+            "row_span": 1,
+            "text": "P/N 6008-D"
+          },
+          {
+            "col": 1,
+            "col_span": 1,
+            "is_header": false,
+            "row": 4,
+            "row_span": 1,
+            "text": "Bearing 6008"
+          },
+          {
+            "col": 2,
+            "col_span": 1,
+            "is_header": false,
+            "row": 4,
+            "row_span": 1,
+            "text": "4"
+          },
+          {
+            "col": 3,
+            "col_span": 1,
+            "is_header": false,
+            "row": 4,
+            "row_span": 1,
+            "text": "70"
+          },
+          {
+            "col": 0,
+            "col_span": 1,
+            "is_header": false,
+            "row": 5,
+            "row_span": 1,
+            "text": "P/N 7731-E"
+          },
+          {
+            "col": 1,
+            "col_span": 1,
+            "is_header": false,
+            "row": 5,
+            "row_span": 1,
+            "text": "Fuse 10 A"
+          },
+          {
+            "col": 2,
+            "col_span": 1,
+            "is_header": false,
+            "row": 5,
+            "row_span": 1,
+            "text": "5"
+          },
+          {
+            "col": 3,
+            "col_span": 1,
+            "is_header": false,
+            "row": 5,
+            "row_span": 1,
+            "text": "2"
+          },
+          {
+            "col": 0,
+            "col_span": 1,
+            "is_header": false,
+            "row": 6,
+            "row_span": 1,
+            "text": "P/N 8802-F"
+          },
+          {
+            "col": 1,
+            "col_span": 1,
+            "is_header": false,
+            "row": 6,
+            "row_span": 1,
+            "text": "Wiring harness"
+          },
+          {
+            "col": 2,
+            "col_span": 1,
+            "is_header": false,
+            "row": 6,
+            "row_span": 1,
+            "text": "1"
+          },
+          {
+            "col": 3,
+            "col_span": 1,
+            "is_header": false,
+            "row": 6,
+            "row_span": 1,
+            "text": "540"
+          }
+        ],
+        "has_merged": false,
+        "n_cols": 4,
+        "n_rows": 7,
+        "ragged": false
+      },
+      "text": "Part number | Description | Qty | Weight (g)\nP/N 4471-A | Drive belt | 1 | 210\nP/N 4472-B | Idler pulley | 2 | 145\nP/N 5120-C | Cover plate gasket | 1 | 32\nP/N 6008-D | Bearing 6008 | 4 | 70\nP/N 7731-E | Fuse 10 A | 5 | 2\nP/N 8802-F | Wiring harness | 1 | 540",
+      "type": "table"
+    },
+    {
+      "bbox": [
+        72.0,
+        286.375,
+        518.3,
+        309.625
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 33,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "M8"
+      ],
+      "numeric_tokens": [
+        "8"
+      ],
+      "page": 3,
+      "raw_lines": [
+        "Wear protective gloves when handling the coolant reservoir. Use only M8 fasteners when refitting the",
+        "mounting bracket. Do not operate the unit while the pressure valve is removed."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Wear protective gloves when handling the coolant reservoir. Use only M8 fasteners when refitting the mounting bracket. Do not operate the unit while the pressure valve is removed.",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        317.625,
+        529.41,
+        354.875
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 34,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "12 V"
+      ],
+      "numeric_tokens": [
+        "12"
+      ],
+      "page": 3,
+      "raw_lines": [
+        "The control circuit runs from a 12 V supply, so disconnect it before servicing the coolant reservoir. Keep",
+        "the area around the pressure valve free of oil and debris. Do not operate the unit while the gearbox",
+        "housing is removed. Support the coolant reservoir with a stand so that it does not fall during removal."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "The control circuit runs from a 12 V supply, so disconnect it before servicing the coolant reservoir. Keep the area around the pressure valve free of oil and debris. Do not operate the unit while the gearbox housing is removed. Support the coolant reservoir with a stand so that it does not fall during removal.",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        362.875,
+        539.98,
+        414.125
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 35,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "12 V",
+        "35 N·m"
+      ],
+      "numeric_tokens": [
+        "12",
+        "35"
+      ],
+      "page": 3,
+      "raw_lines": [
+        "Support the mounting bracket with a stand so that it does not fall during removal. Compare the fuel filter",
+        "against the reference illustration before refitting. The control circuit runs from a 12 V supply, so disconnect",
+        "it before servicing the cover plate. Tighten the pressure valve bolts to 35 N·m in a cross pattern. Support",
+        "the mounting bracket with a stand so that it does not fall during removal."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Support the mounting bracket with a stand so that it does not fall during removal. Compare the fuel filter against the reference illustration before refitting. The control circuit runs from a 12 V supply, so disconnect it before servicing the cover plate. Tighten the pressure valve bolts to 35 N·m in a cross pattern. Support the mounting bracket with a stand so that it does not fall during removal.",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        422.125,
+        528.35,
+        459.375
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": false,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 36,
+      "is_header_footer": false,
+      "numeric_specs": [],
+      "numeric_tokens": [],
+      "page": 3,
+      "raw_lines": [
+        "Inspect the cover plate for wear, cracks, and signs of overheating before continuing. Do not operate the",
+        "unit while the control board is removed. Support the drive belt with a stand so that it does not fall during",
+        "removal. Compare the bearing carrier against the reference illustration before refitting."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Inspect the cover plate for wear, cracks, and signs of overheating before continuing. Do not operate the unit while the control board is removed. Support the drive belt with a stand so that it does not fall during removal. Compare the bearing carrier against the reference illustration before refitting.",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        467.375,
+        536.07,
+        532.625
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 37,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "P/N 4471-A",
+        "M8"
+      ],
+      "numeric_tokens": [
+        "4471",
+        "8"
+      ],
+      "page": 3,
+      "raw_lines": [
+        "Replace the fuel filter with genuine part P/N 4471-A if wear is visible. Clean the idler pulley with a lint-free",
+        "cloth and allow it to dry completely. Support the pressure valve with a stand so that it does not fall during",
+        "removal. Replace the mounting bracket if it shows any sign of deformation. Use only M8 fasteners when",
+        "refitting the wiring harness. Compare the gearbox housing against the reference illustration before",
+        "refitting."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Replace the fuel filter with genuine part P/N 4471-A if wear is visible. Clean the idler pulley with a lint-free cloth and allow it to dry completely. Support the pressure valve with a stand so that it does not fall during removal. Replace the mounting bracket if it shows any sign of deformation. Use only M8 fasteners when refitting the wiring harness. Compare the gearbox housing against the reference illustration before refitting.",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        540.625,
+        523.32,
+        591.875
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": false,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 38,
+      "is_header_footer": false,
+      "numeric_specs": [],
+      "numeric_tokens": [],
+      "page": 3,
+      "raw_lines": [
+        "Record any damage to the idler pulley on the service log. Inspect the cover plate for wear, cracks, and",
+        "signs of overheating before continuing. Do not operate the unit while the coolant reservoir is removed.",
+        "Replace the mounting bracket if it shows any sign of deformation. Replace the mounting bracket if it",
+        "shows any sign of deformation. Keep the area around the pressure valve free of oil and debris."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Record any damage to the idler pulley on the service log. Inspect the cover plate for wear, cracks, and signs of overheating before continuing. Do not operate the unit while the coolant reservoir is removed. Replace the mounting bracket if it shows any sign of deformation. Replace the mounting bracket if it shows any sign of deformation. Keep the area around the pressure valve free of oil and debris.",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        599.875,
+        538.33,
+        637.125
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 39,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "12 V"
+      ],
+      "numeric_tokens": [
+        "12"
+      ],
+      "page": 3,
+      "raw_lines": [
+        "The control circuit runs from a 12 V supply, so disconnect it before servicing the wiring harness. Wear",
+        "protective gloves when handling the fuel filter. Inspect the mounting bracket for wear, cracks, and signs of",
+        "overheating before continuing. Allow the unit to cool before touching the drive belt."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "The control circuit runs from a 12 V supply, so disconnect it before servicing the wiring harness. Wear protective gloves when handling the fuel filter. Inspect the mounting bracket for wear, cracks, and signs of overheating before continuing. Allow the unit to cool before touching the drive belt.",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        645.125,
+        511.09,
+        668.375
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 40,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "10 A",
+        "P/N 4471-A"
+      ],
+      "numeric_tokens": [
+        "4471",
+        "10"
+      ],
+      "page": 3,
+      "raw_lines": [
+        "Replace the cooling fan with genuine part P/N 4471-A if wear is visible. Allow the unit to cool before",
+        "touching the gearbox housing. Protect the circuit that feeds the fuel filter with a 10 A fuse."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Replace the cooling fan with genuine part P/N 4471-A if wear is visible. Allow the unit to cool before touching the gearbox housing. Protect the circuit that feeds the fuel filter with a 10 A fuse.",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        676.375,
+        519.98,
+        699.625
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 41,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "10 A"
+      ],
+      "numeric_tokens": [
+        "10"
+      ],
+      "page": 3,
+      "raw_lines": [
+        "Replace the pressure valve if it shows any sign of deformation. Protect the circuit that feeds the cover",
+        "plate with a 10 A fuse. Wear protective gloves when handling the coolant reservoir."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Replace the pressure valve if it shows any sign of deformation. Protect the circuit that feeds the cover plate with a 10 A fuse. Wear protective gloves when handling the coolant reservoir.",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        745.538,
+        100.521,
+        753.863
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": false,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 42,
+      "is_header_footer": true,
+      "numeric_specs": [],
+      "numeric_tokens": [
+        "3"
+      ],
+      "page": 3,
+      "raw_lines": [
+        "Page 3"
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Page 3",
+      "type": "footer"
+    },
+    {
+      "bbox": [
+        72.0,
+        38.538,
+        183.042,
+        46.863
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": false,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 43,
+      "is_header_footer": true,
+      "numeric_specs": [],
+      "numeric_tokens": [
+        "200"
+      ],
+      "page": 4,
+      "raw_lines": [
+        "Acme X200 Service Manual"
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Acme X200 Service Manual",
+      "type": "header"
+    },
+    {
+      "bbox": [
+        72.0,
+        72.0,
+        216.976,
+        86.8
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": false,
+      "heading_level": 1,
+      "hyphenated": false,
+      "index": 44,
+      "is_header_footer": false,
+      "numeric_specs": [],
+      "numeric_tokens": [
+        "4"
+      ],
+      "page": 4,
+      "raw_lines": [
+        "4. Service Intervals"
+      ],
+      "section_number": "4",
+      "table": null,
+      "text": "4. Service Intervals",
+      "type": "heading"
+    },
+    {
+      "bbox": [
+        72.0,
+        94.8,
+        532.78,
+        146.05
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 45,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "P/N 4471-A"
+      ],
+      "numeric_tokens": [
+        "4471",
+        "4"
+      ],
+      "page": 4,
+      "raw_lines": [
+        "Do not operate the unit while the cooling fan is removed. Record any damage to the fuel filter on the",
+        "service log. Replace the gearbox housing with genuine part P/N 4471-A if wear is visible. Support the",
+        "gearbox housing with a stand so that it does not fall during removal. Clean the cooling fan with a lint-free",
+        "cloth and allow it to dry completely. The values for the wiring harness are listed below (see Table 4)."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Do not operate the unit while the cooling fan is removed. Record any damage to the fuel filter on the service log. Replace the gearbox housing with genuine part P/N 4471-A if wear is visible. Support the gearbox housing with a stand so that it does not fall during removal. Clean the cooling fan with a lint-free cloth and allow it to dry completely. The values for the wiring harness are listed below (see Table 4).",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        154.05,
+        175.536,
+        162.375
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": false,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 46,
+      "is_header_footer": false,
+      "numeric_specs": [],
+      "numeric_tokens": [
+        "4"
+      ],
+      "page": 4,
+      "raw_lines": [
+        "Table 4. Service intervals."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Table 4. Service intervals.",
+      "type": "caption"
+    },
+    {
+      "bbox": [
+        72.0,
+        166.375,
+        442.0,
+        292.375
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 47,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "P/N 4471-A",
+        "2.5 L",
+        "10 A"
+      ],
+      "numeric_tokens": [
+        "250",
+        "3",
+        "1000",
+        "12",
+        "4471",
+        "500",
+        "6",
+        "2.5",
+        "250",
+        "3",
+        "10",
+        "2000",
+        "24"
+      ],
+      "page": 4,
+      "raw_lines": [
+        "Task Interval Notes",
+        "Hours Months",
+        "Belt inspection 250 3 Visual",
+        "Belt replacement 1000 12 P/N 4471-A",
+        "Coolant change 500 6 2.5 L",
+        "Fuse check 250 3 10 A rating",
+        "Full service 2000 24 All items"
+      ],
+      "section_number": null,
+      "table": {
+        "bordered": true,
+        "caption": "Table 4. Service intervals.",
+        "cells": [
+          {
+            "col": 0,
+            "col_span": 1,
+            "is_header": true,
+            "row": 0,
+            "row_span": 2,
+            "text": "Task"
+          },
+          {
+            "col": 1,
+            "col_span": 2,
+            "is_header": true,
+            "row": 0,
+            "row_span": 1,
+            "text": "Interval"
+          },
+          {
+            "col": 3,
+            "col_span": 1,
+            "is_header": true,
+            "row": 0,
+            "row_span": 2,
+            "text": "Notes"
+          },
+          {
+            "col": 1,
+            "col_span": 1,
+            "is_header": true,
+            "row": 1,
+            "row_span": 1,
+            "text": "Hours"
+          },
+          {
+            "col": 2,
+            "col_span": 1,
+            "is_header": true,
+            "row": 1,
+            "row_span": 1,
+            "text": "Months"
+          },
+          {
+            "col": 0,
+            "col_span": 1,
+            "is_header": false,
+            "row": 2,
+            "row_span": 1,
+            "text": "Belt inspection"
+          },
+          {
+            "col": 1,
+            "col_span": 1,
+            "is_header": false,
+            "row": 2,
+            "row_span": 1,
+            "text": "250"
+          },
+          {
+            "col": 2,
+            "col_span": 1,
+            "is_header": false,
+            "row": 2,
+            "row_span": 1,
+            "text": "3"
+          },
+          {
+            "col": 3,
+            "col_span": 1,
+            "is_header": false,
+            "row": 2,
+            "row_span": 1,
+            "text": "Visual"
+          },
+          {
+            "col": 0,
+            "col_span": 1,
+            "is_header": false,
+            "row": 3,
+            "row_span": 1,
+            "text": "Belt replacement"
+          },
+          {
+            "col": 1,
+            "col_span": 1,
+            "is_header": false,
+            "row": 3,
+            "row_span": 1,
+            "text": "1000"
+          },
+          {
+            "col": 2,
+            "col_span": 1,
+            "is_header": false,
+            "row": 3,
+            "row_span": 1,
+            "text": "12"
+          },
+          {
+            "col": 3,
+            "col_span": 1,
+            "is_header": false,
+            "row": 3,
+            "row_span": 1,
+            "text": "P/N 4471-A"
+          },
+          {
+            "col": 0,
+            "col_span": 1,
+            "is_header": false,
+            "row": 4,
+            "row_span": 1,
+            "text": "Coolant change"
+          },
+          {
+            "col": 1,
+            "col_span": 1,
+            "is_header": false,
+            "row": 4,
+            "row_span": 1,
+            "text": "500"
+          },
+          {
+            "col": 2,
+            "col_span": 1,
+            "is_header": false,
+            "row": 4,
+            "row_span": 1,
+            "text": "6"
+          },
+          {
+            "col": 3,
+            "col_span": 1,
+            "is_header": false,
+            "row": 4,
+            "row_span": 1,
+            "text": "2.5 L"
+          },
+          {
+            "col": 0,
+            "col_span": 1,
+            "is_header": false,
+            "row": 5,
+            "row_span": 1,
+            "text": "Fuse check"
+          },
+          {
+            "col": 1,
+            "col_span": 1,
+            "is_header": false,
+            "row": 5,
+            "row_span": 1,
+            "text": "250"
+          },
+          {
+            "col": 2,
+            "col_span": 1,
+            "is_header": false,
+            "row": 5,
+            "row_span": 1,
+            "text": "3"
+          },
+          {
+            "col": 3,
+            "col_span": 1,
+            "is_header": false,
+            "row": 5,
+            "row_span": 1,
+            "text": "10 A rating"
+          },
+          {
+            "col": 0,
+            "col_span": 1,
+            "is_header": false,
+            "row": 6,
+            "row_span": 1,
+            "text": "Full service"
+          },
+          {
+            "col": 1,
+            "col_span": 1,
+            "is_header": false,
+            "row": 6,
+            "row_span": 1,
+            "text": "2000"
+          },
+          {
+            "col": 2,
+            "col_span": 1,
+            "is_header": false,
+            "row": 6,
+            "row_span": 1,
+            "text": "24"
+          },
+          {
+            "col": 3,
+            "col_span": 1,
+            "is_header": false,
+            "row": 6,
+            "row_span": 1,
+            "text": "All items"
+          }
+        ],
+        "has_merged": true,
+        "n_cols": 4,
+        "n_rows": 7,
+        "ragged": false
+      },
+      "text": "Task | Interval | Notes\nHours | Months\nBelt inspection | 250 | 3 | Visual\nBelt replacement | 1000 | 12 | P/N 4471-A\nCoolant change | 500 | 6 | 2.5 L\nFuse check | 250 | 3 | 10 A rating\nFull service | 2000 | 24 | All items",
+      "type": "table"
+    },
+    {
+      "bbox": [
+        72.0,
+        300.375,
+        534.44,
+        337.625
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 48,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "12 V"
+      ],
+      "numeric_tokens": [
+        "12"
+      ],
+      "page": 4,
+      "raw_lines": [
+        "Replace the pressure valve if it shows any sign of deformation. Support the control board with a stand so",
+        "that it does not fall during removal. The control circuit runs from a 12 V supply, so disconnect it before",
+        "servicing the idler pulley."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Replace the pressure valve if it shows any sign of deformation. Support the control board with a stand so that it does not fall during removal. The control circuit runs from a 12 V supply, so disconnect it before servicing the idler pulley.",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        345.625,
+        522.23,
+        382.875
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 49,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "10 A"
+      ],
+      "numeric_tokens": [
+        "10"
+      ],
+      "page": 4,
+      "raw_lines": [
+        "Compare the drive belt against the reference illustration before refitting. Replace the cooling fan if it",
+        "shows any sign of deformation. Protect the circuit that feeds the fuel filter with a 10 A fuse. Inspect the",
+        "control board for wear, cracks, and signs of overheating before continuing."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Compare the drive belt against the reference illustration before refitting. Replace the cooling fan if it shows any sign of deformation. Protect the circuit that feeds the fuel filter with a 10 A fuse. Inspect the control board for wear, cracks, and signs of overheating before continuing.",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        390.875,
+        538.29,
+        456.125
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 50,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "12 V"
+      ],
+      "numeric_tokens": [
+        "12"
+      ],
+      "page": 4,
+      "raw_lines": [
+        "Inspect the gearbox housing for wear, cracks, and signs of overheating before continuing. Compare the",
+        "drive belt against the reference illustration before refitting. Clean the drive belt with a lint-free cloth and",
+        "allow it to dry completely. The control circuit runs from a 12 V supply, so disconnect it before servicing the",
+        "idler pulley. Record any damage to the cover plate on the service log. Inspect the control board for wear,",
+        "cracks, and signs of overheating before continuing."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Inspect the gearbox housing for wear, cracks, and signs of overheating before continuing. Compare the drive belt against the reference illustration before refitting. Clean the drive belt with a lint-free cloth and allow it to dry completely. The control circuit runs from a 12 V supply, so disconnect it before servicing the idler pulley. Record any damage to the cover plate on the service log. Inspect the control board for wear, cracks, and signs of overheating before continuing.",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        464.125,
+        538.99,
+        515.375
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 51,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "12 V",
+        "90°"
+      ],
+      "numeric_tokens": [
+        "90",
+        "12"
+      ],
+      "page": 4,
+      "raw_lines": [
+        "Support the mounting bracket with a stand so that it does not fall during removal. Replace the cover plate",
+        "if it shows any sign of deformation. Replace the drive belt if it shows any sign of deformation. Replace the",
+        "pressure valve if it shows any sign of deformation. Rotate the drive belt through 90° until it seats fully. The",
+        "control circuit runs from a 12 V supply, so disconnect it before servicing the cover plate."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Support the mounting bracket with a stand so that it does not fall during removal. Replace the cover plate if it shows any sign of deformation. Replace the drive belt if it shows any sign of deformation. Replace the pressure valve if it shows any sign of deformation. Rotate the drive belt through 90° until it seats fully. The control circuit runs from a 12 V supply, so disconnect it before servicing the cover plate.",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        523.375,
+        526.1,
+        560.625
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 52,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "M8"
+      ],
+      "numeric_tokens": [
+        "8"
+      ],
+      "page": 4,
+      "raw_lines": [
+        "Compare the cooling fan against the reference illustration before refitting. Use only M8 fasteners when",
+        "refitting the gearbox housing. Compare the idler pulley against the reference illustration before refitting.",
+        "Support the drive belt with a stand so that it does not fall during removal."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Compare the cooling fan against the reference illustration before refitting. Use only M8 fasteners when refitting the gearbox housing. Compare the idler pulley against the reference illustration before refitting. Support the drive belt with a stand so that it does not fall during removal.",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        568.625,
+        516.4,
+        591.875
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 53,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "0.25 mm ±0.05"
+      ],
+      "numeric_tokens": [
+        "0.25",
+        "0.05"
+      ],
+      "page": 4,
+      "raw_lines": [
+        "Set the clearance at the bearing carrier to 0.25 mm ±0.05 using a feeler gauge. Allow the unit to cool",
+        "before touching the idler pulley. Do not operate the unit while the wiring harness is removed."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Set the clearance at the bearing carrier to 0.25 mm ±0.05 using a feeler gauge. Allow the unit to cool before touching the idler pulley. Do not operate the unit while the wiring harness is removed.",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        599.875,
+        536.67,
+        637.125
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 54,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "2.5 L"
+      ],
+      "numeric_tokens": [
+        "2.5"
+      ],
+      "page": 4,
+      "raw_lines": [
+        "Support the cover plate with a stand so that it does not fall during removal. Compare the fuel filter against",
+        "the reference illustration before refitting. Refill the system with 2.5 L of the specified fluid after removing",
+        "the cover plate."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Support the cover plate with a stand so that it does not fall during removal. Compare the fuel filter against the reference illustration before refitting. Refill the system with 2.5 L of the specified fluid after removing the cover plate.",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        645.125,
+        535.55,
+        696.375
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 55,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "10 A"
+      ],
+      "numeric_tokens": [
+        "10"
+      ],
+      "page": 4,
+      "raw_lines": [
+        "Do not operate the unit while the wiring harness is removed. Replace the drive belt if it shows any sign of",
+        "deformation. Replace the cooling fan if it shows any sign of deformation. Clean the control board with a",
+        "lint-free cloth and allow it to dry completely. Protect the circuit that feeds the gearbox housing with a 10 A",
+        "fuse."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Do not operate the unit while the wiring harness is removed. Replace the drive belt if it shows any sign of deformation. Replace the cooling fan if it shows any sign of deformation. Clean the control board with a lint-free cloth and allow it to dry completely. Protect the circuit that feeds the gearbox housing with a 10 A fuse.",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        745.538,
+        100.521,
+        753.863
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": false,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 56,
+      "is_header_footer": true,
+      "numeric_specs": [],
+      "numeric_tokens": [
+        "4"
+      ],
+      "page": 4,
+      "raw_lines": [
+        "Page 4"
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Page 4",
+      "type": "footer"
+    },
+    {
+      "bbox": [
+        72.0,
+        38.538,
+        183.042,
+        46.863
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": false,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 57,
+      "is_header_footer": true,
+      "numeric_specs": [],
+      "numeric_tokens": [
+        "200"
+      ],
+      "page": 5,
+      "raw_lines": [
+        "Acme X200 Service Manual"
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Acme X200 Service Manual",
+      "type": "header"
+    },
+    {
+      "bbox": [
+        72.0,
+        72.0,
+        208.912,
+        86.8
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": false,
+      "heading_level": 1,
+      "hyphenated": false,
+      "index": 58,
+      "is_header_footer": false,
+      "numeric_specs": [],
+      "numeric_tokens": [
+        "5"
+      ],
+      "page": 5,
+      "raw_lines": [
+        "5. Connector Data"
+      ],
+      "section_number": "5",
+      "table": null,
+      "text": "5. Connector Data",
+      "type": "heading"
+    },
+    {
+      "bbox": [
+        72.0,
+        94.8,
+        539.19,
+        132.05
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 59,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "0.25 mm ±0.05"
+      ],
+      "numeric_tokens": [
+        "0.25",
+        "0.05",
+        "5"
+      ],
+      "page": 5,
+      "raw_lines": [
+        "Set the clearance at the cooling fan to 0.25 mm ±0.05 using a feeler gauge. Clean the bearing carrier with",
+        "a lint-free cloth and allow it to dry completely. Record any damage to the cover plate on the service log.",
+        "The values for the idler pulley are listed below (see Table 5)."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Set the clearance at the cooling fan to 0.25 mm ±0.05 using a feeler gauge. Clean the bearing carrier with a lint-free cloth and allow it to dry completely. Record any damage to the cover plate on the service log. The values for the idler pulley are listed below (see Table 5).",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        140.05,
+        218.565,
+        148.375
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": false,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 60,
+      "is_header_footer": false,
+      "numeric_specs": [],
+      "numeric_tokens": [
+        "5"
+      ],
+      "page": 5,
+      "raw_lines": [
+        "Table 5. Connector pin assignments."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Table 5. Connector pin assignments.",
+      "type": "caption"
+    },
+    {
+      "bbox": [
+        72.0,
+        152.375,
+        452.0,
+        278.375
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 61,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "12 V",
+        "10 A"
+      ],
+      "numeric_tokens": [
+        "1",
+        "1",
+        "12",
+        "10",
+        "2",
+        "2",
+        "1",
+        "2.5",
+        "3",
+        "1",
+        "4",
+        "1",
+        "5",
+        "0.8",
+        "5",
+        "1"
+      ],
+      "page": 5,
+      "raw_lines": [
+        "Connector Pin Signal Rating",
+        "J1 1 12 V supply 10 A",
+        "2 Ground",
+        "J2 1 Fan control 2.5 A",
+        "J3 1",
+        "J4 1 Sensor 5 V 0.8 A",
+        "J5 1"
+      ],
+      "section_number": null,
+      "table": {
+        "bordered": true,
+        "caption": "Table 5. Connector pin assignments.",
+        "cells": [
+          {
+            "col": 0,
+            "col_span": 1,
+            "is_header": true,
+            "row": 0,
+            "row_span": 1,
+            "text": "Connector"
+          },
+          {
+            "col": 1,
+            "col_span": 1,
+            "is_header": true,
+            "row": 0,
+            "row_span": 1,
+            "text": "Pin"
+          },
+          {
+            "col": 2,
+            "col_span": 1,
+            "is_header": true,
+            "row": 0,
+            "row_span": 1,
+            "text": "Signal"
+          },
+          {
+            "col": 3,
+            "col_span": 1,
+            "is_header": true,
+            "row": 0,
+            "row_span": 1,
+            "text": "Rating"
+          },
+          {
+            "col": 0,
+            "col_span": 1,
+            "is_header": false,
+            "row": 1,
+            "row_span": 2,
+            "text": "J1"
+          },
+          {
+            "col": 1,
+            "col_span": 1,
+            "is_header": false,
+            "row": 1,
+            "row_span": 1,
+            "text": "1"
+          },
+          {
+            "col": 2,
+            "col_span": 1,
+            "is_header": false,
+            "row": 1,
+            "row_span": 1,
+            "text": "12 V supply"
+          },
+          {
+            "col": 3,
+            "col_span": 1,
+            "is_header": false,
+            "row": 1,
+            "row_span": 1,
+            "text": "10 A"
+          },
+          {
+            "col": 1,
+            "col_span": 1,
+            "is_header": false,
+            "row": 2,
+            "row_span": 1,
+            "text": "2"
+          },
+          {
+            "col": 2,
+            "col_span": 1,
+            "is_header": false,
+            "row": 2,
+            "row_span": 1,
+            "text": "Ground"
+          },
+          {
+            "col": 3,
+            "col_span": 1,
+            "is_header": false,
+            "row": 2,
+            "row_span": 1,
+            "text": ""
+          },
+          {
+            "col": 0,
+            "col_span": 1,
+            "is_header": false,
+            "row": 3,
+            "row_span": 1,
+            "text": "J2"
+          },
+          {
+            "col": 1,
+            "col_span": 1,
+            "is_header": false,
+            "row": 3,
+            "row_span": 1,
+            "text": "1"
+          },
+          {
+            "col": 2,
+            "col_span": 1,
+            "is_header": false,
+            "row": 3,
+            "row_span": 1,
+            "text": "Fan control"
+          },
+          {
+            "col": 3,
+            "col_span": 1,
+            "is_header": false,
+            "row": 3,
+            "row_span": 1,
+            "text": "2.5 A"
+          },
+          {
+            "col": 0,
+            "col_span": 1,
+            "is_header": false,
+            "row": 4,
+            "row_span": 1,
+            "text": "J3"
+          },
+          {
+            "col": 1,
+            "col_span": 1,
+            "is_header": false,
+            "row": 4,
+            "row_span": 1,
+            "text": "1"
+          },
+          {
+            "col": 2,
+            "col_span": 1,
+            "is_header": false,
+            "row": 4,
+            "row_span": 1,
+            "text": ""
+          },
+          {
+            "col": 3,
+            "col_span": 1,
+            "is_header": false,
+            "row": 4,
+            "row_span": 1,
+            "text": ""
+          },
+          {
+            "col": 0,
+            "col_span": 1,
+            "is_header": false,
+            "row": 5,
+            "row_span": 1,
+            "text": "J4"
+          },
+          {
+            "col": 1,
+            "col_span": 1,
+            "is_header": false,
+            "row": 5,
+            "row_span": 1,
+            "text": "1"
+          },
+          {
+            "col": 2,
+            "col_span": 1,
+            "is_header": false,
+            "row": 5,
+            "row_span": 1,
+            "text": "Sensor 5 V"
+          },
+          {
+            "col": 3,
+            "col_span": 1,
+            "is_header": false,
+            "row": 5,
+            "row_span": 1,
+            "text": "0.8 A"
+          },
+          {
+            "col": 0,
+            "col_span": 1,
+            "is_header": false,
+            "row": 6,
+            "row_span": 1,
+            "text": "J5"
+          },
+          {
+            "col": 1,
+            "col_span": 1,
+            "is_header": false,
+            "row": 6,
+            "row_span": 1,
+            "text": "1"
+          },
+          {
+            "col": 2,
+            "col_span": 1,
+            "is_header": false,
+            "row": 6,
+            "row_span": 1,
+            "text": ""
+          },
+          {
+            "col": 3,
+            "col_span": 1,
+            "is_header": false,
+            "row": 6,
+            "row_span": 1,
+            "text": ""
+          }
+        ],
+        "has_merged": true,
+        "n_cols": 4,
+        "n_rows": 7,
+        "ragged": true
+      },
+      "text": "Connector | Pin | Signal | Rating\nJ1 | 1 | 12 V supply | 10 A\n2 | Ground\nJ2 | 1 | Fan control | 2.5 A\nJ3 | 1\nJ4 | 1 | Sensor 5 V | 0.8 A\nJ5 | 1",
+      "type": "table"
+    },
+    {
+      "bbox": [
+        72.0,
+        286.375,
+        539.41,
+        323.625
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 62,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "2.5 L"
+      ],
+      "numeric_tokens": [
+        "2.5"
+      ],
+      "page": 5,
+      "raw_lines": [
+        "Refill the system with 2.5 L of the specified fluid after removing the drive belt. Compare the bearing carrier",
+        "against the reference illustration before refitting. Inspect the cover plate for wear, cracks, and signs of",
+        "overheating before continuing."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Refill the system with 2.5 L of the specified fluid after removing the drive belt. Compare the bearing carrier against the reference illustration before refitting. Inspect the cover plate for wear, cracks, and signs of overheating before continuing.",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        331.625,
+        529.96,
+        382.875
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 63,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "M8"
+      ],
+      "numeric_tokens": [
+        "8"
+      ],
+      "page": 5,
+      "raw_lines": [
+        "Wear protective gloves when handling the fuel filter. Do not operate the unit while the idler pulley is",
+        "removed. Replace the cover plate if it shows any sign of deformation. Allow the unit to cool before",
+        "touching the coolant reservoir. Use only M8 fasteners when refitting the bearing carrier. Wear protective",
+        "gloves when handling the bearing carrier."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Wear protective gloves when handling the fuel filter. Do not operate the unit while the idler pulley is removed. Replace the cover plate if it shows any sign of deformation. Allow the unit to cool before touching the coolant reservoir. Use only M8 fasteners when refitting the bearing carrier. Wear protective gloves when handling the bearing carrier.",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        390.875,
+        537.79,
+        414.125
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": false,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 64,
+      "is_header_footer": false,
+      "numeric_specs": [],
+      "numeric_tokens": [],
+      "page": 5,
+      "raw_lines": [
+        "Allow the unit to cool before touching the bearing carrier. Allow the unit to cool before touching the control",
+        "board. Allow the unit to cool before touching the fuel filter."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Allow the unit to cool before touching the bearing carrier. Allow the unit to cool before touching the control board. Allow the unit to cool before touching the fuel filter.",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        422.125,
+        532.21,
+        473.375
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 65,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "10 A",
+        "2.5 L"
+      ],
+      "numeric_tokens": [
+        "10",
+        "2.5"
+      ],
+      "page": 5,
+      "raw_lines": [
+        "Record any damage to the gearbox housing on the service log. Support the idler pulley with a stand so",
+        "that it does not fall during removal. Wear protective gloves when handling the pressure valve. Clean the",
+        "idler pulley with a lint-free cloth and allow it to dry completely. Protect the circuit that feeds the pressure",
+        "valve with a 10 A fuse. Refill the system with 2.5 L of the specified fluid after removing the control board."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Record any damage to the gearbox housing on the service log. Support the idler pulley with a stand so that it does not fall during removal. Wear protective gloves when handling the pressure valve. Clean the idler pulley with a lint-free cloth and allow it to dry completely. Protect the circuit that feeds the pressure valve with a 10 A fuse. Refill the system with 2.5 L of the specified fluid after removing the control board.",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        481.375,
+        532.76,
+        504.625
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": false,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 66,
+      "is_header_footer": false,
+      "numeric_specs": [],
+      "numeric_tokens": [],
+      "page": 5,
+      "raw_lines": [
+        "Replace the mounting bracket if it shows any sign of deformation. Wear protective gloves when handling",
+        "the wiring harness. Inspect the cover plate for wear, cracks, and signs of overheating before continuing."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Replace the mounting bracket if it shows any sign of deformation. Wear protective gloves when handling the wiring harness. Inspect the cover plate for wear, cracks, and signs of overheating before continuing.",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        512.625,
+        533.9,
+        563.875
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 67,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "0.25 mm ±0.05"
+      ],
+      "numeric_tokens": [
+        "0.25",
+        "0.05"
+      ],
+      "page": 5,
+      "raw_lines": [
+        "Do not operate the unit while the gearbox housing is removed. Set the clearance at the bearing carrier to",
+        "0.25 mm ±0.05 using a feeler gauge. Inspect the cover plate for wear, cracks, and signs of overheating",
+        "before continuing. Wear protective gloves when handling the cooling fan. Support the coolant reservoir",
+        "with a stand so that it does not fall during removal."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Do not operate the unit while the gearbox housing is removed. Set the clearance at the bearing carrier to 0.25 mm ±0.05 using a feeler gauge. Inspect the cover plate for wear, cracks, and signs of overheating before continuing. Wear protective gloves when handling the cooling fan. Support the coolant reservoir with a stand so that it does not fall during removal.",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        571.875,
+        536.09,
+        609.125
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 68,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "P/N 4471-A",
+        "35 N·m"
+      ],
+      "numeric_tokens": [
+        "4471",
+        "35"
+      ],
+      "page": 5,
+      "raw_lines": [
+        "Compare the control board against the reference illustration before refitting. Wear protective gloves when",
+        "handling the bearing carrier. Replace the bearing carrier with genuine part P/N 4471-A if wear is visible.",
+        "Tighten the drive belt bolts to 35 N·m in a cross pattern."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Compare the control board against the reference illustration before refitting. Wear protective gloves when handling the bearing carrier. Replace the bearing carrier with genuine part P/N 4471-A if wear is visible. Tighten the drive belt bolts to 35 N·m in a cross pattern.",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        617.125,
+        539.44,
+        654.375
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": false,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 69,
+      "is_header_footer": false,
+      "numeric_specs": [],
+      "numeric_tokens": [],
+      "page": 5,
+      "raw_lines": [
+        "Record any damage to the drive belt on the service log. Replace the mounting bracket if it shows any sign",
+        "of deformation. Clean the gearbox housing with a lint-free cloth and allow it to dry completely. Record any",
+        "damage to the mounting bracket on the service log."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Record any damage to the drive belt on the service log. Replace the mounting bracket if it shows any sign of deformation. Clean the gearbox housing with a lint-free cloth and allow it to dry completely. Record any damage to the mounting bracket on the service log.",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        662.375,
+        523.31,
+        699.625
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 70,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "P/N 4471-A"
+      ],
+      "numeric_tokens": [
+        "4471"
+      ],
+      "page": 5,
+      "raw_lines": [
+        "Record any damage to the bearing carrier on the service log. Replace the mounting bracket if it shows",
+        "any sign of deformation. Replace the gearbox housing with genuine part P/N 4471-A if wear is visible.",
+        "Compare the fuel filter against the reference illustration before refitting."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Record any damage to the bearing carrier on the service log. Replace the mounting bracket if it shows any sign of deformation. Replace the gearbox housing with genuine part P/N 4471-A if wear is visible. Compare the fuel filter against the reference illustration before refitting.",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        745.538,
+        100.521,
+        753.863
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": false,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 71,
+      "is_header_footer": true,
+      "numeric_specs": [],
+      "numeric_tokens": [
+        "5"
+      ],
+      "page": 5,
+      "raw_lines": [
+        "Page 5"
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Page 5",
+      "type": "footer"
+    },
+    {
+      "bbox": [
+        72.0,
+        38.538,
+        183.042,
+        46.863
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": false,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 72,
+      "is_header_footer": true,
+      "numeric_specs": [],
+      "numeric_tokens": [
+        "200"
+      ],
+      "page": 6,
+      "raw_lines": [
+        "Acme X200 Service Manual"
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Acme X200 Service Manual",
+      "type": "header"
+    },
+    {
+      "bbox": [
+        72.0,
+        72.0,
+        167.136,
+        86.8
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": false,
+      "heading_level": 1,
+      "hyphenated": false,
+      "index": 73,
+      "is_header_footer": false,
+      "numeric_specs": [],
+      "numeric_tokens": [
+        "6"
+      ],
+      "page": 6,
+      "raw_lines": [
+        "6. Fluid Data"
+      ],
+      "section_number": "6",
+      "table": null,
+      "text": "6. Fluid Data",
+      "type": "heading"
+    },
+    {
+      "bbox": [
+        72.0,
+        94.8,
+        532.92,
+        146.05
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 74,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "90°"
+      ],
+      "numeric_tokens": [
+        "90",
+        "6"
+      ],
+      "page": 6,
+      "raw_lines": [
+        "Keep the area around the cover plate free of oil and debris. Rotate the fuel filter through 90° until it seats",
+        "fully. Inspect the control board for wear, cracks, and signs of overheating before continuing. Wear",
+        "protective gloves when handling the gearbox housing. The values for the drive belt are listed below (see",
+        "Table 6)."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Keep the area around the cover plate free of oil and debris. Rotate the fuel filter through 90° until it seats fully. Inspect the control board for wear, cracks, and signs of overheating before continuing. Wear protective gloves when handling the gearbox housing. The values for the drive belt are listed below (see Table 6).",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        154.05,
+        171.54,
+        162.375
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": false,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 75,
+      "is_header_footer": false,
+      "numeric_specs": [],
+      "numeric_tokens": [
+        "6"
+      ],
+      "page": 6,
+      "raw_lines": [
+        "Table 6. Fluid capacities."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Table 6. Fluid capacities.",
+      "type": "caption"
+    },
+    {
+      "bbox": [
+        72.0,
+        166.375,
+        482.0,
+        274.375
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 76,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "2.5 L"
+      ],
+      "numeric_tokens": [
+        "2.5",
+        "6",
+        "1.2",
+        "12",
+        "0.8",
+        "24",
+        "18",
+        "1.5"
+      ],
+      "page": 6,
+      "raw_lines": [
+        "System Capacity Fluid Change interval",
+        "Coolant 2.5 L Type C 6 months",
+        "Gearbox 1.2 L Type G 12 months",
+        "Hydraulic 0.8 L Type H 24 months",
+        "Fuel tank 18 L Diesel n/a",
+        "Washer 1.5 L Water mix as needed"
+      ],
+      "section_number": null,
+      "table": {
+        "bordered": false,
+        "caption": "Table 6. Fluid capacities.",
+        "cells": [
+          {
+            "col": 0,
+            "col_span": 1,
+            "is_header": true,
+            "row": 0,
+            "row_span": 1,
+            "text": "System"
+          },
+          {
+            "col": 1,
+            "col_span": 1,
+            "is_header": true,
+            "row": 0,
+            "row_span": 1,
+            "text": "Capacity"
+          },
+          {
+            "col": 2,
+            "col_span": 1,
+            "is_header": true,
+            "row": 0,
+            "row_span": 1,
+            "text": "Fluid"
+          },
+          {
+            "col": 3,
+            "col_span": 1,
+            "is_header": true,
+            "row": 0,
+            "row_span": 1,
+            "text": "Change interval"
+          },
+          {
+            "col": 0,
+            "col_span": 1,
+            "is_header": false,
+            "row": 1,
+            "row_span": 1,
+            "text": "Coolant"
+          },
+          {
+            "col": 1,
+            "col_span": 1,
+            "is_header": false,
+            "row": 1,
+            "row_span": 1,
+            "text": "2.5 L"
+          },
+          {
+            "col": 2,
+            "col_span": 1,
+            "is_header": false,
+            "row": 1,
+            "row_span": 1,
+            "text": "Type C"
+          },
+          {
+            "col": 3,
+            "col_span": 1,
+            "is_header": false,
+            "row": 1,
+            "row_span": 1,
+            "text": "6 months"
+          },
+          {
+            "col": 0,
+            "col_span": 1,
+            "is_header": false,
+            "row": 2,
+            "row_span": 1,
+            "text": "Gearbox"
+          },
+          {
+            "col": 1,
+            "col_span": 1,
+            "is_header": false,
+            "row": 2,
+            "row_span": 1,
+            "text": "1.2 L"
+          },
+          {
+            "col": 2,
+            "col_span": 1,
+            "is_header": false,
+            "row": 2,
+            "row_span": 1,
+            "text": "Type G"
+          },
+          {
+            "col": 3,
+            "col_span": 1,
+            "is_header": false,
+            "row": 2,
+            "row_span": 1,
+            "text": "12 months"
+          },
+          {
+            "col": 0,
+            "col_span": 1,
+            "is_header": false,
+            "row": 3,
+            "row_span": 1,
+            "text": "Hydraulic"
+          },
+          {
+            "col": 1,
+            "col_span": 1,
+            "is_header": false,
+            "row": 3,
+            "row_span": 1,
+            "text": "0.8 L"
+          },
+          {
+            "col": 2,
+            "col_span": 1,
+            "is_header": false,
+            "row": 3,
+            "row_span": 1,
+            "text": "Type H"
+          },
+          {
+            "col": 3,
+            "col_span": 1,
+            "is_header": false,
+            "row": 3,
+            "row_span": 1,
+            "text": "24 months"
+          },
+          {
+            "col": 0,
+            "col_span": 1,
+            "is_header": false,
+            "row": 4,
+            "row_span": 1,
+            "text": "Fuel tank"
+          },
+          {
+            "col": 1,
+            "col_span": 1,
+            "is_header": false,
+            "row": 4,
+            "row_span": 1,
+            "text": "18 L"
+          },
+          {
+            "col": 2,
+            "col_span": 1,
+            "is_header": false,
+            "row": 4,
+            "row_span": 1,
+            "text": "Diesel"
+          },
+          {
+            "col": 3,
+            "col_span": 1,
+            "is_header": false,
+            "row": 4,
+            "row_span": 1,
+            "text": "n/a"
+          },
+          {
+            "col": 0,
+            "col_span": 1,
+            "is_header": false,
+            "row": 5,
+            "row_span": 1,
+            "text": "Washer"
+          },
+          {
+            "col": 1,
+            "col_span": 1,
+            "is_header": false,
+            "row": 5,
+            "row_span": 1,
+            "text": "1.5 L"
+          },
+          {
+            "col": 2,
+            "col_span": 1,
+            "is_header": false,
+            "row": 5,
+            "row_span": 1,
+            "text": "Water mix"
+          },
+          {
+            "col": 3,
+            "col_span": 1,
+            "is_header": false,
+            "row": 5,
+            "row_span": 1,
+            "text": "as needed"
+          }
+        ],
+        "has_merged": false,
+        "n_cols": 4,
+        "n_rows": 6,
+        "ragged": false
+      },
+      "text": "System | Capacity | Fluid | Change interval\nCoolant | 2.5 L | Type C | 6 months\nGearbox | 1.2 L | Type G | 12 months\nHydraulic | 0.8 L | Type H | 24 months\nFuel tank | 18 L | Diesel | n/a\nWasher | 1.5 L | Water mix | as needed",
+      "type": "table"
+    },
+    {
+      "bbox": [
+        72.0,
+        282.375,
+        532.24,
+        319.625
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 77,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "90°"
+      ],
+      "numeric_tokens": [
+        "90"
+      ],
+      "page": 6,
+      "raw_lines": [
+        "Do not operate the unit while the control board is removed. Support the gearbox housing with a stand so",
+        "that it does not fall during removal. Rotate the mounting bracket through 90° until it seats fully. Replace",
+        "the wiring harness if it shows any sign of deformation."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Do not operate the unit while the control board is removed. Support the gearbox housing with a stand so that it does not fall during removal. Rotate the mounting bracket through 90° until it seats fully. Replace the wiring harness if it shows any sign of deformation.",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        327.625,
+        539.44,
+        378.875
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 78,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "12 V"
+      ],
+      "numeric_tokens": [
+        "12"
+      ],
+      "page": 6,
+      "raw_lines": [
+        "Support the bearing carrier with a stand so that it does not fall during removal. Do not operate the unit",
+        "while the cover plate is removed. Inspect the cooling fan for wear, cracks, and signs of overheating before",
+        "continuing. Record any damage to the fuel filter on the service log. The control circuit runs from a 12 V",
+        "supply, so disconnect it before servicing the pressure valve."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Support the bearing carrier with a stand so that it does not fall during removal. Do not operate the unit while the cover plate is removed. Inspect the cooling fan for wear, cracks, and signs of overheating before continuing. Record any damage to the fuel filter on the service log. The control circuit runs from a 12 V supply, so disconnect it before servicing the pressure valve.",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        386.875,
+        539.97,
+        410.125
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 79,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "P/N 4471-A"
+      ],
+      "numeric_tokens": [
+        "4471"
+      ],
+      "page": 6,
+      "raw_lines": [
+        "Replace the drive belt with genuine part P/N 4471-A if wear is visible. Record any damage to the coolant",
+        "reservoir on the service log. Clean the gearbox housing with a lint-free cloth and allow it to dry completely."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Replace the drive belt with genuine part P/N 4471-A if wear is visible. Record any damage to the coolant reservoir on the service log. Clean the gearbox housing with a lint-free cloth and allow it to dry completely.",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        418.125,
+        531.65,
+        469.375
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": false,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 80,
+      "is_header_footer": false,
+      "numeric_specs": [],
+      "numeric_tokens": [],
+      "page": 6,
+      "raw_lines": [
+        "Inspect the bearing carrier for wear, cracks, and signs of overheating before continuing. Wear protective",
+        "gloves when handling the gearbox housing. Replace the cooling fan if it shows any sign of deformation.",
+        "Compare the bearing carrier against the reference illustration before refitting. Record any damage to the",
+        "gearbox housing on the service log."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Inspect the bearing carrier for wear, cracks, and signs of overheating before continuing. Wear protective gloves when handling the gearbox housing. Replace the cooling fan if it shows any sign of deformation. Compare the bearing carrier against the reference illustration before refitting. Record any damage to the gearbox housing on the service log.",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        477.375,
+        530.0,
+        528.625
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 81,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "90°"
+      ],
+      "numeric_tokens": [
+        "90"
+      ],
+      "page": 6,
+      "raw_lines": [
+        "Do not operate the unit while the drive belt is removed. Rotate the mounting bracket through 90° until it",
+        "seats fully. Inspect the drive belt for wear, cracks, and signs of overheating before continuing. Clean the",
+        "cooling fan with a lint-free cloth and allow it to dry completely. Allow the unit to cool before touching the",
+        "pressure valve."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Do not operate the unit while the drive belt is removed. Rotate the mounting bracket through 90° until it seats fully. Inspect the drive belt for wear, cracks, and signs of overheating before continuing. Clean the cooling fan with a lint-free cloth and allow it to dry completely. Allow the unit to cool before touching the pressure valve.",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        536.625,
+        530.02,
+        587.875
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": false,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 82,
+      "is_header_footer": false,
+      "numeric_specs": [],
+      "numeric_tokens": [],
+      "page": 6,
+      "raw_lines": [
+        "Support the cooling fan with a stand so that it does not fall during removal. Do not operate the unit while",
+        "the fuel filter is removed. Compare the drive belt against the reference illustration before refitting. Wear",
+        "protective gloves when handling the fuel filter. Do not operate the unit while the bearing carrier is",
+        "removed. Keep the area around the wiring harness free of oil and debris."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Support the cooling fan with a stand so that it does not fall during removal. Do not operate the unit while the fuel filter is removed. Compare the drive belt against the reference illustration before refitting. Wear protective gloves when handling the fuel filter. Do not operate the unit while the bearing carrier is removed. Keep the area around the wiring harness free of oil and debris.",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        595.875,
+        522.73,
+        619.125
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 83,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "P/N 4471-A"
+      ],
+      "numeric_tokens": [
+        "4471"
+      ],
+      "page": 6,
+      "raw_lines": [
+        "Replace the coolant reservoir with genuine part P/N 4471-A if wear is visible. Do not operate the unit",
+        "while the coolant reservoir is removed. Replace the pressure valve if it shows any sign of deformation."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Replace the coolant reservoir with genuine part P/N 4471-A if wear is visible. Do not operate the unit while the coolant reservoir is removed. Replace the pressure valve if it shows any sign of deformation.",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        627.125,
+        538.34,
+        678.375
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": true,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 84,
+      "is_header_footer": false,
+      "numeric_specs": [
+        "M8"
+      ],
+      "numeric_tokens": [
+        "8"
+      ],
+      "page": 6,
+      "raw_lines": [
+        "Replace the control board if it shows any sign of deformation. Record any damage to the control board on",
+        "the service log. Wear protective gloves when handling the control board. Wear protective gloves when",
+        "handling the mounting bracket. Use only M8 fasteners when refitting the wiring harness. Wear protective",
+        "gloves when handling the gearbox housing."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Replace the control board if it shows any sign of deformation. Record any damage to the control board on the service log. Wear protective gloves when handling the control board. Wear protective gloves when handling the mounting bracket. Use only M8 fasteners when refitting the wiring harness. Wear protective gloves when handling the gearbox housing.",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        686.375,
+        531.66,
+        709.625
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": false,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 85,
+      "is_header_footer": false,
+      "numeric_specs": [],
+      "numeric_tokens": [],
+      "page": 6,
+      "raw_lines": [
+        "Wear protective gloves when handling the coolant reservoir. Record any damage to the drive belt on the",
+        "service log. Wear protective gloves when handling the coolant reservoir."
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Wear protective gloves when handling the coolant reservoir. Record any damage to the drive belt on the service log. Wear protective gloves when handling the coolant reservoir.",
+      "type": "paragraph"
+    },
+    {
+      "bbox": [
+        72.0,
+        745.538,
+        100.521,
+        753.863
+      ],
+      "column": null,
+      "figure_refs": [],
+      "has_numeric_spec": false,
+      "heading_level": null,
+      "hyphenated": false,
+      "index": 86,
+      "is_header_footer": true,
+      "numeric_specs": [],
+      "numeric_tokens": [
+        "6"
+      ],
+      "page": 6,
+      "raw_lines": [
+        "Page 6"
+      ],
+      "section_number": null,
+      "table": null,
+      "text": "Page 6",
+      "type": "footer"
+    }
+  ],
+  "derived_from": null,
+  "expected_slug": "tables",
+  "figures": [],
+  "file": "tables.pdf",
+  "fixture": "tables",
+  "footer_template": "Page {n}",
+  "header_text": "Acme X200 Service Manual",
+  "kind": "born_digital_pdf",
+  "page_count": 6,
+  "page_size": [
+    612.0,
+    792.0
+  ],
+  "product_model": "Acme X200",
+  "sha256": "e95a57c445f9d4434e377f4a0390f17854adbdafc341847a23759a0657868634",
+  "text_is_reference": false,
+  "title": "Acme X200 Service Manual"
+}
