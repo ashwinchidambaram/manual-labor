@@ -606,3 +606,36 @@ def test_misc_models() -> None:
         },
         "blocks",
     )
+
+
+def test_c12b_manifest_source_doc_cross_checks() -> None:
+    """Re-review finding: article/figure source_doc must match the id slug."""
+    base = manifest_dict()
+    c.Manifest.model_validate(base)
+
+    def mut(fn: Any) -> dict[str, Any]:
+        d = deepcopy(base)
+        fn(d)
+        return d
+
+    def other_doc(d: dict[str, Any]) -> None:
+        d["docs"].append({**deepcopy(d["docs"][0]), "slug": "other", "block_ids": []})
+
+    # article whose id/slug and source_doc disagree, holding another doc's blocks
+    def art_other(d: dict[str, Any]) -> None:
+        other_doc(d)
+        d["articles"][0]["source_doc"] = "other"
+
+    bad(c.Manifest, mut(art_other), "source_doc")
+
+    # figure whose id slug differs from source_doc (direct sub-model check)
+    bad(
+        c.ManifestFigure,
+        {
+            "id": f"FIG-{SLUG}-p001-01",
+            "sidecar": f"images/other/FIG-{SLUG}-p001-01.json",
+            "file": f"images/other/FIG-{SLUG}-p001-01.png",
+            "source_doc": "other",
+        },
+        "source_doc",
+    )

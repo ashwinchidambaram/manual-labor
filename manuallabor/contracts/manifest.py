@@ -57,6 +57,11 @@ class ManifestArticle(ContractModel):
             raise ValueError("path must be articles/<id>.md")
         if self.id == ids.UNASSIGNED:
             raise ValueError("article id must not be the reserved 'unassigned' marker")
+        if ids.parse_article_id(self.id)[0] != self.source_doc:
+            raise ValueError("article id must be <source_doc> or <source_doc>--<topic>")
+        for bid in self.block_ids:
+            if ids.parse_block_id(bid)[0] != self.source_doc:
+                raise ValueError(f"article {self.id}: block {bid} belongs to another doc")
         return self
 
 
@@ -71,6 +76,8 @@ class ManifestFigure(ContractModel):
     def _check(self) -> ManifestFigure:
         if self.sidecar != f"images/{self.source_doc}/{self.id}.json":
             raise ValueError("sidecar must be images/<source_doc>/<id>.json")
+        if ids.parse_figure_id(self.id)[0] != self.source_doc:
+            raise ValueError("figure id slug must equal source_doc")
         return self
 
 
