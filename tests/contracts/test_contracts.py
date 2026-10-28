@@ -243,7 +243,7 @@ def test_c8_figure() -> None:
     bad(c.FigureRecord, figure_dict(phash="XYZ"))
     bad(c.FigureRecord, figure_dict(file="foo.png"), "file")
     bad(c.FigureRecord, figure_dict(file=f"{fid}.gif"), "file")
-    ok = c.FigureRecord.model_validate(figure_dict(file=f"../other-doc/{fid}.png"))
+    ok = c.FigureRecord.model_validate(figure_dict(file="../other-doc/FIG-other-doc-p001-01.png"))
     assert ok.file.startswith("../other-doc/")
     t = c.FigureRecord.model_validate(figure_dict(tags=["B", "a", "b"]))
     assert t.tags == ["b", "a"]

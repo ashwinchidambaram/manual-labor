@@ -12,6 +12,14 @@
   },
   "additionalProperties": false,
   "properties": {
+    "block_ids": {
+      "items": {
+        "pattern": "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$",
+        "type": "string"
+      },
+      "title": "Block Ids",
+      "type": "array"
+    },
     "filename": {
       "minLength": 1,
       "title": "Filename",
@@ -103,6 +111,7 @@
     "product_model_inferred",
     "kind",
     "page_count",
+    "block_ids",
     "pages_without_text_layer",
     "stripped_headers",
     "stripped_footers",

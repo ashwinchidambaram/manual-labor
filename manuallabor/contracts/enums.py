@@ -122,6 +122,7 @@ class FaithViolationKind(StrEnum):
     insertion = "insertion"
     deletion = "deletion"
     numeric_mismatch = "numeric_mismatch"
+    reorder = "reorder"
 
 
 class DiffOpKind(StrEnum):

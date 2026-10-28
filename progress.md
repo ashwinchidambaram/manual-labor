@@ -39,3 +39,13 @@
 | What's the goal? | Manual Labor v1 with every gate proven in docs/PROGRESS.md and §11 in docs/ACCEPTANCE.md |
 | What have I learned? | See findings.md |
 | What have I done? | See above |
+  - M0.3 scaffold done (Haiku), verified by orchestrator: ruff/mypy/pytest/npm green. Commit e366500.
+  - M0.2 design approved (Opus, 474 lines, 57 tests listed, 16 SPEC ambiguities resolved in §10). Committed 5efd28c.
+  - Dispatched M0.4 contracts implement (Sonnet) ∥ M0.5 fixture generator (Sonnet).
+  - M0.4 contracts done (Sonnet): 82 tests, mypy clean, schemas byte-stable. Deviations noted: tags keep SPEC order; Proposal.all_checks_passed dropped on input; schemas_export is a re-export shim. Commit ffd2f8e.
+  - Dispatched M0.6 type-gen + CI wiring (Haiku).
+  - M0.6 type-gen done (Haiku): 50 types from schemas/_all.json, deterministic; CI freshness checks added. Commit 86215cb.
+  - M0.5 fixtures done (Sonnet): 6 fixtures, GT, project-a, CHECKSUMS, determinism proven by double-generate diff. Orchestrator rendered 3 pages and confirmed layout features. Commit b69e0e7.
+  - Dispatched M0.7 review (Opus, fresh).
+  - M0.7 review (Opus): gate met (96 passed, mypy/ruff clean, schemas + fixtures + types stable). 5 majors: self-referential manifest accounting, vector figures overflow GT bbox, sidecar file under-validated, embed output unchecked, CI never run. 12 minors. Spot-checks: 328/328 blocks match PDF words in bbox; raster figure bboxes within 0.1pt.
+  - Dispatched M0.8 fix (Sonnet) for items 1–14.

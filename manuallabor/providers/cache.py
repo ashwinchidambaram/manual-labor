@@ -24,10 +24,9 @@ class LLMCache:
         self.root = Path(root)
 
     @staticmethod
-    def key(provider: str, model: str, task: str, kind: str, inputs: Mapping[str, Any]) -> str:
+    def key(namespace: str, task: str, kind: str, inputs: Mapping[str, Any]) -> str:
         payload = {
-            "provider": provider,
-            "model": model,
+            "namespace": namespace,
             "task": str(task),
             "kind": str(kind),
             "inputs": inputs,
@@ -53,6 +52,10 @@ class LLMCache:
             return None
         if not isinstance(entry, dict) or entry.get("key") != key:
             log.warning("llm cache: key mismatch in %s treated as miss", p)
+            return None
+        response = entry.get("response")
+        if not isinstance(response, dict) or not any(k in response for k in ("text", "vectors")):
+            log.warning("llm cache: entry %s lacks a response, treated as miss", p)
             return None
         return entry
 

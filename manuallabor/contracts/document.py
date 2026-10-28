@@ -6,7 +6,8 @@ from typing import Any
 
 from pydantic import Field, field_validator, model_validator
 
-from manuallabor.contracts._base import ContractModel, DocSlug, Sha256Hex
+from manuallabor import ids
+from manuallabor.contracts._base import BlockId, ContractModel, DocSlug, Sha256Hex
 from manuallabor.contracts.enums import DocKind
 
 
@@ -19,6 +20,7 @@ class Document(ContractModel):
     product_model_inferred: bool = False
     kind: DocKind
     page_count: int = Field(ge=1)
+    block_ids: list[BlockId]
     pages_without_text_layer: list[int] = Field(default_factory=list)
     stripped_headers: list[str] = Field(default_factory=list)
     stripped_footers: list[str] = Field(default_factory=list)
@@ -52,6 +54,10 @@ class Document(ContractModel):
 
     @model_validator(mode="after")
     def _check(self) -> Document:
+        if len(set(self.block_ids)) != len(self.block_ids):
+            raise ValueError("block_ids must be unique")
+        if any(ids.parse_block_id(b)[0] != self.slug for b in self.block_ids):
+            raise ValueError("block_ids: all blocks must belong to this document")
         if self.product_model_inferred and self.product_model is None:
             raise ValueError("product_model_inferred requires product_model")
         if any(p < 1 or p > self.page_count for p in self.pages_without_text_layer):

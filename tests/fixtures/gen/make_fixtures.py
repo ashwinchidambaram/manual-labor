@@ -403,11 +403,22 @@ class Layout:
         self._page_figs.append(fig)
         return fig
 
-    def raster(self, key: str, w: float, h: float, number: int | None, caption: str | None) -> Fig:
+    def raster(
+        self,
+        key: str,
+        w: float,
+        h: float,
+        number: int | None,
+        caption: str | None,
+        separate_object: bool = False,
+    ) -> Fig:
+        """separate_object=True makes reportlab write a second PDF image object (own xref)
+        with identical pixel data: its cache name hashes (pixels + str(mask)), so passing
+        mask="auto" (a no-op for an image without alpha) changes the name."""
         reader, info = self.images[key]
 
         def draw(x: float, ypdf: float, ww: float, hh: float) -> None:
-            self.c.drawImage(reader, x, ypdf, ww, hh)
+            self.c.drawImage(reader, x, ypdf, ww, hh, mask="auto" if separate_object else None)
 
         return self._figure(w, h, number, caption, Extraction.native, draw, info)
 
@@ -418,23 +429,32 @@ class Layout:
         def draw(x: float, ypdf: float, ww: float, hh: float) -> None:
             c = self.c
             c.saveState()
+            # clip every primitive to the figure frame; geometry below also stays inside it
+            clip = c.beginPath()
+            clip.rect(x, ypdf, ww, hh)
+            c.clipPath(clip, stroke=0, fill=0)
             c.setLineWidth(0.5)
             c.setStrokeColorRGB(0.5, 0.5, 0.5)
             c.rect(x, ypdf, ww, hh, stroke=1, fill=0)
+            m = 6.0
             for _ in range(rng.randint(8, 12)):
                 c.setStrokeColorRGB(*rng.choice(colors))
                 c.setLineWidth(rng.choice([0.8, 1.2, 2.0]))
                 kind = rng.choice(["line", "rect", "circle", "bezier"])
-                px = [x + 6 + rng.random() * (ww - 12) for _ in range(4)]
-                py = [ypdf + 6 + rng.random() * (hh - 12) for _ in range(4)]
+                px = [x + m + rng.random() * (ww - 2 * m) for _ in range(4)]
+                py = [ypdf + m + rng.random() * (hh - 2 * m) for _ in range(4)]
                 if kind == "line":
                     c.line(px[0], py[0], px[1], py[1])
                 elif kind == "rect":
-                    c.rect(
-                        min(px[:2]), min(py[:2]), abs(px[0] - px[1]) * 0.6, abs(py[0] - py[1]) * 0.6
-                    )
+                    rw, rh = abs(px[0] - px[1]) * 0.6, abs(py[0] - py[1]) * 0.6
+                    rx = min(min(px[:2]), x + ww - m - rw)
+                    ry = min(min(py[:2]), ypdf + hh - m - rh)
+                    c.rect(rx, ry, rw, rh)
                 elif kind == "circle":
-                    c.circle(px[0], py[0], 4 + rng.random() * min(ww, hh) / 8)
+                    r = min(4 + rng.random() * min(ww, hh) / 8, min(ww, hh) / 2 - m - 1)
+                    cx = min(max(px[0], x + m + r), x + ww - m - r)
+                    cy = min(max(py[0], ypdf + m + r), ypdf + hh - m - r)
+                    c.circle(cx, cy, r)
                 else:
                     p = c.beginPath()
                     p.moveTo(px[0], py[0])
@@ -757,7 +777,11 @@ def build_figures(path: Path) -> tuple[Layout, int]:
         for j, (kind, key, w, h, flag) in enumerate(items):
             n = nums[(pi, j)]
             cap = C.FIGURE_CAPTIONS[(n or 0) % len(C.FIGURE_CAPTIONS)] if n else None
-            fig = lay.raster(key, w, h, n, cap) if kind == "r" else lay.vector(w, h, n, cap)
+            fig = (
+                lay.raster(key, w, h, n, cap, separate_object=flag == "dup")
+                if kind == "r"
+                else lay.vector(w, h, n, cap)
+            )
             if key == "R1" and flag == "":
                 first = fig
             if flag == "dup":

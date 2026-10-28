@@ -101,7 +101,7 @@ Validators: `product_model_inferred` implies `product_model is not None`. For `d
 - `TableData`: `n_rows: int ≥1`, `n_cols: int ≥1`, `cells: list[TableCell]`, `markdown: str`, `shape_by_parser: dict[str, TableShape] = {}`. Validators: cells are sorted by (row, col) and unique on (row, col), every `row+row_span ≤ n_rows`, and every `col+col_span ≤ n_cols`.
 - `DiffOp`: `op: DiffOpKind`, `raw: str`, `clean: str`.
 - `FaithfulnessViolation`: `kind: FaithViolationKind`, `raw_start: int|None`, `raw_end: int|None`, `clean_start: int|None`, `clean_end: int|None`, `raw: str`, `clean: str`.
-- `FaithfulnessResult`: `passed: bool`, `alignment_ratio: Unit`, `violations: list[FaithfulnessViolation]`, `diff: list[DiffOp]`, `numeric_variant_note: str | None = None`. Validator: `passed` is True exactly when `violations == []`.
+- `FaithfulnessResult`: `passed: bool`, `alignment_ratio: Unit`, `violations: list[FaithfulnessViolation]`, `diff: list[DiffOp]`, `numeric_variant: NumericVariant | None = None` (`NumericVariant{raw, chosen, source: "textlayer"|"ocr", reason}`). `DiffOp` carries `raw_start/raw_end/clean_start/clean_end` (ints >= 0, end >= start) and `allowed: bool` (op is in the allowed-edit classes). `FaithViolationKind` = insertion, deletion, numeric_mismatch, reorder. Validator: `passed` is True exactly when `violations == []`.
 
 | `Block` field | Type | Default | Notes |
 |---|---|---|---|
@@ -230,6 +230,7 @@ Manifest validators:
 - (d) `unassigned_reasons` keys are exactly the unassigned blocks.
 - (e) Every `article.figures` id is in `figures`.
 - (f) `duplicate_of` points to an existing figure whose own `duplicate_of` is None.
+- (g) Each `Document` carries `block_ids` (all blocks produced by parsing, in parse order). The multiset union of every article's `block_ids` plus the `unassigned` block ids must equal exactly the union of all docs' `block_ids` (no missing, extra or duplicate block), `accounting.total_blocks` equals that union's size, review-status counts sum to `review_stats.total_blocks`, every article/figure `source_doc` is in `docs`, doc slugs are unique and no article id is the reserved `unassigned` marker.
 
 ### 4.11 `ProjectConfig` (config.py)
 - `ModelRef`: `provider: str` (pattern `^[a-z][a-z0-9_]*$`; known: mock, ollama, anthropic, openai_compatible, vllm, llamacpp), `model: str` (min 1), `api_base: str | None = None`, `api_key_env: str | None = None`. Secrets are never stored in config.
@@ -460,7 +461,7 @@ Fixtures (`tests/fixtures_gen/`):
 2. **ID width overflow.** SPEC uses `p\d{3}` / `\d{2}`. Choice: format with `:03d`/`:02d` (natural widening) and accept `\d{3,4}`/`\d{2,3}`. This is a strict superset of the SPEC regex.
 3. **Topics across documents** conflict with `<docslug>--<topic-slug>`. Choice: in v1, topics and groups are per document (`Group.doc_id`). Cross-doc topics are deferred.
 4. **Header/footer blocks vs "every block assigned".** Choice: they are Blocks (types header/footer) and are accounted as `unassigned` with reason `header_footer`.
-5. **Figure dedupe** has no field in the §6.3 sidecar. Choice: the sidecar `file` may point to `../<slug>/…`, and `duplicate_of` lives in `ManifestFigure`.
+5. **Figure dedupe** has no field in the §6.3 sidecar. Choice: the sidecar `file` may point to `../<slug>/…`, and `duplicate_of` lives in `ManifestFigure`. The sidecar `file` is exactly `<own id>.png|svg`, or for a deduplicated figure exactly `../<other-slug>/<FIG-other-id>.png|svg` (the other id's slug equals the directory; `svg` follows the same rule and must point at the same figure as `file`). The Manifest validator cross-checks `duplicate_of` against this path: a figure with `duplicate_of` must use the dedup path to exactly that figure, and one without must use its own file.
 6. **Figure `review` values** are unspecified. Choice: reuse `BlockStatus`.
 7. **`review: {approved, edited}` semantics.** Choice: `edited ⊆ approved` (consistent with the SPEC example 7/1).
 8. **`has_numeric_spec` is a rule, not a score.** It appears in `SignalName` for display, but module 3 must exclude it from the combiner. Block also has the boolean.
@@ -472,3 +473,8 @@ Fixtures (`tests/fixtures_gen/`):
 14. **The faithfulness "reorder" allowance** (§5.2) conflicts with pure character alignment. Module 3 must define it; the contract only stores the diff and violations.
 15. **Task enum** extends SPEC §8's five with `metadata` (ingest inference) and `agent` (§5.5), each with a config fallback.
 16. **Mock default responses** exist only for cleanup, verifier and vision. Modules 4, 5 and 10 must register theirs (grouping, metadata, agent) so `labor check` runs fully mocked.
+17. **Tag order.** `FigureRecord.tags` keep SPEC example order (lowercased, de-duplicated, not sorted) because C1 requires the SPEC §6.3 example to round-trip.
+18. **ID widening.** IDs with page >= 1000 or index >= 100 widen past the SPEC's published regex by design (`\d{3}|[1-9]\d{3,}` and `\d{2}|[1-9]\d{2,}`); leading zeros beyond the fixed width are rejected.
+19. **Module-level registries.** The `mock.py` canned-reply registry (`DEFAULT_MOCK_RESPONSES`) and the `base.py` provider registry (`DEFAULT_FACTORIES`) are module-level; modules 4, 5, 6 and 10 will register into them at import time.
+20. **CI has not run yet** because the repository has no remote; the workflow is untested beyond its commands being run locally.
+21. **Cache namespace.** The LLM cache key hashes `(provider.cache_namespace, task, kind, inputs)`. The default namespace is `provider:model`; mocks add their class name and a digest of their canned replies so two mocks with the same ModelRef never share entries.

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import math
 import re
 import unicodedata
@@ -81,6 +82,35 @@ class MockProvider(BaseProvider):
         self.vision_response = vision_response
         self.dim = dim
 
+    def _replies_digest(self) -> str:
+        """sha256 over the canned replies (and the vision responder), so that two mocks with
+        the same ModelRef but different replies never share cache entries."""
+
+        def describe(v: str | Responder | Callable[[bytes, str], str] | None) -> str:
+            if v is None:
+                return "none"
+            if isinstance(v, str):
+                return "str:" + v
+            code = getattr(v, "__code__", None)
+            body = (
+                code.co_code.hex() + re.sub(r"0x[0-9a-f]+", "", repr(code.co_consts))
+                if code is not None
+                else ""
+            )
+            return f"fn:{getattr(v, '__module__', '')}.{getattr(v, '__qualname__', repr(v))}:{body}"
+
+        merged = {**DEFAULT_MOCK_RESPONSES, **self.responses}
+        parts = {str(t): describe(merged[t]) for t in sorted(merged, key=str)}
+        parts["vision"] = describe(self.vision_response)
+        parts["dim"] = str(self.dim)
+        return hashlib.sha256(json.dumps(parts, sort_keys=True).encode()).hexdigest()
+
+    @property
+    def cache_namespace(self) -> str:
+        return (
+            f"{self.ref.provider}:{self.ref.model}:{type(self).__name__}:{self._replies_digest()}"
+        )
+
     def _chat_raw(
         self,
         task: Task,
@@ -117,8 +147,23 @@ class MockProvider(BaseProvider):
         )
 
 
-def corrupt(text: str, mode: Literal["digit", "insert_word"] = "digit") -> str:
+CorruptMode = Literal["digit", "insert", "delete"]
+CORRUPT_CYCLE: tuple[CorruptMode, ...] = ("digit", "insert", "delete")
+
+
+def corrupt(text: str, mode: CorruptMode = "digit") -> str:
     """Return text that always differs from the input (pure)."""
+    if mode == "delete":
+        tokens = list(re.finditer(r"\S+", text))
+        if not tokens:
+            return "not"
+        start, end = tokens[-1].span()
+        trailing = len(text[end:]) - len(text[end:].lstrip())
+        if trailing:
+            end += trailing
+        else:
+            start -= len(text[:start]) - len(text[:start].rstrip())
+        return text[:start] + text[end:]
     if mode == "digit":
         m = re.search(r"[0-9]", text)
         if m is not None:
@@ -135,21 +180,38 @@ def corrupt(text: str, mode: Literal["digit", "insert_word"] = "digit") -> str:
 
 class CorruptingMockProvider(MockProvider):
     """Cleanup output is always corrupted. Uses a distinct model name so that
-    its cache entries never collide with MockProvider's in a shared cache dir."""
+    its cache entries never collide with MockProvider's in a shared cache dir.
+
+    mode=None cycles digit -> insert -> delete, one step per (uncached) cleanup call."""
 
     def __init__(
         self,
         ref: ModelRef | None = None,
         *,
-        mode: Literal["digit", "insert_word"] = "digit",
+        mode: CorruptMode | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(ref or ModelRef(provider="mock", model="mock-corrupt-1"), **kwargs)
-        self.mode: Literal["digit", "insert_word"] = mode
+        self.mode: CorruptMode | None = mode
+        self._calls = 0
         user_cleanup = self.responses.get(Task.cleanup, echo_cleanup)
 
         def _cleanup(messages: Sequence[Message]) -> str:
             base = user_cleanup(messages) if callable(user_cleanup) else user_cleanup
-            return corrupt(base, self.mode)
+            mode = self.mode if self.mode is not None else CORRUPT_CYCLE[self._calls % 3]
+            self._calls += 1
+            return corrupt(base, mode)
 
         self.responses[Task.cleanup] = _cleanup
+        self._user_cleanup = user_cleanup
+
+    @property
+    def cache_namespace(self) -> str:
+        wrapper = self.responses[Task.cleanup]
+        self.responses[Task.cleanup] = self._user_cleanup
+        try:
+            inner = super()._replies_digest()
+        finally:
+            self.responses[Task.cleanup] = wrapper
+        base_digest = hashlib.sha256((inner + repr(self.mode)).encode()).hexdigest()
+        return f"{self.ref.provider}:{self.ref.model}:{type(self).__name__}:{base_digest}"

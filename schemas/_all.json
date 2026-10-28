@@ -10,7 +10,7 @@
         },
         "figures": {
           "items": {
-            "pattern": "^FIG-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$",
+            "pattern": "^FIG-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$",
             "type": "string"
           },
           "title": "Figures",
@@ -169,7 +169,7 @@
         "figure_id": {
           "anyOf": [
             {
-              "pattern": "^FIG-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$",
+              "pattern": "^FIG-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$",
               "type": "string"
             },
             {
@@ -199,7 +199,7 @@
           "title": "Heading Level"
         },
         "id": {
-          "pattern": "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$",
+          "pattern": "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$",
           "title": "Id",
           "type": "string"
         },
@@ -334,7 +334,7 @@
       "properties": {
         "assignments": {
           "patternProperties": {
-            "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$": {
+            "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$": {
               "type": "string"
             }
           },
@@ -348,7 +348,7 @@
         },
         "unassigned_reasons": {
           "patternProperties": {
-            "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$": {
+            "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$": {
               "enum": [
                 "not_selected",
                 "header_footer",
@@ -413,7 +413,7 @@
           "$ref": "#/$defs/DecisionAction"
         },
         "block_id": {
-          "pattern": "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$",
+          "pattern": "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$",
           "title": "Block Id",
           "type": "string"
         },
@@ -506,9 +506,23 @@
     "DiffOp": {
       "additionalProperties": false,
       "properties": {
+        "allowed": {
+          "title": "Allowed",
+          "type": "boolean"
+        },
         "clean": {
           "title": "Clean",
           "type": "string"
+        },
+        "clean_end": {
+          "minimum": 0,
+          "title": "Clean End",
+          "type": "integer"
+        },
+        "clean_start": {
+          "minimum": 0,
+          "title": "Clean Start",
+          "type": "integer"
         },
         "op": {
           "$ref": "#/$defs/DiffOpKind"
@@ -516,12 +530,27 @@
         "raw": {
           "title": "Raw",
           "type": "string"
+        },
+        "raw_end": {
+          "minimum": 0,
+          "title": "Raw End",
+          "type": "integer"
+        },
+        "raw_start": {
+          "minimum": 0,
+          "title": "Raw Start",
+          "type": "integer"
         }
       },
       "required": [
         "op",
         "raw",
-        "clean"
+        "clean",
+        "raw_start",
+        "raw_end",
+        "clean_start",
+        "clean_end",
+        "allowed"
       ],
       "title": "DiffOp",
       "type": "object"
@@ -548,6 +577,14 @@
     "Document": {
       "additionalProperties": false,
       "properties": {
+        "block_ids": {
+          "items": {
+            "pattern": "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$",
+            "type": "string"
+          },
+          "title": "Block Ids",
+          "type": "array"
+        },
         "filename": {
           "minLength": 1,
           "title": "Filename",
@@ -639,6 +676,7 @@
         "product_model_inferred",
         "kind",
         "page_count",
+        "block_ids",
         "pages_without_text_layer",
         "stripped_headers",
         "stripped_footers",
@@ -660,7 +698,8 @@
       "enum": [
         "insertion",
         "deletion",
-        "numeric_mismatch"
+        "numeric_mismatch",
+        "reorder"
       ],
       "title": "FaithViolationKind",
       "type": "string"
@@ -681,17 +720,16 @@
           "title": "Diff",
           "type": "array"
         },
-        "numeric_variant_note": {
+        "numeric_variant": {
           "anyOf": [
             {
-              "type": "string"
+              "$ref": "#/$defs/NumericVariant"
             },
             {
               "type": "null"
             }
           ],
-          "default": null,
-          "title": "Numeric Variant Note"
+          "default": null
         },
         "passed": {
           "title": "Passed",
@@ -710,7 +748,7 @@
         "alignment_ratio",
         "violations",
         "diff",
-        "numeric_variant_note"
+        "numeric_variant"
       ],
       "title": "FaithfulnessResult",
       "type": "object"
@@ -857,7 +895,7 @@
           "type": "integer"
         },
         "id": {
-          "pattern": "^FIG-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$",
+          "pattern": "^FIG-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$",
           "title": "Id",
           "type": "string"
         },
@@ -996,7 +1034,7 @@
           "default": "open"
         },
         "target_id": {
-          "pattern": "(?:^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$)|(?:^FIG-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$)",
+          "pattern": "(?:^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$)|(?:^FIG-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$)",
           "title": "Target Id",
           "type": "string"
         }
@@ -1043,7 +1081,7 @@
         },
         "block_ids": {
           "items": {
-            "pattern": "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$",
+            "pattern": "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$",
             "type": "string"
           },
           "title": "Block Ids",
@@ -1353,7 +1391,7 @@
       "properties": {
         "block_ids": {
           "items": {
-            "pattern": "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$",
+            "pattern": "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$",
             "type": "string"
           },
           "title": "Block Ids",
@@ -1361,7 +1399,7 @@
         },
         "figures": {
           "items": {
-            "pattern": "^FIG-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$",
+            "pattern": "^FIG-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$",
             "type": "string"
           },
           "title": "Figures",
@@ -1420,7 +1458,7 @@
         "duplicate_of": {
           "anyOf": [
             {
-              "pattern": "^FIG-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$",
+              "pattern": "^FIG-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$",
               "type": "string"
             },
             {
@@ -1435,7 +1473,7 @@
           "type": "string"
         },
         "id": {
-          "pattern": "^FIG-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$",
+          "pattern": "^FIG-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$",
           "title": "Id",
           "type": "string"
         },
@@ -1532,6 +1570,39 @@
       "title": "ModelRef",
       "type": "object"
     },
+    "NumericVariant": {
+      "additionalProperties": false,
+      "properties": {
+        "chosen": {
+          "title": "Chosen",
+          "type": "string"
+        },
+        "raw": {
+          "title": "Raw",
+          "type": "string"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        },
+        "source": {
+          "enum": [
+            "textlayer",
+            "ocr"
+          ],
+          "title": "Source",
+          "type": "string"
+        }
+      },
+      "required": [
+        "raw",
+        "chosen",
+        "source",
+        "reason"
+      ],
+      "title": "NumericVariant",
+      "type": "object"
+    },
     "OcrEngine": {
       "enum": [
         "rapidocr",
@@ -1607,7 +1678,7 @@
         "target_id": {
           "anyOf": [
             {
-              "pattern": "(?:^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$)|(?:^FIG-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$)",
+              "pattern": "(?:^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$)|(?:^FIG-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$)",
               "type": "string"
             },
             {
@@ -1866,7 +1937,7 @@
           "default": "pending"
         },
         "target_id": {
-          "pattern": "(?:^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$)|(?:^FIG-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$)",
+          "pattern": "(?:^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$)|(?:^FIG-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$)",
           "title": "Target Id",
           "type": "string"
         }
@@ -1986,7 +2057,7 @@
         },
         "numbers_verified_blocks": {
           "items": {
-            "pattern": "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$",
+            "pattern": "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$",
             "type": "string"
           },
           "title": "Numbers Verified Blocks",
@@ -2040,7 +2111,7 @@
         },
         "block_ids": {
           "items": {
-            "pattern": "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$",
+            "pattern": "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$",
             "type": "string"
           },
           "title": "Block Ids",

@@ -18,7 +18,8 @@ Detailed tasks, model assignments, and gates: docs/plans/2026-10-28-manual-labor
 
 ### Phase 0: Scaffold, contracts, fixtures, CI
 - [x] git init + first commit (f79461f)
-- [ ] Design 00-contracts.md (Opus) · Scaffold (Haiku) · Contracts (Sonnet) ∥ Fixture generator (Sonnet) · Type-gen + CI (Haiku) · Review (Opus) · Fix
+- [x] Design 00-contracts.md (Opus) · Scaffold (Haiku) · Contracts (Sonnet) ∥ Fixture generator (Sonnet) · Type-gen + CI (Haiku) · Review (Opus)
+- [ ] Fix review findings (Sonnet, in progress) → re-run gate → record in docs/PROGRESS.md
 - [ ] Gate: `uv run pytest -q`; `uv run labor schemas export`; 5 PDFs + 1 DOCX + ground truth; `npm test`
 - **Status:** in_progress
 

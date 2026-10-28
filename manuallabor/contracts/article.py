@@ -45,6 +45,10 @@ class ArticleFrontmatter(ContractModel):
     def _check(self) -> ArticleFrontmatter:
         if self.review.approved > self.blocks:
             raise ValueError("review.approved must be <= blocks")
+        if self.id != self.source_doc and not self.id.startswith(f"{self.source_doc}--"):
+            raise ValueError("id must equal source_doc or start with '<source_doc>--'")
+        if len(set(self.figures)) != len(self.figures):
+            raise ValueError("figures must be unique")
         return self
 
     def to_yaml_dict(self) -> dict[str, Any]:

@@ -12,7 +12,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 from manuallabor.contracts import CallKind, Message, ModelRef, ProjectConfig, Task
-from manuallabor.contracts.io import canonical_json
+from manuallabor.contracts.io import canonical_json, read_json
 from manuallabor.providers import (
     TEMPERATURE,
     CorruptingMockProvider,
@@ -26,7 +26,7 @@ from manuallabor.providers import (
     build_provider_set,
     corrupt,
 )
-from manuallabor.providers.base import RawChat
+from manuallabor.providers.base import RawChat, RawEmbed
 
 TEXTS = ["Tighten the M8 bolts to 35 N·m", "wiring diagram for the 12 V fuse box", "belt tension"]
 
@@ -138,6 +138,26 @@ def test_p8_one_log_per_call(tmp_path: Path) -> None:
     p.embed(Task.embeddings, ["a", "b"])
     with pytest.raises(ProviderOutputError):
         p.chat(Task.grouping, user("q"), json_schema=SCHEMA)
+
+    class BadVision(MockProvider):
+        def _vision_raw(self, *a: Any, **k: Any) -> RawChat:
+            raise RuntimeError("no eyes")
+
+    class BadEmbed(MockProvider):
+        def _embed_raw(self, *a: Any, **k: Any) -> RawEmbed:
+            raise RuntimeError("no vectors")
+
+    with pytest.raises(ProviderError, match="no eyes"):
+        BadVision(sink=sink).vision(Task.vision, b"img", "describe")
+    with pytest.raises(ProviderError, match="no vectors"):
+        BadEmbed(sink=sink).embed(Task.embeddings, ["a"])
+    assert [(x.kind, x.ok) for x in sink[-2:]] == [
+        (CallKind.vision, False),
+        (CallKind.embed, False),
+    ]
+    assert all(x.cached is False and x.error for x in sink[-2:])
+    assert sink[-1].task == Task.embeddings and "no vectors" in (sink[-1].error or "")
+    del sink[-2:]
     assert len(sink) == 7
     kinds = [(x.kind, x.cached, x.ok) for x in sink]
     assert kinds == [
@@ -152,8 +172,7 @@ def test_p8_one_log_per_call(tmp_path: Path) -> None:
     assert all(x.provider == "mock" and x.model == "mock-1" for x in sink)
     assert [x.task for x in sink][:2] == [Task.cleanup] * 2
     key = LLMCache.key(
-        "mock",
-        "mock-1",
+        p.cache_namespace,
         Task.cleanup,
         "chat",
         {"messages": [{"role": "user", "content": "<raw>a</raw>"}], "json_schema": None},
@@ -194,7 +213,7 @@ def test_p9_temperature_zero() -> None:
 
 @given(st.text())
 def test_p10_corrupt_never_equal(text: str) -> None:
-    for mode in ("digit", "insert_word"):
+    for mode in ("digit", "insert", "delete"):
         assert corrupt(text, mode) != text  # type: ignore[arg-type]
 
 
@@ -205,16 +224,29 @@ def test_p10_corrupt_shapes(text: str) -> None:
         assert len(out) == len(text)
         diffs = [(a, b) for a, b in zip(text, out, strict=True) if a != b]
         assert len(diffs) == 1 and diffs[0][0].isdigit() and diffs[0][1].isdigit()
-    ins = corrupt(text, "insert_word")
+    ins = corrupt(text, "insert")
     assert len(ins.split()) == len(text.split()) + 1
     assert sorted(ins.split()) == sorted([*text.split(), "not"])
+    dele = corrupt(text, "delete")
+    if text.split():
+        assert len(dele.split()) == len(text.split()) - 1
+        words = text.split()
+        for w in dele.split():
+            words.remove(w)
+        assert len(words) == 1
 
 
 def test_p10_corrupting_provider() -> None:
     p = CorruptingMockProvider(sink=ListSink())
     assert p.chat(Task.cleanup, user("<raw>set 5 bolts</raw>")).text == "set 6 bolts"
-    q = CorruptingMockProvider(sink=ListSink(), mode="insert_word")
+    q = CorruptingMockProvider(sink=ListSink(), mode="insert")
     assert q.chat(Task.cleanup, user("<raw>set 5 bolts</raw>")).text == "set not 5 bolts"
+    d = CorruptingMockProvider(sink=ListSink(), mode="delete")
+    assert d.chat(Task.cleanup, user("<raw>set 5 bolts</raw>")).text == "set 5"
+    # default mode cycles digit -> insert -> delete
+    cyc = CorruptingMockProvider(sink=ListSink())
+    outs = [cyc.chat(Task.cleanup, user(f"<raw>set 5 bolts{i}</raw>")).text for i in range(4)]
+    assert outs == ["set 6 bolts0", "set not 5 bolts1", "set 5", "set 6 bolts3"]
     assert p.ref.model != MockProvider(sink=ListSink()).ref.model
 
 
@@ -226,7 +258,8 @@ def test_p11_vision() -> None:
     assert a == f"Generated description (mock) of image {hashlib.sha256(b'abc').hexdigest()[:8]}."
 
 
-def test_p12_build_provider_set(mock_config: ProjectConfig, tmp_path: Path) -> None:
+def test_p12_build_provider_set(fixtures_dir: Path, tmp_path: Path) -> None:
+    mock_config = read_json(fixtures_dir / "project-a" / "project.json", ProjectConfig)
     sink = ListSink()
     ps = build_provider_set(mock_config, cache_dir=tmp_path / "c", sink=sink)
     assert set(ps.by_task) == set(Task)
@@ -257,17 +290,17 @@ def test_p12b_conftest_fixtures(
 
 def test_k1_key() -> None:
     k = LLMCache.key
-    base = k("p", "m", "cleanup", "chat", {"messages": [{"a": 1, "b": 2}], "json_schema": None})
+    base = k("p:m", "cleanup", "chat", {"messages": [{"a": 1, "b": 2}], "json_schema": None})
     assert base == k(
-        "p", "m", "cleanup", "chat", {"json_schema": None, "messages": [{"b": 2, "a": 1}]}
+        "p:m", "cleanup", "chat", {"json_schema": None, "messages": [{"b": 2, "a": 1}]}
     )
     variants = [
-        k("p2", "m", "cleanup", "chat", {"messages": [{"a": 1, "b": 2}], "json_schema": None}),
-        k("p", "m2", "cleanup", "chat", {"messages": [{"a": 1, "b": 2}], "json_schema": None}),
-        k("p", "m", "grouping", "chat", {"messages": [{"a": 1, "b": 2}], "json_schema": None}),
-        k("p", "m", "cleanup", "vision", {"messages": [{"a": 1, "b": 2}], "json_schema": None}),
-        k("p", "m", "cleanup", "chat", {"messages": [{"a": 1, "b": 3}], "json_schema": None}),
-        k("p", "m", "cleanup", "chat", {"messages": [{"a": 1, "b": 2}], "json_schema": {}}),
+        k("p2:m", "cleanup", "chat", {"messages": [{"a": 1, "b": 2}], "json_schema": None}),
+        k("p:m2", "cleanup", "chat", {"messages": [{"a": 1, "b": 2}], "json_schema": None}),
+        k("p:m", "grouping", "chat", {"messages": [{"a": 1, "b": 2}], "json_schema": None}),
+        k("p:m", "cleanup", "vision", {"messages": [{"a": 1, "b": 2}], "json_schema": None}),
+        k("p:m", "cleanup", "chat", {"messages": [{"a": 1, "b": 3}], "json_schema": None}),
+        k("p:m", "cleanup", "chat", {"messages": [{"a": 1, "b": 2}], "json_schema": {}}),
     ]
     assert len({base, *variants}) == 7
     s = ListSink()
@@ -382,3 +415,164 @@ def test_k7_jsonl_sink(tmp_path: Path) -> None:
         assert d["provider"] == "mock"
         assert ", " not in ln and ": " not in ln
     assert ModelRef(provider="mock", model="mock-1")
+
+
+class BadEmbed(MockProvider):
+    def __init__(self, vectors: list[list[float]], **kw: Any) -> None:
+        super().__init__(**kw)
+        self._bad = vectors
+
+    def _embed_raw(self, task: Task, texts: Sequence[str]) -> RawEmbed:
+        return RawEmbed(self._bad)
+
+
+@pytest.mark.parametrize(
+    "vectors",
+    [
+        [[1.0, 0.0]],  # wrong count (2 texts)
+        [[1.0, 0.0], [float("nan"), 1.0]],
+        [[1.0, 0.0], [float("inf"), 1.0]],
+        [[1.0, 0.0], [1.0]],  # ragged
+        [[1.0, 0.0], []],  # empty vector
+        [[1.0, 0.0], ["x", 1.0]],  # type: ignore[list-item]
+    ],
+)
+def test_e1_bad_embedding_rejected_and_not_cached(
+    tmp_path: Path, vectors: list[list[float]]
+) -> None:
+    sink = ListSink()
+    p = BadEmbed(vectors, sink=sink, cache=LLMCache(tmp_path / "c"))
+    with pytest.raises(ProviderError, match="embedding output invalid"):
+        p.embed(Task.embeddings, ["a", "b"])
+    assert not (tmp_path / "c").exists() or list((tmp_path / "c").glob("*.json")) == []
+    assert sink[-1].ok is False
+
+
+def test_e2_malformed_cache_entry_is_a_miss_and_overwritten(tmp_path: Path) -> None:
+    cache = LLMCache(tmp_path)
+    p = Counting(sink=ListSink(), cache=cache)
+    p.chat(Task.cleanup, user("<raw>abc</raw>"))
+    p.embed(Task.embeddings, ["a"])
+    files = sorted(tmp_path.glob("*.json"))
+    assert len(files) == 2
+    for f in files:
+        good = json.loads(f.read_text())
+        for broken in ({"key": good["key"]}, {**good, "response": {}}, {**good, "response": 3}):
+            f.write_text(json.dumps(broken))
+            if "text" in good["response"]:
+                assert p.chat(Task.cleanup, user("<raw>abc</raw>")).text == "abc"
+            else:
+                assert len(p.embed(Task.embeddings, ["a"])) == 1
+            assert json.loads(f.read_text()) == good  # overwritten with a good entry
+        f.write_text("[1, 2")  # unparsable
+        if "text" in good["response"]:
+            p.chat(Task.cleanup, user("<raw>abc</raw>"))
+        else:
+            p.embed(Task.embeddings, ["a"])
+        assert json.loads(f.read_text()) == good
+    # malformed vectors inside an otherwise well-formed entry
+    emb = next(f for f in files if "vectors" in f.read_text())
+    d = json.loads(emb.read_text())
+    d["response"]["vectors"] = [[1.0], [2.0]]
+    emb.write_text(json.dumps(d))
+    assert len(p.embed(Task.embeddings, ["a"])) == 1
+    assert json.loads(emb.read_text())["response"]["vectors"] != [[1.0], [2.0]]
+    # cached text that violates the requested schema is also a miss
+    q = MockProvider(
+        sink=ListSink(), cache=LLMCache(tmp_path / "s"), responses={Task.grouping: '{"n": 3}'}
+    )
+    q.chat(Task.grouping, user("q"), json_schema=SCHEMA)
+    sf = next((tmp_path / "s").glob("*.json"))
+    d = json.loads(sf.read_text())
+    d["response"]["text"] = "not json"
+    sf.write_text(json.dumps(d))
+    assert q.chat(Task.grouping, user("q"), json_schema=SCHEMA).parsed == {"n": 3}
+
+
+def test_n1_mock_namespaces_do_not_collide(tmp_path: Path) -> None:
+    ref = ModelRef(provider="mock", model="same")
+    cache = LLMCache(tmp_path)
+    a = MockProvider(ref, sink=ListSink(), cache=cache, responses={Task.grouping: "A"})
+    b = MockProvider(ref, sink=ListSink(), cache=cache, responses={Task.grouping: "B"})
+    assert a.cache_namespace != b.cache_namespace
+    assert a.chat(Task.grouping, user("q")).text == "A"
+    assert b.chat(Task.grouping, user("q")).text == "B"
+    assert a.chat(Task.grouping, user("q")).text == "A"
+    plain = MockProvider(ref, sink=ListSink(), cache=cache)
+    c1 = CorruptingMockProvider(ref, sink=ListSink(), cache=cache, mode="digit")
+    c2 = CorruptingMockProvider(ref, sink=ListSink(), cache=cache, mode="insert")
+    c3 = CorruptingMockProvider(
+        ref, sink=ListSink(), cache=cache, mode="digit", responses={Task.cleanup: "7 x"}
+    )
+    assert (
+        len({plain.cache_namespace, c1.cache_namespace, c2.cache_namespace, c3.cache_namespace})
+        == 4
+    )
+    msg = user("<raw>set 5 bolts</raw>")
+    assert plain.chat(Task.cleanup, msg).text == "set 5 bolts"
+    assert c1.chat(Task.cleanup, msg).text == "set 6 bolts"
+    assert c2.chat(Task.cleanup, msg).text == "set not 5 bolts"
+    base = MockProvider(ref, sink=ListSink()).cache_namespace
+    assert base.startswith("mock:same:MockProvider:")
+    assert BadEmbed([], sink=ListSink()).cache_namespace != base  # class name participates
+
+
+def test_x1_cache_read_oserror_is_a_miss(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+    cache = LLMCache(tmp_path)
+    (tmp_path / f"{'a' * 64}.json").mkdir()  # reading a directory raises OSError
+    with caplog.at_level("WARNING"):
+        assert cache.get("a" * 64) is None
+    assert any("cannot read" in r.message for r in caplog.records)
+    p = MockProvider(sink=ListSink(), cache=cache)
+    p.chat(Task.cleanup, user("x"))  # still works
+
+
+def test_x2_vision_responder_and_provider_error_fill_in() -> None:
+    p = MockProvider(sink=ListSink(), vision_response=lambda b, pr: f"{len(b)}:{pr}")
+    assert p.vision(Task.vision, b"abc", "p").text == "3:p"
+    assert p.cache_namespace != MockProvider(sink=ListSink()).cache_namespace
+
+    class Boom(MockProvider):
+        def _chat_raw(self, *a: Any, **k: Any) -> RawChat:
+            raise ProviderError("down", retriable=True)
+
+    with pytest.raises(ProviderError) as ei:
+        Boom(sink=ListSink()).chat(Task.cleanup, user("x"))
+    assert (ei.value.provider, ei.value.model, ei.value.task) == ("mock", "mock-1", Task.cleanup)
+    assert ei.value.retriable is True
+
+    class Preset(MockProvider):
+        def _chat_raw(self, *a: Any, **k: Any) -> RawChat:
+            raise ProviderError("down", provider="x", model="y", task=Task.agent)
+
+    with pytest.raises(ProviderError) as ei2:
+        Preset(sink=ListSink()).chat(Task.cleanup, user("x"))
+    assert (ei2.value.provider, ei2.value.model, ei2.value.task) == ("x", "y", Task.agent)
+
+
+def test_x3_cached_non_string_text_is_a_miss(tmp_path: Path) -> None:
+    p = Counting(sink=ListSink(), cache=LLMCache(tmp_path))
+    p.chat(Task.cleanup, user("<raw>a</raw>"))
+    f = next(tmp_path.glob("*.json"))
+    d = json.loads(f.read_text())
+    d["response"]["text"] = 5
+    f.write_text(json.dumps(d))
+    assert p.chat(Task.cleanup, user("<raw>a</raw>")).text == "a"
+    assert p.calls == 2
+
+
+def test_x4_default_cache_namespace() -> None:
+    from manuallabor.providers import BaseProvider
+
+    class Plain(BaseProvider):
+        def _chat_raw(self, *a: Any, **k: Any) -> RawChat:
+            return RawChat("hi")
+
+        def _vision_raw(self, *a: Any, **k: Any) -> RawChat:
+            return RawChat("hi")
+
+        def _embed_raw(self, *a: Any, **k: Any) -> RawEmbed:
+            return RawEmbed([[1.0]])
+
+    p = Plain(ModelRef(provider="ollama", model="m"), sink=ListSink())
+    assert p.cache_namespace == "ollama:m"

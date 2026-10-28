@@ -39,3 +39,10 @@
 
 ## Resources
 - SPEC.md (what), CLAUDE.md (how), docs/plans/2026-10-28-manual-labor-build.md (per-task plan with model assignments), docs/design/*.md (per-module designs, produced during execution), docs/PROGRESS.md (gate log).
+
+## Visual/Browser Findings (2026-10-28, fixture sanity render at 55 DPI)
+- clean.pdf p2: header "Acme X200 Service Manual", L1 "1. Safety and Preparation", L2 "1.1 General Precautions", bullet list with "10 to 60 N·m", forced hyphenation "lubri-/cation", specs "35 N·m", "P/N 4471-A", "0.25 mm ±0.05", "90°", "2.5 L", "10 A", footer "Page 2". Realistic manual layout.
+- figures.pdf p2: two vector line-art figures with captions "Figure 3. Control board connector locations." / "Figure 4. Coolant flow through the reservoir." and in-text "(see Figure 3)" refs. Caption numbering is per-fixture, not page order.
+- scanned.pdf p2: same content as clean p2, visibly rotated ~0.5°, grainy; `get_text()` returns 0 chars (no text layer) — correct.
+- Fixture facts: clean 12p/150 blocks/3 figs; twocol 6p/97/3 (1 composite→crop); tables 6p/87/6 tables; figures 8p/95/14 figs; scanned 12p (copy of clean GT, bboxes ±6pt); manual.docx 13 blocks/2 figs. Total 15 MB; scanned.pdf 14.3 MB (close to 15 MB cap — don't raise noise σ).
+- Pytest addopts already has `-q`; passing `-q` again suppresses the summary line. Use plain `uv run pytest` to see counts.

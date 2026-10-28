@@ -143,6 +143,8 @@ def test_f5_figures_pdf(gt):
         return doc.extract_image(xref)["image"]
 
     orig = dups[0].duplicate_of
+    # the in-document duplicate is a separate PDF image object (own xref), same pixels
+    assert by_id[dups[0].expected_id] != by_id[orig]
     assert (
         hashlib.sha256(img_bytes(by_id[dups[0].expected_id])).digest()
         == hashlib.sha256(img_bytes(by_id[orig])).digest()
@@ -241,3 +243,32 @@ def test_f11_project_a(sums):
         assert ref.provider == "mock" and ref.model == "mock-1"
     for name in ("clean.pdf", "figures.pdf"):
         assert (FIX / "project-a" / "sources" / name).read_bytes() == (FIX / name).read_bytes()
+
+
+def _overlaps(r, area) -> bool:
+    """Closed-interval overlap; unlike Rect.intersects it also works for zero-height lines."""
+    return r.x0 <= area.x1 and r.x1 >= area.x0 and r.y0 <= area.y1 and r.y1 >= area.y0
+
+
+def test_f12_vector_figures_stay_inside_their_bbox(gt):
+    g = gt["figures"]
+    doc = pymupdf.open(FIX / "figures.pdf")
+    vec = [f for f in g.figures if f.expected_extraction == Extraction.vector]
+    assert len(vec) >= 4
+    tol = 0.5
+    for f in vec:
+        page = doc[f.page - 1]
+        frame = pymupdf.Rect(*f.bbox)
+        inner = pymupdf.Rect(frame.x0 - tol, frame.y0 - tol, frame.x1 + tol, frame.y1 + tol)
+        cap = g.blocks[f.caption_block_index] if f.caption_block_index is not None else None
+        cap_rect = pymupdf.Rect(*cap.bbox) if cap is not None else None
+        touching = 0
+        for d in page.get_drawings():
+            r = pymupdf.Rect(d["rect"])
+            if _overlaps(r, frame):
+                touching += 1
+                assert r.x0 >= inner.x0 and r.y0 >= inner.y0, (f.expected_id, tuple(r))
+                assert r.x1 <= inner.x1 and r.y1 <= inner.y1, (f.expected_id, tuple(r))
+            if cap_rect is not None:
+                assert not _overlaps(r, cap_rect), (f.expected_id, tuple(r), tuple(cap_rect))
+        assert touching >= 8, f.expected_id

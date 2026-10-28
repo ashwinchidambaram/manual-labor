@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import time
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Mapping, Sequence
@@ -68,6 +69,9 @@ class RawEmbed:
 class Provider(Protocol):
     ref: ModelRef
 
+    @property
+    def cache_namespace(self) -> str: ...
+
     def chat(
         self,
         task: Task,
@@ -111,6 +115,12 @@ class BaseProvider(ABC):
 
     @abstractmethod
     def _embed_raw(self, task: Task, texts: Sequence[str]) -> RawEmbed: ...
+
+    @property
+    def cache_namespace(self) -> str:
+        """Identity mixed into every cache key. Subclasses whose output depends on more
+        than (provider, model) must extend it."""
+        return f"{self.ref.provider}:{self.ref.model}"
 
     # -- helpers ---------------------------------------------------------
     def _err(self, task: Task, exc: Exception) -> ProviderError:
@@ -183,6 +193,34 @@ class BaseProvider(ABC):
             )
         return parsed
 
+    def _check_vectors(
+        self, task: Task, vectors: Any, expected: int, *, round_values: bool
+    ) -> list[list[float]]:
+        def fail(msg: str) -> ProviderError:
+            return ProviderError(
+                f"embedding output invalid: {msg}",
+                provider=self.ref.provider,
+                model=self.ref.model,
+                task=task,
+            )
+
+        if not isinstance(vectors, list) or len(vectors) != expected:
+            got = len(vectors) if isinstance(vectors, list) else type(vectors).__name__
+            raise fail(f"expected {expected} vectors, got {got}")
+        out: list[list[float]] = []
+        for v in vectors:
+            if not isinstance(v, list) or not v:
+                raise fail("each vector must be a non-empty list")
+            if any(
+                isinstance(x, bool) or not isinstance(x, (int, float)) or not math.isfinite(x)
+                for x in v
+            ):
+                raise fail("vector values must be finite numbers")
+            out.append([round(float(x), 6) + 0.0 if round_values else float(x) for x in v])
+        if len({len(v) for v in out}) > 1:
+            raise fail("vectors must all have the same length")
+        return out
+
     def _text_call(
         self,
         task: Task,
@@ -191,17 +229,26 @@ class BaseProvider(ABC):
         schema: Mapping[str, Any] | None,
         raw_call: Callable[[], RawChat],
     ) -> ChatResult:
-        key = LLMCache.key(self.ref.provider, self.ref.model, task, kind, inputs)
+        key = LLMCache.key(self.cache_namespace, task, kind, inputs)
         t0 = time.perf_counter()
         usage: dict[str, Any] = {}
         try:
+            text: str | None = None
+            parsed: Any | None = None
+            hit = False
             cached = self._cache.get(key) if self._cache else None
             if cached is not None:
-                text = str(cached["response"]["text"])
-                usage = dict(cached.get("usage") or {})
-                parsed = self._validate(task, text, schema)
-                hit = True
-            else:
+                # A malformed or schema-violating entry is a miss; it is overwritten below.
+                try:
+                    cand = cached["response"]["text"]
+                    if isinstance(cand, str):
+                        parsed = self._validate(task, cand, schema)
+                        text = cand
+                        usage = dict(cached.get("usage") or {})
+                        hit = True
+                except (KeyError, TypeError, ValueError, ProviderOutputError):
+                    text = None
+            if text is None:
                 raw = raw_call()
                 text = raw.text
                 usage = {
@@ -221,7 +268,6 @@ class BaseProvider(ABC):
                             "usage": usage,
                         },
                     )
-                hit = False
         except Exception as exc:
             err = self._err(task, exc)
             self._emit(task, kind, key, t0, cached=False, error=str(err))
@@ -262,19 +308,25 @@ class BaseProvider(ABC):
         )
 
     def embed(self, task: Task, texts: Sequence[str]) -> list[list[float]]:
-        key = LLMCache.key(
-            self.ref.provider, self.ref.model, task, CallKind.embed, {"texts": list(texts)}
-        )
+        key = LLMCache.key(self.cache_namespace, task, CallKind.embed, {"texts": list(texts)})
         t0 = time.perf_counter()
         try:
+            vectors: list[list[float]] | None = None
+            usage: dict[str, Any] = {}
+            hit = False
             cached = self._cache.get(key) if self._cache else None
             if cached is not None:
-                vectors = [list(map(float, v)) for v in cached["response"]["vectors"]]
-                usage = dict(cached.get("usage") or {})
-                hit = True
-            else:
+                try:
+                    vectors = self._check_vectors(
+                        task, cached["response"]["vectors"], len(texts), round_values=False
+                    )
+                    usage = dict(cached.get("usage") or {})
+                    hit = True
+                except (KeyError, TypeError, ValueError, ProviderError):
+                    vectors = None
+            if vectors is None:
                 raw = self._embed_raw(task, texts)
-                vectors = [[round(x, 6) + 0.0 for x in v] for v in raw.vectors]
+                vectors = self._check_vectors(task, raw.vectors, len(texts), round_values=True)
                 usage = {"prompt_tokens": raw.prompt_tokens, "completion_tokens": None}
                 if self._cache:
                     self._cache.put(
@@ -288,7 +340,6 @@ class BaseProvider(ABC):
                             "usage": usage,
                         },
                     )
-                hit = False
         except Exception as exc:
             err = self._err(task, exc)
             self._emit(task, CallKind.embed, key, t0, cached=False, error=str(err))

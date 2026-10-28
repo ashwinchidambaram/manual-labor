@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import Field, field_validator, model_validator
 
@@ -29,6 +29,7 @@ __all__ = [
     "DiffOp",
     "FaithfulnessResult",
     "FaithfulnessViolation",
+    "NumericVariant",
     "OcrWord",
     "Signal",
     "TableCell",
@@ -90,6 +91,24 @@ class DiffOp(ContractModel):
     op: DiffOpKind
     raw: str
     clean: str
+    raw_start: int = Field(ge=0)
+    raw_end: int = Field(ge=0)
+    clean_start: int = Field(ge=0)
+    clean_end: int = Field(ge=0)
+    allowed: bool
+
+    @model_validator(mode="after")
+    def _check_spans(self) -> DiffOp:
+        if self.raw_end < self.raw_start or self.clean_end < self.clean_start:
+            raise ValueError("diff span end must be >= start")
+        return self
+
+
+class NumericVariant(ContractModel):
+    raw: str
+    chosen: str
+    source: Literal["textlayer", "ocr"]
+    reason: str
 
 
 class FaithfulnessViolation(ContractModel):
@@ -107,7 +126,7 @@ class FaithfulnessResult(ContractModel):
     alignment_ratio: Unit
     violations: list[FaithfulnessViolation]
     diff: list[DiffOp]
-    numeric_variant_note: str | None = None
+    numeric_variant: NumericVariant | None = None
 
     @model_validator(mode="after")
     def _check_passed(self) -> FaithfulnessResult:

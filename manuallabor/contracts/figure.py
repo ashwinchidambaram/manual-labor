@@ -19,8 +19,26 @@ from manuallabor.contracts._base import (
 )
 from manuallabor.contracts.enums import AttachRule, BlockStatus, Extraction
 
-_FIG_CORE = re.sub(r"\?P<\w+>", "?:", ids.FIGURE_ID_PATTERN[1:-1])
-FILE_RE = re.compile(rf"^(?:\.\./[a-z0-9-]+/)?{_FIG_CORE}\.(?:png|jpg)$")
+_DEDUP_RE = re.compile(
+    rf"^\.\./(?P<dir>{ids.SLUG_PATTERN})/(?P<fid>FIG-[a-z0-9-]+-p[0-9]+-[0-9]+)\.(?P<ext>png|svg)$"
+)
+
+
+def parse_figure_file(own_id: str, file: str, exts: tuple[str, ...]) -> tuple[str, str] | None:
+    """Validate a figure file path. Returns None for the figure's own file, or
+    (other_slug, other_figure_id) for a deduplicated figure. Raises ValueError otherwise."""
+    if any(file == f"{own_id}.{e}" for e in exts):
+        return None
+    m = _DEDUP_RE.match(file)
+    if m is not None and m.group("ext") in exts and ids.FIGURE_ID_RE.match(m.group("fid")):
+        other_slug = ids.parse_figure_id(m.group("fid"))[0]
+        if other_slug == m.group("dir") and m.group("fid") != own_id:
+            return other_slug, m.group("fid")
+    allowed = "|".join(exts)
+    raise ValueError(
+        f"file must be <own id>.({allowed}) or ../<other-slug>/<FIG-other-id>.({allowed}) "
+        f"with the other id's slug matching the directory, got {file!r}"
+    )
 
 
 class FigureRecord(ContractModel):
@@ -58,19 +76,15 @@ class FigureRecord(ContractModel):
             return sorted(set(v))
         return v
 
-    @field_validator("file")
-    @classmethod
-    def _check_file(cls, v: str) -> str:
-        if not FILE_RE.match(v):
-            raise ValueError("file must match [../<slug>/]FIG-<...>.(png|jpg)")
-        return v
-
     @model_validator(mode="after")
     def _check(self) -> FigureRecord:
         if (self.svg is not None) != (self.extraction == Extraction.vector):
             raise ValueError("svg must be set if and only if extraction == vector")
-        if self.svg is not None and self.svg != f"{self.id}.svg":
-            raise ValueError("svg must equal <id>.svg")
+        file_target = parse_figure_file(self.id, self.file, ("png", "svg"))
+        if self.svg is not None:
+            svg_target = parse_figure_file(self.id, self.svg, ("svg",))
+            if svg_target != file_target:
+                raise ValueError("svg must point at the same figure as file")
         slug, page, _ = ids.parse_figure_id(self.id)
         if slug != self.source_doc or page != self.page:
             raise ValueError("id: slug/page do not match source_doc/page")

@@ -8,8 +8,8 @@ from collections.abc import Collection
 from pathlib import Path
 
 SLUG_PATTERN = r"[a-z0-9]+(?:-[a-z0-9]+)*"
-PAGE_PATTERN = r"\d{3,4}"
-INDEX_PATTERN = r"\d{2,3}"
+PAGE_PATTERN = r"(?:\d{3}|[1-9]\d{3,})"
+INDEX_PATTERN = r"(?:\d{2}|[1-9]\d{2,})"
 
 BLOCK_ID_PATTERN = rf"^b-(?P<slug>{SLUG_PATTERN})-p(?P<page>{PAGE_PATTERN})-(?P<n>{INDEX_PATTERN})$"
 FIGURE_ID_PATTERN = (
@@ -17,7 +17,7 @@ FIGURE_ID_PATTERN = (
 )
 ARTICLE_ID_PATTERN = rf"^(?P<slug>{SLUG_PATTERN})(?:--(?P<topic>{SLUG_PATTERN}))?$"
 GROUP_ID_PATTERN = rf"^g-(?P<slug>{SLUG_PATTERN})-(?P<view>[st])(?P<n>\d{{3}})$"
-FIGURE_ID_SEARCH_PATTERN = r"FIG-[a-z0-9-]+-p\d{3,4}-\d{2,3}(?![0-9])"
+FIGURE_ID_SEARCH_PATTERN = rf"FIG-[a-z0-9-]+-p{PAGE_PATTERN}-{INDEX_PATTERN}(?![0-9])"
 
 BLOCK_ID_RE = re.compile(BLOCK_ID_PATTERN)
 FIGURE_ID_RE = re.compile(FIGURE_ID_PATTERN)
@@ -27,6 +27,8 @@ GROUP_ID_RE = re.compile(GROUP_ID_PATTERN)
 SLUG_RE = re.compile(rf"^{SLUG_PATTERN}$")
 
 MAX_SLUG_LEN = 48
+UNASSIGNED = "unassigned"
+RESERVED_SLUGS = frozenset({UNASSIGNED})
 
 
 def slugify(text: str, max_len: int = MAX_SLUG_LEN) -> str:
@@ -44,7 +46,7 @@ def doc_slug_from_filename(filename: str) -> str:
 
 
 def make_unique_slug(base: str, existing: Collection[str]) -> str:
-    if base not in existing:
+    if base not in existing and base not in RESERVED_SLUGS:
         return base
     n = 2
     while True:
@@ -78,6 +80,8 @@ def article_id(slug: str, topic_slug: str | None) -> str:
     if not SLUG_RE.match(slug):
         raise ValueError(f"invalid slug: {slug!r}")
     if topic_slug is None:
+        if slug in RESERVED_SLUGS:
+            raise ValueError(f"slug {slug!r} is reserved and cannot be an article id")
         return slug
     if not SLUG_RE.match(topic_slug):
         raise ValueError(f"invalid topic slug: {topic_slug!r}")

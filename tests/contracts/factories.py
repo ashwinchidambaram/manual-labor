@@ -31,6 +31,7 @@ def document_dict(**over: Any) -> dict[str, Any]:
         "filename": "X200_Service_Manual_rev4.pdf",
         "kind": "born_digital_pdf",
         "page_count": 100,
+        "block_ids": [f"b-{SLUG}-p001-0{i}" for i in (1, 2, 3)],
     }
     d.update(over)
     return d

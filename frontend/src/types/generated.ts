@@ -20,7 +20,7 @@ export type DiffOpKind = 'equal' | 'insert' | 'delete' | 'replace';
  * This interface was referenced by `_All`'s JSON-Schema
  * via the `definition` "FaithViolationKind".
  */
-export type FaithViolationKind = 'insertion' | 'deletion' | 'numeric_mismatch';
+export type FaithViolationKind = 'insertion' | 'deletion' | 'numeric_mismatch' | 'reorder';
 /**
  * This interface was referenced by `_All`'s JSON-Schema
  * via the `definition` "SignalName".
@@ -169,7 +169,7 @@ export interface Block {
 export interface FaithfulnessResult {
   alignment_ratio: number;
   diff: DiffOp[];
-  numeric_variant_note: string | null;
+  numeric_variant: NumericVariant | null;
   passed: boolean;
   violations: FaithfulnessViolation[];
 }
@@ -178,9 +178,24 @@ export interface FaithfulnessResult {
  * via the `definition` "DiffOp".
  */
 export interface DiffOp {
+  allowed: boolean;
   clean: string;
+  clean_end: number;
+  clean_start: number;
   op: DiffOpKind;
   raw: string;
+  raw_end: number;
+  raw_start: number;
+}
+/**
+ * This interface was referenced by `_All`'s JSON-Schema
+ * via the `definition` "NumericVariant".
+ */
+export interface NumericVariant {
+  chosen: string;
+  raw: string;
+  reason: string;
+  source: 'textlayer' | 'ocr';
 }
 /**
  * This interface was referenced by `_All`'s JSON-Schema
@@ -255,7 +270,7 @@ export interface BlockAccounting {
   assignments: {
     /**
      * This interface was referenced by `undefined`'s JSON-Schema definition
-     * via the `patternProperty` "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\d{3,4})-(?:\d{2,3})$".
+     * via the `patternProperty` "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\d{3}|[1-9]\d{3,}))-(?:(?:\d{2}|[1-9]\d{2,}))$".
      */
     [k: string]: string;
   };
@@ -263,7 +278,7 @@ export interface BlockAccounting {
   unassigned_reasons: {
     /**
      * This interface was referenced by `undefined`'s JSON-Schema definition
-     * via the `patternProperty` "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\d{3,4})-(?:\d{2,3})$".
+     * via the `patternProperty` "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\d{3}|[1-9]\d{3,}))-(?:(?:\d{2}|[1-9]\d{2,}))$".
      */
     [k: string]: 'not_selected' | 'header_footer' | 'rejected' | 'empty';
   };
@@ -288,6 +303,7 @@ export interface Decision {
  * via the `definition` "Document".
  */
 export interface Document {
+  block_ids: string[];
   filename: string;
   kind: DocKind;
   page_count: number;

@@ -91,6 +91,11 @@ def test_i5_tricky_slugs(slug: str) -> None:
         "b--p001-01",
         "b-x--y-p001-01",
         "b-x-p042-03\n",
+        "b-x-p0042-03",
+        "b-x-p042-003",
+        "b-x-p-003-01",
+        "b-x-p001--03",
+        "b-x-p0999-01",
     ],
 )
 def test_i6_rejected(bad: str) -> None:
@@ -134,3 +139,28 @@ def test_i9_group_ids() -> None:
 def test_sort_key_numeric() -> None:
     a, b = ids.block_id("x", 9, 1), ids.block_id("x", 10, 1)
     assert sorted([b, a], key=ids.block_sort_key) == [a, b]
+
+
+def test_i2_reserved_slug_gets_suffix() -> None:
+    assert ids.make_unique_slug("unassigned", set()) == "unassigned-2"
+    assert ids.make_unique_slug("unassigned", {"unassigned-2"}) == "unassigned-3"
+    assert ids.make_unique_slug(ids.doc_slug_from_filename("Unassigned.pdf"), set()) != "unassigned"
+
+
+def test_i8_article_id_never_bare_unassigned() -> None:
+    with pytest.raises(ValueError, match="reserved"):
+        ids.article_id("unassigned", None)
+    assert ids.article_id("unassigned-2", None) == "unassigned-2"
+    assert ids.article_id("unassigned", "topic") == "unassigned--topic"
+
+
+@pytest.mark.parametrize("bad", ["p0042", "-003"])
+def test_i6_leading_zero_fragments(bad: str) -> None:
+    assert not ids.BLOCK_ID_RE.match(f"b-x-{bad}-01")
+    assert not ids.BLOCK_ID_RE.match(f"b-x-p001{bad}")
+    assert not ids.FIGURE_ID_RE.match(f"FIG-x-{bad}-01")
+
+
+def test_i6_wide_ids_still_accepted() -> None:
+    assert ids.BLOCK_ID_RE.match("b-x-p1000-100")
+    assert ids.parse_figure_id("FIG-x-p1000-100") == ("x", 1000, 100)

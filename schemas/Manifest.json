@@ -13,7 +13,7 @@
       "properties": {
         "assignments": {
           "patternProperties": {
-            "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$": {
+            "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$": {
               "type": "string"
             }
           },
@@ -27,7 +27,7 @@
         },
         "unassigned_reasons": {
           "patternProperties": {
-            "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$": {
+            "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$": {
               "enum": [
                 "not_selected",
                 "header_footer",
@@ -61,6 +61,14 @@
     "Document": {
       "additionalProperties": false,
       "properties": {
+        "block_ids": {
+          "items": {
+            "pattern": "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$",
+            "type": "string"
+          },
+          "title": "Block Ids",
+          "type": "array"
+        },
         "filename": {
           "minLength": 1,
           "title": "Filename",
@@ -152,6 +160,7 @@
         "product_model_inferred",
         "kind",
         "page_count",
+        "block_ids",
         "pages_without_text_layer",
         "stripped_headers",
         "stripped_footers",
@@ -165,7 +174,7 @@
       "properties": {
         "block_ids": {
           "items": {
-            "pattern": "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$",
+            "pattern": "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$",
             "type": "string"
           },
           "title": "Block Ids",
@@ -173,7 +182,7 @@
         },
         "figures": {
           "items": {
-            "pattern": "^FIG-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$",
+            "pattern": "^FIG-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$",
             "type": "string"
           },
           "title": "Figures",
@@ -232,7 +241,7 @@
         "duplicate_of": {
           "anyOf": [
             {
-              "pattern": "^FIG-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$",
+              "pattern": "^FIG-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$",
               "type": "string"
             },
             {
@@ -247,7 +256,7 @@
           "type": "string"
         },
         "id": {
-          "pattern": "^FIG-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$",
+          "pattern": "^FIG-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$",
           "title": "Id",
           "type": "string"
         },
@@ -372,7 +381,7 @@
         "target_id": {
           "anyOf": [
             {
-              "pattern": "(?:^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$)|(?:^FIG-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$)",
+              "pattern": "(?:^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$)|(?:^FIG-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$)",
               "type": "string"
             },
             {
@@ -417,7 +426,7 @@
         },
         "numbers_verified_blocks": {
           "items": {
-            "pattern": "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$",
+            "pattern": "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$",
             "type": "string"
           },
           "title": "Numbers Verified Blocks",

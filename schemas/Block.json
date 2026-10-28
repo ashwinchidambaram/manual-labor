@@ -30,9 +30,23 @@
     "DiffOp": {
       "additionalProperties": false,
       "properties": {
+        "allowed": {
+          "title": "Allowed",
+          "type": "boolean"
+        },
         "clean": {
           "title": "Clean",
           "type": "string"
+        },
+        "clean_end": {
+          "minimum": 0,
+          "title": "Clean End",
+          "type": "integer"
+        },
+        "clean_start": {
+          "minimum": 0,
+          "title": "Clean Start",
+          "type": "integer"
         },
         "op": {
           "$ref": "#/$defs/DiffOpKind"
@@ -40,12 +54,27 @@
         "raw": {
           "title": "Raw",
           "type": "string"
+        },
+        "raw_end": {
+          "minimum": 0,
+          "title": "Raw End",
+          "type": "integer"
+        },
+        "raw_start": {
+          "minimum": 0,
+          "title": "Raw Start",
+          "type": "integer"
         }
       },
       "required": [
         "op",
         "raw",
-        "clean"
+        "clean",
+        "raw_start",
+        "raw_end",
+        "clean_start",
+        "clean_end",
+        "allowed"
       ],
       "title": "DiffOp",
       "type": "object"
@@ -64,7 +93,8 @@
       "enum": [
         "insertion",
         "deletion",
-        "numeric_mismatch"
+        "numeric_mismatch",
+        "reorder"
       ],
       "title": "FaithViolationKind",
       "type": "string"
@@ -85,17 +115,16 @@
           "title": "Diff",
           "type": "array"
         },
-        "numeric_variant_note": {
+        "numeric_variant": {
           "anyOf": [
             {
-              "type": "string"
+              "$ref": "#/$defs/NumericVariant"
             },
             {
               "type": "null"
             }
           ],
-          "default": null,
-          "title": "Numeric Variant Note"
+          "default": null
         },
         "passed": {
           "title": "Passed",
@@ -114,7 +143,7 @@
         "alignment_ratio",
         "violations",
         "diff",
-        "numeric_variant_note"
+        "numeric_variant"
       ],
       "title": "FaithfulnessResult",
       "type": "object"
@@ -188,6 +217,39 @@
         "clean"
       ],
       "title": "FaithfulnessViolation",
+      "type": "object"
+    },
+    "NumericVariant": {
+      "additionalProperties": false,
+      "properties": {
+        "chosen": {
+          "title": "Chosen",
+          "type": "string"
+        },
+        "raw": {
+          "title": "Raw",
+          "type": "string"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        },
+        "source": {
+          "enum": [
+            "textlayer",
+            "ocr"
+          ],
+          "title": "Source",
+          "type": "string"
+        }
+      },
+      "required": [
+        "raw",
+        "chosen",
+        "source",
+        "reason"
+      ],
+      "title": "NumericVariant",
       "type": "object"
     },
     "OcrWord": {
@@ -460,7 +522,7 @@
     "figure_id": {
       "anyOf": [
         {
-          "pattern": "^FIG-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$",
+          "pattern": "^FIG-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$",
           "type": "string"
         },
         {
@@ -490,7 +552,7 @@
       "title": "Heading Level"
     },
     "id": {
-      "pattern": "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$",
+      "pattern": "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$",
       "title": "Id",
       "type": "string"
     },

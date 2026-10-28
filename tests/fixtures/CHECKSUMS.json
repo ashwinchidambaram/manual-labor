@@ -1,8 +1,8 @@
 {
   "clean.pdf": "a275fa9cf66bccd147912250863b7b7a2a2daa5f49086db99b1da6d0473c189e",
-  "figures.pdf": "1e0c3f49764183d59fbf653f00b2391d1e0315e6c37891ac3fff8b627336ba8b",
+  "figures.pdf": "46aec2beea3cabf78c0ee1e5328dedd15aabd1c62675e0393103c7d1328db42d",
   "ground_truth/clean.json": "3622a586f231842e35a50bce03b868db301fd4c709c61b74295abe4a6cfaa88e",
-  "ground_truth/figures.json": "7296d4ba3ddd83add5af2e7d272858bb0125017e35ead522bbdb5d4d6c689d9e",
+  "ground_truth/figures.json": "1199061ddfed634d05e9ad2e40cbb38a5c97d4d40fc0bbec5b1197c1ff646638",
   "ground_truth/manual.json": "afdca00fea682af1d1536d3c909d7370b1579a52836838307a40364f11ddbbf1",
   "ground_truth/scanned.json": "86b7e0b651cc287cb3e6c7eaf7ac99e99b42b697e424086b239224a3c32b974c",
   "ground_truth/tables.json": "e8b92508608a1160580cfb93f3d0361a72cf80ab1d733563c33e5ef524ae015b",
@@ -10,7 +10,7 @@
   "manual.docx": "c16ce46738507e01fb0808e67f9b8fa592f556b601cea4ffdabec4c05d0c8c6b",
   "project-a/project.json": "98bc91e28d8ae3d43baa900fb90cf70d2a818c8630052bab9afc7f5f888cb62c",
   "project-a/sources/clean.pdf": "a275fa9cf66bccd147912250863b7b7a2a2daa5f49086db99b1da6d0473c189e",
-  "project-a/sources/figures.pdf": "1e0c3f49764183d59fbf653f00b2391d1e0315e6c37891ac3fff8b627336ba8b",
+  "project-a/sources/figures.pdf": "46aec2beea3cabf78c0ee1e5328dedd15aabd1c62675e0393103c7d1328db42d",
   "scanned.pdf": "1d0d616bd6e7993d1ab3dbe45123b367cc2c996532180b530e20cc9b22801255",
   "tables.pdf": "e95a57c445f9d4434e377f4a0390f17854adbdafc341847a23759a0657868634",
   "twocol.pdf": "883c532aacda4a8f25229c05a7ed6f890934f1acf3247439758f61227eb16bbf"
