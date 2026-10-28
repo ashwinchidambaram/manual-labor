@@ -46,3 +46,11 @@
 - scanned.pdf p2: same content as clean p2, visibly rotated ~0.5°, grainy; `get_text()` returns 0 chars (no text layer) — correct.
 - Fixture facts: clean 12p/150 blocks/3 figs; twocol 6p/97/3 (1 composite→crop); tables 6p/87/6 tables; figures 8p/95/14 figs; scanned 12p (copy of clean GT, bboxes ±6pt); manual.docx 13 blocks/2 figs. Total 15 MB; scanned.pdf 14.3 MB (close to 15 MB cap — don't raise noise σ).
 - Pytest addopts already has `-q`; passing `-q` again suppresses the summary line. Use plain `uv run pytest` to see counts.
+
+## Module 1 decisions (2026-10-28, from docs/design/01-parse.md measurements)
+| Decision | Rationale |
+|---|---|
+| OCR engine default = `auto` → Tesseract if the binary is on PATH, else RapidOCR; resolved engine recorded on Document | Design measured Tesseract token F1 0.97–0.997 vs RapidOCR ~0.90 on scanned.pdf, but SPEC §10 wants a pip-only default for portability. `auto` gives both. |
+| Use `rapidocr>=3.10` (not `rapidocr-onnxruntime` 1.4, which drops spaces) | Measured. |
+| Docling required, offline mode when HF models cached; `MANUALLABOR_REQUIRE_DOCLING=1` makes missing models a failure in the gate | Models already in ~/.cache/huggingface/hub on this machine; warm cost ~0.25 s/page. |
+| Scanned pages: two parsers = Tesseract + RapidOCR, Docling layout-only for figure/table regions | PyMuPDF yields nothing on image-only pages. |
