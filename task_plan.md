@@ -4,7 +4,7 @@
 Deliver Manual Labor v1 per SPEC.md: every CLAUDE.md module gate (0–11) passed with its proving command pasted in docs/PROGRESS.md, and SPEC §11 acceptance recorded in docs/ACCEPTANCE.md.
 
 ## Current Phase
-Phase P (planning) complete → awaiting user approval of docs/plans/2026-10-28-manual-labor-build.md before Phase 0 starts.
+Phase 0 (scaffold, contracts, fixtures, CI). User approved autonomous run on 2026-10-28.
 
 ## Phases
 Detailed tasks, model assignments, and gates: docs/plans/2026-10-28-manual-labor-build.md. Decisions and environment: findings.md.
@@ -13,14 +13,14 @@ Detailed tasks, model assignments, and gates: docs/plans/2026-10-28-manual-labor
 - [x] Read SPEC.md and CLAUDE.md; verify toolchain (uv, py3.12, node22, tesseract, ollama) and hardware (M3 16GB)
 - [x] Record decisions in findings.md (synthetic fixtures by construction, MockProvider in M0, parser pair, model tiers)
 - [x] Write docs/plans/2026-10-28-manual-labor-build.md with per-task model assignments and gates
-- [ ] User approves plan (or says run autonomously)
+- [x] User approved: run autonomously through all gates
 - **Status:** complete
 
 ### Phase 0: Scaffold, contracts, fixtures, CI
-- [ ] git init + first commit
+- [x] git init + first commit (f79461f)
 - [ ] Design 00-contracts.md (Opus) · Scaffold (Haiku) · Contracts (Sonnet) ∥ Fixture generator (Sonnet) · Type-gen + CI (Haiku) · Review (Opus) · Fix
 - [ ] Gate: `uv run pytest -q`; `uv run labor schemas export`; 5 PDFs + 1 DOCX + ground truth; `npm test`
-- **Status:** pending
+- **Status:** in_progress
 
 ### Phase 1: Ingest + dual parse + block model
 - [ ] Design (Opus) · Implement parsers/IDs (Sonnet) ∥ OCR/DOCX/tables (Sonnet) · Review (Opus) · Fix

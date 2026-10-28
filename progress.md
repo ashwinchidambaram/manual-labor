@@ -15,7 +15,11 @@
   - CLAUDE.md (modified earlier this session), findings.md, task_plan.md, progress.md, docs/plans/2026-10-28-manual-labor-build.md (created), docs/design/ (empty dir)
 
 ### Phase 0: Scaffold, contracts, fixtures, CI
-- **Status:** pending (blocked on plan approval)
+- **Status:** in_progress
+- **Started:** 2026-10-28 14:25
+- Actions taken:
+  - git init, .gitignore, commit f79461f.
+  - Dispatched M0.2 contracts design (Opus) and M0.3 scaffold (Haiku) in parallel.
 
 ## Test Results
 | Test | Input | Expected | Actual | Status |
