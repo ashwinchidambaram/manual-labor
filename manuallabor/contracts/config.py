@@ -44,7 +44,7 @@ class ProjectConfig(ContractModel):
     models: TaskModels = Field(default_factory=TaskModels)
     article_split: ArticleSplit = ArticleSplit.per_topic
     parsers: list[str] = Field(default_factory=lambda: ["pymupdf", "docling"])
-    ocr_engine: OcrEngine = OcrEngine.rapidocr
+    ocr_engine: OcrEngine = OcrEngine.auto
     ocr_dpi: int = Field(default=300, ge=300)
     background_ocr_born_digital: bool = True
     target_edit_rate: Unit = 0.02

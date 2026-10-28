@@ -4,7 +4,7 @@
 Deliver Manual Labor v1 per SPEC.md: every CLAUDE.md module gate (0–11) passed with its proving command pasted in docs/PROGRESS.md, and SPEC §11 acceptance recorded in docs/ACCEPTANCE.md.
 
 ## Current Phase
-Phase 0 (scaffold, contracts, fixtures, CI). User approved autonomous run on 2026-10-28.
+Phase 1 (ingest + dual parse + block model). User approved autonomous run on 2026-10-28.
 
 ## Phases
 Detailed tasks, model assignments, and gates: docs/plans/2026-10-28-manual-labor-build.md. Decisions and environment: findings.md.
@@ -19,14 +19,14 @@ Detailed tasks, model assignments, and gates: docs/plans/2026-10-28-manual-labor
 ### Phase 0: Scaffold, contracts, fixtures, CI
 - [x] git init + first commit (f79461f)
 - [x] Design 00-contracts.md (Opus) · Scaffold (Haiku) · Contracts (Sonnet) ∥ Fixture generator (Sonnet) · Type-gen + CI (Haiku) · Review (Opus)
-- [ ] Fix review findings (Sonnet, in progress) → re-run gate → record in docs/PROGRESS.md
-- [ ] Gate: `uv run pytest -q`; `uv run labor schemas export`; 5 PDFs + 1 DOCX + ground truth; `npm test`
-- **Status:** in_progress
+- [x] Fix review findings (Sonnet) → gate re-run → recorded in docs/PROGRESS.md
+- [x] Gate: 163 passed; schemas + fixtures byte-stable; 5 PDFs + 1 DOCX + GT; npm test green
+- **Status:** complete
 
 ### Phase 1: Ingest + dual parse + block model
 - [ ] Design (Opus) · Implement parsers/IDs (Sonnet) ∥ OCR/DOCX/tables (Sonnet) · Review (Opus) · Fix
 - [ ] Gate: both parsers on all fixtures; stable IDs across re-runs; headers/footers on ≥2 fixtures; GT token F1 ≥ 0.98
-- **Status:** pending
+- **Status:** in_progress
 
 ### Phase 2: Figure extraction
 - [ ] Design (Opus) · Implement (Sonnet) · Review (Sonnet) · Fix
@@ -34,6 +34,7 @@ Detailed tasks, model assignments, and gates: docs/plans/2026-10-28-manual-labor
 - **Status:** pending
 
 ### Phase 3: Scoring + faithfulness check
+- [ ] Pre-req (user-agreed 2026-10-28): add a real scanned manual as 7th fixture (live-only, no checksum gate) — orchestrator picks a clearly public-domain US government/military technical manual, records the exact source URL + license in findings.md, and tells the user which before use and verify the RapidOCR adapter is not losing accuracy vs the raw engine; re-measure engine choice on it
 - [ ] Design (Opus) · Implement (Opus) · Review (Opus) · Fix
 - [ ] Gate: unit test per signal + combiner; seeded corruptions all < threshold; numeric blocks always queued
 - **Status:** pending
@@ -69,7 +70,7 @@ Detailed tasks, model assignments, and gates: docs/plans/2026-10-28-manual-labor
 - **Status:** pending
 
 ### Phase 10: Agent pass + calibration
-- [ ] Design (Opus) · Implement (Sonnet) · Review (Opus) · Fix
+- [ ] Design (Opus) — include VLM (vision provider) as an optional third reader for flagged numeric blocks; it has no per-word confidence so it is never the primary OCR · Implement (Sonnet) · Review (Opus) · Fix
 - [ ] Gate: proposals re-checked and displayed with pass/fail; reject → queue with history; threshold suggestion from seeded decisions
 - **Status:** pending
 

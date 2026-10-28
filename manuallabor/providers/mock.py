@@ -44,6 +44,7 @@ def echo_cleanup(messages: Sequence[Message]) -> str:
 DEFAULT_MOCK_RESPONSES: dict[Task, str | Responder] = {
     Task.cleanup: echo_cleanup,
     Task.verifier: "NONE",
+    Task.metadata: '{"title": null, "product_model": null}',
 }
 
 

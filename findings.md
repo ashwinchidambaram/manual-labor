@@ -54,3 +54,10 @@
 | Use `rapidocr>=3.10` (not `rapidocr-onnxruntime` 1.4, which drops spaces) | Measured. |
 | Docling required, offline mode when HF models cached; `MANUALLABOR_REQUIRE_DOCLING=1` makes missing models a failure in the gate | Models already in ~/.cache/huggingface/hub on this machine; warm cost ~0.25 s/page. |
 | Scanned pages: two parsers = Tesseract + RapidOCR, Docling layout-only for figure/table regions | PyMuPDF yields nothing on image-only pages. |
+
+## Resource constraint (user flagged 2026-10-28): 16 GB machine
+- A Docling-bearing python process (torch) takes ~0.7–1.4 GB RSS; pytest over tests/parse with Docling + OCR + the 200-page stress test reached 1.4 GB. Running two at once (orchestrator full-suite run alongside an implementer's run) was wasteful.
+- Rules from now on: the orchestrator does NOT run the full suite while an implementer is running it; slow tests (`-m slow`) run once at the gate; never dispatch two agents that both exercise Docling concurrently; one implementer per module unless their work is non-overlapping and light.
+
+## Seventh fixture decision (user delegated 2026-10-28)
+Real public-domain scanned US Army/Air Force technical manual from archive.org (US government work), chosen at module 3 start; live-only (not under CHECKSUMS.json); source URL + license recorded here when chosen. Rejected: a second synthetic manual modeled on a real one — it would reproduce none of the scanner artifacts, mixed typesetting, or hand-drawn figures that the real fixture exists to test.

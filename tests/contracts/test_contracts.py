@@ -377,7 +377,7 @@ def test_c13_config() -> None:
     assert cfg.threshold == 0.85
     assert cfg.article_split == c.ArticleSplit.per_topic
     assert cfg.parsers == ["pymupdf", "docling"]
-    assert cfg.ocr_engine == c.OcrEngine.rapidocr
+    assert cfg.ocr_engine == c.OcrEngine.auto
     assert cfg.ocr_dpi == 300
     assert cfg.target_edit_rate == 0.02
     assert cfg.models.cleanup.model == "gemma4:e4b-it-q4_K_M"

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 from typing import Annotated
@@ -65,16 +66,36 @@ def ingest(
     project: Annotated[Path, typer.Argument(help="Project directory.")],
     files: Annotated[list[Path], typer.Argument(help="Source files to ingest.")],
 ) -> None:
-    """Copy source files into a project."""
-    _not_implemented("ingest")
+    """Copy source files into a project and register them as documents."""
+    from manuallabor.ingest import IngestError, ingest_files
+    from manuallabor.project import ProjectPaths
+
+    try:
+        ingest_files(ProjectPaths(project), files)
+    except IngestError as exc:
+        print(
+            json.dumps({"stage": "ingest", "status": "error", "detail": str(exc)}), file=sys.stderr
+        )
+        raise typer.Exit(1) from exc
 
 
 @app.command()
 def parse(
     project: Annotated[Path, typer.Argument(help="Project directory.")],
+    force: Annotated[bool, typer.Option("--force", help="Re-parse even if up to date.")] = False,
+    doc: Annotated[str | None, typer.Option("--doc", help="Only this document slug.")] = None,
+    workers: Annotated[
+        int | None,
+        typer.Option("--workers", min=1, help="OCR worker processes (default min(2, cpus))."),
+    ] = None,
 ) -> None:
-    """Parse ingested sources into blocks."""
-    _not_implemented("parse")
+    """Parse ingested sources into blocks (one JSON progress line per stage)."""
+    from manuallabor.parse.pipeline import parse_project
+    from manuallabor.project import ProjectPaths
+
+    failed = parse_project(ProjectPaths(project), force=force, only=doc, workers=workers)
+    if failed:
+        raise typer.Exit(1)
 
 
 @app.command()

@@ -1605,6 +1605,7 @@
     },
     "OcrEngine": {
       "enum": [
+        "auto",
         "rapidocr",
         "tesseract"
       ],
@@ -1780,7 +1781,7 @@
         },
         "ocr_engine": {
           "$ref": "#/$defs/OcrEngine",
-          "default": "rapidocr"
+          "default": "auto"
         },
         "parsers": {
           "items": {

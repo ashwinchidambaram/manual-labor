@@ -114,6 +114,7 @@ class CallKind(StrEnum):
 
 
 class OcrEngine(StrEnum):
+    auto = "auto"
     rapidocr = "rapidocr"
     tesseract = "tesseract"
 

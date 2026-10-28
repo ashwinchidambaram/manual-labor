@@ -49,3 +49,14 @@
   - Dispatched M0.7 review (Opus, fresh).
   - M0.7 review (Opus): gate met (96 passed, mypy/ruff clean, schemas + fixtures + types stable). 5 majors: self-referential manifest accounting, vector figures overflow GT bbox, sidecar file under-validated, embed output unchecked, CI never run. 12 minors. Spot-checks: 328/328 blocks match PDF words in bbox; raster figure bboxes within 0.1pt.
   - Dispatched M0.8 fix (Sonnet) for items 1–14.
+  - M0.8 fix done (Sonnet): 14/14 items, 163 tests. Orchestrator ran gate; recorded in docs/PROGRESS.md; commit M0.
+
+### Phase 1: Ingest + dual parse + block model
+- **Status:** in_progress
+- **Started:** 2026-10-28
+- Actions taken:
+  - Dispatched M1.1 design (Opus) ∥ focused re-review of M0.8 contract changes (Sonnet).
+  - M0 re-review (Sonnet): 4/5 fixes confirmed; 2 small manifest gaps (article/figure source_doc vs id slug) fixed inline by orchestrator + test c12b; mock digest closure caveat noted in design §10.22. Commit 6667766.
+  - M1.1 design done (Opus, 373 lines, 31 tests, measured Docling/OCR). Orchestrator decision: OCR default 'auto' (tesseract if present else rapidocr). Commit d231ecd.
+  - Dispatched M1.2 implementer A (Sonnet) ∥ M1.3 implementer B (Sonnet).
+  - M1.3 implementer B done (Sonnet): tables/ocr/ocr_attach/textalign/docx + 32 tests; Tesseract F1 0.987 vs RapidOCR 0.905 on scanned p2; 6/6 tables exact in both parsers; 13/13 DOCX blocks. A still running.

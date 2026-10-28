@@ -93,7 +93,7 @@ export type Task = 'cleanup' | 'grouping' | 'vision' | 'verifier' | 'embeddings'
  * This interface was referenced by `_All`'s JSON-Schema
  * via the `definition` "OcrEngine".
  */
-export type OcrEngine = 'rapidocr' | 'tesseract';
+export type OcrEngine = 'auto' | 'rapidocr' | 'tesseract';
 /**
  * This interface was referenced by `_All`'s JSON-Schema
  * via the `definition` "ProposalStatus".
@@ -513,7 +513,7 @@ export interface ProjectConfig {
   models: TaskModels;
   name: string;
   ocr_dpi: number;
-  ocr_engine: 'rapidocr' | 'tesseract';
+  ocr_engine: 'auto' | 'rapidocr' | 'tesseract';
   parsers: string[];
   schema_version: '1.0';
   target_edit_rate: number;

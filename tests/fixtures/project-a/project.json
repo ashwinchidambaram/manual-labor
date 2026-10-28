@@ -47,7 +47,7 @@
   },
   "name": "project-a",
   "ocr_dpi": 300,
-  "ocr_engine": "rapidocr",
+  "ocr_engine": "auto",
   "parsers": [
     "pymupdf",
     "docling"
