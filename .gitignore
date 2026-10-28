@@ -20,3 +20,4 @@ frontend/playwright-report/
 .llm_cache/
 .planning/.attestation
 .DS_Store
+frontend/tsconfig.tsbuildinfo

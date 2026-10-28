@@ -18,6 +18,11 @@ jobs:
         run: uv run mypy manuallabor/
       - name: Test
         run: uv run pytest -q
+      # Also run after pytest: `uv run labor schemas export --check` verifies that the
+      # committed schemas/ match the Pydantic models. The frontend job checks the TS types
+      # against those committed schemas, so a stale schema fails there too.
+      - name: Schemas up to date
+        run: uv run labor schemas export --check
 
   frontend:
     runs-on: ubuntu-latest
@@ -30,5 +35,9 @@ jobs:
         with:
           node-version: 22
       - run: npm ci
+      # Regenerates src/types/generated.ts from schemas/_all.json and fails if it differs
+      # from the committed file. Needs only the committed schemas/ directory.
+      - name: Generated types are fresh
+        run: npm run check-types-fresh
       - run: npm run typecheck
       - run: npm test -- --run
