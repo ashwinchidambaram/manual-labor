@@ -1,0 +1,2298 @@
+{
+  "$defs": {
+    "ArticleFrontmatter": {
+      "additionalProperties": false,
+      "properties": {
+        "blocks": {
+          "minimum": 0,
+          "title": "Blocks",
+          "type": "integer"
+        },
+        "figures": {
+          "items": {
+            "pattern": "^FIG-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$",
+            "type": "string"
+          },
+          "title": "Figures",
+          "type": "array"
+        },
+        "generated_at": {
+          "format": "date-time",
+          "title": "Generated At",
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^(?:[a-z0-9]+(?:-[a-z0-9]+)*)(?:--(?:[a-z0-9]+(?:-[a-z0-9]+)*))?$",
+          "title": "Id",
+          "type": "string"
+        },
+        "pages": {
+          "items": {
+            "type": "integer"
+          },
+          "title": "Pages",
+          "type": "array"
+        },
+        "product_model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Product Model"
+        },
+        "review": {
+          "$ref": "#/$defs/ReviewCounts"
+        },
+        "sections": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Sections",
+          "type": "array"
+        },
+        "source_doc": {
+          "maxLength": 48,
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "title": "Source Doc",
+          "type": "string"
+        },
+        "source_file": {
+          "title": "Source File",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "source_doc",
+        "source_file",
+        "product_model",
+        "pages",
+        "sections",
+        "figures",
+        "blocks",
+        "review",
+        "generated_at"
+      ],
+      "title": "ArticleFrontmatter",
+      "type": "object"
+    },
+    "ArticleSplit": {
+      "enum": [
+        "per_topic",
+        "per_document"
+      ],
+      "title": "ArticleSplit",
+      "type": "string"
+    },
+    "AttachRule": {
+      "enum": [
+        "caption_ref",
+        "caption_match",
+        "proximity",
+        "none"
+      ],
+      "title": "AttachRule",
+      "type": "string"
+    },
+    "Block": {
+      "additionalProperties": false,
+      "properties": {
+        "bbox": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "maxItems": 4,
+              "minItems": 4,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bbox"
+        },
+        "clean_text": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Clean Text"
+        },
+        "confidence": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Confidence"
+        },
+        "doc_id": {
+          "maxLength": 48,
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "title": "Doc Id",
+          "type": "string"
+        },
+        "faithfulness": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FaithfulnessResult"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "figure_id": {
+          "anyOf": [
+            {
+              "pattern": "^FIG-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Figure Id"
+        },
+        "has_numeric_spec": {
+          "default": false,
+          "title": "Has Numeric Spec",
+          "type": "boolean"
+        },
+        "heading_level": {
+          "anyOf": [
+            {
+              "maximum": 6,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Heading Level"
+        },
+        "id": {
+          "pattern": "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$",
+          "title": "Id",
+          "type": "string"
+        },
+        "numbers_verified": {
+          "default": false,
+          "title": "Numbers Verified",
+          "type": "boolean"
+        },
+        "numeric_tokens": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Numeric Tokens",
+          "type": "array"
+        },
+        "ocr_words": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/OcrWord"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ocr Words"
+        },
+        "order_by_parser": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Order By Parser",
+          "type": "object"
+        },
+        "page": {
+          "minimum": 1,
+          "title": "Page",
+          "type": "integer"
+        },
+        "raw_source": {
+          "title": "Raw Source",
+          "type": "string"
+        },
+        "raw_text": {
+          "title": "Raw Text",
+          "type": "string"
+        },
+        "raw_text_by_parser": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Raw Text By Parser",
+          "type": "object"
+        },
+        "reading_order": {
+          "minimum": 0,
+          "title": "Reading Order",
+          "type": "integer"
+        },
+        "section_number": {
+          "anyOf": [
+            {
+              "pattern": "^\\d+(\\.\\d+)*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Section Number"
+        },
+        "signals": {
+          "items": {
+            "$ref": "#/$defs/Signal"
+          },
+          "title": "Signals",
+          "type": "array"
+        },
+        "status": {
+          "$ref": "#/$defs/BlockStatus",
+          "default": "queued"
+        },
+        "table": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TableData"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "type": {
+          "$ref": "#/$defs/BlockType"
+        }
+      },
+      "required": [
+        "id",
+        "doc_id",
+        "page",
+        "bbox",
+        "type",
+        "reading_order",
+        "raw_text",
+        "raw_source",
+        "raw_text_by_parser",
+        "order_by_parser",
+        "clean_text",
+        "confidence",
+        "signals",
+        "status",
+        "heading_level",
+        "section_number",
+        "table",
+        "ocr_words",
+        "numeric_tokens",
+        "has_numeric_spec",
+        "numbers_verified",
+        "figure_id",
+        "faithfulness"
+      ],
+      "title": "Block",
+      "type": "object"
+    },
+    "BlockAccounting": {
+      "additionalProperties": false,
+      "properties": {
+        "assignments": {
+          "patternProperties": {
+            "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$": {
+              "type": "string"
+            }
+          },
+          "title": "Assignments",
+          "type": "object"
+        },
+        "total_blocks": {
+          "minimum": 0,
+          "title": "Total Blocks",
+          "type": "integer"
+        },
+        "unassigned_reasons": {
+          "patternProperties": {
+            "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$": {
+              "enum": [
+                "not_selected",
+                "header_footer",
+                "rejected",
+                "empty"
+              ],
+              "type": "string"
+            }
+          },
+          "title": "Unassigned Reasons",
+          "type": "object"
+        }
+      },
+      "required": [
+        "total_blocks",
+        "assignments",
+        "unassigned_reasons"
+      ],
+      "title": "BlockAccounting",
+      "type": "object"
+    },
+    "BlockStatus": {
+      "enum": [
+        "auto_approved",
+        "queued",
+        "approved",
+        "edited",
+        "flagged",
+        "rejected"
+      ],
+      "title": "BlockStatus",
+      "type": "string"
+    },
+    "BlockType": {
+      "enum": [
+        "heading",
+        "paragraph",
+        "list",
+        "table",
+        "figure",
+        "caption",
+        "header",
+        "footer",
+        "other"
+      ],
+      "title": "BlockType",
+      "type": "string"
+    },
+    "CallKind": {
+      "enum": [
+        "chat",
+        "vision",
+        "embed"
+      ],
+      "title": "CallKind",
+      "type": "string"
+    },
+    "Decision": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "$ref": "#/$defs/DecisionAction"
+        },
+        "block_id": {
+          "pattern": "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$",
+          "title": "Block Id",
+          "type": "string"
+        },
+        "edited_text": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Edited Text"
+        },
+        "flag_id": {
+          "anyOf": [
+            {
+              "pattern": "^flag-\\d{6}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Flag Id"
+        },
+        "score": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Score"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "signals": {
+          "items": {
+            "$ref": "#/$defs/Signal"
+          },
+          "title": "Signals",
+          "type": "array"
+        },
+        "threshold": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Threshold",
+          "type": "number"
+        },
+        "timestamp": {
+          "format": "date-time",
+          "title": "Timestamp",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "block_id",
+        "action",
+        "score",
+        "threshold",
+        "signals",
+        "edited_text",
+        "flag_id",
+        "timestamp"
+      ],
+      "title": "Decision",
+      "type": "object"
+    },
+    "DecisionAction": {
+      "enum": [
+        "approve",
+        "edit",
+        "flag",
+        "skip"
+      ],
+      "title": "DecisionAction",
+      "type": "string"
+    },
+    "DiffOp": {
+      "additionalProperties": false,
+      "properties": {
+        "clean": {
+          "title": "Clean",
+          "type": "string"
+        },
+        "op": {
+          "$ref": "#/$defs/DiffOpKind"
+        },
+        "raw": {
+          "title": "Raw",
+          "type": "string"
+        }
+      },
+      "required": [
+        "op",
+        "raw",
+        "clean"
+      ],
+      "title": "DiffOp",
+      "type": "object"
+    },
+    "DiffOpKind": {
+      "enum": [
+        "equal",
+        "insert",
+        "delete",
+        "replace"
+      ],
+      "title": "DiffOpKind",
+      "type": "string"
+    },
+    "DocKind": {
+      "enum": [
+        "born_digital_pdf",
+        "scanned_pdf",
+        "docx"
+      ],
+      "title": "DocKind",
+      "type": "string"
+    },
+    "Document": {
+      "additionalProperties": false,
+      "properties": {
+        "filename": {
+          "minLength": 1,
+          "title": "Filename",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/DocKind"
+        },
+        "page_count": {
+          "minimum": 1,
+          "title": "Page Count",
+          "type": "integer"
+        },
+        "pages_without_text_layer": {
+          "items": {
+            "type": "integer"
+          },
+          "title": "Pages Without Text Layer",
+          "type": "array"
+        },
+        "parser_versions": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Parser Versions",
+          "type": "object"
+        },
+        "product_model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Product Model"
+        },
+        "product_model_inferred": {
+          "default": false,
+          "title": "Product Model Inferred",
+          "type": "boolean"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "slug": {
+          "maxLength": 48,
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "title": "Slug",
+          "type": "string"
+        },
+        "stripped_footers": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Stripped Footers",
+          "type": "array"
+        },
+        "stripped_headers": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Stripped Headers",
+          "type": "array"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        }
+      },
+      "required": [
+        "slug",
+        "sha256",
+        "filename",
+        "title",
+        "product_model",
+        "product_model_inferred",
+        "kind",
+        "page_count",
+        "pages_without_text_layer",
+        "stripped_headers",
+        "stripped_footers",
+        "parser_versions"
+      ],
+      "title": "Document",
+      "type": "object"
+    },
+    "Extraction": {
+      "enum": [
+        "native",
+        "vector",
+        "crop"
+      ],
+      "title": "Extraction",
+      "type": "string"
+    },
+    "FaithViolationKind": {
+      "enum": [
+        "insertion",
+        "deletion",
+        "numeric_mismatch"
+      ],
+      "title": "FaithViolationKind",
+      "type": "string"
+    },
+    "FaithfulnessResult": {
+      "additionalProperties": false,
+      "properties": {
+        "alignment_ratio": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Alignment Ratio",
+          "type": "number"
+        },
+        "diff": {
+          "items": {
+            "$ref": "#/$defs/DiffOp"
+          },
+          "title": "Diff",
+          "type": "array"
+        },
+        "numeric_variant_note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Numeric Variant Note"
+        },
+        "passed": {
+          "title": "Passed",
+          "type": "boolean"
+        },
+        "violations": {
+          "items": {
+            "$ref": "#/$defs/FaithfulnessViolation"
+          },
+          "title": "Violations",
+          "type": "array"
+        }
+      },
+      "required": [
+        "passed",
+        "alignment_ratio",
+        "violations",
+        "diff",
+        "numeric_variant_note"
+      ],
+      "title": "FaithfulnessResult",
+      "type": "object"
+    },
+    "FaithfulnessViolation": {
+      "additionalProperties": false,
+      "properties": {
+        "clean": {
+          "title": "Clean",
+          "type": "string"
+        },
+        "clean_end": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Clean End"
+        },
+        "clean_start": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Clean Start"
+        },
+        "kind": {
+          "$ref": "#/$defs/FaithViolationKind"
+        },
+        "raw": {
+          "title": "Raw",
+          "type": "string"
+        },
+        "raw_end": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Raw End"
+        },
+        "raw_start": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Raw Start"
+        }
+      },
+      "required": [
+        "kind",
+        "raw_start",
+        "raw_end",
+        "clean_start",
+        "clean_end",
+        "raw",
+        "clean"
+      ],
+      "title": "FaithfulnessViolation",
+      "type": "object"
+    },
+    "FigureRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "articles": {
+          "items": {
+            "pattern": "^(?:[a-z0-9]+(?:-[a-z0-9]+)*)(?:--(?:[a-z0-9]+(?:-[a-z0-9]+)*))?$",
+            "type": "string"
+          },
+          "title": "Articles",
+          "type": "array"
+        },
+        "attach_rule": {
+          "$ref": "#/$defs/AttachRule"
+        },
+        "bbox": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "maxItems": 4,
+              "minItems": 4,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Bbox"
+        },
+        "caption_original": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Caption Original"
+        },
+        "confidence": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "description_generated": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Description Generated"
+        },
+        "extraction": {
+          "$ref": "#/$defs/Extraction"
+        },
+        "file": {
+          "title": "File",
+          "type": "string"
+        },
+        "height": {
+          "minimum": 1,
+          "title": "Height",
+          "type": "integer"
+        },
+        "id": {
+          "pattern": "^FIG-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$",
+          "title": "Id",
+          "type": "string"
+        },
+        "page": {
+          "minimum": 1,
+          "title": "Page",
+          "type": "integer"
+        },
+        "phash": {
+          "pattern": "^[0-9a-f]{16}$",
+          "title": "Phash",
+          "type": "string"
+        },
+        "product_model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Product Model"
+        },
+        "review": {
+          "$ref": "#/$defs/BlockStatus"
+        },
+        "source_doc": {
+          "maxLength": 48,
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "title": "Source Doc",
+          "type": "string"
+        },
+        "svg": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Svg"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        },
+        "width": {
+          "minimum": 1,
+          "title": "Width",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "file",
+        "svg",
+        "source_doc",
+        "product_model",
+        "page",
+        "bbox",
+        "extraction",
+        "width",
+        "height",
+        "phash",
+        "caption_original",
+        "description_generated",
+        "tags",
+        "articles",
+        "attach_rule",
+        "confidence",
+        "review"
+      ],
+      "title": "FigureRecord",
+      "type": "object"
+    },
+    "Flag": {
+      "additionalProperties": false,
+      "properties": {
+        "category": {
+          "$ref": "#/$defs/FlagCategory"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^flag-\\d{6}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        },
+        "resolution": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Resolution"
+        },
+        "resolved_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Resolved At"
+        },
+        "status": {
+          "$ref": "#/$defs/FlagStatus",
+          "default": "open"
+        },
+        "target_id": {
+          "pattern": "(?:^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$)|(?:^FIG-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$)",
+          "title": "Target Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "target_id",
+        "category",
+        "note",
+        "status",
+        "created_at",
+        "resolved_at",
+        "resolution"
+      ],
+      "title": "Flag",
+      "type": "object"
+    },
+    "FlagCategory": {
+      "enum": [
+        "wrong_text",
+        "missing_figure",
+        "wrong_grouping",
+        "bad_crop",
+        "table_structure"
+      ],
+      "title": "FlagCategory",
+      "type": "string"
+    },
+    "FlagStatus": {
+      "enum": [
+        "open",
+        "resolved"
+      ],
+      "title": "FlagStatus",
+      "type": "string"
+    },
+    "Group": {
+      "additionalProperties": false,
+      "properties": {
+        "block_count": {
+          "minimum": 0,
+          "title": "Block Count",
+          "type": "integer"
+        },
+        "block_ids": {
+          "items": {
+            "pattern": "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$",
+            "type": "string"
+          },
+          "title": "Block Ids",
+          "type": "array"
+        },
+        "cohesion": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cohesion"
+        },
+        "doc_id": {
+          "maxLength": 48,
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "title": "Doc Id",
+          "type": "string"
+        },
+        "figure_count": {
+          "minimum": 0,
+          "title": "Figure Count",
+          "type": "integer"
+        },
+        "id": {
+          "pattern": "^g-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-(?:[st])(?:\\d{3})$",
+          "title": "Id",
+          "type": "string"
+        },
+        "is_unassigned": {
+          "default": false,
+          "title": "Is Unassigned",
+          "type": "boolean"
+        },
+        "level": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Level",
+          "type": "integer"
+        },
+        "page_ranges": {
+          "items": {
+            "$ref": "#/$defs/PageRange"
+          },
+          "title": "Page Ranges",
+          "type": "array"
+        },
+        "parent_id": {
+          "anyOf": [
+            {
+              "pattern": "^g-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-(?:[st])(?:\\d{3})$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parent Id"
+        },
+        "section_ids": {
+          "items": {
+            "pattern": "^g-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-(?:[st])(?:\\d{3})$",
+            "type": "string"
+          },
+          "title": "Section Ids",
+          "type": "array"
+        },
+        "section_number": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Section Number"
+        },
+        "slug": {
+          "maxLength": 48,
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "title": "Slug",
+          "type": "string"
+        },
+        "title": {
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "view": {
+          "$ref": "#/$defs/GroupView"
+        }
+      },
+      "required": [
+        "id",
+        "view",
+        "doc_id",
+        "title",
+        "slug",
+        "block_ids",
+        "page_ranges",
+        "section_ids",
+        "parent_id",
+        "level",
+        "section_number",
+        "cohesion",
+        "is_unassigned",
+        "block_count",
+        "figure_count"
+      ],
+      "title": "Group",
+      "type": "object"
+    },
+    "GroupView": {
+      "enum": [
+        "structure",
+        "topic"
+      ],
+      "title": "GroupView",
+      "type": "string"
+    },
+    "LLMCallLog": {
+      "additionalProperties": false,
+      "properties": {
+        "cached": {
+          "title": "Cached",
+          "type": "boolean"
+        },
+        "completion_tokens": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Completion Tokens"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error"
+        },
+        "input_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Input Hash",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/CallKind"
+        },
+        "latency_ms": {
+          "minimum": 0,
+          "title": "Latency Ms",
+          "type": "number"
+        },
+        "model": {
+          "title": "Model",
+          "type": "string"
+        },
+        "ok": {
+          "default": true,
+          "title": "Ok",
+          "type": "boolean"
+        },
+        "prompt_tokens": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Prompt Tokens"
+        },
+        "provider": {
+          "title": "Provider",
+          "type": "string"
+        },
+        "task": {
+          "$ref": "#/$defs/Task"
+        },
+        "timestamp": {
+          "format": "date-time",
+          "title": "Timestamp",
+          "type": "string"
+        }
+      },
+      "required": [
+        "task",
+        "kind",
+        "provider",
+        "model",
+        "input_hash",
+        "prompt_tokens",
+        "completion_tokens",
+        "latency_ms",
+        "cached",
+        "ok",
+        "error",
+        "timestamp"
+      ],
+      "title": "LLMCallLog",
+      "type": "object"
+    },
+    "Manifest": {
+      "additionalProperties": false,
+      "properties": {
+        "accounting": {
+          "$ref": "#/$defs/BlockAccounting"
+        },
+        "article_split": {
+          "$ref": "#/$defs/ArticleSplit"
+        },
+        "articles": {
+          "items": {
+            "$ref": "#/$defs/ManifestArticle"
+          },
+          "title": "Articles",
+          "type": "array"
+        },
+        "docs": {
+          "items": {
+            "$ref": "#/$defs/Document"
+          },
+          "title": "Docs",
+          "type": "array"
+        },
+        "figures": {
+          "items": {
+            "$ref": "#/$defs/ManifestFigure"
+          },
+          "title": "Figures",
+          "type": "array"
+        },
+        "models": {
+          "additionalProperties": {
+            "$ref": "#/$defs/ModelRef"
+          },
+          "propertyNames": {
+            "$ref": "#/$defs/Task"
+          },
+          "title": "Models",
+          "type": "object"
+        },
+        "overrides": {
+          "items": {
+            "$ref": "#/$defs/Override"
+          },
+          "title": "Overrides",
+          "type": "array"
+        },
+        "project": {
+          "$ref": "#/$defs/ManifestProject"
+        },
+        "review_stats": {
+          "$ref": "#/$defs/ReviewStats"
+        },
+        "schema_version": {
+          "const": "1.0",
+          "default": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "threshold": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Threshold",
+          "type": "number"
+        }
+      },
+      "required": [
+        "schema_version",
+        "project",
+        "docs",
+        "articles",
+        "figures",
+        "review_stats",
+        "models",
+        "threshold",
+        "article_split",
+        "overrides",
+        "accounting"
+      ],
+      "title": "Manifest",
+      "type": "object"
+    },
+    "ManifestArticle": {
+      "additionalProperties": false,
+      "properties": {
+        "block_ids": {
+          "items": {
+            "pattern": "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$",
+            "type": "string"
+          },
+          "title": "Block Ids",
+          "type": "array"
+        },
+        "figures": {
+          "items": {
+            "pattern": "^FIG-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$",
+            "type": "string"
+          },
+          "title": "Figures",
+          "type": "array"
+        },
+        "id": {
+          "pattern": "^(?:[a-z0-9]+(?:-[a-z0-9]+)*)(?:--(?:[a-z0-9]+(?:-[a-z0-9]+)*))?$",
+          "title": "Id",
+          "type": "string"
+        },
+        "pages": {
+          "items": {
+            "type": "integer"
+          },
+          "title": "Pages",
+          "type": "array"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "sections": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Sections",
+          "type": "array"
+        },
+        "source_doc": {
+          "maxLength": 48,
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "title": "Source Doc",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "path",
+        "title",
+        "source_doc",
+        "block_ids",
+        "figures",
+        "pages",
+        "sections"
+      ],
+      "title": "ManifestArticle",
+      "type": "object"
+    },
+    "ManifestFigure": {
+      "additionalProperties": false,
+      "properties": {
+        "duplicate_of": {
+          "anyOf": [
+            {
+              "pattern": "^FIG-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Duplicate Of"
+        },
+        "file": {
+          "title": "File",
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^FIG-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$",
+          "title": "Id",
+          "type": "string"
+        },
+        "sidecar": {
+          "title": "Sidecar",
+          "type": "string"
+        },
+        "source_doc": {
+          "maxLength": 48,
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "title": "Source Doc",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "sidecar",
+        "file",
+        "source_doc",
+        "duplicate_of"
+      ],
+      "title": "ManifestFigure",
+      "type": "object"
+    },
+    "ManifestProject": {
+      "additionalProperties": false,
+      "properties": {
+        "generated_at": {
+          "format": "date-time",
+          "title": "Generated At",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "tool_version": {
+          "title": "Tool Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "tool_version",
+        "generated_at"
+      ],
+      "title": "ManifestProject",
+      "type": "object"
+    },
+    "ModelRef": {
+      "additionalProperties": false,
+      "properties": {
+        "api_base": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Api Base"
+        },
+        "api_key_env": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Api Key Env"
+        },
+        "model": {
+          "minLength": 1,
+          "title": "Model",
+          "type": "string"
+        },
+        "provider": {
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Provider",
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider",
+        "model",
+        "api_base",
+        "api_key_env"
+      ],
+      "title": "ModelRef",
+      "type": "object"
+    },
+    "OcrEngine": {
+      "enum": [
+        "rapidocr",
+        "tesseract"
+      ],
+      "title": "OcrEngine",
+      "type": "string"
+    },
+    "OcrWord": {
+      "additionalProperties": false,
+      "properties": {
+        "bbox": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "maxItems": 4,
+              "minItems": 4,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bbox"
+        },
+        "confidence": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text",
+        "confidence",
+        "bbox"
+      ],
+      "title": "OcrWord",
+      "type": "object"
+    },
+    "Override": {
+      "additionalProperties": false,
+      "properties": {
+        "at": {
+          "format": "date-time",
+          "title": "At",
+          "type": "string"
+        },
+        "flag_id": {
+          "anyOf": [
+            {
+              "pattern": "^flag-\\d{6}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Flag Id"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        },
+        "target_id": {
+          "anyOf": [
+            {
+              "pattern": "(?:^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$)|(?:^FIG-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$)",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target Id"
+        }
+      },
+      "required": [
+        "target_id",
+        "flag_id",
+        "reason",
+        "at"
+      ],
+      "title": "Override",
+      "type": "object"
+    },
+    "PageRange": {
+      "additionalProperties": false,
+      "properties": {
+        "end": {
+          "minimum": 1,
+          "title": "End",
+          "type": "integer"
+        },
+        "start": {
+          "minimum": 1,
+          "title": "Start",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "start",
+        "end"
+      ],
+      "title": "PageRange",
+      "type": "object"
+    },
+    "PriorAttempt": {
+      "additionalProperties": false,
+      "properties": {
+        "decided_at": {
+          "format": "date-time",
+          "title": "Decided At",
+          "type": "string"
+        },
+        "proposal_id": {
+          "title": "Proposal Id",
+          "type": "string"
+        },
+        "proposal_text": {
+          "title": "Proposal Text",
+          "type": "string"
+        },
+        "rationale": {
+          "title": "Rationale",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/ProposalStatus"
+        }
+      },
+      "required": [
+        "proposal_id",
+        "proposal_text",
+        "rationale",
+        "status",
+        "decided_at"
+      ],
+      "title": "PriorAttempt",
+      "type": "object"
+    },
+    "ProjectConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "article_split": {
+          "$ref": "#/$defs/ArticleSplit",
+          "default": "per_topic"
+        },
+        "background_ocr_born_digital": {
+          "default": true,
+          "title": "Background Ocr Born Digital",
+          "type": "boolean"
+        },
+        "models": {
+          "$ref": "#/$defs/TaskModels"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "ocr_dpi": {
+          "default": 300,
+          "minimum": 300,
+          "title": "Ocr Dpi",
+          "type": "integer"
+        },
+        "ocr_engine": {
+          "$ref": "#/$defs/OcrEngine",
+          "default": "rapidocr"
+        },
+        "parsers": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Parsers",
+          "type": "array"
+        },
+        "schema_version": {
+          "const": "1.0",
+          "default": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "target_edit_rate": {
+          "default": 0.02,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Target Edit Rate",
+          "type": "number"
+        },
+        "threshold": {
+          "default": 0.85,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Threshold",
+          "type": "number"
+        }
+      },
+      "required": [
+        "schema_version",
+        "name",
+        "threshold",
+        "models",
+        "article_split",
+        "parsers",
+        "ocr_engine",
+        "ocr_dpi",
+        "background_ocr_born_digital",
+        "target_edit_rate"
+      ],
+      "title": "ProjectConfig",
+      "type": "object"
+    },
+    "Proposal": {
+      "additionalProperties": false,
+      "properties": {
+        "all_checks_passed": {
+          "readOnly": true,
+          "title": "All Checks Passed",
+          "type": "boolean"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "final_text": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Final Text"
+        },
+        "flag_id": {
+          "pattern": "^flag-\\d{6}$",
+          "title": "Flag Id",
+          "type": "string"
+        },
+        "history": {
+          "items": {
+            "$ref": "#/$defs/PriorAttempt"
+          },
+          "title": "History",
+          "type": "array"
+        },
+        "id": {
+          "pattern": "^prop-\\d{6}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "input_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Input Hash",
+          "type": "string"
+        },
+        "model": {
+          "title": "Model",
+          "type": "string"
+        },
+        "proposal_text": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Proposal Text"
+        },
+        "proposed_bbox": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "maxItems": 4,
+              "minItems": 4,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Proposed Bbox"
+        },
+        "rationale": {
+          "maxLength": 300,
+          "minLength": 1,
+          "title": "Rationale",
+          "type": "string"
+        },
+        "rechecks": {
+          "items": {
+            "$ref": "#/$defs/RecheckResult"
+          },
+          "title": "Rechecks",
+          "type": "array"
+        },
+        "round": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Round",
+          "type": "integer"
+        },
+        "status": {
+          "$ref": "#/$defs/ProposalStatus",
+          "default": "pending"
+        },
+        "target_id": {
+          "pattern": "(?:^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$)|(?:^FIG-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$)",
+          "title": "Target Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "flag_id",
+        "target_id",
+        "round",
+        "proposal_text",
+        "proposed_bbox",
+        "evidence",
+        "rationale",
+        "rechecks",
+        "status",
+        "final_text",
+        "history",
+        "model",
+        "input_hash",
+        "created_at",
+        "all_checks_passed"
+      ],
+      "title": "Proposal",
+      "type": "object"
+    },
+    "ProposalStatus": {
+      "enum": [
+        "pending",
+        "accepted",
+        "edited",
+        "rejected"
+      ],
+      "title": "ProposalStatus",
+      "type": "string"
+    },
+    "RecheckResult": {
+      "additionalProperties": false,
+      "properties": {
+        "check": {
+          "title": "Check",
+          "type": "string"
+        },
+        "detail": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Detail"
+        },
+        "passed": {
+          "title": "Passed",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "check",
+        "passed",
+        "detail"
+      ],
+      "title": "RecheckResult",
+      "type": "object"
+    },
+    "ReviewCounts": {
+      "additionalProperties": false,
+      "properties": {
+        "approved": {
+          "minimum": 0,
+          "title": "Approved",
+          "type": "integer"
+        },
+        "edited": {
+          "minimum": 0,
+          "title": "Edited",
+          "type": "integer"
+        },
+        "overrides": {
+          "minimum": 0,
+          "title": "Overrides",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "approved",
+        "edited",
+        "overrides"
+      ],
+      "title": "ReviewCounts",
+      "type": "object"
+    },
+    "ReviewStats": {
+      "additionalProperties": false,
+      "properties": {
+        "approved": {
+          "minimum": 0,
+          "title": "Approved",
+          "type": "integer"
+        },
+        "auto_approved": {
+          "minimum": 0,
+          "title": "Auto Approved",
+          "type": "integer"
+        },
+        "edited": {
+          "minimum": 0,
+          "title": "Edited",
+          "type": "integer"
+        },
+        "flagged": {
+          "minimum": 0,
+          "title": "Flagged",
+          "type": "integer"
+        },
+        "numbers_verified_blocks": {
+          "items": {
+            "pattern": "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$",
+            "type": "string"
+          },
+          "title": "Numbers Verified Blocks",
+          "type": "array"
+        },
+        "overrides": {
+          "minimum": 0,
+          "title": "Overrides",
+          "type": "integer"
+        },
+        "queued": {
+          "minimum": 0,
+          "title": "Queued",
+          "type": "integer"
+        },
+        "rejected": {
+          "minimum": 0,
+          "title": "Rejected",
+          "type": "integer"
+        },
+        "total_blocks": {
+          "minimum": 0,
+          "title": "Total Blocks",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "total_blocks",
+        "auto_approved",
+        "approved",
+        "edited",
+        "flagged",
+        "rejected",
+        "queued",
+        "overrides",
+        "numbers_verified_blocks"
+      ],
+      "title": "ReviewStats",
+      "type": "object"
+    },
+    "Selection": {
+      "additionalProperties": false,
+      "properties": {
+        "active_view": {
+          "$ref": "#/$defs/GroupView",
+          "default": "topic"
+        },
+        "article_split": {
+          "$ref": "#/$defs/ArticleSplit",
+          "default": "per_topic"
+        },
+        "block_ids": {
+          "items": {
+            "pattern": "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$",
+            "type": "string"
+          },
+          "title": "Block Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "block_ids",
+        "article_split",
+        "active_view"
+      ],
+      "title": "Selection",
+      "type": "object"
+    },
+    "Signal": {
+      "additionalProperties": false,
+      "properties": {
+        "critical": {
+          "title": "Critical",
+          "type": "boolean"
+        },
+        "detail": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Detail"
+        },
+        "name": {
+          "$ref": "#/$defs/SignalName"
+        },
+        "value": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Value",
+          "type": "number"
+        }
+      },
+      "required": [
+        "name",
+        "value",
+        "critical",
+        "detail"
+      ],
+      "title": "Signal",
+      "type": "object"
+    },
+    "SignalName": {
+      "enum": [
+        "ocr_mean",
+        "ocr_min",
+        "textlayer_vs_ocr",
+        "parser_agreement",
+        "reading_order_risk",
+        "table_consistency",
+        "garbage_ratio",
+        "faithfulness",
+        "figure_method",
+        "figure_attach_rule",
+        "has_numeric_spec",
+        "llm_verifier"
+      ],
+      "title": "SignalName",
+      "type": "string"
+    },
+    "TableCell": {
+      "additionalProperties": false,
+      "properties": {
+        "col": {
+          "minimum": 0,
+          "title": "Col",
+          "type": "integer"
+        },
+        "col_span": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Col Span",
+          "type": "integer"
+        },
+        "is_header": {
+          "default": false,
+          "title": "Is Header",
+          "type": "boolean"
+        },
+        "row": {
+          "minimum": 0,
+          "title": "Row",
+          "type": "integer"
+        },
+        "row_span": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Row Span",
+          "type": "integer"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "row",
+        "col",
+        "row_span",
+        "col_span",
+        "text",
+        "is_header"
+      ],
+      "title": "TableCell",
+      "type": "object"
+    },
+    "TableData": {
+      "additionalProperties": false,
+      "properties": {
+        "cells": {
+          "items": {
+            "$ref": "#/$defs/TableCell"
+          },
+          "title": "Cells",
+          "type": "array"
+        },
+        "markdown": {
+          "title": "Markdown",
+          "type": "string"
+        },
+        "n_cols": {
+          "minimum": 1,
+          "title": "N Cols",
+          "type": "integer"
+        },
+        "n_rows": {
+          "minimum": 1,
+          "title": "N Rows",
+          "type": "integer"
+        },
+        "shape_by_parser": {
+          "additionalProperties": {
+            "$ref": "#/$defs/TableShape"
+          },
+          "title": "Shape By Parser",
+          "type": "object"
+        }
+      },
+      "required": [
+        "n_rows",
+        "n_cols",
+        "cells",
+        "markdown",
+        "shape_by_parser"
+      ],
+      "title": "TableData",
+      "type": "object"
+    },
+    "TableShape": {
+      "additionalProperties": false,
+      "properties": {
+        "cols": {
+          "minimum": 0,
+          "title": "Cols",
+          "type": "integer"
+        },
+        "rows": {
+          "minimum": 0,
+          "title": "Rows",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "rows",
+        "cols"
+      ],
+      "title": "TableShape",
+      "type": "object"
+    },
+    "Task": {
+      "enum": [
+        "cleanup",
+        "grouping",
+        "vision",
+        "verifier",
+        "embeddings",
+        "metadata",
+        "agent"
+      ],
+      "title": "Task",
+      "type": "string"
+    },
+    "TaskModels": {
+      "additionalProperties": false,
+      "properties": {
+        "agent": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ModelRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "cleanup": {
+          "$ref": "#/$defs/ModelRef"
+        },
+        "embeddings": {
+          "$ref": "#/$defs/ModelRef"
+        },
+        "grouping": {
+          "$ref": "#/$defs/ModelRef"
+        },
+        "metadata": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ModelRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "verifier": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ModelRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "vision": {
+          "$ref": "#/$defs/ModelRef"
+        }
+      },
+      "required": [
+        "cleanup",
+        "grouping",
+        "vision",
+        "embeddings",
+        "verifier",
+        "metadata",
+        "agent"
+      ],
+      "title": "TaskModels",
+      "type": "object"
+    }
+  },
+  "title": "ManualLaborContracts"
+}

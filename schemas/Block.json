@@ -1,0 +1,622 @@
+{
+  "$defs": {
+    "BlockStatus": {
+      "enum": [
+        "auto_approved",
+        "queued",
+        "approved",
+        "edited",
+        "flagged",
+        "rejected"
+      ],
+      "title": "BlockStatus",
+      "type": "string"
+    },
+    "BlockType": {
+      "enum": [
+        "heading",
+        "paragraph",
+        "list",
+        "table",
+        "figure",
+        "caption",
+        "header",
+        "footer",
+        "other"
+      ],
+      "title": "BlockType",
+      "type": "string"
+    },
+    "DiffOp": {
+      "additionalProperties": false,
+      "properties": {
+        "clean": {
+          "title": "Clean",
+          "type": "string"
+        },
+        "op": {
+          "$ref": "#/$defs/DiffOpKind"
+        },
+        "raw": {
+          "title": "Raw",
+          "type": "string"
+        }
+      },
+      "required": [
+        "op",
+        "raw",
+        "clean"
+      ],
+      "title": "DiffOp",
+      "type": "object"
+    },
+    "DiffOpKind": {
+      "enum": [
+        "equal",
+        "insert",
+        "delete",
+        "replace"
+      ],
+      "title": "DiffOpKind",
+      "type": "string"
+    },
+    "FaithViolationKind": {
+      "enum": [
+        "insertion",
+        "deletion",
+        "numeric_mismatch"
+      ],
+      "title": "FaithViolationKind",
+      "type": "string"
+    },
+    "FaithfulnessResult": {
+      "additionalProperties": false,
+      "properties": {
+        "alignment_ratio": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Alignment Ratio",
+          "type": "number"
+        },
+        "diff": {
+          "items": {
+            "$ref": "#/$defs/DiffOp"
+          },
+          "title": "Diff",
+          "type": "array"
+        },
+        "numeric_variant_note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Numeric Variant Note"
+        },
+        "passed": {
+          "title": "Passed",
+          "type": "boolean"
+        },
+        "violations": {
+          "items": {
+            "$ref": "#/$defs/FaithfulnessViolation"
+          },
+          "title": "Violations",
+          "type": "array"
+        }
+      },
+      "required": [
+        "passed",
+        "alignment_ratio",
+        "violations",
+        "diff",
+        "numeric_variant_note"
+      ],
+      "title": "FaithfulnessResult",
+      "type": "object"
+    },
+    "FaithfulnessViolation": {
+      "additionalProperties": false,
+      "properties": {
+        "clean": {
+          "title": "Clean",
+          "type": "string"
+        },
+        "clean_end": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Clean End"
+        },
+        "clean_start": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Clean Start"
+        },
+        "kind": {
+          "$ref": "#/$defs/FaithViolationKind"
+        },
+        "raw": {
+          "title": "Raw",
+          "type": "string"
+        },
+        "raw_end": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Raw End"
+        },
+        "raw_start": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Raw Start"
+        }
+      },
+      "required": [
+        "kind",
+        "raw_start",
+        "raw_end",
+        "clean_start",
+        "clean_end",
+        "raw",
+        "clean"
+      ],
+      "title": "FaithfulnessViolation",
+      "type": "object"
+    },
+    "OcrWord": {
+      "additionalProperties": false,
+      "properties": {
+        "bbox": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "maxItems": 4,
+              "minItems": 4,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bbox"
+        },
+        "confidence": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text",
+        "confidence",
+        "bbox"
+      ],
+      "title": "OcrWord",
+      "type": "object"
+    },
+    "Signal": {
+      "additionalProperties": false,
+      "properties": {
+        "critical": {
+          "title": "Critical",
+          "type": "boolean"
+        },
+        "detail": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Detail"
+        },
+        "name": {
+          "$ref": "#/$defs/SignalName"
+        },
+        "value": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Value",
+          "type": "number"
+        }
+      },
+      "required": [
+        "name",
+        "value",
+        "critical",
+        "detail"
+      ],
+      "title": "Signal",
+      "type": "object"
+    },
+    "SignalName": {
+      "enum": [
+        "ocr_mean",
+        "ocr_min",
+        "textlayer_vs_ocr",
+        "parser_agreement",
+        "reading_order_risk",
+        "table_consistency",
+        "garbage_ratio",
+        "faithfulness",
+        "figure_method",
+        "figure_attach_rule",
+        "has_numeric_spec",
+        "llm_verifier"
+      ],
+      "title": "SignalName",
+      "type": "string"
+    },
+    "TableCell": {
+      "additionalProperties": false,
+      "properties": {
+        "col": {
+          "minimum": 0,
+          "title": "Col",
+          "type": "integer"
+        },
+        "col_span": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Col Span",
+          "type": "integer"
+        },
+        "is_header": {
+          "default": false,
+          "title": "Is Header",
+          "type": "boolean"
+        },
+        "row": {
+          "minimum": 0,
+          "title": "Row",
+          "type": "integer"
+        },
+        "row_span": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Row Span",
+          "type": "integer"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "row",
+        "col",
+        "row_span",
+        "col_span",
+        "text",
+        "is_header"
+      ],
+      "title": "TableCell",
+      "type": "object"
+    },
+    "TableData": {
+      "additionalProperties": false,
+      "properties": {
+        "cells": {
+          "items": {
+            "$ref": "#/$defs/TableCell"
+          },
+          "title": "Cells",
+          "type": "array"
+        },
+        "markdown": {
+          "title": "Markdown",
+          "type": "string"
+        },
+        "n_cols": {
+          "minimum": 1,
+          "title": "N Cols",
+          "type": "integer"
+        },
+        "n_rows": {
+          "minimum": 1,
+          "title": "N Rows",
+          "type": "integer"
+        },
+        "shape_by_parser": {
+          "additionalProperties": {
+            "$ref": "#/$defs/TableShape"
+          },
+          "title": "Shape By Parser",
+          "type": "object"
+        }
+      },
+      "required": [
+        "n_rows",
+        "n_cols",
+        "cells",
+        "markdown",
+        "shape_by_parser"
+      ],
+      "title": "TableData",
+      "type": "object"
+    },
+    "TableShape": {
+      "additionalProperties": false,
+      "properties": {
+        "cols": {
+          "minimum": 0,
+          "title": "Cols",
+          "type": "integer"
+        },
+        "rows": {
+          "minimum": 0,
+          "title": "Rows",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "rows",
+        "cols"
+      ],
+      "title": "TableShape",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "bbox": {
+      "anyOf": [
+        {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 4,
+          "minItems": 4,
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Bbox"
+    },
+    "clean_text": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Clean Text"
+    },
+    "confidence": {
+      "anyOf": [
+        {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Confidence"
+    },
+    "doc_id": {
+      "maxLength": 48,
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "title": "Doc Id",
+      "type": "string"
+    },
+    "faithfulness": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/FaithfulnessResult"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "figure_id": {
+      "anyOf": [
+        {
+          "pattern": "^FIG-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Figure Id"
+    },
+    "has_numeric_spec": {
+      "default": false,
+      "title": "Has Numeric Spec",
+      "type": "boolean"
+    },
+    "heading_level": {
+      "anyOf": [
+        {
+          "maximum": 6,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Heading Level"
+    },
+    "id": {
+      "pattern": "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$",
+      "title": "Id",
+      "type": "string"
+    },
+    "numbers_verified": {
+      "default": false,
+      "title": "Numbers Verified",
+      "type": "boolean"
+    },
+    "numeric_tokens": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Numeric Tokens",
+      "type": "array"
+    },
+    "ocr_words": {
+      "anyOf": [
+        {
+          "items": {
+            "$ref": "#/$defs/OcrWord"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Ocr Words"
+    },
+    "order_by_parser": {
+      "additionalProperties": {
+        "type": "integer"
+      },
+      "title": "Order By Parser",
+      "type": "object"
+    },
+    "page": {
+      "minimum": 1,
+      "title": "Page",
+      "type": "integer"
+    },
+    "raw_source": {
+      "title": "Raw Source",
+      "type": "string"
+    },
+    "raw_text": {
+      "title": "Raw Text",
+      "type": "string"
+    },
+    "raw_text_by_parser": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Raw Text By Parser",
+      "type": "object"
+    },
+    "reading_order": {
+      "minimum": 0,
+      "title": "Reading Order",
+      "type": "integer"
+    },
+    "section_number": {
+      "anyOf": [
+        {
+          "pattern": "^\\d+(\\.\\d+)*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Section Number"
+    },
+    "signals": {
+      "items": {
+        "$ref": "#/$defs/Signal"
+      },
+      "title": "Signals",
+      "type": "array"
+    },
+    "status": {
+      "$ref": "#/$defs/BlockStatus",
+      "default": "queued"
+    },
+    "table": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/TableData"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "type": {
+      "$ref": "#/$defs/BlockType"
+    }
+  },
+  "required": [
+    "id",
+    "doc_id",
+    "page",
+    "bbox",
+    "type",
+    "reading_order",
+    "raw_text",
+    "raw_source",
+    "raw_text_by_parser",
+    "order_by_parser",
+    "clean_text",
+    "confidence",
+    "signals",
+    "status",
+    "heading_level",
+    "section_number",
+    "table",
+    "ocr_words",
+    "numeric_tokens",
+    "has_numeric_spec",
+    "numbers_verified",
+    "figure_id",
+    "faithfulness"
+  ],
+  "title": "Block",
+  "type": "object"
+}

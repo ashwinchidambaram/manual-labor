@@ -1,0 +1,216 @@
+{
+  "$defs": {
+    "PriorAttempt": {
+      "additionalProperties": false,
+      "properties": {
+        "decided_at": {
+          "format": "date-time",
+          "title": "Decided At",
+          "type": "string"
+        },
+        "proposal_id": {
+          "title": "Proposal Id",
+          "type": "string"
+        },
+        "proposal_text": {
+          "title": "Proposal Text",
+          "type": "string"
+        },
+        "rationale": {
+          "title": "Rationale",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/ProposalStatus"
+        }
+      },
+      "required": [
+        "proposal_id",
+        "proposal_text",
+        "rationale",
+        "status",
+        "decided_at"
+      ],
+      "title": "PriorAttempt",
+      "type": "object"
+    },
+    "ProposalStatus": {
+      "enum": [
+        "pending",
+        "accepted",
+        "edited",
+        "rejected"
+      ],
+      "title": "ProposalStatus",
+      "type": "string"
+    },
+    "RecheckResult": {
+      "additionalProperties": false,
+      "properties": {
+        "check": {
+          "title": "Check",
+          "type": "string"
+        },
+        "detail": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Detail"
+        },
+        "passed": {
+          "title": "Passed",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "check",
+        "passed",
+        "detail"
+      ],
+      "title": "RecheckResult",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "all_checks_passed": {
+      "readOnly": true,
+      "title": "All Checks Passed",
+      "type": "boolean"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "evidence": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Evidence",
+      "type": "array"
+    },
+    "final_text": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Final Text"
+    },
+    "flag_id": {
+      "pattern": "^flag-\\d{6}$",
+      "title": "Flag Id",
+      "type": "string"
+    },
+    "history": {
+      "items": {
+        "$ref": "#/$defs/PriorAttempt"
+      },
+      "title": "History",
+      "type": "array"
+    },
+    "id": {
+      "pattern": "^prop-\\d{6}$",
+      "title": "Id",
+      "type": "string"
+    },
+    "input_hash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Input Hash",
+      "type": "string"
+    },
+    "model": {
+      "title": "Model",
+      "type": "string"
+    },
+    "proposal_text": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Proposal Text"
+    },
+    "proposed_bbox": {
+      "anyOf": [
+        {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 4,
+          "minItems": 4,
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Proposed Bbox"
+    },
+    "rationale": {
+      "maxLength": 300,
+      "minLength": 1,
+      "title": "Rationale",
+      "type": "string"
+    },
+    "rechecks": {
+      "items": {
+        "$ref": "#/$defs/RecheckResult"
+      },
+      "title": "Rechecks",
+      "type": "array"
+    },
+    "round": {
+      "default": 1,
+      "minimum": 1,
+      "title": "Round",
+      "type": "integer"
+    },
+    "status": {
+      "$ref": "#/$defs/ProposalStatus",
+      "default": "pending"
+    },
+    "target_id": {
+      "pattern": "(?:^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$)|(?:^FIG-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$)",
+      "title": "Target Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "flag_id",
+    "target_id",
+    "round",
+    "proposal_text",
+    "proposed_bbox",
+    "evidence",
+    "rationale",
+    "rechecks",
+    "status",
+    "final_text",
+    "history",
+    "model",
+    "input_hash",
+    "created_at",
+    "all_checks_passed"
+  ],
+  "title": "Proposal",
+  "type": "object"
+}

@@ -24,14 +24,22 @@ def _not_implemented(name: str) -> None:
 
 
 @schemas_app.command("export")
-def schemas_export() -> None:
+def schemas_export(
+    out: Annotated[Path, typer.Option("--out", help="Output directory.")] = Path("schemas"),
+    check: Annotated[
+        bool, typer.Option("--check", help="Write nothing; exit 1 if files would change.")
+    ] = False,
+) -> None:
     """Export JSON schemas from the contract models into ./schemas."""
-    try:
-        from manuallabor.schemas_export import export_schemas  # type: ignore[import-not-found, unused-ignore]
-    except ImportError:
-        print("schemas export not implemented yet", file=sys.stderr)
-        raise typer.Exit(2) from None
-    export_schemas(Path("schemas"))
+    from manuallabor.schemas_export import export_schemas
+
+    result = export_schemas(out, check=check)
+    if check:
+        if result:
+            for p in result:
+                print(f"schema drift: {p}", file=sys.stderr)
+            raise typer.Exit(1)
+        print("schemas up to date")
 
 
 @app.command()

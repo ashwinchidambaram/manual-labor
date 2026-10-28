@@ -1,0 +1,155 @@
+{
+  "$defs": {
+    "DecisionAction": {
+      "enum": [
+        "approve",
+        "edit",
+        "flag",
+        "skip"
+      ],
+      "title": "DecisionAction",
+      "type": "string"
+    },
+    "Signal": {
+      "additionalProperties": false,
+      "properties": {
+        "critical": {
+          "title": "Critical",
+          "type": "boolean"
+        },
+        "detail": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Detail"
+        },
+        "name": {
+          "$ref": "#/$defs/SignalName"
+        },
+        "value": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Value",
+          "type": "number"
+        }
+      },
+      "required": [
+        "name",
+        "value",
+        "critical",
+        "detail"
+      ],
+      "title": "Signal",
+      "type": "object"
+    },
+    "SignalName": {
+      "enum": [
+        "ocr_mean",
+        "ocr_min",
+        "textlayer_vs_ocr",
+        "parser_agreement",
+        "reading_order_risk",
+        "table_consistency",
+        "garbage_ratio",
+        "faithfulness",
+        "figure_method",
+        "figure_attach_rule",
+        "has_numeric_spec",
+        "llm_verifier"
+      ],
+      "title": "SignalName",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "action": {
+      "$ref": "#/$defs/DecisionAction"
+    },
+    "block_id": {
+      "pattern": "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$",
+      "title": "Block Id",
+      "type": "string"
+    },
+    "edited_text": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Edited Text"
+    },
+    "flag_id": {
+      "anyOf": [
+        {
+          "pattern": "^flag-\\d{6}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Flag Id"
+    },
+    "score": {
+      "anyOf": [
+        {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Score"
+    },
+    "seq": {
+      "minimum": 1,
+      "title": "Seq",
+      "type": "integer"
+    },
+    "signals": {
+      "items": {
+        "$ref": "#/$defs/Signal"
+      },
+      "title": "Signals",
+      "type": "array"
+    },
+    "threshold": {
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Threshold",
+      "type": "number"
+    },
+    "timestamp": {
+      "format": "date-time",
+      "title": "Timestamp",
+      "type": "string"
+    }
+  },
+  "required": [
+    "seq",
+    "block_id",
+    "action",
+    "score",
+    "threshold",
+    "signals",
+    "edited_text",
+    "flag_id",
+    "timestamp"
+  ],
+  "title": "Decision",
+  "type": "object"
+}

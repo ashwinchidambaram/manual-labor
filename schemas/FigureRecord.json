@@ -1,0 +1,185 @@
+{
+  "$defs": {
+    "AttachRule": {
+      "enum": [
+        "caption_ref",
+        "caption_match",
+        "proximity",
+        "none"
+      ],
+      "title": "AttachRule",
+      "type": "string"
+    },
+    "BlockStatus": {
+      "enum": [
+        "auto_approved",
+        "queued",
+        "approved",
+        "edited",
+        "flagged",
+        "rejected"
+      ],
+      "title": "BlockStatus",
+      "type": "string"
+    },
+    "Extraction": {
+      "enum": [
+        "native",
+        "vector",
+        "crop"
+      ],
+      "title": "Extraction",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "articles": {
+      "items": {
+        "pattern": "^(?:[a-z0-9]+(?:-[a-z0-9]+)*)(?:--(?:[a-z0-9]+(?:-[a-z0-9]+)*))?$",
+        "type": "string"
+      },
+      "title": "Articles",
+      "type": "array"
+    },
+    "attach_rule": {
+      "$ref": "#/$defs/AttachRule"
+    },
+    "bbox": {
+      "anyOf": [
+        {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 4,
+          "minItems": 4,
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Bbox"
+    },
+    "caption_original": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Caption Original"
+    },
+    "confidence": {
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Confidence",
+      "type": "number"
+    },
+    "description_generated": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Description Generated"
+    },
+    "extraction": {
+      "$ref": "#/$defs/Extraction"
+    },
+    "file": {
+      "title": "File",
+      "type": "string"
+    },
+    "height": {
+      "minimum": 1,
+      "title": "Height",
+      "type": "integer"
+    },
+    "id": {
+      "pattern": "^FIG-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$",
+      "title": "Id",
+      "type": "string"
+    },
+    "page": {
+      "minimum": 1,
+      "title": "Page",
+      "type": "integer"
+    },
+    "phash": {
+      "pattern": "^[0-9a-f]{16}$",
+      "title": "Phash",
+      "type": "string"
+    },
+    "product_model": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Product Model"
+    },
+    "review": {
+      "$ref": "#/$defs/BlockStatus"
+    },
+    "source_doc": {
+      "maxLength": 48,
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "title": "Source Doc",
+      "type": "string"
+    },
+    "svg": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Svg"
+    },
+    "tags": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Tags",
+      "type": "array"
+    },
+    "width": {
+      "minimum": 1,
+      "title": "Width",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "id",
+    "file",
+    "svg",
+    "source_doc",
+    "product_model",
+    "page",
+    "bbox",
+    "extraction",
+    "width",
+    "height",
+    "phash",
+    "caption_original",
+    "description_generated",
+    "tags",
+    "articles",
+    "attach_rule",
+    "confidence",
+    "review"
+  ],
+  "title": "FigureRecord",
+  "type": "object"
+}

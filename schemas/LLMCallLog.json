@@ -1,0 +1,117 @@
+{
+  "$defs": {
+    "CallKind": {
+      "enum": [
+        "chat",
+        "vision",
+        "embed"
+      ],
+      "title": "CallKind",
+      "type": "string"
+    },
+    "Task": {
+      "enum": [
+        "cleanup",
+        "grouping",
+        "vision",
+        "verifier",
+        "embeddings",
+        "metadata",
+        "agent"
+      ],
+      "title": "Task",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "cached": {
+      "title": "Cached",
+      "type": "boolean"
+    },
+    "completion_tokens": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Completion Tokens"
+    },
+    "error": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Error"
+    },
+    "input_hash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Input Hash",
+      "type": "string"
+    },
+    "kind": {
+      "$ref": "#/$defs/CallKind"
+    },
+    "latency_ms": {
+      "minimum": 0,
+      "title": "Latency Ms",
+      "type": "number"
+    },
+    "model": {
+      "title": "Model",
+      "type": "string"
+    },
+    "ok": {
+      "default": true,
+      "title": "Ok",
+      "type": "boolean"
+    },
+    "prompt_tokens": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Prompt Tokens"
+    },
+    "provider": {
+      "title": "Provider",
+      "type": "string"
+    },
+    "task": {
+      "$ref": "#/$defs/Task"
+    },
+    "timestamp": {
+      "format": "date-time",
+      "title": "Timestamp",
+      "type": "string"
+    }
+  },
+  "required": [
+    "task",
+    "kind",
+    "provider",
+    "model",
+    "input_hash",
+    "prompt_tokens",
+    "completion_tokens",
+    "latency_ms",
+    "cached",
+    "ok",
+    "error",
+    "timestamp"
+  ],
+  "title": "LLMCallLog",
+  "type": "object"
+}

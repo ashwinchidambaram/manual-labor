@@ -1,0 +1,197 @@
+{
+  "$defs": {
+    "ArticleSplit": {
+      "enum": [
+        "per_topic",
+        "per_document"
+      ],
+      "title": "ArticleSplit",
+      "type": "string"
+    },
+    "ModelRef": {
+      "additionalProperties": false,
+      "properties": {
+        "api_base": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Api Base"
+        },
+        "api_key_env": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Api Key Env"
+        },
+        "model": {
+          "minLength": 1,
+          "title": "Model",
+          "type": "string"
+        },
+        "provider": {
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Provider",
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider",
+        "model",
+        "api_base",
+        "api_key_env"
+      ],
+      "title": "ModelRef",
+      "type": "object"
+    },
+    "OcrEngine": {
+      "enum": [
+        "rapidocr",
+        "tesseract"
+      ],
+      "title": "OcrEngine",
+      "type": "string"
+    },
+    "TaskModels": {
+      "additionalProperties": false,
+      "properties": {
+        "agent": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ModelRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "cleanup": {
+          "$ref": "#/$defs/ModelRef"
+        },
+        "embeddings": {
+          "$ref": "#/$defs/ModelRef"
+        },
+        "grouping": {
+          "$ref": "#/$defs/ModelRef"
+        },
+        "metadata": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ModelRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "verifier": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ModelRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "vision": {
+          "$ref": "#/$defs/ModelRef"
+        }
+      },
+      "required": [
+        "cleanup",
+        "grouping",
+        "vision",
+        "embeddings",
+        "verifier",
+        "metadata",
+        "agent"
+      ],
+      "title": "TaskModels",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "article_split": {
+      "$ref": "#/$defs/ArticleSplit",
+      "default": "per_topic"
+    },
+    "background_ocr_born_digital": {
+      "default": true,
+      "title": "Background Ocr Born Digital",
+      "type": "boolean"
+    },
+    "models": {
+      "$ref": "#/$defs/TaskModels"
+    },
+    "name": {
+      "title": "Name",
+      "type": "string"
+    },
+    "ocr_dpi": {
+      "default": 300,
+      "minimum": 300,
+      "title": "Ocr Dpi",
+      "type": "integer"
+    },
+    "ocr_engine": {
+      "$ref": "#/$defs/OcrEngine",
+      "default": "rapidocr"
+    },
+    "parsers": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Parsers",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "target_edit_rate": {
+      "default": 0.02,
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Target Edit Rate",
+      "type": "number"
+    },
+    "threshold": {
+      "default": 0.85,
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Threshold",
+      "type": "number"
+    }
+  },
+  "required": [
+    "schema_version",
+    "name",
+    "threshold",
+    "models",
+    "article_split",
+    "parsers",
+    "ocr_engine",
+    "ocr_dpi",
+    "background_ocr_born_digital",
+    "target_edit_rate"
+  ],
+  "title": "ProjectConfig",
+  "type": "object"
+}

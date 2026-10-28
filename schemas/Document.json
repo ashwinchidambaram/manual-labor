@@ -1,0 +1,113 @@
+{
+  "$defs": {
+    "DocKind": {
+      "enum": [
+        "born_digital_pdf",
+        "scanned_pdf",
+        "docx"
+      ],
+      "title": "DocKind",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "filename": {
+      "minLength": 1,
+      "title": "Filename",
+      "type": "string"
+    },
+    "kind": {
+      "$ref": "#/$defs/DocKind"
+    },
+    "page_count": {
+      "minimum": 1,
+      "title": "Page Count",
+      "type": "integer"
+    },
+    "pages_without_text_layer": {
+      "items": {
+        "type": "integer"
+      },
+      "title": "Pages Without Text Layer",
+      "type": "array"
+    },
+    "parser_versions": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Parser Versions",
+      "type": "object"
+    },
+    "product_model": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Product Model"
+    },
+    "product_model_inferred": {
+      "default": false,
+      "title": "Product Model Inferred",
+      "type": "boolean"
+    },
+    "sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Sha256",
+      "type": "string"
+    },
+    "slug": {
+      "maxLength": 48,
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "title": "Slug",
+      "type": "string"
+    },
+    "stripped_footers": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Stripped Footers",
+      "type": "array"
+    },
+    "stripped_headers": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Stripped Headers",
+      "type": "array"
+    },
+    "title": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Title"
+    }
+  },
+  "required": [
+    "slug",
+    "sha256",
+    "filename",
+    "title",
+    "product_model",
+    "product_model_inferred",
+    "kind",
+    "page_count",
+    "pages_without_text_layer",
+    "stripped_headers",
+    "stripped_footers",
+    "parser_versions"
+  ],
+  "title": "Document",
+  "type": "object"
+}

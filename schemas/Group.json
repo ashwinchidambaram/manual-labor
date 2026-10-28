@@ -1,0 +1,163 @@
+{
+  "$defs": {
+    "GroupView": {
+      "enum": [
+        "structure",
+        "topic"
+      ],
+      "title": "GroupView",
+      "type": "string"
+    },
+    "PageRange": {
+      "additionalProperties": false,
+      "properties": {
+        "end": {
+          "minimum": 1,
+          "title": "End",
+          "type": "integer"
+        },
+        "start": {
+          "minimum": 1,
+          "title": "Start",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "start",
+        "end"
+      ],
+      "title": "PageRange",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "block_count": {
+      "minimum": 0,
+      "title": "Block Count",
+      "type": "integer"
+    },
+    "block_ids": {
+      "items": {
+        "pattern": "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$",
+        "type": "string"
+      },
+      "title": "Block Ids",
+      "type": "array"
+    },
+    "cohesion": {
+      "anyOf": [
+        {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cohesion"
+    },
+    "doc_id": {
+      "maxLength": 48,
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "title": "Doc Id",
+      "type": "string"
+    },
+    "figure_count": {
+      "minimum": 0,
+      "title": "Figure Count",
+      "type": "integer"
+    },
+    "id": {
+      "pattern": "^g-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-(?:[st])(?:\\d{3})$",
+      "title": "Id",
+      "type": "string"
+    },
+    "is_unassigned": {
+      "default": false,
+      "title": "Is Unassigned",
+      "type": "boolean"
+    },
+    "level": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Level",
+      "type": "integer"
+    },
+    "page_ranges": {
+      "items": {
+        "$ref": "#/$defs/PageRange"
+      },
+      "title": "Page Ranges",
+      "type": "array"
+    },
+    "parent_id": {
+      "anyOf": [
+        {
+          "pattern": "^g-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-(?:[st])(?:\\d{3})$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Parent Id"
+    },
+    "section_ids": {
+      "items": {
+        "pattern": "^g-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-(?:[st])(?:\\d{3})$",
+        "type": "string"
+      },
+      "title": "Section Ids",
+      "type": "array"
+    },
+    "section_number": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Section Number"
+    },
+    "slug": {
+      "maxLength": 48,
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "title": "Slug",
+      "type": "string"
+    },
+    "title": {
+      "minLength": 1,
+      "title": "Title",
+      "type": "string"
+    },
+    "view": {
+      "$ref": "#/$defs/GroupView"
+    }
+  },
+  "required": [
+    "id",
+    "view",
+    "doc_id",
+    "title",
+    "slug",
+    "block_ids",
+    "page_ranges",
+    "section_ids",
+    "parent_id",
+    "level",
+    "section_number",
+    "cohesion",
+    "is_unassigned",
+    "block_count",
+    "figure_count"
+  ],
+  "title": "Group",
+  "type": "object"
+}

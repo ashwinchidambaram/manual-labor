@@ -1,0 +1,97 @@
+{
+  "$defs": {
+    "FlagCategory": {
+      "enum": [
+        "wrong_text",
+        "missing_figure",
+        "wrong_grouping",
+        "bad_crop",
+        "table_structure"
+      ],
+      "title": "FlagCategory",
+      "type": "string"
+    },
+    "FlagStatus": {
+      "enum": [
+        "open",
+        "resolved"
+      ],
+      "title": "FlagStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "category": {
+      "$ref": "#/$defs/FlagCategory"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "id": {
+      "pattern": "^flag-\\d{6}$",
+      "title": "Id",
+      "type": "string"
+    },
+    "note": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Note"
+    },
+    "resolution": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Resolution"
+    },
+    "resolved_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Resolved At"
+    },
+    "status": {
+      "$ref": "#/$defs/FlagStatus",
+      "default": "open"
+    },
+    "target_id": {
+      "pattern": "(?:^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$)|(?:^FIG-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$)",
+      "title": "Target Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "target_id",
+    "category",
+    "note",
+    "status",
+    "created_at",
+    "resolved_at",
+    "resolution"
+  ],
+  "title": "Flag",
+  "type": "object"
+}

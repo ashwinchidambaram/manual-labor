@@ -1,0 +1,114 @@
+{
+  "$defs": {
+    "ReviewCounts": {
+      "additionalProperties": false,
+      "properties": {
+        "approved": {
+          "minimum": 0,
+          "title": "Approved",
+          "type": "integer"
+        },
+        "edited": {
+          "minimum": 0,
+          "title": "Edited",
+          "type": "integer"
+        },
+        "overrides": {
+          "minimum": 0,
+          "title": "Overrides",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "approved",
+        "edited",
+        "overrides"
+      ],
+      "title": "ReviewCounts",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "blocks": {
+      "minimum": 0,
+      "title": "Blocks",
+      "type": "integer"
+    },
+    "figures": {
+      "items": {
+        "pattern": "^FIG-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$",
+        "type": "string"
+      },
+      "title": "Figures",
+      "type": "array"
+    },
+    "generated_at": {
+      "format": "date-time",
+      "title": "Generated At",
+      "type": "string"
+    },
+    "id": {
+      "pattern": "^(?:[a-z0-9]+(?:-[a-z0-9]+)*)(?:--(?:[a-z0-9]+(?:-[a-z0-9]+)*))?$",
+      "title": "Id",
+      "type": "string"
+    },
+    "pages": {
+      "items": {
+        "type": "integer"
+      },
+      "title": "Pages",
+      "type": "array"
+    },
+    "product_model": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Product Model"
+    },
+    "review": {
+      "$ref": "#/$defs/ReviewCounts"
+    },
+    "sections": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Sections",
+      "type": "array"
+    },
+    "source_doc": {
+      "maxLength": 48,
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "title": "Source Doc",
+      "type": "string"
+    },
+    "source_file": {
+      "title": "Source File",
+      "type": "string"
+    },
+    "title": {
+      "title": "Title",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "title",
+    "source_doc",
+    "source_file",
+    "product_model",
+    "pages",
+    "sections",
+    "figures",
+    "blocks",
+    "review",
+    "generated_at"
+  ],
+  "title": "ArticleFrontmatter",
+  "type": "object"
+}

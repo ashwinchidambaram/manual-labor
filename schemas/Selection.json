@@ -1,0 +1,46 @@
+{
+  "$defs": {
+    "ArticleSplit": {
+      "enum": [
+        "per_topic",
+        "per_document"
+      ],
+      "title": "ArticleSplit",
+      "type": "string"
+    },
+    "GroupView": {
+      "enum": [
+        "structure",
+        "topic"
+      ],
+      "title": "GroupView",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "active_view": {
+      "$ref": "#/$defs/GroupView",
+      "default": "topic"
+    },
+    "article_split": {
+      "$ref": "#/$defs/ArticleSplit",
+      "default": "per_topic"
+    },
+    "block_ids": {
+      "items": {
+        "pattern": "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:\\d{3,4})-(?:\\d{2,3})$",
+        "type": "string"
+      },
+      "title": "Block Ids",
+      "type": "array"
+    }
+  },
+  "required": [
+    "block_ids",
+    "article_split",
+    "active_view"
+  ],
+  "title": "Selection",
+  "type": "object"
+}
