@@ -67,3 +67,13 @@ Real public-domain scanned US Army/Air Force technical manual from archive.org (
 - Built as `tests/fixtures/real/real-manual.pdf` (image-only, 300 DPI gray JPEG q80, 25.8 MiB) by `tests/fixtures/real/fetch.py`; gitignored; tests skip when absent. 20 model-transcribed GT blocks (48 numeric tokens) in `ground_truth_sample.json` — needs a human spot-check.
 - Orchestrator viewed page 8: real two-column layout, dotted-leader spec lists, "100 ft.lb." torque values, microfiche dark edge + binder holes. Good stress input for OCR, column detection, and numeric recall.
 - Alternates noted by the acquiring agent: `micro_IA41152645_0207` (centrifugal pump TM, 64 p) and `micro_IA41152645_0238` (electric forklift TM, 61 p).
+
+## Module 3 decisions (2026-10-28, from docs/design/03-scoring.md)
+| Decision | Rationale |
+|---|---|
+| Scores live in `docs/<slug>/scores.json`, never rewritten into `blocks.json` | Module 2 fingerprints blocks.json; later modules read via `load_scored_blocks()`. Stage order parse → figures → score; `figures --force` marks score stale. |
+| `garbage_ratio` = token-shape rules, no dictionary | Entropy doesn't separate garbage from spec tables (1.42 vs 1.45 vs 2.18 bits); wordlists misfire on part codes/non-English. |
+| Reorder allowance is evidence-gated (layout evidence or another parser read that order); sentence swaps need parser evidence; accepted reorder → faithfulness 0.9 | Step order is a fact; SPEC §4.6 "reorder for reading-order fixes" only. |
+| Critical set: faithfulness, figure_method always; parser_agreement + textlayer_vs_ocr when numeric or < 0.8; ocr_min when numeric | SPEC §5.3 "single critical failure should dominate". |
+| `FaithfulnessResult.numeric_variant` → `numeric_variants: list[NumericVariant]` | A block can have two OCR conflicts. Contract change made in M3 implementation (nothing downstream uses it yet). |
+| Module 9: the threshold slider is a **view filter** over the queue; it never re-approves blocks | SPEC "drag to 0 to see everything" conflicts with "≥ threshold = auto-approved"; filtering preserves the audit trail. |
