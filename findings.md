@@ -166,3 +166,11 @@ User freed disk and asked to run things in parallel wherever possible to finish 
 | Only auto_approved/approved/edited blocks contribute text; export unlocks at zero open flags AND zero queued in-scope blocks; `--override` exports machine clean_text (else raw) with each block listed in `manifest.overrides` + `review.overrides` and an `export_override` action | Stricter than SPEC §7.4: numeric blocks are always queued, so an unreviewed number can never ship as approved text without an explicit, recorded override. |
 | List items render `* ` not `- `; source text never Markdown-escaped; one figure placement per article at the attachment point; alt text `FIG-ID — caption` | `- 12` would read as −12 to the numeric regex. |
 | `scripts/acceptance.sh [--live]` + `render_acceptance.py` → docs/ACCEPTANCE.md with NOT VERIFIED/INCOMPLETE markers for skipped steps; AC8 via `MANUALLABOR_OFFLINE=1` socket guard | SPEC §11 evidence must be pasted, never asserted. |
+
+## Module 10 decisions (2026-10-29, docs/design/10-agent-calibration.md)
+| Decision | Rationale |
+|---|---|
+| Agent proposals pass strict §5.2 first; any violation must be matched by an independent reader at the same position; a changed number needs 1 attester if an OCR look-alike, else 2; the vision reader attests but never yields a confidence/signal | Lets `3S→35` corrections through only with evidence. |
+| Learned OCR confusion pairs NEVER enter the faithfulness look-alike table or the attestation rule (corrects an earlier note in findings); they only force blocks to the queue and appear as agent-prompt hints | Anything else weakens the invariant on less evidence. |
+| Calibration: 20 buckets of 0.05; sparse < 20; only non-numeric-spec decisions count; suggestion = lowest t in [0.50, 0.95] with ≥ 50 decisions above, Wilson upper (z=1.645) < target 2%, no non-sparse bucket above with Wilson lower > target; apply only explicitly, default scope "next docs" via `doc_thresholds` | Never changes config silently; 133+ zero-edit decisions needed before 2% is met. |
+| Forced M7 changes: proposal store methods + `(flag_id, round)` index; agent-sourced decisions; override services resolve flags; learning `agent.json`; agent job type; `ActionKind.agent_run`; richer API models; scoring reads `doc_thresholds` | Implemented in M10.2 against M7's code. |
