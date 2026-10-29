@@ -127,3 +127,13 @@
   - M6.1 design done (Sonnet, 227 lines, T1–T15). Defaults flipped to small tier. Pulling llama3.2:1b + moondream in background. Dispatched M6.2 implement (Sonnet).
   - M6.2 implement done (Sonnet): fast suite 1173; live Ollama chat/json/vision/embed pass; cleanup smoke 10 attempts / 9 rejected / 0 violations; probe prints small tier on M3 16 GB. Commit c3db421. Dispatched M6.3 review (Opus, fresh).
   - M6.3 review (Opus): conditional PASS. Majors: Ollama num_ctx not honored (prompt_eval_count 4098 for 8.4k-token prompt, silent truncation); finish_reason=length accepted + cached; small-tier verifier == cleanup model → verifier skipped. Minors: estimated flag leak, --apply keeps metadata/agent, --apply ignores disk, global OLLAMA_API_BASE, tags parser crash. Pulling qwen2.5:1.5b for the verifier; dispatched M6.4 fix (Sonnet).
+  - M6.4 fix done (Sonnet): 5/5; 210 provider tests; live 12 passed. Gate run by orchestrator (1220 fast); M6 recorded + pushed.
+
+### Phase 7: API + project state
+- **Status:** in_progress
+- **Started:** 2026-10-29
+- Actions taken:
+  - Dispatched M7.1 design (Opus).
+  - M7.1 design done (Opus, 450 lines, 48 tests). Dispatched M7.2 implementer A (state/jobs/check, Sonnet) ∥ M7.3 implementer B (API/serve/client types, Sonnet).
+  - M7.3 implementer B done (Sonnet): api/ routers + serve + openapi export + gen-api; 79 API tests; V1 real serve smoke passes. A still running.
+  - User asked to speed up: two-track plan adopted (M8∥M10, then M9∥M11). Dispatched M8.1 Scope UI design (Sonnet) while M7 implementer A finishes.

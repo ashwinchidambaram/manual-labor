@@ -4,7 +4,7 @@
 Deliver Manual Labor v1 per SPEC.md: every CLAUDE.md module gate (0–11) passed with its proving command pasted in docs/PROGRESS.md, and SPEC §11 acceptance recorded in docs/ACCEPTANCE.md.
 
 ## Current Phase
-Phase 6 (provider layer + hardware probe). Overnight autonomous 2026-10-29.
+Phase 7 (API + project state). Autonomous 2026-10-29.
 
 ## Phases
 Detailed tasks, model assignments, and gates: docs/plans/2026-10-28-manual-labor-build.md. Decisions and environment: findings.md.
@@ -50,14 +50,14 @@ Detailed tasks, model assignments, and gates: docs/plans/2026-10-28-manual-labor
 - **Status:** complete
 
 ### Phase 6: Provider layer + hardware probe
-- [ ] Design (Sonnet) · Implement (Sonnet) · Review (Opus) · Fix
-- [ ] Gate: same contract test passes for ollama/anthropic/openai-compatible; probe table on macOS; `--live` with local Ollama models (needs a small chat + vision model pulled; gemma4 was removed overnight)
-- **Status:** in_progress
+- [x] Design (Sonnet) · Implement (Sonnet) · Review (Opus) · Fix (Sonnet)
+- [x] Gate: 1220 fast tests; contract suite on all backends; live Ollama 12 passed; probe table on macOS
+- **Status:** complete
 
 ### Phase 7: API + project state
 - [ ] Design (Opus) · Implement (Sonnet ×2) · Review (Opus) · Fix
 - [ ] Gate: `labor check ./tests/fixtures/project-a` passes; SIGKILL-resume test; every action persisted
-- **Status:** pending
+- **Status:** in_progress
 
 ### Phase 8: UI Scope
 - [ ] Design (Sonnet) · Implement (Sonnet) · UX check (Sonnet) · Review (Sonnet) · Fix
@@ -78,6 +78,9 @@ Detailed tasks, model assignments, and gates: docs/plans/2026-10-28-manual-labor
 - [ ] Design (Sonnet) · Implement (Sonnet, README Haiku) · Review (Opus) · Fix
 - [ ] Gate: zip validates; every FIG resolves; README; SPEC §11 checklist in docs/ACCEPTANCE.md incl. offline `--live` run
 - **Status:** pending
+
+## Schedule change (user asked to speed up, 2026-10-29)
+- Two tracks after M7: frontend (M8 → M9) ∥ backend (M10 → M11). Designs start while the previous module is in review. One Docling-bearing test run and one Playwright run at a time. M8.1 design started during M7 implementation.
 
 ## Cross-cutting (user, 2026-10-29)
 - Self-improvement from HIL feedback: capture everything in M7's decision store (mandatory); learning hooks in M5 cleanup, M3/M10 calibration, M4 grouping, M10 agent pass (nice-to-have, never bypasses faithfulness). REQUIRED: immutable baseline, `learning.enabled` toggle, versioned learned layer with snapshots, reset + rollback, provenance of which snapshot produced each output, learned-vs-baseline comparison in calibration. See findings.md.
