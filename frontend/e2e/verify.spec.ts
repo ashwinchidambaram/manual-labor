@@ -62,7 +62,7 @@ test.beforeEach(async ({ request }) => {
   await waitJobsIdle(request);
 });
 
-test("VE1 twenty blocks keyboard-only (gate)", async ({ page, request }) => {
+test("VE1 twenty blocks keyboard-only (gate) @AC4", async ({ page, request }) => {
   const Q = (await getQueue(request)).items;
   await putCursor(request, Q[0].block_id);
   type Role = "A" | "EDIT_OK" | "EDIT_409" | "FLAG1" | "FLAG5" | "SKIP" | "AKA";
@@ -534,6 +534,7 @@ test("VE12 a figure attached, then the screen left while the job runs, shows in 
   await key(page, "Enter");
   await expect(page.getByTestId("figure-picker")).toBeVisible();
   await page.keyboard.type(f.figure_id);
+  await expect(page.getByTestId(`pick-${f.figure_id}`)).toBeVisible();
   await key(page, "ArrowDown");
   await key(page, "Enter");
   await expect(page.getByTestId(`rail-item-${f.figure_id}`).first()).toBeVisible();

@@ -21,6 +21,6 @@ frontend/playwright-report/
 .planning/.attestation
 .DS_Store
 frontend/tsconfig.tsbuildinfo
-.pytest_tmp/
+.pytest_tmp*/
 frontend/e2e/.cache/
 frontend/e2e/.cache.lock

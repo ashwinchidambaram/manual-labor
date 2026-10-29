@@ -158,3 +158,4 @@
   - M9.5 fix done (Sonnet, vitest 214). Orchestrator rebuilt e2e cache (80 s) and ran the full Playwright suite: 42/44; VE1 and UX T6 (the gate tests) fail on textarea focus (edit + flag note) — regression from the focus changes. Dispatched M9.6 focus fix (Sonnet, reproduce-first).
   - M10.4 fix done (Opus): 7/7 failing-first; 492 tests. Gate run by orchestrator; M10 recorded + pushed. Re-review (Opus) running. Still running: M9.6 focus fix, M11.2 export implement.
   - M10 re-review (Opus): race/outcomes/look-alikes/suggestion hold; 1 medium-high: header-row shift attested via right-padded text grids (readers drop empty cells); 2 lows (suggestion jumps an unreviewed gap; reverted edit counts as edited). Dispatched M10.6 fix (Opus).
+  - M9.6 focus fix done (Sonnet, root-caused: late approve ack consumed wantFocus while editor/dialog open). VE1 + T6 pass; 54/55 Playwright; VE12 (rail after attach while unmounted) fails — dispatched M9.7 reproduce-first fix.

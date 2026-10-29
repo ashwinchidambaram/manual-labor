@@ -92,8 +92,12 @@ def test_a_bad_sparse_bucket_blocks_everything_below_it() -> None:
     rows = many([(0.6, 3000, 0), (0.97, 19, 19)])
     s, _w = suggest_threshold(rows, 0.02)
     assert s.suggested is None
-    # a sparse bucket whose edits are not significant does not block
+    # a sparse bucket whose edits are not significant does not block on its edits, but the
+    # empty buckets between 0.6 and it are an unreviewed gap (round c): no suggestion
     rows = many([(0.6, 3000, 0), (0.97, 19, 1)])
+    s, _w = suggest_threshold(rows, 0.02)
+    assert s.suggested is None and "unreviewed" in (s.detail or "")
+    rows = many([(0.62 + 0.05 * k, 300, 0) for k in range(7)] + [(0.97, 20, 1)])
     s, _w = suggest_threshold(rows, 0.02)
     assert s.suggested == 0.6
 
@@ -143,3 +147,48 @@ def test_replayed_project_apply_returns_the_original_job(aenv: AEnv) -> None:
     thr2, pinned2, job2 = cal.apply(0.8, "project", "apply-p")
     assert job2 is not None and job2.id == job.id and (thr2, pinned2) == (thr, pinned)
     assert len(aenv.store.job_rows()) == n_jobs
+
+
+# -- round c: a reverted edit is an approval; no suggestion across an unreviewed gap -----------
+
+
+def test_reverted_edit_then_approve_is_approved() -> None:
+    bid = "b-clean-p001-01"
+    raw = "raw txt"
+    acts = [
+        record(1, ActionKind.edit, example(bid, raw, shown=raw, final="fixed")),
+        record(2, ActionKind.edit, example(bid, raw, shown="fixed", final=raw)),
+        record(3, ActionKind.approve, example(bid, raw, shown=raw, final=raw)),
+    ]
+    (o,) = outcomes(acts)
+    assert o.action_id == 3 and not o.edited and o.final_text == raw
+    # the revert itself, as the latest action, is not an edit either
+    (o2,) = outcomes(acts[:2])
+    assert not o2.edited
+    # edit, approve, revert, approve: approved
+    acts2 = [
+        record(1, ActionKind.edit, example(bid, raw, shown=raw, final="fixed")),
+        record(2, ActionKind.approve, example(bid, raw, shown="fixed", final="fixed")),
+        record(3, ActionKind.edit, example(bid, raw, shown="fixed", final=raw)),
+        record(4, ActionKind.approve, example(bid, raw, shown=raw, final=raw)),
+    ]
+    (o3,) = outcomes(acts2)
+    assert not o3.edited
+    # an edit that stays changed is still an edit
+    (o4,) = outcomes(acts2[:2])
+    assert o4.edited
+
+
+def test_no_suggestion_jumps_an_unreviewed_gap() -> None:
+    s, _w = suggest_threshold(many([(0.52, 25, 0), (0.97, 300, 0)]), 0.02)
+    assert s.suggested in (0.95, None)
+    if s.suggested is None:
+        assert s.detail
+    # contiguous populated buckets still allow the low threshold
+    s, _w = suggest_threshold(many([(0.52 + 0.05 * k, 25, 0) for k in range(10)]), 0.02)
+    assert s.suggested == 0.5
+
+
+def test_the_140_at_097_case_still_suggests_095() -> None:
+    s, _w = suggest_threshold(many([(0.97, 140, 0)]), 0.02)
+    assert (s.suggested, s.reason) == (0.95, "ok")

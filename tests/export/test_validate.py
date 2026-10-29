@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import zipfile
 from collections.abc import Callable
 from pathlib import Path
@@ -194,3 +195,48 @@ def test_e17_unknown_manifest_fields_fail_the_schema(
 
     problems = mutate(exported_a, tmp_path, fn)
     assert "Z2" in codes(problems) and any(extra in p.detail for p in problems)
+
+
+def test_e17_a_sidecar_that_names_an_article_that_does_not_reference_it(
+    exported_a: Exported, tmp_path: Path
+) -> None:
+    def fn(f: Files) -> None:
+        side = next(n for n in sorted(f) if n.startswith("images/figures/") and n.endswith(".json"))
+        data = json.loads(f[side])
+        other = next(
+            n[len("articles/") : -3] for n in sorted(f) if n.startswith("articles/clean--")
+        )
+        data["articles"] = [other]  # a real article, but its body does not show this figure
+        f[side] = (json.dumps(data, sort_keys=True, indent=2) + "\n").encode()
+
+    problems = mutate(exported_a, tmp_path, fn)
+    assert "Z6" in codes(problems) and any("does not reference" in p.detail for p in problems)
+
+
+def test_e17_frontmatter_must_agree_with_the_manifest(exported_a: Exported, tmp_path: Path) -> None:
+    def fn(f: Files) -> None:
+        a = first_article(f)
+        text = f[a].decode()
+        f[a] = re.sub(r"^blocks: \d+$", "blocks: 1", text, count=1, flags=re.M).encode()
+
+    problems = mutate(exported_a, tmp_path, fn)
+    assert "Z3" in codes(problems) and any("blocks" in p.detail for p in problems)
+
+
+def test_e17_an_invalid_sidecar(exported_a: Exported, tmp_path: Path) -> None:
+    def fn(f: Files) -> None:
+        side = next(n for n in sorted(f) if n.startswith("images/figures/") and n.endswith(".json"))
+        f[side] = b'{"id": "FIG-figures-p001-01"}'
+
+    assert "Z4" in codes(mutate(exported_a, tmp_path, fn))
+
+
+def test_e17_a_figure_line_that_is_not_the_contracted_shape(
+    exported_a: Exported, tmp_path: Path
+) -> None:
+    def fn(f: Files) -> None:
+        a = first_article(f)
+        line = first_figure_line(f[a].decode())
+        f[a] = f[a].replace(line.encode(), line.replace(" \u2014 ", " - ").encode())
+
+    assert "Z4" in codes(mutate(exported_a, tmp_path, fn))

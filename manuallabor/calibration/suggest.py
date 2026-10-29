@@ -43,7 +43,9 @@ def suggest_threshold(
     No extrapolation: t is never below the lowest bucket that holds MIN_BUCKET_N decisions
     (the scores below it were not observed in any number, so nothing says they are safe), and
     a sparse bucket whose edits are significant (lower bound above the target) blocks every
-    t below it however many clean decisions sit lower down. Warnings: `current_too_low`."""
+    t below it however many clean decisions sit lower down. Every bucket from t up to the
+    highest observed score must hold MIN_BUCKET_N decisions: a pooled row never jumps an
+    unreviewed gap. Warnings: `current_too_low`."""
     rows = pooled(outs)
     buckets = bucketize(outs)
     warnings: list[str] = []
@@ -58,15 +60,38 @@ def suggest_threshold(
     suggested: float | None = None
     populated = [b.lo for b in buckets if not b.sparse]
     floor = min(populated) if populated else None
+    seen = [i for i, b in enumerate(buckets) if b.n > 0]
+    top = seen[-1] if seen else -1
+
+    def gaps(t: float) -> list[float]:
+        """Sparse buckets between t and the highest observed score: an unreviewed gap."""
+        return [b.lo for b in buckets[: top + 1] if b.lo >= t - 1e-9 and b.sparse]
+
+    gapped: tuple[float, list[float]] | None = None
     for r in rows:
         if r.n < MIN_SUGGEST_N or floor is None or r.t < floor - 1e-9:
             continue
         bad_bucket = any(b.n > 0 and b.lo >= r.t - 1e-9 and b.wilson_lo > target for b in buckets)
         if r.hi < target and not bad_bucket:
+            g = gaps(r.t)
+            if g:
+                gapped = gapped or (r.t, g)
+                continue
             suggested = r.t
             break
     if suggested is not None:
         return ThresholdSuggestion(suggested=suggested, reason="ok"), warnings
+    if gapped is not None:
+        t, g = gapped
+        return (
+            ThresholdSuggestion(
+                reason="insufficient_data",
+                detail=f"at {t:g} the buckets starting {', '.join(f'{x:g}' for x in g[:5])} "
+                f"hold fewer than {MIN_BUCKET_N} reviewed decisions each; no threshold may "
+                "span an unreviewed score range",
+            ),
+            warnings,
+        )
     if floor is None:
         return (
             ThresholdSuggestion(

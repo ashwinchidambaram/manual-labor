@@ -5,7 +5,6 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 
-from manuallabor import ids
 from manuallabor.contracts.block import Block
 from manuallabor.contracts.enums import BlockStatus, FlagStatus
 from manuallabor.contracts.flag import Flag
@@ -85,7 +84,3 @@ def _covers(
         if tgt == block_id:
             return True
     return ov.flag_id is not None and ov.flag_id == flag_id
-
-
-def is_figure_target(target_id: str) -> bool:
-    return target_id.startswith("FIG-") and bool(ids.FIGURE_ID_RE.match(target_id))

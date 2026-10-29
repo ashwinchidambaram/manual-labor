@@ -37,8 +37,14 @@ def table_block(raw: str, cells: list[list[str]] | None, **texts: str):  # type:
     return b
 
 
-def position(b: Any, cells: list[list[str]], spec: bool = True) -> Any:
-    return check_table_position(b, cells, dict(b.raw_text_by_parser), b.raw_source, spec)
+def position(b: Any, cells: list[list[str]], spec: bool = True, **tables: list[list[str]]) -> Any:
+    """Attesters are structured cells (round c): a reader's dense text attests nothing."""
+    structured = {k: build_table_data(v, 1) for k, v in tables.items()}
+    return check_table_position(b, cells, structured, b.raw_source, spec)
+
+
+def grid(text: str) -> list[list[str]]:
+    return [[c.strip() for c in ln.split("|")] for ln in text.splitlines()]
 
 
 def test_cells_kind_runs_the_position_check() -> None:
@@ -80,7 +86,7 @@ def test_attested_look_alike_in_one_cell_passes() -> None:
     other = "Part | Torque\nBolt | 10 N·m\nNut | 25 N·m"
     fixed = [["Part", "Torque"], ["Bolt", "10 N·m"], ["Nut", "25 N·m"]]
     b = table_block(raw, [["Part", "Torque"], ["Bolt", "1O N·m"], ["Nut", "25 N·m"]], docling=other)
-    r = position(b, fixed)
+    r = position(b, fixed, docling=grid(other))
     assert r.passed, r.detail
     assert "docling" in (r.detail or "")
     # the same change with no reader showing it at that position is refused
@@ -88,15 +94,17 @@ def test_attested_look_alike_in_one_cell_passes() -> None:
     assert not position(lone, fixed).passed
     # a reader that shows 10 in another row attests nothing at (1,1)
     moved = "Part | Torque\nBolt | 25 N·m\nNut | 10 N·m"
-    assert not position(table_block(raw, None, docling=moved), fixed).passed
+    assert not position(table_block(raw, None, docling=moved), fixed, docling=grid(moved)).passed
 
 
 def test_new_value_in_a_cell_needs_two_attesters() -> None:
     raw = "Part | Torque\nBolt | 36 N·m"
     other = "Part | Torque\nBolt | 35 N·m"
     fixed = [["Part", "Torque"], ["Bolt", "35 N·m"]]
-    assert not position(table_block(raw, None, docling=other), fixed).passed
-    assert position(table_block(raw, None, docling=other, ocr=other), fixed).passed
+    one = table_block(raw, None, docling=other)
+    assert not position(one, fixed, docling=grid(other)).passed
+    two = table_block(raw, None, docling=other, ocr=other)
+    assert position(two, fixed, docling=grid(other), ocr=grid(other)).passed
 
 
 def test_shape_must_match_the_raw_structure_or_rows() -> None:
@@ -119,7 +127,7 @@ def test_text_change_in_a_cell_needs_a_reader() -> None:
     cells = [["Part", "Note"], ["Bolt", "grade 8 steel"]]
     assert not position(table_block(raw, None), cells).passed
     other = "Part | Note\nBolt | grade 8 steel"
-    assert position(table_block(raw, None, docling=other), cells).passed
+    assert position(table_block(raw, None, docling=other), cells, docling=grid(other)).passed
 
 
 def test_bulk_guard_compares_numbers_by_position() -> None:

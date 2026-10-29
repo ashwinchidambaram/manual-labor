@@ -294,3 +294,22 @@ schemas up to date
 openapi up to date: /Users/ashwinchidambaram/dev/projects/doc-to-KB/frontend/src/api/openapi.json
 $ gate (tests/agent/test_pass.py, test_accept.py, tests/calibration/test_gate.py): 5 seeded flags on project-a → 5 proposals each with its category recheck list; unfaithful mock proposal displayed with failing checks, accept → 409, accept-all-passing skips it; reject → item back in queue round 2 with PriorAttempt (prior rationale never in the prompt); calibration on 400 seeded decisions suggests 0.85, project.json byte-identical until explicit apply; proposals.json byte-identical across processes; table proposals compared per (row, col); concurrent accept → one decision
 ```
+
+## M9 — UI: Verify — PASSED 2026-10-29
+
+Design: docs/design/09-ui-verify.md. UX check: independent Sonnet agent, 14 Playwright behaviours with server-side evidence (11 pass initially). Review: fresh Opus agent — 1 faithfulness major (textarea editable while the 409 conflict panel was open, so a reviewer could confirm unseen text) + rail staleness + minors; all fixed failing-test-first; a focus regression from the fix was root-caused (a late approve ack consumed the queue's focus request while the editor/dialog was open) and fixed; one failing scenario was a test race. 216 vitest, 55/55 Playwright.
+
+Commands: `cd frontend && npm test -- --run`, `npm run e2e` (all five specs), `npm run build`.
+
+```
+$ npm run typecheck && npm test -- --run
+ Test Files  21 passed (21)
+      Tests  216 passed (216)
+$ npm run e2e   # all specs: scope, ux-scope, scope-fixes, verify, ux-verify against labor serve --dev --mock
+  55 passed (6.8m)
+$ npm run build
+dist/assets/index-Dtm-8Tu0.css   20.01 kB │ gzip:   4.71 kB
+dist/assets/index-jtyAfxb4.js   393.06 kB │ gzip: 124.17 kB
+✓ built in 896ms
+$ gate: VE1 + UX-T6 — 20 queued blocks processed keyboard-only (A/E/F/J/K incl. a 409-then-confirm edit and digit-keyed flags), server-side decision counts asserted; VE2 + UX-T5 — diff view matches the 12-row DiffOp rendering table; VE3 + UX-T10 + VE12 — figure re-attach via keyboard picker persists across reload with rule human, detach, rail refresh after job; slider = view filter; numeric approve sets numbers_verified; reload resumes at the cursor; late acks never steal focus from the editor/dialog
+```

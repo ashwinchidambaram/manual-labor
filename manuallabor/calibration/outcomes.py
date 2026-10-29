@@ -95,15 +95,22 @@ def outcomes(actions: Iterable[ActionRecord]) -> list[Outcome]:
 
     An edit that changed the text stays an edit: a later approval of the same (block, raw
     text) approves the edited text (Verify's "K then A"), so the machine output still needed a
-    change and the outcome is `edited`."""
+    change and the outcome is `edited`. An edit back to the machine output (the text the first
+    decision on that (block, raw text) was shown) is a revert, not an edit: the outcome is
+    `approved`."""
     latest: dict[tuple[str, str], Outcome] = {}
     last_edit: dict[tuple[str, str], Outcome] = {}
+    machine: dict[tuple[str, str], str] = {}
     for a in sorted(actions, key=lambda x: x.id):
         o = outcome_of(a)
         if o is None:
             continue
         key = (o.block_id, o.raw_sha)
-        if o.edited and a.kind in _EDIT_KINDS:
+        machine.setdefault(key, o.shown_sha)
+        if o.edited and o.final_sha == machine[key]:
+            last_edit.pop(key, None)  # reverted to the machine output
+            o = replace(o, edited=False)
+        elif o.edited and a.kind in _EDIT_KINDS:
             last_edit[key] = o
         elif not o.edited and key in last_edit:
             e = last_edit[key]  # the approval keeps the edited text: the edit is the outcome

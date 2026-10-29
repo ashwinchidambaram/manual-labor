@@ -13,6 +13,8 @@ from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
+from functools import lru_cache
+from pathlib import Path
 from typing import Any, Final
 
 from manuallabor import ids
@@ -43,12 +45,14 @@ from manuallabor.contracts.block import (
     VisionReading,
 )
 from manuallabor.contracts.enums import BlockType, ProposalKind
+from manuallabor.contracts.io import read_json
 from manuallabor.contracts.proposal import REQUIRED_CHECKS, EvidenceRef, RecheckResult
 from manuallabor.grouping.coverage import overlap
 from manuallabor.grouping.pipeline import check_partition
 from manuallabor.parse import geometry as g
-from manuallabor.parse.tables import table_markdown_from_data
+from manuallabor.parse.tables import table_markdown_from_data, to_table_data
 from manuallabor.parse.text import collapse_ws
+from manuallabor.parse.types import ParserOutput
 from manuallabor.project import ProjectPaths
 from manuallabor.scoring.faithfulness import (
     _TOKEN_PUNCT,
@@ -59,7 +63,7 @@ from manuallabor.scoring.faithfulness import (
 )
 from manuallabor.scoring.garbage import garbage_ratio
 from manuallabor.scoring.pipeline import faith_kwargs
-from manuallabor.scoring.tables import ragged_rows, table_consistency
+from manuallabor.scoring.tables import table_consistency
 from manuallabor.scoring.text import cmp_tokens, weighted_agreement
 from manuallabor.scoring.types import BlockContext
 from manuallabor.state.data import ProjectData
@@ -72,6 +76,7 @@ __all__ = [
     "check_table_position",
     "numbers_changed",
     "numeric_attested",
+    "reader_tables",
     "resolve_payload",
     "run_rechecks",
 ]
@@ -295,16 +300,60 @@ def check_parser_agreement(
 # -- cells ---------------------------------------------------------------------------------------
 
 
+def _base_spans(
+    cells: Sequence[Sequence[str]], base: TableData | None
+) -> dict[tuple[int, int], TableCell]:
+    """The merged cells of `base` (same shape) whose covered slots the proposal leaves empty:
+    the proposal keeps those merges. Only structure is carried; the texts are the proposal's."""
+    out: dict[tuple[int, int], TableCell] = {}
+    if base is None or (base.n_rows, base.n_cols) != (len(cells), len(cells[0])):
+        return out
+    taken: set[tuple[int, int]] = set()
+    for bc in base.cells:
+        if bc.row_span == 1 and bc.col_span == 1:
+            continue
+        slots = {
+            (r, c)
+            for r in range(bc.row, bc.row + bc.row_span)
+            for c in range(bc.col, bc.col + bc.col_span)
+        }
+        covered = slots - {(bc.row, bc.col)}
+        if slots & taken or any(cells[r][c].strip() for r, c in covered):
+            continue
+        taken |= slots
+        out[(bc.row, bc.col)] = bc
+    return out
+
+
 def build_table_data(
     cells: Sequence[Sequence[str]],
     header_rows: int,
     shape_by_parser: Mapping[str, TableShape] | None = None,
+    base: TableData | None = None,
 ) -> TableData:
+    """The proposal's cells as TableData. With `base` (the block's parsed structure), a merged
+    cell of the base whose covered slots the proposal leaves empty stays merged."""
     n_rows, n_cols = len(cells), len(cells[0])
+    spans = _base_spans(cells, base)
+    covered = {
+        (r, c)
+        for bc in spans.values()
+        for r in range(bc.row, bc.row + bc.row_span)
+        for c in range(bc.col, bc.col + bc.col_span)
+        if (r, c) != (bc.row, bc.col)
+    }
     tcs = [
-        TableCell(row=r, col=c, text=cells[r][c], is_header=r < header_rows)
+        TableCell(
+            row=r,
+            col=c,
+            row_span=spans[(r, c)].row_span if (r, c) in spans else 1,
+            col_span=spans[(r, c)].col_span if (r, c) in spans else 1,
+            text=cells[r][c],
+            is_header=r < header_rows,
+        )
         for r in range(n_rows)
         for c in range(n_cols)
+        if (r, c) not in covered
     ]
     td = TableData(
         n_rows=n_rows,
@@ -332,9 +381,21 @@ def check_table_coverage(
     return _r("table_coverage", False, cov.detail())
 
 
+def _ragged_all(t: TableData) -> int:
+    """Rows (header rows included: no exemption) with a grid slot no non-empty cell covers."""
+    covered = [[False] * t.n_cols for _ in range(t.n_rows)]
+    for cell in t.cells:
+        if not cell.text.strip():
+            continue
+        for r in range(cell.row, min(t.n_rows, cell.row + cell.row_span)):
+            for c in range(cell.col, min(t.n_cols, cell.col + cell.col_span)):
+                covered[r][c] = True
+    return sum(1 for row in covered if not all(row))
+
+
 def check_table_consistency(block: Block, td: TableData) -> RecheckResult:
     new = table_consistency(td, block.raw_text)
-    ragged, _body = ragged_rows(td)
+    ragged = _ragged_all(td)
     cur = next((s.value for s in block.signals if s.name.value == "table_consistency"), None)
     if cur is None and block.table is not None:
         cur = table_consistency(block.table, block.raw_text).value
@@ -348,6 +409,8 @@ def check_table_consistency(block: Block, td: TableData) -> RecheckResult:
 _BULLET_RE: Final = re.compile(r"^[•·◦▪‣●*–-]\s+")
 _SEP_RE: Final = re.compile(r"^:?-{3,}:?$")
 Grid = list[list[str]]
+# A raw-text grid: None marks a cell whose column is unknown (its row dropped empty cells).
+TextGrid = list[list[str | None]]
 
 
 def _norm_cell(text: str) -> str:
@@ -356,10 +419,12 @@ def _norm_cell(text: str) -> str:
     return _BULLET_RE.sub("", collapse_ws(text))
 
 
-def _text_grid(text: str) -> Grid:
+def _text_grid(text: str) -> TextGrid:
     """Rows of a pipe-delimited table text: one row per non-empty line, cells split on `|`
-    (outer pipes and GFM separator rows dropped), padded with empty cells to the widest row."""
-    rows: Grid = []
+    (outer pipes and GFM separator rows dropped). Never padded or shifted: a dense table text
+    drops empty cells, so a row with fewer cells than the widest row cannot say which column
+    each value sits in, and all its cells are None (unknown; the row attests nothing)."""
+    rows: list[list[str]] = []
     for line in text.splitlines():
         ln = line.strip()
         if not ln:
@@ -373,7 +438,7 @@ def _text_grid(text: str) -> Grid:
             continue
         rows.append(cells)
     width = max((len(r) for r in rows), default=0)
-    return [r + [""] * (width - len(r)) for r in rows]
+    return [list[str | None](r) if len(r) == width else [None] * width for r in rows]
 
 
 def _table_grid(td: TableData) -> Grid:
@@ -384,12 +449,12 @@ def _table_grid(td: TableData) -> Grid:
     return grid
 
 
-def _shape(g: Grid) -> tuple[int, int]:
+def _shape(g: Sequence[Sequence[str | None]]) -> tuple[int, int]:
     return len(g), (len(g[0]) if g else 0)
 
 
 def _position_failures(
-    base: Grid,
+    base: TextGrid,
     prop: Grid,
     others: Mapping[str, Grid],
     raw_source: str,
@@ -400,13 +465,16 @@ def _position_failures(
     changed: list[str] = []
     for r, row in enumerate(prop):
         for c, new in enumerate(row):
-            old = base[r][c]
-            if new == old:
+            base_cell = base[r][c]
+            if new == base_cell:
                 continue
-            at = f"({r},{c}) {_clip(old, 16)!r}→{_clip(new, 16)!r}"
+            old = base_cell or ""
+            shown = "?" if base_cell is None else repr(_clip(old, 16))
+            at = f"({r},{c}) {shown}→{_clip(new, 16)!r}"
             who = sorted(k for k, g in others.items() if g[r][c] == new)
             if not who:
-                bad.append(f"{at} [no reader shows it there]")
+                where = "raw column unknown; " if base_cell is None else ""
+                bad.append(f"{at} [{where}no structured reader shows it there]")
                 continue
             cell_readers = {raw_source: old, **{k: g[r][c] for k, g in others.items()}}
             n = numeric_attested(old, cell_readers, raw_source, new, None, has_numeric_spec)
@@ -420,21 +488,23 @@ def _position_failures(
 def check_table_position(
     block: Block,
     cells: Sequence[Sequence[str]],
-    readers: Mapping[str, str],
+    tables: Mapping[str, TableData],
     raw_source: str,
     has_numeric_spec: bool,
 ) -> RecheckResult:
     """Cells compared by position (row, col) with the raw table: the parsed structure of the
-    raw source, or its raw_text rows. The shape must equal one of them; every cell must equal
-    the raw cell at that position (whitespace and bullets normalized), except cells the
-    proposal changes, each of which an independent reader must show at the SAME position and
-    which must pass the numeric-attestation rule there. Moving values between cells or rows
-    (a permutation the multiset checks cannot see) fails."""
+    raw source, or its raw_text rows (a row that dropped empty cells is unknown, never padded).
+    The shape must equal one of them; every cell must equal the raw cell at that position
+    (whitespace and bullets normalized), except cells the proposal changes, each of which an
+    independent reader's STRUCTURED cells (`tables`: span-aware grid positions) must show at
+    the SAME position and which must pass the numeric-attestation rule there. A reader with
+    only a dense text attests nothing. Moving values between cells or rows (a permutation the
+    multiset checks cannot see) fails."""
     prop: Grid = [[_norm_cell(str(c)) for c in row] for row in cells]
     shape = _shape(prop)
-    bases: list[tuple[str, Grid]] = []
+    bases: list[tuple[str, TextGrid]] = []
     if block.table is not None:
-        bases.append(("parsed table", _table_grid(block.table)))
+        bases.append(("parsed table", [list[str | None](r) for r in _table_grid(block.table)]))
     tg = _text_grid(block.raw_text)
     if tg and all(tg != g for _n, g in bases):
         bases.append(("raw rows", tg))
@@ -448,8 +518,8 @@ def check_table_position(
         )
     others = {
         k: g
-        for k, v in sorted(readers.items())
-        if k != raw_source and _shape(g := _text_grid(v)) == shape
+        for k, td in sorted(tables.items())
+        if k != raw_source and _shape(g := _table_grid(td)) == shape
     }
     best: tuple[str, list[str], list[str]] | None = None
     for name, grid in same:
@@ -461,6 +531,40 @@ def check_table_position(
             best = (name, bad, changed)
     assert best is not None
     return _r("table_position", False, f"vs the {best[0]}: " + "; ".join(best[1][:4]))
+
+
+@lru_cache(maxsize=8)
+def _parser_output(path: str, mtime_ns: int, size: int) -> ParserOutput | None:
+    try:
+        return read_json(Path(path), ParserOutput)
+    except (OSError, ValueError):
+        return None  # an OCR output, or unreadable: no structured cells
+
+
+def reader_tables(paths: ProjectPaths, slug: str, block: Block) -> dict[str, TableData]:
+    """The independent readers' STRUCTURED cells for a table block: each parser's stored raw
+    block at the block's page and that parser's order (parse/<parser>.json), when it is a table
+    with cells. The raw source is not independent; a reader without stored cells (OCR lines,
+    a dense text) is left out and attests nothing."""
+    out: dict[str, TableData] = {}
+    dp = paths.doc(slug)
+    for k, order in sorted(block.order_by_parser.items()):
+        if k == block.raw_source:
+            continue
+        f = dp.parser_output(k)
+        try:
+            st = f.stat()
+        except OSError:
+            continue
+        po = _parser_output(str(f), st.st_mtime_ns, st.st_size)
+        if po is None:
+            continue
+        page = next((pp for pp in po.pages if pp.page == block.page), None)
+        rb = next((b for b in page.blocks if b.order == order), None) if page else None
+        if rb is None or rb.kind != BlockType.table or rb.table is None or not rb.table.cells:
+            continue
+        out[k] = to_table_data(rb.table, {})
+    return out
 
 
 # -- figures and groups -------------------------------------------------------------------------
@@ -506,7 +610,10 @@ def resolve_payload(
         if check_shape_cells(cells).passed:
             blk = next((b for b in data.raw_blocks(slug) if b.id == item.target_id), None)
             td = build_table_data(
-                cells, header, blk.table.shape_by_parser if blk and blk.table else None
+                cells,
+                header,
+                blk.table.shape_by_parser if blk and blk.table else None,
+                base=blk.table if blk else None,
             )
             out["proposal_text"] = td.markdown
             extra["td"] = td
@@ -810,7 +917,11 @@ def run_rechecks(
                 )
                 out.append(
                     check_table_position(
-                        block, cells, inp.readers, block.raw_source, block.has_numeric_spec
+                        block,
+                        cells,
+                        reader_tables(paths, slug, block),
+                        block.raw_source,
+                        block.has_numeric_spec,
                     )
                 )
             else:

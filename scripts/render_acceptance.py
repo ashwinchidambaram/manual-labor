@@ -78,10 +78,24 @@ def load(d: Path) -> dict[int, list[Step]]:
 
 
 def pytest_summary(out: str) -> str:
+    """pytest's own summary line; with `-qq` (addopts `-q` plus ours) there is none, so count
+    the progress characters instead."""
     for ln in reversed(out.splitlines()):
         if re.search(r"\d+ (passed|failed|error|skipped|deselected)|no tests ran", ln):
             return ln.strip(" =")
-    return "no pytest summary line"
+    marks = "".join(
+        m.group(1)
+        for ln in out.splitlines()
+        if (m := re.match(r"^([.FEsxX]+)(?:\s+\[\s*\d+%\])?\s*$", ln))
+    )
+    if not marks:
+        return "no pytest summary line"
+    parts = [
+        f"{marks.count(c)} {name}"
+        for c, name in ((".", "passed"), ("F", "failed"), ("E", "errors"), ("s", "skipped"))
+        if marks.count(c)
+    ]
+    return ", ".join(parts) + " (counted from the progress line)"
 
 
 # -- verdicts ----------------------------------------------------------------------------------
@@ -112,9 +126,18 @@ def v1(steps: list[Step], _live: bool) -> Result:
     for k, m in rows.items():
         if m is None or " PASS " not in m.group(0):
             return Result(FAILED, f"{k} is not PASS in the labor check table")
-    k14 = rows["K14"].group(0)  # type: ignore[union-attr]
+    detail = re.sub(r"^K14\s.*?PASS\s+\d+\s+", "", rows["K14"].group(0))  # type: ignore[union-attr]
+    per_doc = re.findall(r"(\w+) \| (\d+) \| (\d+) \| (\d+) \| (\d+) \| (\d+)", detail)
+    if not per_doc:
+        return Result(FAILED, "the K14 round-trip table has no rows")
+    bad = [d[0] for d in per_doc if d[3] != "0"]
+    if bad:
+        return Result(FAILED, f"faithfulness violations on auto-approved blocks in {bad}")
+    rows_txt = ", ".join(f"{d[0]} 0/{d[2]}" for d in per_doc)
     return Result(
-        VERIFIED, "K3, K12, K13, K14 PASS; " + re.sub(r"\s+", " ", k14.split("PASS", 1)[1]).strip()
+        VERIFIED,
+        "K3, K12, K13, K14 PASS; faithfulness violations / auto-approved blocks per fixture: "
+        + rows_txt,
     )
 
 

@@ -131,8 +131,8 @@ Every draft goes through §3.6 before it is stored; nothing in the reply other t
 | `garbage_ratio` | text | `garbage_ratio(P) ≥ garbage_ratio(raw)` (scoring §2.7, on a block copy) |
 | `parser_agreement` | text | `max_k weighted_agreement(P, r_k) ≥ max_k weighted_agreement(raw, r_k)` over independent readers r_k (03 §2.0 tokens, `directional=False`): the fix moves toward the other readers, never away |
 | `table_coverage` | cells | `table_coverage(raw_text, rows).ok` (05 P7 / AE6), or the same against an independent reader's text |
-| `table_consistency` | cells | `scoring.tables.table_consistency(td_P, raw)` value ≥ the block's current value and 0 ragged rows |
-| `table_position` | cells | (review fix) cells compared by (row, col): the shape equals the raw parsed table or the raw_text rows; every cell equals the raw cell at that position (whitespace and a leading bullet glyph + space normalized), except changed cells, each shown at the SAME position by an independent reader and passing N at that cell. A permutation of values or rows fails |
+| `table_consistency` | cells | `scoring.tables.table_consistency(td_P, raw)` value ≥ the block's current value and 0 ragged rows (round c: header rows included, no exemption; a merged cell of the parsed table whose covered slots the proposal leaves empty stays merged) |
+| `table_position` | cells | (review fix) cells compared by (row, col): the shape equals the raw parsed table or the raw_text rows; every cell equals the raw cell at that position (whitespace and a leading bullet glyph + space normalized), except changed cells, each shown at the SAME position by an independent reader and passing N at that cell. A permutation of values or rows fails. (round c) Attesters are **structured cells only**: each independent parser's stored table (`parse/<parser>.json`, the block's page + `order_by_parser`), laid out by (row, col, span); a reader with only a dense text (which drops empty cells) attests nothing. raw_text rows are never padded or shifted: a row shorter than the widest is unknown and attests nothing |
 | `attach_target` | attach | figure has a sidecar and image (not a `FigureFailure`); article in the current `build_articles` of the selection; same doc |
 | `attach_evidence` | attach | a deterministic rule supports (figure, article): caption_ref, caption_match (05 §5.2) or proximity (figure page within the article's pages ± 1); detail names the rule |
 | `regroup_target` | regroup | topic exists in `groups.json`; `apply_overrides` dry run + `check_partition` returns `[]` |
@@ -193,7 +193,7 @@ One `Outcome{block_id, raw_sha, action_id, score, numeric, block_type, doc_kind,
 | Action | edited |
 |---|---|
 | approve | False, unless an edit that changed the text of the same (block, raw_sha) came earlier (review fix: Verify's "K then A" approves the edited text, so the outcome stays edited) |
-| edit (human) / proposal_accept (text, cells) / proposal_edit | True, unless `sha(edited_text) == shown_text_sha256` (no-op edit → False) |
+| edit (human) / proposal_accept (text, cells) / proposal_edit | True, unless `sha(edited_text) == shown_text_sha256` (no-op edit → False), or (round c) the edited text equals the machine output (the text the first decision on that (block, raw_sha) was shown): a revert clears the earlier edit and the outcome is approved |
 | flag wrong_text / table_structure / bad_crop | True |
 | flag missing_figure / wrong_grouping; skip; attach/regroup accepts | not an outcome (they do not say the block's score was wrong) |
 
@@ -204,7 +204,7 @@ Stale raw (re-parse) keeps its observation: the score and outcome were real for 
 Unreviewed auto-approved blocks are **unknown**, never counted as correct. Reviewers add evidence above the threshold with the Verify view threshold (spot checks).
 
 ### 4.3 Suggestion rule (`suggest.py`)
-For `t ∈ {0.50, 0.55, …, 0.95}` ascending, pooled `P_t` = outcomes with `score ≥ t`: `ok(t) = n_t ≥ MIN_SUGGEST_N (50) and wilson_hi(e_t, n_t) < target and no bucket (sparse or not; review fix) within [t, 1] has wilson_lo > target`, and (review fix, no extrapolation) `t ≥` the lower edge of the lowest bucket holding ≥ `MIN_BUCKET_N` decisions; no such bucket → `insufficient_data`. `suggested = min{t : ok(t)}` else None.
+For `t ∈ {0.50, 0.55, …, 0.95}` ascending, pooled `P_t` = outcomes with `score ≥ t`: `ok(t) = n_t ≥ MIN_SUGGEST_N (50) and wilson_hi(e_t, n_t) < target and no bucket (sparse or not; review fix) within [t, 1] has wilson_lo > target`, and (review fix, no extrapolation) `t ≥` the lower edge of the lowest bucket holding ≥ `MIN_BUCKET_N` decisions; no such bucket → `insufficient_data`. (round c) Every bucket from t up to the highest observed score must hold ≥ `MIN_BUCKET_N` decisions: a t whose pooled row spans an unreviewed gap is rejected (if that is the only reason, `insufficient_data` with the gap named). `suggested = min{t : ok(t)}` else None.
 `suggestion_reason`: `ok` · `insufficient_data` (no t with `n_t ≥ 50`) · `target_not_met` (enough data, bounds ≥ target; detail = how many more zero-edit decisions at the best t would be needed). Warning `current_too_low` when `wilson_lo(P_current) > target`. Floor 0.50: nothing below is ever suggested. With 0 edits, the bound drops below 2 % at `n ≥ 133`; that is the honest price of a 95 % one-sided bound at a 2 % target.
 `pooled` rows (t, n, edited, rate, lo, hi) feed the UI chart. Target = `config.target_edit_rate`.
 
