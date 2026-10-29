@@ -58,7 +58,13 @@ def test_unknown_provider_names_it(tmp_path: Path) -> None:
     ref = ModelRef(provider="nope", model="x")
     cfg = ProjectConfig(
         name="p",
-        models=TaskModels(cleanup=ref, grouping=ref, vision=ref, embeddings=ref, verifier=ref),
+        models=TaskModels(
+            cleanup=ref,
+            grouping=ref,
+            vision=ref,
+            embeddings=ref,
+            verifier=ModelRef(provider="mock", model="mock-verifier"),
+        ),
     )
     with pytest.raises(ProviderError, match="nope"):
         build_provider_set(cfg, cache_dir=None, sink=ListSink())

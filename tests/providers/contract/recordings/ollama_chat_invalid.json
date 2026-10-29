@@ -9,7 +9,7 @@
       "role": "assistant"
     },
     "model": "llama3.2:1b",
-    "prompt_eval_count": 12
+    "prompt_eval_count": 150
   },
   "match": {
     "method": "POST",

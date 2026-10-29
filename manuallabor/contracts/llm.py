@@ -27,6 +27,7 @@ class LLMCallLog(ContractModel):
     cached: bool
     ok: bool = True
     error: str | None = None
+    truncated: bool = False
     timestamp: UTCDateTime
 
     @field_validator("latency_ms")

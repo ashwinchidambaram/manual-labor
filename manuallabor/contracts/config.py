@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from manuallabor.contracts._base import ContractModel, Unit
 from manuallabor.contracts.enums import ArticleSplit, OcrEngine, Task
@@ -28,6 +28,12 @@ def _default_vision() -> ModelRef:
     return ModelRef(provider="ollama", model="moondream")
 
 
+def _default_verifier() -> ModelRef:
+    """A different model than the cleanup default: a verifier that is the cleanup model only
+    re-reads its own output (the pipeline skips it as `skip_same_model`)."""
+    return ModelRef(provider="ollama", model="qwen2.5:1.5b")
+
+
 class TaskModels(ContractModel):
     cleanup: ModelRef = Field(default_factory=_default_chat)
     grouping: ModelRef = Field(default_factory=_default_chat)
@@ -35,9 +41,20 @@ class TaskModels(ContractModel):
     embeddings: ModelRef = Field(
         default_factory=lambda: ModelRef(provider="ollama", model="nomic-embed-text")
     )
-    verifier: ModelRef | None = Field(default_factory=_default_chat)
+    verifier: ModelRef | None = Field(default_factory=_default_verifier)
     metadata: ModelRef | None = None
     agent: ModelRef | None = None
+
+    @model_validator(mode="after")
+    def _verifier_differs_from_cleanup(self) -> TaskModels:
+        v, c = self.verifier, self.cleanup
+        if v is not None and (v.provider, v.model, v.api_base) == (c.provider, c.model, c.api_base):
+            raise ValueError(
+                f"models.verifier must differ from cleanup ({c.provider}:{c.model}): "
+                "a model grading its own output is not an independent check; pick another model "
+                "or set models.verifier to null to disable it"
+            )
+        return self
 
 
 class LearningConfig(ContractModel):

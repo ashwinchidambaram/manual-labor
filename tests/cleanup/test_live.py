@@ -18,7 +18,7 @@ import pytest
 from manuallabor.cleanup.describe import describe_figure
 from manuallabor.cleanup.pipeline import clean_document
 from manuallabor.cleanup.types import LLM_TYPES
-from manuallabor.contracts import ModelRef, Task
+from manuallabor.contracts import ModelRef, Task, TaskModels
 from manuallabor.contracts.figure import FigureRecord
 from manuallabor.contracts.io import read_json
 from manuallabor.contracts.llm import Message
@@ -28,7 +28,9 @@ from manuallabor.providers.cache import LLMCache
 from tests.cleanup.test_gt import independent_check
 
 OLLAMA = os.environ.get("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
-MODEL = "gemma4:e4b-it-q4_K_M"
+_DEFAULTS = TaskModels()
+MODEL = _DEFAULTS.cleanup.model  # the configured defaults (llama3.2:1b / moondream)
+VISION_MODEL = _DEFAULTS.vision.model
 LIMIT = int(os.environ.get("MANUALLABOR_LIVE_LIMIT", "20"))
 
 
@@ -53,7 +55,7 @@ class OllamaTestProvider(BaseProvider):
     ) -> RawChat:
         payload: dict[str, Any] = {
             "messages": [m.model_dump(mode="json") for m in messages],
-            "options": {"temperature": temperature},
+            "options": {"temperature": temperature, "num_predict": 1024},
         }
         if json_schema is not None:
             payload["format"] = dict(json_schema)
@@ -72,7 +74,10 @@ class OllamaTestProvider(BaseProvider):
             "content": prompt,
             "images": [base64.b64encode(image_bytes).decode()],
         }
-        payload: dict[str, Any] = {"messages": [msg], "options": {"temperature": temperature}}
+        payload: dict[str, Any] = {
+            "messages": [msg],
+            "options": {"temperature": temperature, "num_predict": 512},
+        }
         if json_schema is not None:
             payload["format"] = dict(json_schema)
         return self._post(payload)
@@ -87,13 +92,14 @@ def _ollama_ready() -> bool:
             names = [m["name"] for m in json.loads(resp.read()).get("models", [])]
     except Exception:
         return False
-    return MODEL in names
+    have = set(names) | {n.removesuffix(":latest") for n in names}
+    return MODEL in have and VISION_MODEL in have
 
 
 LIVE = os.environ.get("MANUALLABOR_LIVE") == "1"
 pytestmark = pytest.mark.skipif(
     not LIVE or not _ollama_ready(),
-    reason="set MANUALLABOR_LIVE=1 and serve " + MODEL + " from Ollama at " + OLLAMA,
+    reason=f"set MANUALLABOR_LIVE=1 and serve {MODEL} and {VISION_MODEL} from Ollama at {OLLAMA}",
 )
 
 
@@ -103,6 +109,11 @@ def test_40_live_cleanup_and_describe(request: pytest.FixtureRequest, tmp_path: 
     sink = ListSink()
     prov = OllamaTestProvider(
         ModelRef(provider="ollama", model=MODEL), sink=sink, cache=LLMCache(tmp_path / "cache")
+    )
+    vision = OllamaTestProvider(
+        ModelRef(provider="ollama", model=VISION_MODEL),
+        sink=sink,
+        cache=LLMCache(tmp_path / "vcache"),
     )
     raw = proj.raw_blocks(slug)
     eligible = [
@@ -137,7 +148,7 @@ def test_40_live_cleanup_and_describe(request: pytest.FixtureRequest, tmp_path: 
         assert b.figure_id is not None
         rec = read_json(proj.paths.figure_file(slug, b.figure_id, "json"), FigureRecord)
         png = (proj.paths.figure_dir(slug) / rec.file).resolve().read_bytes()
-        d = describe_figure(prov, png, rec.caption_original)
+        d = describe_figure(vision, png, rec.caption_original)
         print(f"LIVE describe {b.figure_id}: {d.outcome} {d.description!r} {d.tags}")
         if d.outcome == "ok":
             assert d.description is not None and len(d.description) <= 300

@@ -240,7 +240,9 @@ def test_f11_project_a(sums):
     cfg = ProjectConfig.model_validate_json((FIX / "project-a" / "project.json").read_text())
     for task in ("cleanup", "grouping", "vision", "embeddings", "verifier", "metadata", "agent"):
         ref = getattr(cfg.models, task)
-        assert ref.provider == "mock" and ref.model == "mock-1"
+        # the verifier must be a different model than cleanup (TaskModels validator)
+        want = "mock-verifier" if task == "verifier" else "mock-1"
+        assert ref.provider == "mock" and ref.model == want
     for name in ("clean.pdf", "figures.pdf"):
         assert (FIX / "project-a" / "sources" / name).read_bytes() == (FIX / name).read_bytes()
 

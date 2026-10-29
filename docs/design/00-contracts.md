@@ -243,7 +243,7 @@ Manifest validators:
 - `ModelRef`: `provider: str` (pattern `^[a-z][a-z0-9_]*$`; known: mock, ollama, anthropic, openai_compatible, vllm, llamacpp), `model: str` (min 1), `api_base: str | None = None`, `api_key_env: str | None = None`. Secrets are never stored in config.
 - `TaskModels`: `cleanup`, `grouping`, `vision`, `embeddings: ModelRef`; `verifier: ModelRef | None`; `metadata: ModelRef | None = None` (falls back to grouping); `agent: ModelRef | None = None` (falls back to cleanup).
 - `ProjectConfig`: `schema_version: Literal["1.0"]="1.0"`, `name: str`, `threshold: Unit = 0.85`, `models: TaskModels = <defaults>`, `article_split: ArticleSplit = per_topic`, `parsers: list[str] = ["pymupdf", "docling"]` (≥2, unique, order = primary first), `ocr_engine: OcrEngine = rapidocr`, `ocr_dpi: int ≥300 = 300`, `background_ocr_born_digital: bool = True`, `target_edit_rate: Unit = 0.02`.
-- The default `TaskModels` are all `ollama`: cleanup/grouping/vision `gemma4:e4b-it-q4_K_M`, verifier `llama3.2:1b`, embeddings `nomic-embed-text`.
+- The default `TaskModels` are all `ollama`: cleanup/grouping `llama3.2:1b`, vision `moondream`, verifier `qwen2.5:1.5b`, embeddings `nomic-embed-text`. A `TaskModels` validator rejects `verifier` equal to `cleanup` (provider + model + api_base): a model grading its own output is not an independent check (the pipeline would skip it as `skip_same_model`); set `verifier` to `null` to disable it.
 - `LearningConfig{enabled: bool = False}` as `ProjectConfig.learning` (default `LearningConfig()`); the grouping stage reads the learned snapshot only when `enabled`.
 - `CleanupConfig{llm: "off"|"residual"|"always" = "residual", describe: bool = True}` as `ProjectConfig.cleanup` (module 5): `llm` says when the cleanup LLM pass runs (never / only for lines the deterministic passes could not settle / on every eligible block); `describe` toggles figure descriptions.
 - `AttachRule` gains `human`: a figure attachment set by a reviewer (re-attach in Verify); cleanup never overwrites it. `TitleSource.human` likewise marks a reviewer-set title.
@@ -251,7 +251,7 @@ Manifest validators:
 
 ### 4.12 LLM records (llm.py)
 - `Message`: `role: Literal["system","user","assistant"]`, `content: str`.
-- `LLMCallLog`: `task: Task`, `kind: CallKind`, `provider: str`, `model: str`, `input_hash: Sha256Hex`, `prompt_tokens: int|None`, `completion_tokens: int|None`, `latency_ms: float ≥0` (rounded to 3 places), `cached: bool`, `ok: bool = True`, `error: str|None = None`, `timestamp: UTCDateTime`.
+- `LLMCallLog`: `task: Task`, `kind: CallKind`, `provider: str`, `model: str`, `input_hash: Sha256Hex`, `prompt_tokens: int|None`, `completion_tokens: int|None`, `latency_ms: float ≥0` (rounded to 3 places), `cached: bool`, `ok: bool = True`, `error: str|None = None`, `truncated: bool = False` (the reply hit `max_tokens` or the prompt hit `num_ctx`), `timestamp: UTCDateTime`.
 - `ChatResult`: `text: str`, `parsed: Any | None = None` (only when `json_schema` was given and validated), `log: LLMCallLog`.
 
 ## 5. IDs (`manuallabor/ids.py`)

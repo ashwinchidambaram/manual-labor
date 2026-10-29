@@ -1143,7 +1143,7 @@ def generate(out: Path) -> dict[str, str]:
             grouping=ref,
             vision=ref,
             embeddings=ref,
-            verifier=ref,
+            verifier=ModelRef(provider="mock", model="mock-verifier"),
             metadata=ref,
             agent=ref,
         ),

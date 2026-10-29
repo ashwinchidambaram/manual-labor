@@ -202,6 +202,12 @@ def probe(
     force: Annotated[
         bool, typer.Option("--force", help="With --apply: write a tier that does not fit.")
     ] = False,
+    keep_overrides: Annotated[
+        bool,
+        typer.Option(
+            "--keep-overrides", help="With --apply: keep models.metadata and models.agent."
+        ),
+    ] = False,
 ) -> None:
     """Probe local hardware and suggest model settings (never installs anything)."""
     from manuallabor.contracts.io import dump_json, write_json
@@ -212,6 +218,9 @@ def probe(
         raise typer.Exit(2)
     if apply is not None and project is None:
         print("--apply requires --project", file=sys.stderr)
+        raise typer.Exit(2)
+    if project is not None and not project.is_dir():
+        print(f"project directory not found: {project}", file=sys.stderr)
         raise typer.Exit(2)
     result = pr.run_probe(path=project)
     table = pr.suggest(result)
@@ -224,6 +233,8 @@ def probe(
                 table,
                 apply,  # type: ignore[arg-type]
                 force=force,
+                keep_overrides=keep_overrides,
+                probe=result,
             )
         except pr.ApplyError as exc:
             print(str(exc), file=sys.stderr)

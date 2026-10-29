@@ -5,6 +5,7 @@ LiteLLM is imported lazily (`_litellm()`); importing this module does not import
 from __future__ import annotations
 
 import base64
+import contextlib
 import functools
 import json
 import logging
@@ -13,7 +14,7 @@ import os
 import re
 import threading
 import time
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from typing import Any, Final, TypeVar
 
 from manuallabor.contracts.config import ModelRef
@@ -37,7 +38,7 @@ log = logging.getLogger(__name__)
 T = TypeVar("T")
 
 MAX_TOKENS: Final[dict[str, int]] = {
-    "cleanup": 4096,
+    "cleanup": 4096,  # ceiling; the per-call budget is `max_tokens_for`
     "grouping": 2048,
     "verifier": 256,
     "vision": 1024,
@@ -45,6 +46,10 @@ MAX_TOKENS: Final[dict[str, int]] = {
     "agent": 2048,
     "embeddings": 0,
 }
+CLEANUP_MAX_TOKENS: Final = 4096
+CLEANUP_HEADROOM: Final = 256
+CHARS_PER_TOKEN: Final = 3.5  # conservative: real text is 3.5-4.5 chars per token
+OLLAMA_MIN_EVAL_RATIO: Final = 0.8
 OLLAMA_NUM_CTX: Final = 8192
 OLLAMA_KEEP_ALIVE: Final = "10m"
 EMBED_BATCH: Final = 64
@@ -64,7 +69,9 @@ _SECRET_PATTERNS = (re.compile(r"sk-[A-Za-z0-9_\-]{6,}"), re.compile(r"Bearer\s+
 
 @functools.cache
 def _litellm() -> Any:
-    os.environ.setdefault("LITELLM_LOCAL_MODEL_COST_MAP", "True")
+    # Always offline: a user-set value never re-enables the remote cost-map fetch or telemetry.
+    os.environ["LITELLM_LOCAL_MODEL_COST_MAP"] = "True"
+    os.environ["LITELLM_TELEMETRY"] = "False"
     import litellm
 
     litellm.telemetry = False
@@ -117,6 +124,30 @@ def _estimate(text: str) -> int:
     return math.ceil(len(text.encode("utf-8")) / 4)
 
 
+def _message_text(messages: Sequence[Mapping[str, Any]]) -> int:
+    """Characters of text in wire-format messages (image payloads are not counted)."""
+    n = 0
+    for m in messages:
+        c = m.get("content")
+        if isinstance(c, str):
+            n += len(c)
+        elif isinstance(c, list):
+            n += sum(len(str(x.get("text", ""))) for x in c if isinstance(x, Mapping))
+    return n
+
+
+def estimate_prompt_tokens(messages: Sequence[Mapping[str, Any]]) -> int:
+    return math.ceil(_message_text(messages) / CHARS_PER_TOKEN)
+
+
+def max_tokens_for(task: Task | str, messages: Sequence[Mapping[str, Any]]) -> int:
+    """Reply budget. Cleanup output is about as long as its input, so it scales with the
+    prompt (2x + headroom, capped); every other task has a fixed budget."""
+    if str(task) == "cleanup":
+        return min(CLEANUP_MAX_TOKENS, 2 * estimate_prompt_tokens(messages) + CLEANUP_HEADROOM)
+    return MAX_TOKENS.get(str(task), 1024) or 1024
+
+
 def schema_instruction(schema: Mapping[str, Any]) -> str:
     return (
         "Reply with ONLY a JSON value valid against this JSON Schema, no prose, no code fence:\n"
@@ -126,6 +157,16 @@ def schema_instruction(schema: Mapping[str, Any]) -> str:
 
 _SEMAPHORES: dict[tuple[str, str, int], threading.BoundedSemaphore] = {}
 _SEM_LOCK = threading.Lock()
+_OLLAMA_ENV = threading.Condition()
+
+
+class _Pin:
+    count = 0
+    base: str | None = None
+    prior: str | None = None
+
+
+_OLLAMA_PIN = _Pin()
 
 
 def _concurrency(spec: BackendSpec) -> int:
@@ -234,12 +275,14 @@ class LiteLLMProvider(BaseProvider):
         assert tmpl is not None
         return tmpl.format(m=self.ref.model)
 
-    def _common(self, task: Task, temperature: float) -> dict[str, Any]:
+    def _common(
+        self, task: Task, temperature: float, messages: Sequence[Mapping[str, Any]] = ()
+    ) -> dict[str, Any]:
         if temperature != 0:
             raise ProviderError("temperature must be 0")
         kw: dict[str, Any] = {
             "temperature": temperature,
-            "max_tokens": MAX_TOKENS.get(str(task), 1024) or 1024,
+            "max_tokens": max_tokens_for(task, messages),
             "num_retries": 0,
             "timeout": self.spec.read_timeout,
         }
@@ -253,11 +296,37 @@ class LiteLLMProvider(BaseProvider):
             kw["seed"] = 0
         return kw
 
-    def _pin_ollama_env(self) -> None:
-        """LiteLLM's runtime model-info lookup (/api/show) ignores the per-call api_base and
-        reads OLLAMA_API_BASE; pin it so that no request leaves OLLAMA_HOST."""
-        if self.spec.name == "ollama" and self.endpoint.api_base:
-            os.environ["OLLAMA_API_BASE"] = self.endpoint.api_base
+    @contextlib.contextmanager
+    def _ollama_env(self) -> Iterator[None]:
+        """LiteLLM's runtime model-info lookup (/api/show) ignores the per-call api_base
+        (0.x: `get_runtime_model_info` is called without it) and reads OLLAMA_API_BASE. Set it
+        only while calls are in flight (refcounted under a lock) and restore the previous value,
+        so no request leaves OLLAMA_HOST and the process environment is left as found."""
+        if self.spec.name != "ollama" or not self.endpoint.api_base:
+            yield
+            return
+        base = self.endpoint.api_base
+        with _OLLAMA_ENV:
+            # calls with the same base share the pin (so they stay concurrent); a different
+            # base waits until the in-flight ones finish
+            while _OLLAMA_PIN.count and _OLLAMA_PIN.base != base:
+                _OLLAMA_ENV.wait()
+            if _OLLAMA_PIN.count == 0:
+                _OLLAMA_PIN.prior = os.environ.get("OLLAMA_API_BASE")
+                _OLLAMA_PIN.base = base
+                os.environ["OLLAMA_API_BASE"] = base
+            _OLLAMA_PIN.count += 1
+        try:
+            yield
+        finally:
+            with _OLLAMA_ENV:
+                _OLLAMA_PIN.count -= 1
+                if _OLLAMA_PIN.count == 0:
+                    if _OLLAMA_PIN.prior is None:
+                        os.environ.pop("OLLAMA_API_BASE", None)
+                    else:
+                        os.environ["OLLAMA_API_BASE"] = _OLLAMA_PIN.prior
+                    _OLLAMA_ENV.notify_all()
 
     def _secrets(self) -> list[str | None]:
         return [self.endpoint.api_key]
@@ -322,17 +391,24 @@ class LiteLLMProvider(BaseProvider):
         schema: Mapping[str, Any] | None,
         temperature: float,
     ) -> tuple[str, int | None, int | None]:
-        kw = self._common(task, temperature)
+        kw = self._common(task, temperature, messages)
+        estimate = estimate_prompt_tokens(messages)
+        if self.spec.name == "ollama" and estimate > OLLAMA_NUM_CTX:
+            raise ProviderError(
+                f"prompt truncated: about {estimate} prompt tokens exceed "
+                f"num_ctx={OLLAMA_NUM_CTX}; no request was sent",
+                retriable=False,
+            )
         if schema is not None and self.spec.schema_mode == "native":
             kw["response_format"] = {
                 "type": "json_schema",
                 "json_schema": {"name": "out", "schema": dict(schema), "strict": False},
             }
         lt = _litellm()
-        self._pin_ollama_env()
 
         def go() -> Any:
-            return lt.completion(model=self._model_id(), messages=messages, **kw)
+            with self._ollama_env():
+                return lt.completion(model=self._model_id(), messages=messages, **kw)
 
         resp = self._call(go)
         try:
@@ -342,10 +418,21 @@ class LiteLLMProvider(BaseProvider):
         usage = getattr(resp, "usage", None)
         pt = getattr(usage, "prompt_tokens", None) if usage else None
         ct = getattr(usage, "completion_tokens", None) if usage else None
-        if self.spec.name == "ollama" and isinstance(pt, int) and pt >= OLLAMA_NUM_CTX:
+        if (
+            self.spec.name == "ollama"
+            and isinstance(pt, int)
+            and (pt >= OLLAMA_NUM_CTX or pt < OLLAMA_MIN_EVAL_RATIO * estimate)
+        ):
             raise ProviderError(
-                f"prompt truncated at num_ctx={OLLAMA_NUM_CTX} ({pt} prompt tokens)",
+                f"prompt truncated: Ollama evaluated {pt} prompt tokens of about {estimate} "
+                f"(num_ctx={OLLAMA_NUM_CTX})",
                 retriable=False,
+            )
+        if getattr(resp.choices[0], "finish_reason", None) == "length":
+            raise ProviderError(
+                f"response truncated at max_tokens={kw['max_tokens']}",
+                retriable=False,
+                truncated=True,
             )
         text = _unfence(text)
         if not text.strip():
@@ -423,8 +510,8 @@ class LiteLLMProvider(BaseProvider):
             )
         if self.spec.name == "ollama" and any(not t.strip() for t in texts):
             raise ProviderError("cannot embed an empty string", retriable=False)
+        self._tl.estimated = False
         lt = _litellm()
-        self._pin_ollama_env()
         kw: dict[str, Any] = {"num_retries": 0, "timeout": self.spec.read_timeout}
         if self.endpoint.api_base:
             kw["api_base"] = self.endpoint.api_base
@@ -436,7 +523,8 @@ class LiteLLMProvider(BaseProvider):
             batch = list(texts[i : i + EMBED_BATCH])
 
             def go(batch: list[str] = batch) -> Any:
-                return lt.embedding(model=self._model_id(embed=True), input=batch, **kw)
+                with self._ollama_env():
+                    return lt.embedding(model=self._model_id(embed=True), input=batch, **kw)
 
             resp = self._call(go)
             items = list(_get(resp, "data") or [])

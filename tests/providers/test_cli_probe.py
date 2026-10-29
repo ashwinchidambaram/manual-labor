@@ -85,7 +85,7 @@ def test_t9_apply_small(tmp_path: Path, canned: list[list[str]]) -> None:
     assert (cfg.models.cleanup.provider, cfg.models.cleanup.model) == ("ollama", "llama3.2:1b")
     assert cfg.models.vision.model == "moondream"
     assert cfg.models.embeddings.model == "nomic-embed-text"
-    assert cfg.models.verifier is not None and cfg.models.verifier.model == "llama3.2:1b"
+    assert cfg.models.verifier is not None and cfg.models.verifier.model == "qwen2.5:1.5b"
     assert "ollama pull moondream" in res.stdout
     assert not any(c[:2] == ["ollama", "pull"] for c in canned)
     assert all(c[0] in ("sysctl", "system_profiler", "ollama") for c in canned)

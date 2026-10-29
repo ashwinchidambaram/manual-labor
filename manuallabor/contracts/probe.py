@@ -39,7 +39,7 @@ class GpuInfo(ContractModel):
 
 class OllamaModel(ContractModel):
     name: str
-    size_gb: Gb
+    size_gb: Gb | None  # None when Ollama reported a negative or non-finite size
     digest: str
 
 
@@ -90,3 +90,4 @@ class SuggestionTable(ContractModel):
     default_tier: Tier
     rows: list[TaskSuggestion]
     pull_commands: dict[str, list[str]] = Field(default_factory=dict)
+    default_reason: str | None = None  # why default_tier is not the usual small

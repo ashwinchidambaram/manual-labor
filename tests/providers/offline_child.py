@@ -68,6 +68,7 @@ def main() -> None:
     cache_dir = Path(tempfile.mkdtemp())
     sink = ListSink()
     calls = 0
+    probe_ok = False
     if negative:
         os.environ["ANTHROPIC_API_KEY"] = "sk-test-NEGATIVE"
         ref = ModelRef(provider="anthropic", model="claude-haiku-4-5")
@@ -78,7 +79,7 @@ def main() -> None:
                 grouping=ref,
                 vision=ref,
                 embeddings=ModelRef(provider="mock", model="mock-1"),
-                verifier=ref,
+                verifier=ModelRef(provider="anthropic", model="claude-sonnet-4-5"),
             ),
         )
         ps = build_provider_set(cfg, cache_dir=cache_dir, sink=sink)
@@ -93,7 +94,7 @@ def main() -> None:
                 grouping=ModelRef(provider="mock", model="mock-1"),
                 vision=ModelRef(provider="ollama", model="moondream"),
                 embeddings=ModelRef(provider="ollama", model="nomic-embed-text"),
-                verifier=oll,
+                verifier=ModelRef(provider="ollama", model="qwen2.5:1.5b"),
             ),
         )
         ps = build_provider_set(cfg, cache_dir=cache_dir, sink=sink)
@@ -107,7 +108,16 @@ def main() -> None:
         ps.get(Task.cleanup).chat(Task.cleanup, [Message(role="user", content="hi")])  # cache hit
         ps.get(Task.grouping).chat(Task.grouping, [Message(role="user", content="x")])
         calls = len(sink)
-    print(json.dumps({"violations": violations, "calls": calls}))
+        # `labor probe` itself must stay on the loopback stub (its only network call is /api/tags)
+        from typer.testing import CliRunner
+
+        from manuallabor.cli import app
+
+        res = CliRunner().invoke(app, ["probe", "--json"])
+        probe_ok = res.exit_code == 0 and '"reachable": true' in res.stdout.replace(
+            '"reachable":true', '"reachable": true'
+        )
+    print(json.dumps({"violations": violations, "calls": calls, "probe_ok": probe_ok}))
 
 
 if __name__ == "__main__":

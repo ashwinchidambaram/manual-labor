@@ -124,6 +124,18 @@
   },
   "additionalProperties": false,
   "properties": {
+    "default_reason": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Default Reason"
+    },
     "default_tier": {
       "enum": [
         "small",
@@ -155,7 +167,8 @@
   "required": [
     "default_tier",
     "rows",
-    "pull_commands"
+    "pull_commands",
+    "default_reason"
   ],
   "title": "SuggestionTable",
   "type": "object"

@@ -96,6 +96,11 @@
       "format": "date-time",
       "title": "Timestamp",
       "type": "string"
+    },
+    "truncated": {
+      "default": false,
+      "title": "Truncated",
+      "type": "boolean"
     }
   },
   "required": [
@@ -110,6 +115,7 @@
     "cached",
     "ok",
     "error",
+    "truncated",
     "timestamp"
   ],
   "title": "LLMCallLog",

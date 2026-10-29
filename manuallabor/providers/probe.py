@@ -5,6 +5,7 @@ Never installs anything and never runs `ollama pull`; it only prints the command
 from __future__ import annotations
 
 import json
+import math
 import os
 import platform
 import re
@@ -140,6 +141,14 @@ def parse_cpuinfo(text: str | None) -> tuple[str | None, int | None]:
     return (m.group(1).strip() if m else None), n
 
 
+def _size_gb(size: object) -> float | None:
+    if isinstance(size, bool) or not isinstance(size, (int, float)):
+        return None
+    if not math.isfinite(size) or size < 0:
+        return None
+    return size / GIB
+
+
 def parse_ollama_tags(text: str | None) -> list[OllamaModel]:
     try:
         data = json.loads(text or "")
@@ -153,7 +162,7 @@ def parse_ollama_tags(text: str | None) -> list[OllamaModel]:
             out.append(
                 OllamaModel(
                     name=it["name"],
-                    size_gb=(size / GIB) if isinstance(size, (int, float)) else 0.0,
+                    size_gb=_size_gb(size),
                     digest=str(it.get("digest", ""))[:12],
                 )
             )
@@ -401,11 +410,23 @@ def suggest(probe: ProbeResult) -> SuggestionTable:
             missing = sum(o.approx_gb for o in uniq.values() if not o.present)
             if fits_all and total <= budget and missing <= probe.disk_free_gb - DISK_RESERVE_GB:
                 default = tier
+    reason: str | None = None
+    first = [r.small for r in rows]
+    if not all(o.fits for o in first):
+        default = "api"
+        misfit = sorted({o.model for o in first if not o.fits})
+        reason = (
+            f"no local tier fits this machine (about {probe.effective_model_memory_gb:.1f} GB "
+            f"usable for models; the small tier needs more for {', '.join(misfit)}): use the api "
+            "tier (data leaves the machine; needs ANTHROPIC_API_KEY and OPENAI_API_KEY)"
+        )
     pulls: dict[str, list[str]] = {}
     for tier in ("small", "medium", "large"):
         cmds = sorted({c for r in rows if (c := getattr(r, tier).pull_command)})
         pulls[tier] = cmds
-    return SuggestionTable(default_tier=default, rows=rows, pull_commands=pulls)
+    return SuggestionTable(
+        default_tier=default, rows=rows, pull_commands=pulls, default_reason=reason
+    )
 
 
 def tier_models(table: SuggestionTable, tier: Tier) -> dict[str, dict[str, str]]:
@@ -437,6 +458,7 @@ def render_table(probe: ProbeResult, table: SuggestionTable, tier: Tier | None =
         ),
         "",
         f"Suggested tier: {table.default_tier}",
+        *([f"  ({table.default_reason})"] if table.default_reason else []),
         "",
     ]
 
@@ -472,10 +494,35 @@ class ApplyError(Exception):
     """--apply refused (does not fit, or project.json unusable)."""
 
 
+def tier_memory_need_gb(table: SuggestionTable, tier: Tier) -> float:
+    """Weights of every distinct model of the tier plus one KV-cache allowance (Ollama keeps
+    them resident for `keep_alive`, so the sum is the honest worst case)."""
+    uniq = {getattr(r, tier).model: getattr(r, tier).approx_gb for r in table.rows}
+    return float(sum(uniq.values())) + KV_OVERHEAD_GB
+
+
+def tier_pull_gb(table: SuggestionTable, tier: Tier) -> float:
+    uniq = {
+        getattr(r, tier).model: getattr(r, tier).approx_gb
+        for r in table.rows
+        if not getattr(r, tier).present
+    }
+    return float(sum(uniq.values()))
+
+
 def apply_tier(
-    config_path: Path, table: SuggestionTable, tier: Tier, *, force: bool = False
+    config_path: Path,
+    table: SuggestionTable,
+    tier: Tier,
+    *,
+    force: bool = False,
+    keep_overrides: bool = False,
+    probe: ProbeResult | None = None,
 ) -> dict[str, dict[str, str]]:
-    """Rewrite `models` of project.json for `tier`; every other key is preserved."""
+    """Rewrite `models` of project.json for `tier`; every other key is preserved.
+
+    metadata/agent overrides are reset to their fallbacks (grouping / cleanup model) unless
+    `keep_overrides`, so that a tier switch never leaves a stale model behind."""
     from manuallabor.contracts.config import ProjectConfig
     from manuallabor.contracts.io import write_json
 
@@ -488,6 +535,20 @@ def apply_tier(
                 f"tier {tier!r} does not fit this machine for: {', '.join(too_big)} "
                 "(use --force to write it anyway)"
             )
+        if probe is not None:
+            budget = probe.effective_model_memory_gb - _headroom_gb(probe)
+            need = tier_memory_need_gb(table, tier)
+            if need > budget:
+                raise ApplyError(
+                    f"tier {tier!r} needs about {need:.1f} GB of memory for its models together "
+                    f"but only about {budget:.1f} GB is available (use --force to write it anyway)"
+                )
+            pull = tier_pull_gb(table, tier)
+            if pull > probe.disk_free_gb:
+                raise ApplyError(
+                    f"tier {tier!r} needs about {pull:.1f} GB of downloads but only "
+                    f"{probe.disk_free_gb:.1f} GB of disk is free (use --force to write it anyway)"
+                )
     try:
         raw = json.loads(config_path.read_text(encoding="utf-8"))
         if not isinstance(raw, dict):
@@ -499,6 +560,9 @@ def apply_tier(
     models = dict(models) if isinstance(models, dict) else {}
     for task, ref in chosen.items():
         models[task] = {"provider": ref["provider"], "model": ref["model"]}
+    if not keep_overrides:
+        models["metadata"] = None
+        models["agent"] = None
     raw["models"] = models
     try:
         ProjectConfig.model_validate(raw)

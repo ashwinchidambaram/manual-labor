@@ -160,7 +160,13 @@ def mock_config() -> ProjectConfig:
     ref = ModelRef(provider="mock", model="mock-1")
     return ProjectConfig(
         name="project-a",
-        models=TaskModels(cleanup=ref, grouping=ref, vision=ref, embeddings=ref, verifier=ref),
+        models=TaskModels(
+            cleanup=ref,
+            grouping=ref,
+            vision=ref,
+            embeddings=ref,
+            verifier=ModelRef(provider="mock", model="mock-verifier"),
+        ),
     )
 
 

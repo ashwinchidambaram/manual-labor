@@ -95,9 +95,16 @@
           "type": "string"
         },
         "size_gb": {
-          "minimum": 0,
-          "title": "Size Gb",
-          "type": "number"
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Size Gb"
         }
       },
       "required": [

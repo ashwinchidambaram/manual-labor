@@ -42,7 +42,7 @@
     "verifier": {
       "api_base": null,
       "api_key_env": null,
-      "model": "mock-1",
+      "model": "mock-verifier",
       "provider": "mock"
     },
     "vision": {

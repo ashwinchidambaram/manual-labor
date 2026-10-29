@@ -18,7 +18,7 @@ import respx
 
 from manuallabor.contracts import ModelRef, Task
 from manuallabor.providers import ListSink, LLMCache, MockProvider
-from manuallabor.providers.base import Provider, utc_now
+from manuallabor.providers.base import Provider, ProviderError, utc_now
 from manuallabor.providers.registry import make_factory
 
 REC = Path(__file__).parent / "recordings"
@@ -126,6 +126,14 @@ class Replay:
         if outcome == "http_500":
             r = rec("error_500")
             return httpx.Response(r["status"], json=r["json"])
+        if outcome == "http_429":
+            return httpx.Response(
+                429, json={"error": {"message": "rate limited", "type": "rate_limit_error"}}
+            )
+        if outcome == "http_404":
+            return httpx.Response(404, json={"error": "model 'x' not found"})
+        if outcome == "malformed":
+            return httpx.Response(200, json={"unexpected": True})
         if outcome == "http_401":
             r = rec("error_401_anthropic" if self.fmt == "anthropic" else "error_401_openai")
             return httpx.Response(r["status"], json=r["json"])
@@ -138,10 +146,21 @@ class Replay:
             "invalid_json": "this is not json",
             "schema_mismatch": '{"n": "seven"}',
             "empty": "",
+            "length": None,
         }[outcome]
         if text is not None:
             js = _set_text(self.fmt, js, text)
         js = copy.deepcopy(js)
+        if outcome == "length":
+            key, val = {
+                "ollama": ("done_reason", "length"),
+                "anthropic": ("stop_reason", "max_tokens"),
+                "openai": ("finish_reason", "length"),
+            }[self.fmt]
+            if self.fmt == "openai":
+                js["choices"][0][key] = val
+            else:
+                js[key] = val
         if self.drop_usage:
             for k in ("usage", "prompt_eval_count", "eval_count"):
                 js.pop(k, None)
@@ -162,10 +181,22 @@ class Backend:
     replay: Replay | None = None
     spy_temps: list[float] = field(default_factory=list)
     spy_embeds: list[int] = field(default_factory=list)
+    mock_queue: list[str] = field(default_factory=list)
 
     @property
     def can_script(self) -> bool:
-        return self.replay is not None
+        return self.replay is not None or self.kind == "mock"
+
+    @property
+    def retries(self) -> bool:
+        """Transport retries and the corrective JSON re-ask live in the LiteLLM provider."""
+        return self.kind == "replay"
+
+    def script(self, *outcomes: str) -> None:
+        if self.replay is not None:
+            self.replay.script(*outcomes)
+        else:
+            self.mock_queue.extend(outcomes)
 
     def make(self, role: str = "chat", *, cache: bool = True) -> Provider:
         c = LLMCache(self.cache_dir) if cache else None
@@ -254,10 +285,23 @@ def backend(
         be = Backend(bid, "mock", "mock", True, sink, cache_dir, build=lambda r, s, c: None)  # type: ignore[arg-type,return-value]
 
         def build_mock(role: str, sink: ListSink, cache: LLMCache | None) -> Provider:
+            def scripted(_messages: object) -> str:
+                outcome = be.mock_queue.pop(0) if be.mock_queue else "ok"
+                if outcome in ("http_500", "timeout"):
+                    raise ProviderError(f"scripted {outcome}", retriable=True)
+                if outcome == "http_401":
+                    raise ProviderError("401 invalid api key", retriable=False)
+                return {
+                    "ok": '{"n": 7}',
+                    "invalid_json": "this is not json",
+                    "schema_mismatch": '{"n": "seven"}',
+                    "empty": "",
+                }[outcome]
+
             p = MockProvider(
                 sink=sink,
                 cache=cache,
-                responses={Task.cleanup: '{"n": 7}', Task.vision: '{"n": 7}'},
+                responses={Task.cleanup: scripted, Task.vision: '{"n": 7}'},
             )
             orig = p._chat_raw
 

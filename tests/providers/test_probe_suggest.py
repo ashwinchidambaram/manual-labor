@@ -26,7 +26,7 @@ def test_present_models_have_no_pull_command() -> None:
     assert emb.small.present  # nomic-embed-text:latest matches
     vision = next(r for r in t.rows if r.task == "vision")
     assert not vision.small.present and vision.small.pull_command == "ollama pull moondream"
-    assert t.pull_commands["small"] == ["ollama pull moondream"]
+    assert t.pull_commands["small"] == ["ollama pull moondream", "ollama pull qwen2.5:1.5b"]
 
 
 def test_big_apple_max_picks_highest_fitting_tier() -> None:
@@ -50,7 +50,8 @@ def test_nvidia_24gb_fits_large_with_one_gb_headroom() -> None:
 def test_cpu_only_8gb_nothing_beyond_small() -> None:
     p = ps.linux_probe({}, ram_kb=8 * 1024 * 1024)
     t = pr.suggest(p)
-    assert t.default_tier == "small"
+    # 4 GB usable - 3 GB headroom: not even the small tier fits, so the table says use the api
+    assert t.default_tier == "api" and t.default_reason
     for r in t.rows:
         assert r.medium.speed_class == "n/a" and r.large.speed_class == "n/a"
         assert not r.medium.fits and not r.large.fits

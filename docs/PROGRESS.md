@@ -163,3 +163,47 @@ $ cd frontend && npm run gen-types && git diff --stat -- src/types/generated.ts;
       Tests  1 passed (1)
 $ gate (tests/cleanup tests 16/21/23 + reviewer run): CorruptingMockProvider rejected 100% on 6 fixtures × 4 modes; 0 faithfulness violations on auto-approved blocks after clean+re-score on all fixtures (scanned: 64 auto-approved, 0 violations; 133/133 corrupt outputs rejected); attach rule recorded on every attachment; caption_ref correct for every GT reference (clean 3/3, twocol 3/3, figures 12/12, scanned 3/3, manual 2/2); clean.json byte-identical across PYTHONHASHSEED
 ```
+
+## M6 — Provider layer + hardware probe — PASSED 2026-10-29
+
+Design: docs/design/06-providers.md (one LiteLLM-backed provider for ollama/anthropic/openai-compatible; lazy import; offline env; Ollama num_ctx + digest in cache key; probe + tiered suggestion table; `labor probe --apply <tier>`). Review: fresh Opus agent — conditional pass; 3 majors (prompt-truncation guard never fired on real Ollama, truncated replies accepted+cached, verifier defaulted to the cleanup model → skipped) + 8 minors; all fixed failing-test-first (210 provider tests). Defaults are the small tier (llama3.2:1b / qwen2.5:1.5b verifier / moondream / nomic-embed-text); the orchestrator pulled those models.
+
+Commands: `uv run labor probe [--json] [--project P] [--apply small|medium|large|api] [--force] [--keep-overrides]`; live: `MANUALLABOR_LIVE=1 uv run pytest tests/providers -m live`; API live: `MANUALLABOR_LIVE_API=1` + key.
+
+Known live-quality note: with the 1.5B verifier, 5 of 10 verifier calls errored (validation) on the cleanup smoke; errors are omitted as a signal (never lower or raise confidence), so faithfulness is unaffected. Larger tiers via `--apply`.
+
+```
+$ uv run ruff check manuallabor/ tests/ && uv run mypy manuallabor/
+All checks passed!
+Success: no issues found in 108 source files
+$ uv run pytest tests/providers
+210 passed, 65 skipped, 10 warnings in 14.93s
+$ uv run python -c "import manuallabor.providers, sys; assert \"litellm\" not in sys.modules; print(\"lazy ok\")"
+lazy ok
+$ MANUALLABOR_LIVE=1 uv run pytest tests/providers -m live
+12 passed, 46 skipped, 217 deselected, 16 warnings in 138.90s (0:02:18)
+$ uv run labor probe
+Platform : Darwin arm64
+CPU      : Apple M3 (8 cores)
+RAM      : 16.0 GB   usable for models: ~10.6 GB
+GPU      : Apple M3 (10-core GPU)
+Disk free: 16.1 GB (/Users/ashwinchidambaram/dev/projects/doc-to-KB)
+Ollama   : 0.40.2 at http://localhost:11434, reachable
+
+Suggested tier: small
+
+task        small                                 medium                                  large                              api
+----------  ------------------------------------  --------------------------------------  ---------------------------------  -----------------------------
+cleanup     llama3.2:1b 1.3G ~38.5t/s fast        qwen2.5:7b 4.7G ~10.6t/s ok *           qwen2.5:14b 9G NO-FIT *            anthropic:claude-haiku-4-5
+grouping    llama3.2:1b 1.3G ~38.5t/s fast        qwen2.5:7b 4.7G ~10.6t/s ok *           qwen2.5:14b 9G NO-FIT *            anthropic:claude-haiku-4-5
+vision      moondream 1.7G ~29.4t/s ok            gemma3:4b 3.3G ~15.2t/s ok *            llama3.2-vision:11b 7.8G NO-FIT *  anthropic:claude-haiku-4-5
+$ MANUALLABOR_REQUIRE_DOCLING=1 uv run pytest   # fast suite
+1220 passed, 69 skipped, 2 deselected, 22 warnings in 325.66s (0:05:25)
+$ uv run labor schemas export --check && uv run python -m tests.fixtures.gen.make_fixtures --check
+schemas up to date
+ok: 15 files match CHECKSUMS.json
+$ cd frontend && npm run gen-types && git diff --stat -- src/types/generated.ts; npm run typecheck && npm test -- --run
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+      Tests  1 passed (1)
+$ gate: one parametrized contract suite (assertions a–m) passes for mock, ollama (replay + LIVE), anthropic (replay), openai-compatible (replay); temperature 0 asserted on every outgoing request; offline guard: only OLLAMA_HOST contacted; secrets absent from logs/cache/project.json; labor probe prints the suggestion table on this macOS machine (small tier)
+```

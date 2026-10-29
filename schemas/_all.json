@@ -1815,6 +1815,11 @@
           "format": "date-time",
           "title": "Timestamp",
           "type": "string"
+        },
+        "truncated": {
+          "default": false,
+          "title": "Truncated",
+          "type": "boolean"
         }
       },
       "required": [
@@ -1829,6 +1834,7 @@
         "cached",
         "ok",
         "error",
+        "truncated",
         "timestamp"
       ],
       "title": "LLMCallLog",
@@ -2209,9 +2215,16 @@
           "type": "string"
         },
         "size_gb": {
-          "minimum": 0,
-          "title": "Size Gb",
-          "type": "number"
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Size Gb"
         }
       },
       "required": [
@@ -3044,6 +3057,18 @@
     "SuggestionTable": {
       "additionalProperties": false,
       "properties": {
+        "default_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Default Reason"
+        },
         "default_tier": {
           "enum": [
             "small",
@@ -3075,7 +3100,8 @@
       "required": [
         "default_tier",
         "rows",
-        "pull_commands"
+        "pull_commands",
+        "default_reason"
       ],
       "title": "SuggestionTable",
       "type": "object"

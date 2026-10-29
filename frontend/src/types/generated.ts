@@ -556,6 +556,7 @@ export interface LLMCallLog {
   provider: string;
   task: Task;
   timestamp: string;
+  truncated: boolean;
 }
 /**
  * Self-improvement toggle (module 7 extends it with snapshot settings).
@@ -661,7 +662,7 @@ export interface ReviewStats {
 export interface OllamaModel {
   digest: string;
   name: string;
-  size_gb: number;
+  size_gb: number | null;
 }
 /**
  * This interface was referenced by `_All`'s JSON-Schema
@@ -813,6 +814,7 @@ export interface Selection {
  * via the `definition` "SuggestionTable".
  */
 export interface SuggestionTable {
+  default_reason: string | null;
   default_tier: 'small' | 'medium' | 'large' | 'api';
   pull_commands: {
     [k: string]: string[] | undefined;

@@ -43,13 +43,14 @@ class Stub(BaseHTTPRequestHandler):
             self._send({"model_info": {}, "capabilities": ["completion"]})
         elif self.path == "/api/chat":
             content = '{"n": 7}' if "format" in body else "ok"
+            chars = sum(len(str(m.get("content", ""))) for m in body.get("messages", []))
             self._send(
                 {
                     "model": "x",
                     "created_at": "2026-01-01T00:00:00Z",
                     "message": {"role": "assistant", "content": content},
                     "done": True,
-                    "prompt_eval_count": 5,
+                    "prompt_eval_count": max(5, chars // 3),  # a realistic count
                     "eval_count": 2,
                 }
             )
@@ -74,7 +75,9 @@ def run_child(*args: str) -> tuple[dict[str, Any], list[str]]:
             "MANUALLABOR_STUB_PORT": str(port),
         }
         r = subprocess.run(
-            [sys.executable, "-m", "tests.providers.offline_child", *args],
+            # -I: isolated mode (no PYTHON* env vars, no user site, no cwd on sys.path), so
+            # nothing but the installed package can leak into the guarded process
+            [sys.executable, "-I", str(ROOT / "tests" / "providers" / "offline_child.py"), *args],
             capture_output=True,
             text=True,
             cwd=ROOT,
@@ -91,12 +94,14 @@ def test_t4_only_ollama_host_is_contacted() -> None:
     out, seen = run_child()
     assert out["violations"] == [], out
     assert out["calls"] == 6
+    assert out["probe_ok"] is True, out  # `labor probe` ran under the same guard
     assert seen, "the stub saw no request"
     assert {s.split(" ", 1)[1] for s in seen} <= {
         "/api/tags",
         "/api/show",
         "/api/chat",
         "/api/embed",
+        "/api/version",  # `ollama --version` (run by `labor probe`) asks the server at OLLAMA_HOST
     }
     # cache hit + mock make no request: 3 chat-ish calls + 1 embed = 4 inference requests
     assert sum(1 for s in seen if s in ("POST /api/chat",)) == 3

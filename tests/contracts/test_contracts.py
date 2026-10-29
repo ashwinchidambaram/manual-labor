@@ -507,7 +507,7 @@ def test_c13_config() -> None:
     assert cfg.target_edit_rate == 0.02
     assert cfg.models.cleanup.model == "llama3.2:1b"
     assert cfg.models.vision.model == "moondream"
-    assert cfg.models.verifier is not None and cfg.models.verifier.model == "llama3.2:1b"
+    assert cfg.models.verifier is not None and cfg.models.verifier.model == "qwen2.5:1.5b"
     assert cfg.models.embeddings.model == "nomic-embed-text"
     bad(c.ProjectConfig, {"name": "x", "parsers": ["pymupdf"]})
     bad(c.ProjectConfig, {"name": "x", "parsers": ["a", "a"]})

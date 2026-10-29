@@ -23,7 +23,7 @@ VISION_PROMPT = "Describe this image in one short sentence."
 
 def needs_script(be: Backend) -> None:
     if not be.can_script:
-        pytest.skip("failure injection needs a scripted backend")
+        pytest.skip("live backends cannot inject failures")
 
 
 def test_a_chat(backend: Backend) -> None:
@@ -41,8 +41,9 @@ def test_b_json_chat(backend: Backend) -> None:
 
 def test_c_json_invalid_then_valid(backend: Backend) -> None:
     needs_script(backend)
-    assert backend.replay is not None
-    backend.replay.script("invalid_json", "ok")
+    if not backend.retries:
+        pytest.skip("the corrective re-ask is a LiteLLM-provider feature; the mock never re-asks")
+    backend.script("invalid_json", "ok")
     res = backend.make().chat(Task.cleanup, JSON_CHAT, json_schema=SCHEMA)
     assert res.parsed == {"n": 7}
     assert backend.inference_count() == 2
@@ -52,26 +53,24 @@ def test_c_json_invalid_then_valid(backend: Backend) -> None:
 @pytest.mark.parametrize("bad", ["invalid_json", "schema_mismatch"])
 def test_d_json_invalid_twice(backend: Backend, bad: str) -> None:
     needs_script(backend)
-    assert backend.replay is not None
-    backend.replay.script(bad, bad)
+    asks = 2 if backend.retries else 1  # LiteLLM re-asks once; the mock cannot
+    backend.script(*[bad] * asks)
     p = backend.make()
     with pytest.raises(ProviderOutputError):
         p.chat(Task.cleanup, JSON_CHAT, json_schema=SCHEMA)
-    assert backend.inference_count() == 2
+    assert backend.inference_count() == asks
     assert len(backend.sink) == 1 and backend.sink[0].ok is False
     assert not list(backend.cache_dir.glob("*.json")) if backend.cache_dir.exists() else True
     res = p.chat(Task.cleanup, JSON_CHAT, json_schema=SCHEMA)  # recovered: a third call asks again
-    assert res.parsed == {"n": 7} and backend.inference_count() == 3
+    assert res.parsed == {"n": 7} and backend.inference_count() == asks + 1
 
 
 def test_e_vision(backend: Backend) -> None:
-    if backend.id == "mock":
-        pytest.skip("mock vision has no wire format")
     res = backend.make("vision").vision(Task.vision, PNG, VISION_PROMPT)
     assert res.text.strip()
     assert res.log.kind == "vision"
     if backend.replay is None:
-        return
+        return  # the wire-format checks below need a recording; mock/live have none
     body = backend.replay.inference[0].body
     if backend.replay.fmt == "ollama":
         import base64
@@ -108,11 +107,23 @@ def test_f_embed(backend: Backend) -> None:
 def test_g_temperature_zero(backend: Backend) -> None:
     p = backend.make()
     p.chat(Task.cleanup, CHAT)
+    n_plain = len(backend.temperatures())
+    if backend.retries:
+        backend.script("invalid_json", "ok")  # the corrective re-ask is a second request
     p.chat(Task.cleanup, JSON_CHAT, json_schema=SCHEMA)
+    temps = backend.temperatures()
+    if backend.retries:
+        assert len(temps) - n_plain == 2, temps
     if backend.id != "mock":
         backend.make("vision").vision(Task.vision, PNG, VISION_PROMPT)
     temps = backend.temperatures()
     assert temps and all(t == 0 for t in temps), temps
+    if backend.supports_embed:
+        before = backend.inference_count()
+        vecs = backend.make("embed").embed(Task.embeddings, ["alpha", "beta", "gamma"])
+        assert len(vecs) == 3  # one request, no sampling parameters involved
+        if backend.id != "mock":
+            assert backend.inference_count() == before + 1
 
 
 def test_h_log_line(backend: Backend, tmp_path: Path) -> None:
@@ -151,8 +162,11 @@ def test_j_failures_not_cached(
     backend: Backend, outcome: str, retriable: bool, attempts: int
 ) -> None:
     needs_script(backend)
-    assert backend.replay is not None
-    backend.replay.script(*[outcome] * attempts)
+    if not backend.retries:
+        if outcome == "empty":
+            pytest.skip("empty-reply rejection is a LiteLLM-provider check; the mock returns text")
+        attempts = 1  # the mock does not retry
+    backend.script(*[outcome] * attempts)
     p = backend.make()
     with pytest.raises(ProviderError) as ei:
         p.chat(Task.cleanup, CHAT)
@@ -165,8 +179,7 @@ def test_j_failures_not_cached(
 
 def test_k_non_retriable_auth(backend: Backend) -> None:
     needs_script(backend)
-    assert backend.replay is not None
-    backend.replay.script("http_401")
+    backend.script("http_401")
     with pytest.raises(ProviderError) as ei:
         backend.make().chat(Task.cleanup, CHAT)
     assert ei.value.retriable is False
@@ -177,10 +190,9 @@ def test_k_non_retriable_auth(backend: Backend) -> None:
 
 def test_l_key_hygiene(backend: Backend, caplog: pytest.LogCaptureFixture, tmp_path: Path) -> None:
     needs_script(backend)
-    assert backend.replay is not None
     caplog.set_level(logging.DEBUG)
     sink = JsonlSink(tmp_path / "calls.jsonl")
-    backend.replay.script("http_401")
+    backend.script("http_401")
     p = backend.build("chat", backend.sink, None)
     p._sink = lambda log: (backend.sink(log), sink(log))  # type: ignore[attr-defined]
     with pytest.raises(ProviderError) as ei:

@@ -39,8 +39,10 @@ class ProviderError(Exception):
         model: str = "",
         task: Task | None = None,
         retriable: bool = False,
+        truncated: bool = False,
     ) -> None:
         super().__init__(message)
+        self.truncated = truncated
         self.provider = provider
         self.model = model
         self.task = task
@@ -160,6 +162,7 @@ class BaseProvider(ABC):
         cached: bool,
         usage: Mapping[str, Any] | None = None,
         error: str | None = None,
+        truncated: bool = False,
     ) -> LLMCallLog:
         usage = usage or {}
         entry = LLMCallLog(
@@ -174,6 +177,7 @@ class BaseProvider(ABC):
             cached=cached,
             ok=error is None,
             error=error,
+            truncated=truncated,
             timestamp=self._clock(),
         )
         self._sink(entry)
@@ -282,7 +286,7 @@ class BaseProvider(ABC):
                     )
         except Exception as exc:
             err = self._err(task, exc)
-            self._emit(task, kind, key, t0, cached=False, error=str(err))
+            self._emit(task, kind, key, t0, cached=False, error=str(err), truncated=err.truncated)
             if err is exc:
                 raise
             raise err from exc
@@ -374,7 +378,9 @@ class BaseProvider(ABC):
                     )
         except Exception as exc:
             err = self._err(task, exc)
-            self._emit(task, CallKind.embed, key, t0, cached=False, error=str(err))
+            self._emit(
+                task, CallKind.embed, key, t0, cached=False, error=str(err), truncated=err.truncated
+            )
             if err is exc:
                 raise
             raise err from exc

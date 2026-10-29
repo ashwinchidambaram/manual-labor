@@ -80,7 +80,14 @@ def test_skip_reasons(tmp_path: Path) -> None:
     assert llm_verifier(RAW, CLEAN, faith_passed=False, plan=plan) == ("skip_faith_failed", None)
     no, _, _ = _plan("NONE", tmp_path, verifier=None)
     assert llm_verifier(RAW, CLEAN, faith_passed=True, plan=no) == ("skip_no_verifier", None)
-    same, _, _ = _plan("NONE", tmp_path, verifier=CLEANUP)
+    # TaskModels now rejects verifier == cleanup, so the guard is reached with an unvalidated
+    # config (a hand-built or legacy one); the pipeline must still skip, not self-grade
+    with pytest.raises(ValueError, match="verifier must differ from cleanup"):
+        _config(CLEANUP)
+    unchecked = ProjectConfig(name="p").model_copy(
+        update={"models": TaskModels.model_construct(cleanup=CLEANUP, verifier=CLEANUP)}
+    )
+    same = plan_verifier(unchecked, lambda: ProviderSet(by_task={}))
     assert llm_verifier(RAW, CLEAN, faith_passed=True, plan=same) == ("skip_same_model", None)
     assert sink == []  # none of the skips called a model
 

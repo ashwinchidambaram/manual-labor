@@ -17,12 +17,15 @@ TIERS = ("small", "medium", "large")
 _CHAT_S = Candidate("ollama", "llama3.2:1b", 1.3)
 _CHAT_M = Candidate("ollama", "qwen2.5:7b", 4.7)
 _CHAT_L = Candidate("ollama", "qwen2.5:14b", 9.0)
+# The verifier must never be the cleanup model (TaskModels enforces it): small -> a model of
+# another family/size, medium/large -> a different model than the cleanup one in the same tier.
+_VERIFIER_S = Candidate("ollama", "qwen2.5:1.5b", 1.0)
 
 CATALOG: dict[str, dict[str, Candidate]] = {
     "cleanup": {"small": _CHAT_S, "medium": _CHAT_M, "large": _CHAT_L},
     "grouping": {"small": _CHAT_S, "medium": _CHAT_M, "large": _CHAT_L},
     "verifier": {
-        "small": _CHAT_S,
+        "small": _VERIFIER_S,
         "medium": Candidate("ollama", "llama3.2:3b", 2.0),
         "large": _CHAT_M,
     },
@@ -39,10 +42,11 @@ CATALOG: dict[str, dict[str, Candidate]] = {
 }
 
 _API_CHAT = Candidate("anthropic", "claude-haiku-4-5", 0.0)
+_API_VERIFIER = Candidate("anthropic", "claude-sonnet-4-5", 0.0)
 API: dict[str, Candidate] = {
     "cleanup": _API_CHAT,
     "grouping": _API_CHAT,
-    "verifier": _API_CHAT,
+    "verifier": _API_VERIFIER,
     "vision": _API_CHAT,
     # Anthropic has no embeddings API.
     "embeddings": Candidate("openai", "text-embedding-3-small", 0.0),

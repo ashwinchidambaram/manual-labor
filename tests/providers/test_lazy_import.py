@@ -32,7 +32,7 @@ def test_mock_only_flow_leaves_litellm_out() -> None:
         "from manuallabor.providers import build_provider_set, ListSink\n"
         "ref = ModelRef(provider='mock', model='mock-1')\n"
         "cfg = ProjectConfig(name='x', models=TaskModels(cleanup=ref, grouping=ref, vision=ref,"
-        " embeddings=ref, verifier=ref))\n"
+        " embeddings=ref, verifier=ModelRef(provider='mock', model='mock-verifier')))\n"
         "cache = pathlib.Path(tempfile.mkdtemp())\n"
         "ps = build_provider_set(cfg, cache_dir=cache, sink=ListSink())\n"
         "ps.get(Task.cleanup).chat(Task.cleanup, [Message(role='user', content='hi')])\n"
