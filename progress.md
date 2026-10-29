@@ -138,3 +138,10 @@
   - M7.3 implementer B done (Sonnet): api/ routers + serve + openapi export + gen-api; 79 API tests; V1 real serve smoke passes. A still running.
   - User asked to speed up: two-track plan adopted (M8∥M10, then M9∥M11). Dispatched M8.1 Scope UI design (Sonnet) while M7 implementer A finishes.
   - User freed disk and asked for maximum parallelism. Rule update: parallel tracks allowed; disk guard relaxed; still at most one Docling-bearing pytest + one Playwright run concurrently (RAM 16 GB is the binding constraint).
+  - M8.1 design done (Sonnet, 305 lines; react-router v6, TanStack Query, cached e2e mock project; gaps G1 scope/blocks route, G2 select_all/clear ops). Dispatched M8.2 frontend implement (Sonnet). Also running: M7.2 A, M9.1 design (Opus), M10.1 design (Opus), M11.1 design (Sonnet).
+  - M11.1 design done (Sonnet, 256 lines, E1–E27; strict export gate). Implementation waits for M7 gate (executor project-level nodes, store helpers).
+  - M9.1 design done (Opus, 298 lines; PNG source pane, slider = view filter, VE1 20-key sequence; API gaps G1–G4). Implementation waits for M8.2 (shared shell).
+  - M10.1 design done (Opus, 360 lines, 31 tests). Implementation waits for M7 gate.
+  - M8.2 implement done (Sonnet): 72 vitest, 11/11 Playwright ×3, build served by labor serve; e2e project build 98 s cached. G2 ops deferred to M9.2 (state/ off-limits). Commit 58a0158. Dispatched M8.3 UX check (Sonnet) ∥ M8.4 review (Opus).
+  - M8.3 UX check (Sonnet): 13/14 PASS with server-side evidence; FAIL: focus drops to body after 't' and 's' (keyboard gate); 1-in-8 flake on optimistic count; axe clean except color-contrast on stale chips; TTI 251 ms, PUT 256 ms. M8.4 review (Opus) still running.
+  - M8.4 review (Opus): gate PASS (toggle/counts/keyboard); 3 majors on selection loss (unmount drops pending debounce; no flush on reload; stale refetch overwrites save) + focus bug + CI cache key/cold-build risks + minors. Dispatched M8.5 fix (Sonnet), which also lands module 9's shared-shell changes. M7.2 A still running.
