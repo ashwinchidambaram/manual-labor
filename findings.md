@@ -97,3 +97,12 @@ Slots, cheapest first:
 - **M10 (agent pass)**: prior accepted/rejected proposals for similar flags are shown to the model as examples; rejected proposals' rationale is excluded from re-use.
 - **UI (M8/M9)**: a "why did this change" chip when a learned rule or example influenced output, so the user can disable it.
 Design docs for M5, M7, M10 must include a "Learning hooks" section; M7's schema is the only part that is mandatory now (capture everything; learning can be added later without migration).
+
+### Learning must be reversible (user, 2026-10-29)
+- **Baseline is immutable.** The shipped behaviour (deterministic rules, default signal weights, default threshold, empty few-shot store) is the baseline and is never edited in place by learning.
+- **Learning mode is a toggle** in `ProjectConfig` (`learning.enabled`, default off until the baseline is validated; later default may flip). Off = baseline behaviour exactly, even if learned state exists on disk.
+- **Learned state is a separate, versioned layer** (`<project>/learning/` with numbered snapshots + a `global/` opt-in store), applied on top of the baseline at runtime. Nothing learned is written into code, config defaults, or the decision store itself.
+- **Reset button** = delete/disable the learned layer; decisions (the raw examples) are kept so learning can be re-derived later. Also a per-rule disable from the UI chip.
+- **Rollback** = pick a previous snapshot; every scoring/cleanup output records which learning snapshot (or `baseline`) produced it, so a regression can be traced and the manifest states it.
+- **Guardrail**: calibration compares edit rate under learned vs baseline on the same project (A/B on the decision history); if learned is worse, the UI says so and offers the reset.
+This is a required part of the M7 state design (snapshots + toggle) and M10 (compare + reset); M5/M4 hooks must read the toggle.

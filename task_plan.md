@@ -80,7 +80,7 @@ Detailed tasks, model assignments, and gates: docs/plans/2026-10-28-manual-labor
 - **Status:** pending
 
 ## Cross-cutting (user, 2026-10-29)
-- Self-improvement from HIL feedback: capture everything in M7's decision store (mandatory); learning hooks in M5 cleanup, M3/M10 calibration, M4 grouping, M10 agent pass (nice-to-have, never bypasses faithfulness). See findings.md.
+- Self-improvement from HIL feedback: capture everything in M7's decision store (mandatory); learning hooks in M5 cleanup, M3/M10 calibration, M4 grouping, M10 agent pass (nice-to-have, never bypasses faithfulness). REQUIRED: immutable baseline, `learning.enabled` toggle, versioned learned layer with snapshots, reset + rollback, provenance of which snapshot produced each output, learned-vs-baseline comparison in calibration. See findings.md.
 
 ## Key Questions
 1. Synthetic fixtures OK for gates? (assumed yes)
