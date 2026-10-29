@@ -174,3 +174,7 @@ User freed disk and asked to run things in parallel wherever possible to finish 
 | Learned OCR confusion pairs NEVER enter the faithfulness look-alike table or the attestation rule (corrects an earlier note in findings); they only force blocks to the queue and appear as agent-prompt hints | Anything else weakens the invariant on less evidence. |
 | Calibration: 20 buckets of 0.05; sparse < 20; only non-numeric-spec decisions count; suggestion = lowest t in [0.50, 0.95] with ≥ 50 decisions above, Wilson upper (z=1.645) < target 2%, no non-sparse bucket above with Wilson lower > target; apply only explicitly, default scope "next docs" via `doc_thresholds` | Never changes config silently; 133+ zero-edit decisions needed before 2% is met. |
 | Forced M7 changes: proposal store methods + `(flag_id, round)` index; agent-sourced decisions; override services resolve flags; learning `agent.json`; agent job type; `ActionKind.agent_run`; richer API models; scoring reads `doc_thresholds` | Implemented in M10.2 against M7's code. |
+
+## Concurrency rules v2 (2026-10-29 afternoon, disk 39 GB free)
+- `--basetemp=.pytest_tmp` (addopts) is wiped at the start of every pytest session: a concurrent run deletes another's temp. Every agent-run pytest MUST pass `--basetemp=.pytest_tmp_<agent>` and delete it afterwards. The orchestrator's gate runs use the default.
+- At most two Docling-bearing pytest runs + one Playwright run at a time (RAM 16 GB). Check `pgrep -fl "uv run pytest" | wc -l` before starting.
