@@ -125,3 +125,5 @@
 - Actions taken:
   - Dispatched M6.1 design (Sonnet).
   - M6.1 design done (Sonnet, 227 lines, T1–T15). Defaults flipped to small tier. Pulling llama3.2:1b + moondream in background. Dispatched M6.2 implement (Sonnet).
+  - M6.2 implement done (Sonnet): fast suite 1173; live Ollama chat/json/vision/embed pass; cleanup smoke 10 attempts / 9 rejected / 0 violations; probe prints small tier on M3 16 GB. Commit c3db421. Dispatched M6.3 review (Opus, fresh).
+  - M6.3 review (Opus): conditional PASS. Majors: Ollama num_ctx not honored (prompt_eval_count 4098 for 8.4k-token prompt, silent truncation); finish_reason=length accepted + cached; small-tier verifier == cleanup model → verifier skipped. Minors: estimated flag leak, --apply keeps metadata/agent, --apply ignores disk, global OLLAMA_API_BASE, tags parser crash. Pulling qwen2.5:1.5b for the verifier; dispatched M6.4 fix (Sonnet).
