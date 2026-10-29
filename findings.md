@@ -106,3 +106,12 @@ Design docs for M5, M7, M10 must include a "Learning hooks" section; M7's schema
 - **Rollback** = pick a previous snapshot; every scoring/cleanup output records which learning snapshot (or `baseline`) produced it, so a regression can be traced and the manifest states it.
 - **Guardrail**: calibration compares edit rate under learned vs baseline on the same project (A/B on the decision history); if learned is worse, the UI says so and offers the reset.
 This is a required part of the M7 state design (snapshots + toggle) and M10 (compare + reset); M5/M4 hooks must read the toggle.
+
+## Additional real fixtures (2026-10-29), all under tests/fixtures/real/<name>/, PDFs gitignored, rebuilt by fetch.py
+| Name | Source | Kind | Pages | GT blocks |
+|---|---|---|---|---|
+| faa-amt | FAA-H-8083-30B (2023) AMT Handbook General, ch. 7, faa.gov (whole-book download, pages 245–324 copied with insert_pdf) | born-digital, 2-col, 233 image placements | 80 | 20 |
+| parts-list | TM 5-4110-231-24P refrigeration unit RPSTL (1979), archive.org micro_IA41152645_0202 | 300 DPI image-only scan; some dot-matrix pages near-unreadable | 61 | 20 |
+| old-scan | TM 11-427 Barometers ML-102 (1944), archive.org micro_IA41152616_0619 | 300 DPI image-only scan, faded/off-centre; low priority | 57 | 8 |
+| nist-handbook | NIST Handbook 44 (2026) §2.20 Scales, nist.gov | born-digital, vector table borders; text-layer quirks: "≤"→"<", captions detach, private-use glyphs, rotated watermark line. URL is replaced yearly → sha mismatch after supersession. | 64 | 20 |
+All GT model-transcribed; needs human spot-check. The real set now covers: scan (pile driver), born-digital 2-col figure-heavy, table-heavy scan, poor old scan, born-digital complex tables.
