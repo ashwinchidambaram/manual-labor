@@ -43,6 +43,13 @@ class LearningConfig(ContractModel):
     enabled: bool = False
 
 
+class CleanupConfig(ContractModel):
+    """Cleanup stage settings (module 5): when the LLM pass runs, and figure descriptions."""
+
+    llm: Literal["off", "residual", "always"] = "residual"
+    describe: bool = True
+
+
 class ProjectConfig(ContractModel):
     schema_version: Literal["1.0"] = "1.0"
     name: str
@@ -55,6 +62,7 @@ class ProjectConfig(ContractModel):
     background_ocr_born_digital: bool = True
     target_edit_rate: Unit = 0.02
     learning: LearningConfig = Field(default_factory=LearningConfig)
+    cleanup: CleanupConfig = Field(default_factory=CleanupConfig)
 
     @field_validator("parsers")
     @classmethod

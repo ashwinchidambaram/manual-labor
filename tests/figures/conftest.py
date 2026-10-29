@@ -15,7 +15,7 @@ from manuallabor.figures.types import FigureExtraction, FigureIndex, FigureRepor
 from manuallabor.ingest import ingest_files
 from manuallabor.parse.pipeline import parse_project
 from manuallabor.project import ProjectPaths
-from tests.conftest import FIXTURES, Parsed
+from tests.conftest import FIXTURES, Parsed, copy_project
 
 GT_STEMS = ("figures", "twocol", "clean", "scanned", "manual")
 
@@ -44,7 +44,7 @@ def index(paths: ProjectPaths) -> FigureIndex:
 @pytest.fixture(scope="session")
 def figproj(parsed: Parsed, tmp_path_factory: pytest.TempPathFactory) -> ProjectPaths:
     root = tmp_path_factory.mktemp("figproj") / "proj"
-    shutil.copytree(parsed.paths.root, root)
+    copy_project(parsed.paths.root, root)
     paths = ProjectPaths(root)
     assert run_figures(paths, emit=lambda _o: None) == []
     return paths
@@ -55,7 +55,7 @@ def twin(parsed: Parsed, tmp_path_factory: pytest.TempPathFactory) -> ProjectPat
     """figures.pdf ingested twice: as `figures` and as `figures-copy`."""
     base = tmp_path_factory.mktemp("twin")
     root = base / "proj"
-    shutil.copytree(parsed.paths.root, root)
+    copy_project(parsed.paths.root, root)
     paths = ProjectPaths(root)
     copy = base / "figures-copy.pdf"
     shutil.copyfile(FIXTURES / "figures.pdf", copy)

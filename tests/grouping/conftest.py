@@ -25,6 +25,7 @@ from manuallabor.providers import ListSink, MockProvider, ProviderSet
 from manuallabor.providers.mock import Responder
 from manuallabor.scoring.pipeline import load_scored_blocks
 from tests.conftest import ALL_FIXTURES, FIXTURES, Scored
+from tests.conftest import copy_project as _lean_copy
 
 SLUG = "doc"
 GT_DIR = FIXTURES / "ground_truth"
@@ -172,7 +173,7 @@ class Grouped:
 def grouped(scoredproj: Scored, tmp_path_factory: pytest.TempPathFactory) -> Grouped:
     """All six fixtures grouped once with the all-mock project config (one parse per session)."""
     root = tmp_path_factory.mktemp("grouped") / "proj"
-    shutil.copytree(scoredproj.paths.root, root)
+    _lean_copy(scoredproj.paths.root, root)
     paths = ProjectPaths(root)
     assert run_group(paths, emit=lambda _o: None) == []
     return Grouped(paths=paths, scored=scoredproj)
@@ -198,7 +199,7 @@ def model_ref() -> ModelRef:
 
 
 def copy_project(src: Path, dst: Path) -> ProjectPaths:
-    shutil.copytree(src, dst)
+    _lean_copy(src, dst)
     return ProjectPaths(dst)
 
 

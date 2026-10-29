@@ -28,6 +28,7 @@ from manuallabor.contracts.block import (
 )
 from manuallabor.contracts.config import (
     KNOWN_PROVIDERS,
+    CleanupConfig,
     LearningConfig,
     ModelRef,
     ProjectConfig,
@@ -114,6 +115,7 @@ __all__ = [
     "ScopeSummary",
     "ReviewLoad",
     "LearningConfig",
+    "CleanupConfig",
     "GroupsFile",
     "GroupingParams",
     "GroupOverride",

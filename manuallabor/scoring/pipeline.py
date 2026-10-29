@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from manuallabor import ids
+from manuallabor.cleanup.types import CleanFile, fallback_detail
 from manuallabor.contracts.block import Block, NumericVariant, Signal
 from manuallabor.contracts.config import ProjectConfig
 from manuallabor.contracts.document import Document
@@ -28,7 +29,7 @@ from manuallabor.figures.types import FigureIndex, FigureReport
 from manuallabor.parse.pipeline import Emit, stdout_emit
 from manuallabor.parse.text import collapse_ws
 from manuallabor.parse.types import PageLayout
-from manuallabor.project import ProjectPaths
+from manuallabor.project import DocPaths, ProjectPaths
 from manuallabor.providers.base import ProviderSet, build_provider_set
 from manuallabor.providers.sinks import JsonlSink
 from manuallabor.scoring.agreement import parser_agreement, textlayer_vs_ocr
@@ -42,6 +43,7 @@ from manuallabor.scoring.ocr import ocr_signals
 from manuallabor.scoring.queue import assign_status
 from manuallabor.scoring.tables import table_consistency
 from manuallabor.scoring.types import (
+    FAITH_FALLBACK_VALUE,
     FAITH_REORDER_VALUE,
     SCORING_ALGO_VERSION,
     BlockContext,
@@ -57,7 +59,9 @@ from manuallabor.scoring.verifier import VerifierPlan, llm_verifier, plan_verifi
 
 __all__ = [
     "block_contexts",
+    "faith_kwargs",
     "fingerprint",
+    "load_clean_overlay",
     "load_scored_blocks",
     "run_score",
     "score_block",
@@ -114,6 +118,29 @@ def block_contexts(
     return out
 
 
+def faith_kwargs(
+    block: Block, ctx: BlockContext, variants: Sequence[NumericVariant] = ()
+) -> dict[str, Any]:
+    """The full-context keyword arguments of ``check_faithfulness_ex`` for one block (design
+    05 S4). Scoring and cleanup both call the check with exactly these, so their verdicts on
+    the same (raw, clean) pair are identical by construction."""
+    texts = block.raw_text_by_parser
+    return {
+        "block_type": block.type,
+        "table": block.table,
+        "hf_strings": ctx.hf_strings,
+        "hf_pages": ctx.hf_pages,
+        "variant_sources": texts,
+        "raw_source": block.raw_source,
+        "page": block.page,
+        "variants": list(variants),
+        "evidence": ReorderEvidence(
+            layout_risk=ctx.layout_risk,
+            alt_texts=tuple(texts[k] for k in sorted(texts) if k != block.raw_source),
+        ),
+    }
+
+
 def score_block(
     block: Block,
     ctx: BlockContext,
@@ -123,9 +150,11 @@ def score_block(
     variants: Sequence[NumericVariant] = (),
     plan: VerifierPlan = NO_VERIFIER,
     counters: Counter[str] | None = None,
+    fallback: str | None = None,
 ) -> BlockScore:
     """All signals of one block, its confidence and machine status. Pure except the optional
-    verifier call."""
+    verifier call. ``fallback``: cleanup rejected a candidate for this block and kept its
+    deterministic result (the reason), which caps faithfulness at FAITH_FALLBACK_VALUE."""
     counters = counters if counters is not None else Counter()
     signals: list[Signal] = []
     if block.type == BlockType.figure:
@@ -163,18 +192,10 @@ def score_block(
     if g is not None:
         signals.append(g)
 
-    texts = block.raw_text_by_parser
-    common: dict[str, Any] = {
-        "block_type": block.type,
-        "table": block.table,
-        "hf_strings": ctx.hf_strings,
-        "hf_pages": ctx.hf_pages,
-        "variant_sources": texts,
-        "raw_source": block.raw_source,
-        "page": block.page,
-    }
+    kw = faith_kwargs(block, ctx, variants)
     faith_result = None
     if block.clean_text is None:
+        common = {k: v for k, v in kw.items() if k not in ("variants", "evidence")}
         self_test = check_faithfulness_ex(block.raw_text, block.raw_text, **common)
         if not self_test.result.passed:
             raise ScoringError(f"{block.id}: canonicalizer self-test failed (raw vs raw)")
@@ -188,18 +209,16 @@ def score_block(
         )
         faith_passed = True
     else:
-        evidence = ReorderEvidence(
-            layout_risk=ctx.layout_risk,
-            alt_texts=tuple(texts[k] for k in sorted(texts) if k != block.raw_source),
-        )
-        out = check_faithfulness_ex(
-            block.raw_text, block.clean_text, variants=variants, evidence=evidence, **common
-        )
+        out = check_faithfulness_ex(block.raw_text, block.clean_text, **kw)
         faith_result = out.result
         faith_passed = out.result.passed
         if not faith_passed:
             value, detail = 0.0, _faith_detail(out.result.violations)
             counters["faith_failed"] += 1
+        elif fallback is not None:
+            value = FAITH_FALLBACK_VALUE
+            detail = truncate(f"cleanup candidate rejected ({fallback}); kept deterministic result")
+            counters["faith_fallback"] += 1
         elif out.reordered:
             value, detail = FAITH_REORDER_VALUE, "passed via evidence-backed reorder"
         else:
@@ -244,9 +263,11 @@ def score_document(
     threshold: float,
     plan: VerifierPlan = NO_VERIFIER,
     counters: Counter[str] | None = None,
+    fallbacks: Mapping[str, str] | None = None,
 ) -> list[BlockScore]:
     """Score every block of one document; sorted by block id."""
     ctxs = block_contexts(doc, blocks, layouts)
+    fallbacks = fallbacks or {}
     out = [
         score_block(
             b,
@@ -256,6 +277,7 @@ def score_document(
             variants=variants.get(b.id, ()),
             plan=plan,
             counters=counters,
+            fallback=fallbacks.get(b.id),
         )
         for b in sorted(blocks, key=lambda b: b.reading_order)
     ]
@@ -322,6 +344,34 @@ def _figure_inputs(
             sidecar_inputs[fid] = [rec.attach_rule.value, list(rec.articles)]
     dedupe_dump = [entries[k].model_dump(mode="json") for k in sorted(entries)]
     return out, sidecar_inputs, dedupe_dump
+
+
+def load_clean_overlay(
+    dp: DocPaths, block_ids: set[str]
+) -> tuple[dict[str, str], dict[str, str], str | None]:
+    """clean.json (module 5) as (block id -> clean_text, block id -> fallback reason, sha of the
+    file). No file: empty maps and None. An entry for a block that does not exist is an error:
+    clean.json is stale for this parse."""
+    if not dp.clean.is_file():
+        return {}, {}, None
+    data = dp.clean.read_bytes()
+    try:
+        cf = CleanFile.model_validate_json(data)
+    except ValueError as exc:
+        raise ScoringError(f"clean.json is invalid: {exc}") from exc
+    texts: dict[str, str] = {}
+    fallbacks: dict[str, str] = {}
+    for e in cf.blocks:
+        if e.block_id not in block_ids:
+            raise ScoringError(
+                f"clean.json names unknown block {e.block_id} (stale for this parse: delete "
+                f"{dp.clean.name} and run `labor clean`)"
+            )
+        texts[e.block_id] = e.clean_text
+        reason = fallback_detail(e)
+        if reason is not None:
+            fallbacks[e.block_id] = reason
+    return texts, fallbacks, hashlib.sha256(data).hexdigest()
 
 
 def fingerprint(payload: Mapping[str, Any]) -> str:
@@ -484,6 +534,12 @@ def _score_doc(
         raise ScoringError("document is not parsed (blocks.json missing)")
     doc = paths.load_document(slug)
     blocks = read_json_list(dp.blocks, Block)
+    clean_texts, fallbacks, clean_sha = load_clean_overlay(dp, {b.id for b in blocks})
+    if clean_texts:
+        blocks = [
+            b.model_copy(update={"clean_text": clean_texts[b.id]}) if b.id in clean_texts else b
+            for b in blocks
+        ]
     layouts = read_json_list(dp.layout, PageLayout) if dp.layout.is_file() else []
     report = read_json(dp.figure_report, FigureReport) if dp.figure_report.is_file() else None
     fig_inputs, sidecar_inputs, dedupe_dump = _figure_inputs(paths, slug, blocks, report)
@@ -502,6 +558,7 @@ def _score_doc(
             "sidecar_inputs": sidecar_inputs,
             "verifier_ref": vref.model_dump(mode="json") if vref else None,
             "cleanup_ref": cref.model_dump(mode="json") if cref else None,
+            "clean_sha": clean_sha,
             "variants": {
                 k: [v.model_dump(mode="json") for v in vs] for k, vs in sorted(variants.items())
             },
@@ -537,7 +594,7 @@ def _score_doc(
         return
     counters: Counter[str] = Counter()
     scores = score_document(
-        doc, blocks, layouts, fig_inputs, variants, config.threshold, plan, counters
+        doc, blocks, layouts, fig_inputs, variants, config.threshold, plan, counters, fallbacks
     )
     _write_outputs(paths, slug, blocks, fp, config.threshold, scores)
     emit(_progress(slug, "done", scores, blocks, t0, _detail(counters)))
@@ -590,8 +647,8 @@ def run_score(
 
 
 def load_scored_blocks(paths: ProjectPaths, slug: str) -> list[Block]:
-    """blocks.json merged with the scores.json overlay, validated as contract Blocks. Modules
-    4-11 and the API read blocks only through this."""
+    """blocks.json merged with the scores.json and clean.json overlays, validated as contract
+    Blocks. Modules 4-11 and the API read blocks only through this."""
     dp = paths.doc(slug)
     blocks = read_json_list(dp.blocks, Block)
     sf = _load_prior(dp.scores)
@@ -600,17 +657,20 @@ def load_scored_blocks(paths: ProjectPaths, slug: str) -> list[Block]:
             f"{slug}: scores.json missing or from another algo version (run `labor score`)"
         )
     by_id = {s.block_id: s for s in sf.blocks}
+    clean_texts, _, _ = load_clean_overlay(dp, {b.id for b in blocks})
     out: list[Block] = []
     for b in blocks:
         s = by_id.get(b.id)
         if s is None:
             raise ScoringError(f"{slug}: {b.id} has no score (run `labor score`)")
-        fields = {
+        fields: dict[str, Any] = {
             "confidence": s.confidence,
             "signals": [x.model_dump(mode="json") for x in s.signals],
             "status": s.status,
             "has_numeric_spec": s.has_numeric_spec,
             "faithfulness": s.faithfulness.model_dump(mode="json") if s.faithfulness else None,
         }
+        if b.id in clean_texts:
+            fields["clean_text"] = clean_texts[b.id]
         out.append(Block.model_validate({**b.model_dump(mode="json"), **fields}))
     return out

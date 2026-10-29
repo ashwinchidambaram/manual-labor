@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import random
-import shutil
 from pathlib import Path
 
 from manuallabor.contracts.enums import BlockStatus, BlockType
@@ -12,6 +11,7 @@ from manuallabor.contracts.io import read_json, write_json
 from manuallabor.project import ProjectPaths
 from manuallabor.scoring.pipeline import load_scored_blocks, run_score
 from manuallabor.scoring.queue import assign_status, build_queue
+from tests.conftest import copy_project
 from tests.scoring.conftest import Scored, make_block
 
 
@@ -53,7 +53,7 @@ def test_fixture_queue(scoredproj: Scored) -> None:
 
 def test_sidecar_review_not_overwritten(scoredproj: Scored, tmp_path: Path) -> None:
     root = tmp_path / "proj"
-    shutil.copytree(scoredproj.paths.root, root)
+    copy_project(scoredproj.paths.root, root)
     paths = ProjectPaths(root)
     fid = "FIG-scanned-p005-01"
     sc = paths.figure_file("scanned", fid, "json")

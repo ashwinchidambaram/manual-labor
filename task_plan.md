@@ -4,7 +4,7 @@
 Deliver Manual Labor v1 per SPEC.md: every CLAUDE.md module gate (0–11) passed with its proving command pasted in docs/PROGRESS.md, and SPEC §11 acceptance recorded in docs/ACCEPTANCE.md.
 
 ## Current Phase
-Phase 4 (grouping). User approved autonomous run on 2026-10-28; overnight autonomous 2026-10-29.
+Phase 5 (cleanup + figure attachment). Overnight autonomous 2026-10-29.
 
 ## Phases
 Detailed tasks, model assignments, and gates: docs/plans/2026-10-28-manual-labor-build.md. Decisions and environment: findings.md.
@@ -40,14 +40,14 @@ Detailed tasks, model assignments, and gates: docs/plans/2026-10-28-manual-labor
 - **Status:** pending
 
 ### Phase 4: Grouping
-- [ ] Design (Opus) · Implement (Sonnet) · Review (Opus) · Fix
-- [ ] Gate: every block assigned exactly once; coverage mapping correct; cohesion computed
-- **Status:** in_progress
+- [x] Design (Opus) · Implement (Sonnet) · Review (Opus) · Fix (Sonnet)
+- [x] Gate: 838 fast tests; partition exact both views; coverage exact; cohesion computed; byte-stable
+- **Status:** complete
 
 ### Phase 5: Cleanup + figure attachment
 - [ ] Design (Opus) · Implement (Opus) · Review (Opus) · Fix
 - [ ] Gate: 0 faithfulness violations on auto-approved; attach rule recorded; caption-ref attachments correct
-- **Status:** pending
+- **Status:** in_progress
 
 ### Phase 6: Provider layer + hardware probe
 - [ ] Design (Sonnet) · Implement (Sonnet) · Review (Sonnet) · Fix

@@ -98,7 +98,8 @@
         "caption_ref",
         "caption_match",
         "proximity",
-        "none"
+        "none",
+        "human"
       ],
       "title": "AttachRule",
       "type": "string"
@@ -405,6 +406,33 @@
       ],
       "title": "CallKind",
       "type": "string"
+    },
+    "CleanupConfig": {
+      "additionalProperties": false,
+      "description": "Cleanup stage settings (module 5): when the LLM pass runs, and figure descriptions.",
+      "properties": {
+        "describe": {
+          "default": true,
+          "title": "Describe",
+          "type": "boolean"
+        },
+        "llm": {
+          "default": "residual",
+          "enum": [
+            "off",
+            "residual",
+            "always"
+          ],
+          "title": "Llm",
+          "type": "string"
+        }
+      },
+      "required": [
+        "llm",
+        "describe"
+      ],
+      "title": "CleanupConfig",
+      "type": "object"
     },
     "CoverageReport": {
       "additionalProperties": false,
@@ -2201,6 +2229,9 @@
           "title": "Background Ocr Born Digital",
           "type": "boolean"
         },
+        "cleanup": {
+          "$ref": "#/$defs/CleanupConfig"
+        },
         "learning": {
           "$ref": "#/$defs/LearningConfig"
         },
@@ -2260,7 +2291,8 @@
         "ocr_dpi",
         "background_ocr_born_digital",
         "target_edit_rate",
-        "learning"
+        "learning",
+        "cleanup"
       ],
       "title": "ProjectConfig",
       "type": "object"

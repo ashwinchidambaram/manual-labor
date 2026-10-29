@@ -70,6 +70,22 @@ class DocPaths:
         return self.root / "group_overrides.json"
 
     @property
+    def clean(self) -> Path:
+        return self.root / "clean.json"
+
+    @property
+    def attach(self) -> Path:
+        return self.root / "attach.json"
+
+    @property
+    def describe(self) -> Path:
+        return self.root / "describe.json"
+
+    @property
+    def attach_overrides(self) -> Path:
+        return self.root / "attach_overrides.json"
+
+    @property
     def score_history(self) -> Path:
         return self.root / "score_history.jsonl"
 
@@ -119,6 +135,11 @@ class ProjectPaths:
     def learned_grouping(self) -> Path:
         """Stand-in for module 7's learning layer: the grouping snapshot, if one exists."""
         return self.root / "learning" / "grouping.json"
+
+    @property
+    def learned_cleanup(self) -> Path:
+        """Stand-in for module 7's learning layer: the cleanup snapshot, if one exists."""
+        return self.root / "learning" / "cleanup.json"
 
     @property
     def figures_index(self) -> Path:

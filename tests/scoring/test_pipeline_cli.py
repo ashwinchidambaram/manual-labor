@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -20,6 +19,7 @@ from manuallabor.figures.pipeline import run_figures
 from manuallabor.project import ProjectPaths
 from manuallabor.scoring.pipeline import load_scored_blocks, run_score
 from manuallabor.scoring.types import ScoreFile
+from tests.conftest import copy_project
 
 runner = CliRunner()
 
@@ -41,7 +41,7 @@ def _lines(output: str) -> list[dict[str, object]]:
 
 
 def _copy(src: Path, dst: Path) -> ProjectPaths:
-    shutil.copytree(src, dst)
+    copy_project(src, dst)
     return ProjectPaths(dst)
 
 

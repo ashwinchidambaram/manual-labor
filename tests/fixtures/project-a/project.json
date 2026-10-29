@@ -1,6 +1,10 @@
 {
   "article_split": "per_topic",
   "background_ocr_born_digital": true,
+  "cleanup": {
+    "describe": true,
+    "llm": "residual"
+  },
   "learning": {
     "enabled": false
   },

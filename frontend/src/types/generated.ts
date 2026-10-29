@@ -10,7 +10,7 @@ export type ArticleSplit = 'per_topic' | 'per_document';
  * This interface was referenced by `_All`'s JSON-Schema
  * via the `definition` "AttachRule".
  */
-export type AttachRule = 'caption_ref' | 'caption_match' | 'proximity' | 'none';
+export type AttachRule = 'caption_ref' | 'caption_match' | 'proximity' | 'none' | 'human';
 /**
  * This interface was referenced by `_All`'s JSON-Schema
  * via the `definition` "DiffOpKind".
@@ -296,6 +296,16 @@ export interface BlockAccounting {
      */
     [k: string]: 'not_selected' | 'header_footer' | 'rejected' | 'empty';
   };
+}
+/**
+ * Cleanup stage settings (module 5): when the LLM pass runs, and figure descriptions.
+ *
+ * This interface was referenced by `_All`'s JSON-Schema
+ * via the `definition` "CleanupConfig".
+ */
+export interface CleanupConfig {
+  describe: boolean;
+  llm: 'off' | 'residual' | 'always';
 }
 /**
  * This interface was referenced by `_All`'s JSON-Schema
@@ -643,6 +653,7 @@ export interface PriorAttempt {
 export interface ProjectConfig {
   article_split: 'per_topic' | 'per_document';
   background_ocr_born_digital: boolean;
+  cleanup: CleanupConfig;
   learning: LearningConfig;
   models: TaskModels;
   name: string;

@@ -59,6 +59,7 @@ class AttachRule(StrEnum):
     caption_match = "caption_match"
     proximity = "proximity"
     none = "none"
+    human = "human"
 
 
 class GroupView(StrEnum):

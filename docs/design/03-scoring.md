@@ -307,6 +307,11 @@ def build_queue(scored: Iterable[ScoredBlock]) -> list[BlockId]
 - `score_history.jsonl` keeps the pre-cleanup vs post-cleanup trajectory for the module 10 edit-rate buckets.
 - Module 3 computes nothing for calibration.
 
+## 7a. Module 5 interplay (algo version 3)
+- `SCORING_ALGO_VERSION = "3"`. A `clean.json` overlay (module 5) is read per document and its content hash is part of the fingerprint, so a changed cleanup re-scores; scoring then evaluates each block's `clean_text` against `raw_text`.
+- When cleanup rejected a candidate and kept its deterministic result (`fallback`), the faithfulness signal is capped at `FAITH_FALLBACK_VALUE = 0.5` (`scoring/types.py`) instead of 1.0, with the rejection reason in `detail`.
+- `faith_kwargs(block, ctx, variants)` (`scoring/pipeline.py`) is the single builder of the full-context arguments to `check_faithfulness_ex`; scoring and cleanup both call it, so their verdicts on the same (raw, clean) pair are identical by construction.
+
 ## 8. Determinism and performance
 | Source | Handling |
 |---|---|

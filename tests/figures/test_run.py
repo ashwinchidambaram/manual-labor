@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -15,7 +14,7 @@ from typer.testing import CliRunner
 from manuallabor.cli import app
 from manuallabor.figures.pipeline import run_figures
 from manuallabor.project import ProjectPaths
-from tests.conftest import Parsed
+from tests.conftest import Parsed, copy_project
 
 pytestmark = pytest.mark.usefixtures("requires_docling")
 
@@ -42,7 +41,7 @@ def test_13_deterministic_across_processes(
     parsed: Parsed, figproj: ProjectPaths, tmp_path: Path
 ) -> None:
     root = tmp_path / "proj"
-    shutil.copytree(parsed.paths.root, root)
+    copy_project(parsed.paths.root, root)
     env = {**os.environ, "PYTHONHASHSEED": "123"}
     res = subprocess.run(
         [sys.executable, "-c", "from manuallabor.cli import app; app()", "figures", str(root)],
@@ -60,7 +59,7 @@ def test_13_deterministic_across_processes(
 
 def test_14_idempotent_and_force(figproj: ProjectPaths, tmp_path: Path) -> None:
     root = tmp_path / "proj"
-    shutil.copytree(figproj.root, root)
+    copy_project(figproj.root, root)
     paths = ProjectPaths(root)
     before_bytes, before_mtimes = snapshot(paths), mtimes(paths)
     lines: list[dict[str, object]] = []
@@ -76,7 +75,7 @@ def test_14_idempotent_and_force(figproj: ProjectPaths, tmp_path: Path) -> None:
 
 def test_22_cli(parsed: Parsed, tmp_path: Path) -> None:
     root = tmp_path / "proj"
-    shutil.copytree(parsed.paths.root, root)
+    copy_project(parsed.paths.root, root)
     runner = CliRunner()
     res = runner.invoke(app, ["figures", str(root), "--doc", "figures"])
     assert res.exit_code == 0, res.output

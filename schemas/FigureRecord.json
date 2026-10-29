@@ -5,7 +5,8 @@
         "caption_ref",
         "caption_match",
         "proximity",
-        "none"
+        "none",
+        "human"
       ],
       "title": "AttachRule",
       "type": "string"

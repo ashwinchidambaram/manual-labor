@@ -10,6 +10,7 @@ import unicodedata
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any, Literal
 
+from manuallabor.cleanup.mock_replies import mock_describe_reply
 from manuallabor.contracts.config import ModelRef
 from manuallabor.contracts.enums import Task
 from manuallabor.contracts.llm import Message
@@ -105,6 +106,7 @@ class MockProvider(BaseProvider):
         merged = {**DEFAULT_MOCK_RESPONSES, **self.responses}
         parts = {str(t): describe(merged[t]) for t in sorted(merged, key=str)}
         parts["vision"] = describe(self.vision_response)
+        parts["vision_json"] = describe(mock_describe_reply)
         parts["dim"] = str(self.dim)
         return hashlib.sha256(json.dumps(parts, sort_keys=True).encode()).hexdigest()
 
@@ -134,10 +136,17 @@ class MockProvider(BaseProvider):
         return RawChat(text, len(prompt.split()), len(text.split()))
 
     def _vision_raw(
-        self, task: Task, image_bytes: bytes, prompt: str, temperature: float
+        self,
+        task: Task,
+        image_bytes: bytes,
+        prompt: str,
+        temperature: float,
+        json_schema: Mapping[str, Any] | None = None,
     ) -> RawChat:
         if self.vision_response is not None:
             text = self.vision_response(image_bytes, prompt)
+        elif json_schema is not None:
+            text = mock_describe_reply(image_bytes, prompt)
         else:
             digest = hashlib.sha256(image_bytes).hexdigest()[:8]
             text = f"Generated description (mock) of image {digest}."

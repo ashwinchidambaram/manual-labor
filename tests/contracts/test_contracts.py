@@ -580,7 +580,13 @@ def test_c18_enums() -> None:
         "table_structure",
     ]
     assert [e.value for e in c.Extraction] == ["native", "vector", "crop"]
-    assert [e.value for e in c.AttachRule] == ["caption_ref", "caption_match", "proximity", "none"]
+    assert [e.value for e in c.AttachRule] == [
+        "caption_ref",
+        "caption_match",
+        "proximity",
+        "none",
+        "human",
+    ]
     assert len(c.SignalName) == 13 and len(c.Task) == 7
 
 

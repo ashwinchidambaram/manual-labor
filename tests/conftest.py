@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import os
 import shutil
 from collections.abc import Callable
@@ -53,6 +54,12 @@ def requires_docling() -> None:
     if os.environ.get("MANUALLABOR_REQUIRE_DOCLING") == "1":
         pytest.fail("MANUALLABOR_REQUIRE_DOCLING=1 but the Docling models are not cached")
     pytest.skip("docling models not cached; run: uv run docling-tools models download")
+
+
+def copy_project(src: Path, dst: Path) -> Path:
+    """Copy a project minus the parse-only page renders (downstream stages never read them)."""
+    shutil.copytree(src, dst, ignore=shutil.ignore_patterns("pages"))
+    return dst
 
 
 def make_template(root: Path) -> ProjectPaths:
@@ -221,7 +228,7 @@ class Scored:
 @pytest.fixture(scope="session")
 def figproj_scoring(parsed: Parsed, tmp_path_factory: pytest.TempPathFactory) -> ProjectPaths:
     root = tmp_path_factory.mktemp("figproj-scoring") / "proj"
-    shutil.copytree(parsed.paths.root, root)
+    copy_project(parsed.paths.root, root)
     paths = ProjectPaths(root)
     assert run_figures(paths, emit=lambda _o: None) == []
     return paths
@@ -230,7 +237,7 @@ def figproj_scoring(parsed: Parsed, tmp_path_factory: pytest.TempPathFactory) ->
 @pytest.fixture(scope="session")
 def scoredproj(figproj_scoring: ProjectPaths, tmp_path_factory: pytest.TempPathFactory) -> Scored:
     root = tmp_path_factory.mktemp("scoredproj") / "proj"
-    shutil.copytree(figproj_scoring.root, root)
+    copy_project(figproj_scoring.root, root)
     paths = ProjectPaths(root)
     assert run_score(paths, emit=lambda _o: None) == []
     return Scored(paths)
@@ -239,5 +246,29 @@ def scoredproj(figproj_scoring: ProjectPaths, tmp_path_factory: pytest.TempPathF
 @pytest.fixture
 def scored_copy(scoredproj: Scored, tmp_path: Path) -> ProjectPaths:
     root = tmp_path / "scored"
-    shutil.copytree(scoredproj.paths.root, root)
+    copy_project(scoredproj.paths.root, root)
     return ProjectPaths(root)
+
+
+# --- disk guard: the shared basetemp must stay small ---
+
+MAX_TMP_BYTES = 2 * 1024**3
+
+
+def _tree_bytes(root: Path) -> int:
+    total = 0
+    for dirpath, _dirs, files in os.walk(root):
+        for f in files:
+            with contextlib.suppress(OSError):
+                total += os.lstat(os.path.join(dirpath, f)).st_size
+    return total
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _tmp_footprint_guard(tmp_path_factory: pytest.TempPathFactory) -> Any:
+    yield
+    base = tmp_path_factory.getbasetemp()
+    size = _tree_bytes(base)
+    print(f"\n[tmp footprint] {base}: {size / 1024**2:.0f} MiB")
+    if size > MAX_TMP_BYTES:
+        pytest.fail(f"pytest basetemp {base} is {size / 1024**3:.2f} GiB (> 2 GiB cap)")

@@ -144,6 +144,42 @@ def group(
 
 
 @app.command()
+def clean(
+    project: Annotated[Path, typer.Argument(help="Project directory.")],
+    force: Annotated[bool, typer.Option("--force", help="Recompute even if up to date.")] = False,
+    doc: Annotated[str | None, typer.Option("--doc", help="Only this document slug.")] = None,
+    llm: Annotated[
+        str | None,
+        typer.Option("--llm", help="LLM pass: off, residual or always (default: project.json)."),
+    ] = None,
+    no_describe: Annotated[
+        bool, typer.Option("--no-describe", help="Do not generate figure descriptions.")
+    ] = False,
+    no_score: Annotated[
+        bool, typer.Option("--no-score", help="Do not re-score after cleaning.")
+    ] = False,
+) -> None:
+    """Clean selected blocks, attach figures to articles, describe figures, re-score (one JSON
+    progress line per document and stage)."""
+    from manuallabor.cleanup.pipeline import run_clean
+    from manuallabor.project import ProjectPaths
+
+    if llm is not None and llm not in ("off", "residual", "always"):
+        print(f"--llm must be off, residual or always, got {llm!r}", file=sys.stderr)
+        raise typer.Exit(2)
+    failed = run_clean(
+        ProjectPaths(project),
+        only=doc,
+        force=force,
+        llm_mode=llm,  # type: ignore[arg-type]
+        describe=False if no_describe else None,
+        rescore=not no_score,
+    )
+    if failed:
+        raise typer.Exit(1)
+
+
+@app.command()
 def export(
     project: Annotated[Path, typer.Argument(help="Project directory.")],
 ) -> None:

@@ -11,7 +11,7 @@ from manuallabor.contracts.block import FaithfulnessResult, Signal
 from manuallabor.contracts.enums import AttachRule, Extraction
 from manuallabor.figures.types import DedupeEntry, FigureExtraction, FigureFailure
 
-SCORING_ALGO_VERSION: Final = "2"
+SCORING_ALGO_VERSION: Final = "3"
 
 # -- comparison normalization / agreement (2.0, 2.2, 2.3) ------------------------------------
 DIGIT_WEIGHT: Final = 3
@@ -49,6 +49,7 @@ ATTACH: Final = {
     AttachRule.caption_match: 0.9,
     AttachRule.proximity: 0.6,
     AttachRule.none: 0.4,
+    AttachRule.human: 1.0,
 }
 
 # -- verifier (2.10) -------------------------------------------------------------------------
@@ -58,6 +59,7 @@ VERIFIER_MIN_SPAN: Final = 3
 
 # -- faithfulness (4) ------------------------------------------------------------------------
 FAITH_REORDER_VALUE: Final = 0.9
+FAITH_FALLBACK_VALUE: Final = 0.5  # cleanup kept its deterministic result after a rejection
 REORDER_MAX_UNITS: Final = 200
 REORDER_MAX_STEPS: Final = 10_000
 FAITH_MAX_CHARS: Final = 50_000

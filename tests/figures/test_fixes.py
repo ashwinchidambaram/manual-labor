@@ -15,7 +15,7 @@ from manuallabor.figures.dedupe import DedupeItem, dedupe
 from manuallabor.figures.docx_images import DocxImages, UnsupportedImage
 from manuallabor.figures.pipeline import run_figures
 from manuallabor.project import ProjectPaths
-from tests.conftest import Parsed
+from tests.conftest import Parsed, copy_project
 from tests.figures.conftest import index, report, sidecar
 
 requires = pytest.mark.usefixtures("requires_docling")
@@ -29,7 +29,7 @@ BAD_BOXES = {
 
 def _copy(src: ProjectPaths, tmp_path: Path) -> ProjectPaths:
     root = tmp_path / "proj"
-    shutil.copytree(src.root, root)
+    copy_project(src.root, root)
     return ProjectPaths(root)
 
 

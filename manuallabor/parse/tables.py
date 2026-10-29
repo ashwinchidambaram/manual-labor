@@ -17,6 +17,12 @@ def _norm(text: str | None) -> str:
     return _WS.sub(" ", text or "").strip()
 
 
+def norm_cell(text: str | None) -> str:
+    """Cell text normalization used everywhere a cell is rendered: whitespace runs to one
+    space, ends stripped. Nothing else is ever changed in a cell."""
+    return _norm(text)
+
+
 # --------------------------------------------------------------------------- PyMuPDF
 
 
@@ -209,15 +215,25 @@ def _md_cell(text: str) -> str:
     return _norm(text).replace("|", "\\|")
 
 
-def table_markdown(tc: TableCandidate) -> str:
-    """GFM table: row 0 header, separator, remaining rows; n_rows + 1 lines, no trailing newline."""
-    grid = [["" for _ in range(tc.n_cols)] for _ in range(tc.n_rows)]
-    for cell in tc.cells:
-        if cell.row < tc.n_rows and cell.col < tc.n_cols:
+def _markdown(n_rows: int, n_cols: int, cells: Sequence[TableCell]) -> str:
+    grid = [["" for _ in range(n_cols)] for _ in range(n_rows)]
+    for cell in cells:
+        if cell.row < n_rows and cell.col < n_cols:
             grid[cell.row][cell.col] = _md_cell(cell.text)
-    lines = ["| " + " | ".join(grid[0]) + " |", "|" + "---|" * tc.n_cols]
+    lines = ["| " + " | ".join(grid[0]) + " |", "|" + "---|" * n_cols]
     lines.extend("| " + " | ".join(row) + " |" for row in grid[1:])
     return "\n".join(lines)
+
+
+def table_markdown(tc: TableCandidate) -> str:
+    """GFM table: row 0 header, separator, remaining rows; n_rows + 1 lines, no trailing newline."""
+    return _markdown(tc.n_rows, tc.n_cols, tc.cells)
+
+
+def table_markdown_from_data(td: TableData) -> str:
+    """The same GFM as ``table_markdown``, rendered from stored TableData: covered span slots
+    are empty, ``|`` is escaped, cell text is only ``norm_cell``ed."""
+    return _markdown(td.n_rows, td.n_cols, td.cells)
 
 
 def shape_of(tc: TableCandidate) -> TableShape:
@@ -245,8 +261,10 @@ def to_table_data(
 __all__ = [
     "from_docling",
     "from_pymupdf",
+    "norm_cell",
     "shape_of",
     "table_markdown",
+    "table_markdown_from_data",
     "table_raw_text",
     "to_table_data",
 ]

@@ -80,7 +80,14 @@ class Provider(Protocol):
         json_schema: Mapping[str, Any] | None = None,
     ) -> ChatResult: ...
 
-    def vision(self, task: Task, image_bytes: bytes, prompt: str) -> ChatResult: ...
+    def vision(
+        self,
+        task: Task,
+        image_bytes: bytes,
+        prompt: str,
+        *,
+        json_schema: Mapping[str, Any] | None = None,
+    ) -> ChatResult: ...
 
     def embed(self, task: Task, texts: Sequence[str]) -> list[list[float]]: ...
 
@@ -110,7 +117,12 @@ class BaseProvider(ABC):
 
     @abstractmethod
     def _vision_raw(
-        self, task: Task, image_bytes: bytes, prompt: str, temperature: float
+        self,
+        task: Task,
+        image_bytes: bytes,
+        prompt: str,
+        temperature: float,
+        json_schema: Mapping[str, Any] | None = None,
     ) -> RawChat: ...
 
     @abstractmethod
@@ -297,14 +309,34 @@ class BaseProvider(ABC):
             lambda: self._chat_raw(task, messages, json_schema, TEMPERATURE),
         )
 
-    def vision(self, task: Task, image_bytes: bytes, prompt: str) -> ChatResult:
-        inputs = {"image_sha256": sha256_hex(image_bytes), "prompt": prompt}
+    def vision(
+        self,
+        task: Task,
+        image_bytes: bytes,
+        prompt: str,
+        *,
+        json_schema: Mapping[str, Any] | None = None,
+    ) -> ChatResult:
+        """A schema, when given, validates the reply (a failure is never cached) and is part of
+        the cache key; without one the key is the pre-schema key (existing caches stay valid)."""
+        inputs: dict[str, Any] = {"image_sha256": sha256_hex(image_bytes), "prompt": prompt}
+        if json_schema is None:
+            return self._text_call(
+                task,
+                CallKind.vision,
+                inputs,
+                None,
+                lambda: self._vision_raw(task, image_bytes, prompt, TEMPERATURE),
+            )
+        inputs["json_schema"] = json_schema
         return self._text_call(
             task,
             CallKind.vision,
             inputs,
-            None,
-            lambda: self._vision_raw(task, image_bytes, prompt, TEMPERATURE),
+            json_schema,
+            lambda: self._vision_raw(
+                task, image_bytes, prompt, TEMPERATURE, json_schema=json_schema
+            ),
         )
 
     def embed(self, task: Task, texts: Sequence[str]) -> list[list[float]]:

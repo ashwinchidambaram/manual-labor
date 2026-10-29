@@ -245,6 +245,8 @@ Manifest validators:
 - `ProjectConfig`: `schema_version: Literal["1.0"]="1.0"`, `name: str`, `threshold: Unit = 0.85`, `models: TaskModels = <defaults>`, `article_split: ArticleSplit = per_topic`, `parsers: list[str] = ["pymupdf", "docling"]` (≥2, unique, order = primary first), `ocr_engine: OcrEngine = rapidocr`, `ocr_dpi: int ≥300 = 300`, `background_ocr_born_digital: bool = True`, `target_edit_rate: Unit = 0.02`.
 - The default `TaskModels` are all `ollama`: cleanup/grouping/vision `gemma4:e4b-it-q4_K_M`, verifier `llama3.2:1b`, embeddings `nomic-embed-text`.
 - `LearningConfig{enabled: bool = False}` as `ProjectConfig.learning` (default `LearningConfig()`); the grouping stage reads the learned snapshot only when `enabled`.
+- `CleanupConfig{llm: "off"|"residual"|"always" = "residual", describe: bool = True}` as `ProjectConfig.cleanup` (module 5): `llm` says when the cleanup LLM pass runs (never / only for lines the deterministic passes could not settle / on every eligible block); `describe` toggles figure descriptions.
+- `AttachRule` gains `human`: a figure attachment set by a reviewer (re-attach in Verify); cleanup never overwrites it. `TitleSource.human` likewise marks a reviewer-set title.
 - `model_for(task: Task) -> ModelRef | None` resolves the fallbacks. `verifier=None` means the signal is skipped.
 
 ### 4.12 LLM records (llm.py)
@@ -300,13 +302,13 @@ Clock = Callable[[], datetime]            # default: lambda: datetime.now(UTC)
 class Provider(Protocol):
     ref: ModelRef
     def chat(self, task: Task, messages: Sequence[Message], *, json_schema: Mapping[str, Any] | None = None) -> ChatResult: ...
-    def vision(self, task: Task, image_bytes: bytes, prompt: str) -> ChatResult: ...
+    def vision(self, task: Task, image_bytes: bytes, prompt: str, *, json_schema: Mapping[str, Any] | None = None) -> ChatResult: ...
     def embed(self, task: Task, texts: Sequence[str]) -> list[list[float]]: ...
 
 class BaseProvider(ABC):   # implements Provider; subclasses implement only the raw methods
     def __init__(self, ref: ModelRef, *, sink: LogSink, cache: LLMCache | None = None, clock: Clock = utc_now): ...
     @abstractmethod def _chat_raw(self, task, messages, json_schema, temperature: float) -> RawChat   # RawChat(text, prompt_tokens, completion_tokens)
-    @abstractmethod def _vision_raw(self, task, image_bytes, prompt, temperature: float) -> RawChat
+    @abstractmethod def _vision_raw(self, task, image_bytes, prompt, temperature: float, json_schema=None) -> RawChat   # `vision(json_schema=)` validates the reply exactly as `chat` does (failure never cached; the schema is part of the cache key)
     @abstractmethod def _embed_raw(self, task, texts) -> RawEmbed                                   # RawEmbed(vectors, prompt_tokens)
 ```
 Public method flow: build the key with `cache.key(...)`. On a hit, return the cached response. On a miss, call raw with `temperature=TEMPERATURE` (there is no parameter or attribute that changes it), time it with `time.perf_counter`, and store the result unless raw raised. When `json_schema` is given, validate with `jsonschema.Draft202012Validator`: parse `text` as JSON, set `parsed`, and on failure raise `ProviderOutputError`. A failed result is never cached. **Each public call emits exactly one `LLMCallLog` to the sink**, including cache hits (`cached=True`) and failures (`ok=False`, `error=str(exc)`, then re-raise). Raw exceptions that are not ProviderError are wrapped in `ProviderError(retriable=False)`.
