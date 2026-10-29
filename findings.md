@@ -145,3 +145,14 @@ Root cause: `/private/var/folders/.../T/com.docker.install` — a Docker Desktop
 | `TaskModels` defaults flipped to the small tier: chat/verifier/grouping/metadata `llama3.2:1b`, vision `moondream`, embeddings `nomic-embed-text` (was gemma4 e4b, 9.6 GB) | Fits a 16 GB machine; probe suggests bigger tiers; `labor probe --apply <tier>` sets them. |
 | Orchestrator pulls `llama3.2:1b` (1.3 GB) + `moondream` (1.7 GB) for the live gate; user may delete after | Live gates are part of the build; gemma4 was removed overnight (likely to free disk). |
 | JSON-schema retry = one corrective re-ask inside the same logged call; transport retries separate; validation failures never retried at transport level | Reconciles SPEC "validated" with "never retry validation failures". |
+
+## Module 7 decisions (2026-10-29, docs/design/07-api-state.md)
+| Decision | Rationale |
+|---|---|
+| Job worker = subprocess (`python -m manuallabor.jobs.worker`, own process group) supervised by the serve process; serve process is the single DB writer; workers write files + progress log only; concurrency 1 | Survives server kill; has the `__main__` guard the parse pool needs; cancel = kill group. |
+| `labor check` runs on a temp copy, rewrites project.json to all-mock AND passes `factories={"mock"}` so any non-mock ref fails loudly; `--live` applies the probe's small tier and `SKIP live:` exits 0 when Ollama/models are missing | Two layers because parse builds its own metadata provider. |
+| Threshold slider = view filter adding auto-approved blocks to the queue; project threshold changes only via calibration apply | Audit trail preserved (findings M3). |
+| Approval does not survive a later change to the block's clean text ("changed since approval" chip) | Faithfulness: a human approved specific text. |
+| Selection lives in SQLite; `selection.json` is a derived copy for modules 4/5 | Single source of truth without changing earlier modules. |
+| Forced changes F1–F6: expose stage fingerprints as pure functions; figures reads `figure_overrides.json`; scoring appends history before writing scores.json (kill-safe); new paths; `LearningConfig.use_global/contribute_global`; stage CLI commands go through the executor | Kill-and-resume byte-identity. |
+| v1 macOS/Linux only (file locks, process groups) | SPEC §8 probe scope. |
