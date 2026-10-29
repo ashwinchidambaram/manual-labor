@@ -105,3 +105,11 @@
   - Disk-full incident (Docker installer temp, 8.6 GB) blocked all tools 00:30–02:15; recovered via cron retry. M4.2 implement done (Sonnet): 84 grouping tests, fast suite 814, live nomic clean 11 topics / twocol 10, cohesion 0.27–0.68. Gate commands green; committed 24fbc42. Dispatched M4.3 review (Opus, fresh).
   - M4.3 review (Opus): gate PASS (partition exact on 6 fixtures both views; structure tree 0 mismatches vs GT; coverage exact; byte-identical across seeds/cwd/cold cache; LLM output validation rejects all 7 bad cases). 1 major dormant (do-not-merge pairs re-merged by straggler/binding), minors (no subtree-select op needed by M8; 60-cap not re-applied after stragglers; test 13 mismatch; contracts doc; untested branches). Dispatched M4.4 fix (Sonnet).
   - 04:3x: third disk-full; removed stale com.docker.install (8.6 GB, no holders). Resuming M4 gate.
+  - M4.4 fix done (Sonnet): 7/7; 106 grouping tests. Gate run by orchestrator (838 fast); M4 recorded + pushed.
+
+### Phase 5: Cleanup + figure attachment
+- **Status:** in_progress
+- **Started:** 2026-10-29
+- Actions taken:
+  - Dispatched M5.1 design (Opus).
+  - Detached 3 stale Docker installer mounts; disk 11 GB free. M4 recorded (059c2c9). M5.1 design (Opus) running.
