@@ -159,3 +159,10 @@ Root cause: `/private/var/folders/.../T/com.docker.install` — a Docker Desktop
 
 ## Parallelism (user, 2026-10-29 mid-day)
 User freed disk and asked to run things in parallel wherever possible to finish ASAP. Binding constraint is now RAM (16 GB), not disk: at most one Docling-bearing pytest run + one Playwright run at a time; design/review agents that only read are unlimited. Two tracks after M7: frontend (M8→M9) ∥ backend (M10→M11), with designs started one step ahead on each track.
+
+## Module 11 decisions (2026-10-29, docs/design/11-export.md)
+| Decision | Rationale |
+|---|---|
+| Only auto_approved/approved/edited blocks contribute text; export unlocks at zero open flags AND zero queued in-scope blocks; `--override` exports machine clean_text (else raw) with each block listed in `manifest.overrides` + `review.overrides` and an `export_override` action | Stricter than SPEC §7.4: numeric blocks are always queued, so an unreviewed number can never ship as approved text without an explicit, recorded override. |
+| List items render `* ` not `- `; source text never Markdown-escaped; one figure placement per article at the attachment point; alt text `FIG-ID — caption` | `- 12` would read as −12 to the numeric regex. |
+| `scripts/acceptance.sh [--live]` + `render_acceptance.py` → docs/ACCEPTANCE.md with NOT VERIFIED/INCOMPLETE markers for skipped steps; AC8 via `MANUALLABOR_OFFLINE=1` socket guard | SPEC §11 evidence must be pasted, never asserted. |
