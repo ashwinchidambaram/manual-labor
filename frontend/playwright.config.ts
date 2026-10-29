@@ -18,7 +18,7 @@ export default defineConfig({
       command: "bash ../scripts/e2e-serve.sh",
       url: "http://127.0.0.1:8765/api/project",
       reuseExistingServer: false,
-      timeout: 300_000,
+      timeout: 600_000, // cold path: Docling model download plus the mock pipeline build
       stdout: "pipe",
     },
     {
@@ -32,7 +32,7 @@ export default defineConfig({
       command: "npm run build && E2E_PORT=8766 E2E_DEV=0 bash ../scripts/e2e-serve.sh",
       url: "http://127.0.0.1:8766/api/project",
       reuseExistingServer: false,
-      timeout: 300_000,
+      timeout: 600_000, // cold path: Docling model download plus the mock pipeline build
     },
   ],
 });

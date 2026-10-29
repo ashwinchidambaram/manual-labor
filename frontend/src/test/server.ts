@@ -33,6 +33,12 @@ export interface Fake {
   /** every request, as `METHOD /path` */
   log: string[];
   groupsError: boolean;
+  /** when set, the next GET /api/scope/selection answers with the state at request time, after this resolves */
+  selGate: Promise<void> | null;
+  confirmFail: { status: number; detail: string } | null;
+  statusError: boolean;
+  jobsError: boolean;
+  blocksError: boolean;
 }
 
 export function installFake(over: Partial<Fake> = {}): Fake {
@@ -59,6 +65,11 @@ export function installFake(over: Partial<Fake> = {}): Fake {
     requests: [],
     log: [],
     groupsError: false,
+    selGate: null,
+    confirmFail: null,
+    statusError: false,
+    jobsError: false,
+    blocksError: false,
     ...over,
   };
   server.events.on("request:start", ({ request }) => {
@@ -71,10 +82,18 @@ export function installFake(over: Partial<Fake> = {}): Fake {
   server.use(
     http.get("*/api/project", () => HttpResponse.json(makeProject())),
     http.get("*/api/sources", () => HttpResponse.json(f.sources)),
-    http.get("*/api/status", () => HttpResponse.json(f.status)),
+    http.get("*/api/status", () => (f.statusError ? HttpResponse.json({ detail: "status down", code: "internal" }, { status: 500 }) : HttpResponse.json(f.status))),
     http.get("*/api/scope/groups", () => (f.groupsError ? HttpResponse.json({ detail: "boom", code: "internal" }, { status: 500 }) : HttpResponse.json(f.docs))),
-    http.get("*/api/scope/blocks", () => HttpResponse.json(f.blocks)),
-    http.get("*/api/scope/selection", () => HttpResponse.json(out())),
+    http.get("*/api/scope/blocks", () => (f.blocksError ? HttpResponse.json({ detail: "index down", code: "internal" }, { status: 500 }) : HttpResponse.json(f.blocks))),
+    http.get("*/api/scope/selection", async () => {
+      const snap = out();
+      if (f.selGate) {
+        const g = f.selGate;
+        f.selGate = null;
+        await g;
+      }
+      return HttpResponse.json(snap);
+    }),
     http.get("*/api/scope/summary", () => HttpResponse.json(out().summary)),
     http.get("*/api/scope/models", () => HttpResponse.json(f.models)),
     http.put("*/api/scope/selection", async ({ request }) => {
@@ -90,6 +109,7 @@ export function installFake(over: Partial<Fake> = {}): Fake {
     }),
     http.get("*/api/jobs", ({ request }) => {
       f.requests.push(new URL(request.url).search);
+      if (f.jobsError) return HttpResponse.json({ detail: "jobs down", code: "internal" }, { status: 500 });
       const body = f.jobPolls.length > 1 ? f.jobPolls.shift()! : f.jobPolls[0];
       return HttpResponse.json(body);
     }),
@@ -102,6 +122,7 @@ export function installFake(over: Partial<Fake> = {}): Fake {
     http.post("*/api/jobs", () => HttpResponse.json(makeJob({ id: "rerun" }), { status: 202 })),
     http.post("*/api/scope/confirm", () => {
       f.confirms++;
+      if (f.confirmFail) return HttpResponse.json({ detail: f.confirmFail.detail, code: "confirm_failed" }, { status: f.confirmFail.status });
       return HttpResponse.json(makeJob({ id: "confirm", plan: { to: "score2" } }), { status: 202 });
     }),
     http.post("*/api/sources", () => {

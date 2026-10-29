@@ -26,3 +26,25 @@ describe("U1 HOTKEYS map", () => {
     expect(matches({ key: "a", shiftKey: false }, "selectWholeDoc")).toBe(false);
   });
 });
+
+describe("U2 scope overlap across screens and zones", () => {
+  it("per-screen scopes never collide with another screen's", () => {
+    expect(scopesOverlap("scope", "verify")).toBe(false);
+    expect(scopesOverlap("tree", "verify")).toBe(false);
+    expect(scopesOverlap("scope", "verifyQueue")).toBe(false);
+    expect(scopesOverlap("models", "verifyRail")).toBe(false);
+  });
+  it("a zone overlaps its own screen scope, not a sibling zone", () => {
+    expect(scopesOverlap("tree", "scope")).toBe(true);
+    expect(scopesOverlap("verifyQueue", "verify")).toBe(true);
+    expect(scopesOverlap("tree", "models")).toBe(false);
+    expect(scopesOverlap("verifyQueue", "verifyRail")).toBe(false);
+  });
+  it("global overlaps every non-modal scope; a modal shadows globals so may reuse their keys", () => {
+    expect(scopesOverlap("global", "verify")).toBe(true);
+    expect(scopesOverlap("global", "tree")).toBe(true);
+    expect(scopesOverlap("global", "flagDialog")).toBe(false);
+    expect(scopesOverlap("picker", "flagDialog")).toBe(false);
+    expect(scopesOverlap("flagDialog", "flagDialog")).toBe(true);
+  });
+});

@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useActiveJobs, useConfirmScope, useModels, useSources, useStatus } from "../api/queries";
 import type { Split, View } from "../api/schema";
 import { useHotkeys } from "../hooks/useHotkeys";
+import { useToast } from "../shell/Toast";
 import { useSelectionEngine } from "../hooks/useSelectionEngine";
 import ConfirmButton from "./ConfirmButton";
 import {
@@ -44,6 +45,23 @@ function Panel({ error, retry, children, testid }: { error: Error | null; retry:
   );
 }
 
+/** Non-blocking error: the content stays usable, the failure is visible and retryable. */
+function Notice({ error, retry, testid, children }: { error: Error | null; retry: () => void; testid: string; children: React.ReactNode }) {
+  if (!error) return null;
+  const e = error as Error & { code?: string; detail?: string };
+  return (
+    <div role="alert" data-testid={testid} className="flex items-center gap-2 rounded border border-amber-300 bg-amber-50 px-2 py-1 text-sm text-amber-950">
+      <span>
+        {children} ({e.code ? `${e.code}: ` : ""}
+        {e.detail ?? e.message})
+      </span>
+      <button type="button" onClick={retry} className={`rounded border border-amber-500 px-2 text-xs ${FOCUS}`}>
+        Retry
+      </button>
+    </div>
+  );
+}
+
 export default function ScopeScreen() {
   const nav = useNavigate();
   const [params, setParams] = useSearchParams();
@@ -53,6 +71,7 @@ export default function ScopeScreen() {
   const models = useModels();
   const jobs = useActiveJobs();
   const confirm = useConfirmScope();
+  const toast = useToast();
   const [live, setLive] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [cursor, setCursor] = useState<string | null>(null);
@@ -116,53 +135,79 @@ export default function ScopeScreen() {
     document.querySelector<HTMLElement>("[data-zone='tree'] [tabindex='0']")?.focus();
   }, []);
 
+  const { apply } = eng;
   const changeView = useCallback(
     (v: View) => {
       if (v === view) return;
       setParams({ view: v }, { replace: true });
-      eng.apply({ op: "set_view", view: v });
+      apply({ op: "set_view", view: v });
       setLive(`Switched to ${VIEW_NAME[v]} view`);
     },
-    [view, setParams, eng],
+    [view, setParams, apply],
   );
-  const changeSplit = useCallback((s: Split) => eng.apply({ op: "set_split", split: s }), [eng]);
+  const changeSplit = useCallback((s: Split) => apply({ op: "set_split", split: s }), [apply]);
 
+  // Callbacks read the latest ids/rows through refs so their identity only changes with the view:
+  // memoised rows are not re-rendered on every selection change.
+  const latest = useRef({ ids: eng.ids, rows, index, docs: eng.docs });
+  latest.current = { ids: eng.ids, rows, index, docs: eng.docs };
   const toggleRow = useCallback(
     (id: string) => {
-      const row = rows.find((r) => r.group.id === id);
+      const { ids, rows: rs, index: ix } = latest.current;
+      const row = rs.find((r) => r.group.id === id);
       if (!row) return;
-      const { selected, total } = rowCounts(eng.ids, index, id, view);
+      const { selected, total } = rowCounts(ids, ix, id, view);
       if (total === 0) return;
-      eng.apply({
+      apply({
         op: smartToggle(checkState(selected, total)),
         group_id: id,
         doc_id: row.docId,
         subtree: view === "structure",
       });
     },
-    [rows, index, view, eng],
+    [view, apply],
   );
   const selectOnly = useCallback(
     (id: string) => {
-      const row = rows.find((r) => r.group.id === id);
+      const { ids, rows: rs } = latest.current;
+      const row = rs.find((r) => r.group.id === id);
       if (!row) return;
-      eng.apply(
-        { op: "deselect", block_ids: [...eng.ids] },
+      apply(
+        { op: "deselect", block_ids: [...ids] },
         { op: "select_group", group_id: id, doc_id: row.docId, subtree: view === "structure" },
       );
     },
-    [rows, view, eng],
+    [view, apply],
   );
   const selectDoc = useCallback(
     (id: string) => {
-      const doc = index.docOf.get(id);
-      const d = eng.docs.find((x) => x.doc_id === doc);
-      if (d) eng.apply({ op: "select", block_ids: d.groups.structure.flatMap((g) => g.block_ids) });
+      const { index: ix, docs: ds } = latest.current;
+      const d = ds.find((x) => x.doc_id === ix.docOf.get(id));
+      if (d) apply({ op: "select", block_ids: d.groups.structure.flatMap((g) => g.block_ids) });
     },
-    [index, eng],
+    [apply],
   );
-  const selectAll = useCallback(() => eng.apply({ op: "select", block_ids: [...index.selectable] }), [index, eng]);
-  const selectNone = useCallback(() => eng.apply({ op: "deselect", block_ids: [...eng.ids] }), [eng]);
+  const selectAll = useCallback(() => apply({ op: "select", block_ids: [...latest.current.index.selectable] }), [apply]);
+  // `n` throws the whole selection away: it must be pressed twice within 3 s.
+  const clearArmed = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (clearArmed.current) clearTimeout(clearArmed.current);
+    },
+    [],
+  );
+  const selectNone = useCallback(() => {
+    if (clearArmed.current) {
+      clearTimeout(clearArmed.current);
+      clearArmed.current = null;
+      apply({ op: "deselect", block_ids: [...latest.current.ids] });
+      return;
+    }
+    setLive("Press n again to clear the selection");
+    clearArmed.current = setTimeout(() => {
+      clearArmed.current = null;
+    }, 3000);
+  }, [apply]);
 
   const toggleExpanded = useCallback((id: string) => {
     setExpanded((s) => {
@@ -172,6 +217,13 @@ export default function ScopeScreen() {
       return n;
     });
   }, []);
+
+  const { error: engError, clearError, settle } = eng;
+  useEffect(() => {
+    if (!engError) return;
+    toast.error(engError);
+    clearError();
+  }, [engError, clearError, toast]);
 
   const onConfirm = useCallback(async () => {
     if (!summary || summary.blocks === 0) {
@@ -183,13 +235,18 @@ export default function ScopeScreen() {
       return;
     }
     try {
-      await eng.settle();
+      if (!(await settle())) {
+        setLive("Selection not saved; scope not confirmed");
+        return;
+      }
       await confirm.mutateAsync();
       nav("/verify");
     } catch (e) {
-      setLive(`Could not confirm scope: ${e instanceof Error ? e.message : String(e)}`);
+      const msg = `Could not confirm scope: ${e instanceof Error ? e.message : String(e)}`;
+      setLive(msg);
+      toast.error(msg);
     }
-  }, [summary, processing, eng, confirm, nav]);
+  }, [summary, processing, settle, confirm, nav, toast]);
 
   const focusZone = (zone: string, ...inner: string[]) => () => {
     for (const q of inner) {
@@ -220,6 +277,9 @@ export default function ScopeScreen() {
   return (
     <main className="grid grid-cols-1 gap-4 p-4 lg:grid-cols-[18rem_minmax(0,1fr)_20rem]" data-testid="scope-screen">
       <aside className="flex flex-col gap-4" aria-label="Sources panel">
+        <Notice error={status.error} retry={() => void status.refetch()} testid="status-error">
+          Processing status is unavailable.
+        </Notice>
         <Panel error={sources.error} retry={() => void sources.refetch()} testid="sources-error">
           <SourcesList
             sources={sources.data ?? []}
@@ -241,14 +301,12 @@ export default function ScopeScreen() {
             Press <kbd className="rounded border px-1">?</kbd> for keyboard help
           </span>
         </div>
-        {eng.error ? (
-          <div role="alert" className="flex items-center gap-2 rounded bg-red-50 px-2 py-1 text-sm text-red-900" data-testid="toast">
-            {eng.error}
-            <button type="button" className={`rounded border border-red-400 px-2 text-xs ${FOCUS}`} onClick={eng.clearError}>
-              Dismiss
-            </button>
-          </div>
-        ) : null}
+        <Notice error={jobs.error} retry={() => void jobs.refetch()} testid="jobs-error">
+          Background jobs cannot be listed.
+        </Notice>
+        <Notice error={eng.blocksError} retry={eng.retryBlocks} testid="blocks-error">
+          Live counts are unavailable until the block index loads; the server still saves your choices.
+        </Notice>
         <div role="status" aria-live="polite" data-testid="live" className="sr-only">
           {live}
         </div>
@@ -301,8 +359,8 @@ export default function ScopeScreen() {
       </div>
 
       <aside className="flex flex-col gap-4" aria-label="Summary and models">
-        {summary ? <SelectionSummary summary={summary} processing={ungrouped.length} /> : null}
         {summary ? <SplitModeControl split={split} summary={summary} view={view} onChange={changeSplit} /> : null}
+        {summary ? <SelectionSummary summary={summary} processing={ungrouped.length} /> : null}
         <ConfirmButton
           blocks={summary?.blocks ?? 0}
           processing={processing}

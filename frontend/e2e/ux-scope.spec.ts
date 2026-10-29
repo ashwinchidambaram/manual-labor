@@ -277,6 +277,7 @@ test("8 review-load estimate equals queued selected blocks", async ({ page }) =>
   };
   await check("default-all");
   await page.keyboard.press("n");
+  await page.keyboard.press("n"); // clearing needs a second press
   await expect(page.getByTestId("sum-blocks")).toHaveText("0");
   expect(await check("none")).toBe(0);
   let sawNonzero = queuedAll > 0;

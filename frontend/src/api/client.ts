@@ -14,6 +14,8 @@ export class ApiError extends Error {
     public status: number,
     public code: string,
     public detail: string,
+    /** the parsed response body, e.g. the 409 `conflict` details */
+    public body: unknown = undefined,
   ) {
     super(`${code}: ${detail}`);
     this.name = "ApiError";
@@ -32,7 +34,7 @@ export function unwrap<T>(r: Result<T>): T {
     const e = r.error as { detail?: unknown; code?: string } | undefined;
     const detail =
       typeof e?.detail === "string" ? e.detail : e?.detail ? JSON.stringify(e.detail) : r.response.statusText;
-    throw new ApiError(r.response.status, e?.code ?? "http_error", detail || "request failed");
+    throw new ApiError(r.response.status, e?.code ?? "http_error", detail || "request failed", r.error);
   }
   return r.data;
 }

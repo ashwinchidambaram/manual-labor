@@ -73,14 +73,18 @@ test("E2 counts update live, before the server answers", async ({ page, request 
   await page.goto("/scope");
   await waitForTree(page);
   await expect(page.getByTestId("sum-blocks")).toHaveText("0");
+  let putAnswered = false;
   await page.route("**/api/scope/selection", async (route) => {
     if (route.request().method() === "PUT") await new Promise((r) => setTimeout(r, 800));
     await route.continue();
+    if (route.request().method() === "PUT") putAnswered = true;
   });
   const groups = await getGroups(request);
   const topic = groups[0].groups.topics.find((t) => !t.is_unassigned)!;
   await row(page, topic.id).click();
-  await expect(page.getByTestId("sum-blocks")).toHaveText(String(topic.block_count), { timeout: 100 });
+  // No wall-clock race: the count must show while the (held) PUT has not been answered.
+  await expect(page.getByTestId("sum-blocks")).toHaveText(String(topic.block_count));
+  expect(putAnswered).toBe(false);
   expect(await stat(page, "sum-pages")).toBeGreaterThan(0);
   await expect(page.locator("[data-testid=coverage-chip][data-stale=true]").first()).toBeVisible();
   await waitSettled(page);
@@ -92,9 +96,12 @@ test("E2 counts update live, before the server answers", async ({ page, request 
 });
 
 test("E3 keyboard-only flow ends on /verify", async ({ page, request }) => {
+  const jobIdsBefore = new Set(((await (await request.get("/api/jobs")).json()) as { id: string }[]).map((j) => j.id));
   await page.goto("/scope");
   await expect(page.locator("[data-testid=row]:focus")).toBeVisible();
   const kb = page.keyboard;
+  await kb.press("n"); // first press only asks
+  await expect(page.getByTestId("live")).toHaveText("Press n again to clear the selection");
   await kb.press("n");
   await expect(page.getByTestId("sum-blocks")).toHaveText("0");
   await kb.press("Escape");
@@ -127,8 +134,9 @@ test("E3 keyboard-only flow ends on /verify", async ({ page, request }) => {
   await expect(page.locator("[data-zone=tree] :focus")).toHaveCount(1);
   await kb.press("g");
   await expect(page).toHaveURL(/\/verify$/);
-  const jobs = await (await request.get("/api/jobs")).json();
-  expect(jobs.filter((j: { plan: { to?: string } }) => j.plan?.to === "score2").length).toBeGreaterThanOrEqual(1);
+  const jobs = (await (await request.get("/api/jobs")).json()) as { id: string; plan: { to?: string } }[];
+  // the confirm job created by THIS attempt, not a leftover from an earlier run
+  expect(jobs.filter((j) => !jobIdsBefore.has(j.id) && j.plan?.to === "score2").length).toBeGreaterThanOrEqual(1);
 });
 
 test("E4 low-cohesion marker", async ({ page }) => {

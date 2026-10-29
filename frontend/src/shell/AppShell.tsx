@@ -5,6 +5,7 @@ import { useHotkeys } from "../hooks/useHotkeys";
 import ErrorBoundary from "./ErrorBoundary";
 import Help from "./Help";
 import JobsBar from "./JobsBar";
+import { ToastProvider } from "./Toast";
 
 const NAV = [
   { to: "/scope", label: "Scope", key: "1" },
@@ -29,6 +30,7 @@ export default function AppShell() {
   });
   const unreachable = project.isError;
   return (
+    <ToastProvider>
     <div className="min-h-screen bg-slate-50 text-slate-900">
       {unreachable ? (
         <div role="alert" className="bg-red-700 px-4 py-1 text-sm text-white" data-testid="server-down">
@@ -73,5 +75,6 @@ export default function AppShell() {
       </ErrorBoundary>
       {help ? <Help onClose={() => setHelp(false)} /> : null}
     </div>
+    </ToastProvider>
   );
 }

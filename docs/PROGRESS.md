@@ -207,3 +207,22 @@ $ cd frontend && npm run gen-types && git diff --stat -- src/types/generated.ts;
       Tests  1 passed (1)
 $ gate: one parametrized contract suite (assertions a–m) passes for mock, ollama (replay + LIVE), anthropic (replay), openai-compatible (replay); temperature 0 asserted on every outgoing request; offline guard: only OLLAMA_HOST contacted; secrets absent from logs/cache/project.json; labor probe prints the suggestion table on this macOS machine (small tier)
 ```
+
+## M8 — UI: Scope — PASSED 2026-10-29
+
+Design: docs/design/08-ui-scope.md (react-router 6, TanStack Query over openapi-fetch, server-owned selection with optimistic update + 150 ms debounce, single hotkey map, cached mock project for e2e via scripts/e2e-project.sh). UX check: independent Sonnet agent, 14 Playwright behaviours with server-side evidence (13 pass; focus loss after t/s). Review: fresh Opus agent — gate PASS; 3 majors (pending selection lost on unmount / reload; stale refetch overwrote a save) + focus bug + CI cache key; all fixed failing-test-first; module 9's shared-shell changes landed at the same time.
+
+Commands: `cd frontend && npm test -- --run`, `npm run e2e` (starts `labor serve --dev --mock` on the cached mock project), `npm run build`; `bash scripts/e2e-project.sh` rebuilds the mock project (~95 s cold, cached by fixture+code hash).
+
+```
+$ npm run typecheck && npm test -- --run
+ Test Files  12 passed (12)
+      Tests  98 passed (98)
+$ npm run e2e   # scope.spec + ux-scope.spec + scope-fixes.spec against labor serve --dev --mock on the cached mock project
+  29 passed (1.3m)
+$ npm run build
+dist/assets/index-DVWAUwrK.css   15.02 kB │ gzip:  3.64 kB
+dist/assets/index-CHvh8E8o.js   308.75 kB │ gzip: 97.83 kB
+✓ built in 1.03s
+$ gate: E1/UX2 toggle preserves selection (server GET /api/scope/selection identical across toggle); E2/UX3 counts live (optimistic < 100 ms, equal to GET /api/scope/summary after debounce); E3/UX9 keyboard-only flow (Tab/j/k/space/t/s/g) ends on /verify with visible focus at every step; FX1-FX3 selection never lost on navigate/reload/stale refetch
+```

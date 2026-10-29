@@ -45,6 +45,35 @@ export default function GroupTree(p: GroupTreeProps) {
       z.querySelector<HTMLElement>(`[data-group-id="${CSS.escape(p.cursor)}"]`)?.focus();
   }, [p.cursor, p.rows]);
 
+  // A view toggle or split change swaps the rows under a focused row and the browser drops focus to <body>.
+  // Remember (during render, before the DOM changes) which row had focus; afterwards focus the same group if it
+  // still exists, else the first row. Never steals focus that was elsewhere.
+  const owned = useRef<string | null>(null);
+  const active = typeof document === "undefined" ? null : document.activeElement;
+  if (zone.current?.contains(active)) owned.current = (active as HTMLElement).getAttribute("data-group-id") ?? "";
+  else if (active && active !== document.body) owned.current = null;
+  useEffect(() => {
+    const drop = (): void => {
+      owned.current = null; // a pointer press elsewhere means focus was moved on purpose
+    };
+    document.addEventListener("mousedown", drop, true);
+    return () => document.removeEventListener("mousedown", drop, true);
+  }, []);
+  const { onCursor } = p;
+  useEffect(() => {
+    const z = zone.current;
+    const was = owned.current;
+    if (!z || was === null) return;
+    const a = document.activeElement;
+    if (a && a !== document.body) return;
+    const same = was ? z.querySelector<HTMLElement>(`[data-group-id="${CSS.escape(was)}"]`) : null;
+    const target = same ?? z.querySelector<HTMLElement>("[data-group-id]");
+    if (!target) return;
+    target.focus();
+    const id = target.getAttribute("data-group-id");
+    if (id) onCursor(id);
+  });
+
   const cur = p.cursor;
   useHotkeys({
     moveDown: () => p.onMove(1),

@@ -4,8 +4,10 @@ import { afterAll, afterEach, beforeAll } from "vitest";
 import { server } from "./test/server";
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-afterEach(() => {
+afterEach(async () => {
   cleanup();
+  // Unmounting flushes pending selection edits; let that PUT land on this test's handlers, not the next test's.
+  await new Promise((r) => setTimeout(r, 30));
   server.resetHandlers();
   server.events.removeAllListeners();
 });

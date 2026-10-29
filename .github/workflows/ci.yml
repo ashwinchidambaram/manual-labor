@@ -64,6 +64,16 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
         working-directory: frontend
+      - name: Install Tesseract (OCR for the scanned fixture)
+        run: sudo apt-get update && sudo apt-get install -y tesseract-ocr
+      - name: Cache Docling models
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/huggingface
+            ~/.cache/docling
+          key: docling-models-${{ runner.os }}-${{ hashFiles('uv.lock') }}
+          restore-keys: docling-models-${{ runner.os }}-
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
         working-directory: frontend
@@ -71,7 +81,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: frontend/e2e/.cache
-          key: e2e-project-${{ hashFiles('tests/fixtures/CHECKSUMS.json', 'tests/fixtures/project-a/project.json', 'scripts/e2e-project.sh', 'uv.lock') }}
+          # Same inputs as the key in scripts/e2e-project.sh: fixtures, the script, every Python source (which holds the
+          # *ALGO_VERSION constants) and the lock file.
+          key: e2e-project-${{ hashFiles('tests/fixtures/CHECKSUMS.json', 'tests/fixtures/project-a/project.json', 'scripts/e2e-project.sh', 'uv.lock', 'manuallabor/**/*.py') }}
       - name: Playwright
         run: npm run e2e
         working-directory: frontend

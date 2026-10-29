@@ -1,12 +1,5 @@
 import { useEffect, useRef } from "react";
-import { HOTKEYS, displayKey, type HotkeyScope } from "../hotkeys";
-
-const TITLES: Record<HotkeyScope, string> = {
-  global: "Everywhere",
-  scope: "Scope screen",
-  tree: "Inside the group list",
-  models: "Model panel",
-};
+import { HOTKEYS, LOCAL_KEYS, SCOPE_TITLES, displayKey, type HotkeyScope } from "../hotkeys";
 
 /** Keyboard help, rendered from the same HOTKEYS map the handlers use. Focus-trapped dialog. */
 export default function Help({ onClose }: { onClose: () => void }) {
@@ -39,10 +32,9 @@ export default function Help({ onClose }: { onClose: () => void }) {
     }
   };
 
-  const scopes = (Object.keys(TITLES) as HotkeyScope[]).map((s) => ({
-    scope: s,
-    rows: Object.values(HOTKEYS).filter((h) => h.scope === s),
-  }));
+  const scopes = (Object.keys(SCOPE_TITLES) as HotkeyScope[])
+    .map((s) => ({ scope: s, rows: Object.values(HOTKEYS).filter((h) => h.scope === s) }))
+    .filter((g) => g.rows.length > 0);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
       <div
@@ -66,7 +58,7 @@ export default function Help({ onClose }: { onClose: () => void }) {
         </div>
         {scopes.map(({ scope, rows }) => (
           <section key={scope} className="mb-3">
-            <h3 className="text-sm font-semibold text-slate-700">{TITLES[scope]}</h3>
+            <h3 className="text-sm font-semibold text-slate-700">{SCOPE_TITLES[scope]}</h3>
             <dl className="grid grid-cols-[9rem_1fr] gap-x-2 text-sm">
               {rows.map((h) => (
                 <div key={h.label} className="contents">
@@ -80,6 +72,19 @@ export default function Help({ onClose }: { onClose: () => void }) {
             </dl>
           </section>
         ))}
+        <section className="mb-1">
+          <h3 className="text-sm font-semibold text-slate-700">Inside a widget</h3>
+          <dl className="grid grid-cols-[9rem_1fr] gap-x-2 text-sm">
+            {LOCAL_KEYS.map((k) => (
+              <div key={k.widget} className="contents">
+                <dt className="font-mono">{k.keys.map(displayKey).join(" / ")}</dt>
+                <dd>
+                  {k.widget}: {k.label}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </section>
       </div>
     </div>
   );

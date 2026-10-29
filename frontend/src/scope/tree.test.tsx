@@ -191,8 +191,11 @@ describe("C11 keyboard", () => {
     expect(blocks()).toHaveTextContent("3");
     await user.keyboard("a");
     expect(blocks()).toHaveTextContent("10");
+    await waitFor(() => expect(f.ids).toHaveLength(10));
+    await user.keyboard("n"); // asks first; the selection is untouched
+    expect(blocks()).toHaveTextContent(/^10$/);
     await user.keyboard("n");
-    expect(blocks()).toHaveTextContent("0");
+    expect(blocks()).toHaveTextContent(/^0$/);
     await waitFor(() => expect(f.ids).toHaveLength(0));
   });
   it("Shift+A selects the document of the cursor row", async () => {

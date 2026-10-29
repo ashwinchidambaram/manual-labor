@@ -201,7 +201,7 @@ describe("C13 ConfirmButton", () => {
   it("posts the confirmation after the selection is saved and goes to /verify", async () => {
     const f = installFake({ ids: [a(1, 1)] });
     const { user, router } = await loaded();
-    await user.keyboard("n"); // pending PUT must be flushed before confirming
+    await user.keyboard("nn"); // pending PUT must be flushed before confirming
     await user.keyboard("a");
     await user.click(screen.getByTestId("confirm"));
     await waitFor(() => expect(router.state.location.pathname).toBe("/verify"));

@@ -1,18 +1,8 @@
 import { expect, type APIRequestContext, type Page } from "@playwright/test";
 
-export interface Group {
-  id: string;
-  title: string;
-  block_ids: string[];
-  block_count: number;
-  is_unassigned: boolean;
-  parent_id: string | null;
-  cohesion: number | null;
-}
-export interface DocGroups {
-  doc_id: string;
-  groups: { structure: Group[]; topics: Group[]; params: { low_cohesion: number } };
-}
+// Types come from the generated OpenAPI aliases, never hand-written copies.
+import type { DocGroups, Group, SelectionOut } from "../src/api/schema";
+export type { DocGroups, Group, SelectionOut };
 
 export async function getGroups(request: APIRequestContext): Promise<DocGroups[]> {
   const r = await request.get("/api/scope/groups");

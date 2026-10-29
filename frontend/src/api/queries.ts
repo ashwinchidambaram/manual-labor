@@ -1,7 +1,8 @@
 // All TanStack Query wrappers live here (design 08 section 1.2): one place for keys and fetchers.
-import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, type QueryClient, type QueryKey } from "@tanstack/react-query";
 import { client, unwrap } from "./client";
-import type { ApplyTierOut, JobInfo, ProbeOut, Tier } from "./schema";
+import { selSync } from "./selectionSync";
+import type { ApplyTierOut, JobInfo, ProbeOut, SelectionOut, Tier } from "./schema";
 
 export const qk = {
   project: ["project"] as const,
@@ -9,7 +10,6 @@ export const qk = {
   status: ["status"] as const,
   groups: ["groups"] as const,
   selection: ["selection"] as const,
-  summary: ["summary"] as const,
   models: ["models"] as const,
   jobs: ["jobs", "active"] as const,
   blocks: ["block-index"] as const,
@@ -46,7 +46,14 @@ export const useBlockIndexData = () =>
 export const useSelectionQuery = () =>
   useQuery({
     queryKey: qk.selection,
-    queryFn: async () => unwrap(await client.GET("/api/scope/selection")),
+    queryFn: async ({ client: qc }) => {
+      const version = selSync.version;
+      const dirty = selSync.pending > 0;
+      const data = unwrap(await client.GET("/api/scope/selection"));
+      // A local edit happened (or is unconfirmed) since this request began: the answer is older than the cache.
+      if (dirty || selSync.pending > 0 || selSync.version !== version) return qc.getQueryData<SelectionOut>(qk.selection) ?? data;
+      return data;
+    },
     staleTime: Infinity,
   });
 
@@ -133,8 +140,20 @@ export function useApplyTier() {
   });
 }
 
-/** Query keys refreshed whenever a background job finishes successfully (design 1.2). */
-export function invalidateAfterJob(qc: QueryClient): void {
-  for (const key of [qk.sources, qk.status, qk.groups, qk.selection, qk.summary, qk.blocks, qk.models])
-    void qc.invalidateQueries({ queryKey: key });
+/** Query-key prefixes of later screens (Verify) that a finished job makes stale. */
+export const JOB_INVALIDATION_PREFIXES: readonly (readonly string[])[] = [["verify"], ["rail"], ["docFigures"], ["pageBlocks"]];
+
+/** Query keys refreshed whenever a background job finishes successfully (design 1.2); `extra` adds more. */
+export function invalidateAfterJob(qc: QueryClient, extra: readonly QueryKey[] = []): void {
+  const keys: readonly QueryKey[] = [
+    qk.sources,
+    qk.status,
+    qk.groups,
+    qk.selection,
+    qk.blocks,
+    qk.models,
+    ...JOB_INVALIDATION_PREFIXES,
+    ...extra,
+  ];
+  for (const key of keys) void qc.invalidateQueries({ queryKey: key });
 }
