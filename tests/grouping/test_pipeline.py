@@ -336,4 +336,11 @@ def test_three_thousand_blocks_under_five_seconds() -> None:
     assert elapsed < 5.0, f"{elapsed:.2f}s"
     assert check_partition(blocks, gf) == []
     assert all(t.block_count <= 3000 for t in gf.topics)
-    assert ids.block_sort_key(gf.topics[1].block_ids[0])
+    assert (
+        sum(t.block_count for t in gf.topics) == 3000 == sum(len(g.block_ids) for g in gf.structure)
+    )
+    for t in gf.topics:
+        keys = [ids.block_sort_key(b) for b in t.block_ids]
+        assert keys == sorted(keys)
+    firsts = [ids.block_sort_key(t.block_ids[0]) for t in gf.topics[1:]]
+    assert firsts == sorted(firsts)

@@ -29,12 +29,53 @@ def deselect_blocks(sel: Selection, block_ids: Iterable[str]) -> Selection:
     return _with(sel, block_ids=[b for b in sel.block_ids if b not in drop])
 
 
-def select_group(sel: Selection, group: Group) -> Selection:
-    return select_blocks(sel, group.block_ids)
+def _find_group(gf: GroupsFile, group_id: str) -> Group:
+    for g in (*gf.structure, *gf.topics):
+        if g.id == group_id:
+            return g
+    raise KeyError(group_id)
 
 
-def deselect_group(sel: Selection, group: Group) -> Selection:
-    return deselect_blocks(sel, group.block_ids)
+def group_block_ids(gf: GroupsFile, group_id: str, *, subtree: bool) -> list[str]:
+    """The group's own blocks, or with `subtree` (structure groups) its own plus every
+    descendant's, in structure order. Topics have no subtree."""
+    g = _find_group(gf, group_id)
+    if not subtree or g.view != GroupView.structure:
+        return list(g.block_ids)
+    wanted = {g.id}
+    for h in gf.structure:  # parents precede children in structure order
+        if h.parent_id in wanted:
+            wanted.add(h.id)
+    return [b for h in gf.structure if h.id in wanted for b in h.block_ids]
+
+
+def _group_ids(group: Group | str, subtree: bool, gf: GroupsFile | None) -> list[str]:
+    if not subtree:
+        return list(group.block_ids) if isinstance(group, Group) else _need(gf, group)
+    if gf is None:
+        raise ValueError("subtree selection needs the document's GroupsFile")
+    return group_block_ids(gf, group if isinstance(group, str) else group.id, subtree=True)
+
+
+def _need(gf: GroupsFile | None, group_id: str) -> list[str]:
+    if gf is None:
+        raise ValueError("a group id needs the document's GroupsFile")
+    return group_block_ids(gf, group_id, subtree=False)
+
+
+def select_group(
+    sel: Selection, group: Group | str, *, subtree: bool = False, gf: GroupsFile | None = None
+) -> Selection:
+    """Select a group's own blocks (`subtree=False`, literal) or, for a structure group, its
+    whole subtree. The Scope UI passes `subtree=True` for structure rows. A group id (instead of
+    a Group) and `subtree=True` need `gf`."""
+    return select_blocks(sel, _group_ids(group, subtree, gf))
+
+
+def deselect_group(
+    sel: Selection, group: Group | str, *, subtree: bool = False, gf: GroupsFile | None = None
+) -> Selection:
+    return deselect_blocks(sel, _group_ids(group, subtree, gf))
 
 
 def set_view(sel: Selection, view: GroupView) -> Selection:

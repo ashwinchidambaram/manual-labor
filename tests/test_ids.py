@@ -23,6 +23,8 @@ figures: [FIG-acme-x200-service-p042-01, FIG-acme-x200-service-p042-02]
         ("Ünïcödé Manual", "unicode-manual"),
         ("---", "doc"),
         ("clean", "clean"),
+        ("Pages 1–10", "pages-1-10"),
+        ("a—b", "a-b"),
     ],
 )
 def test_i1_slugify(text: str, expected: str) -> None:

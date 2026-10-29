@@ -391,7 +391,8 @@
         "header_footer",
         "low_similarity",
         "no_text",
-        "topic_failed"
+        "topic_failed",
+        "do_not_merge"
       ],
       "title": "UnassignedReason",
       "type": "string"

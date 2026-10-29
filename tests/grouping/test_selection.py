@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
+from manuallabor.contracts.block import Block
 from manuallabor.contracts.enums import ArticleSplit, BlockStatus, BlockType, GroupView
 from manuallabor.contracts.io import dump_json
 from manuallabor.contracts.selection import Selection
@@ -68,12 +71,25 @@ def test_review_load_matches_load_scored_blocks_and_follows_threshold(grouped: G
     assert s1.review_load.queued == sum(
         1 for b in blocks["clean"] if b.id in set(one.block_ids) and b.status == BlockStatus.queued
     )
-    strict = [
-        b.model_copy(update={"status": assign_status(b.confidence, b.has_numeric_spec, 1.0)})
+    # mock scoring gives every block confidence 1.0, so spread them to make the slider matter
+    spread = [
+        b.model_copy(update={"confidence": 0.6 if not b.has_numeric_spec else b.confidence})
         for b in blocks["clean"]
     ]
-    s2 = scope_summary(everything, groups, {"clean": strict}, threshold=1.0)
-    assert s2.review_load.queued >= s.review_load.queued and s2.review_load.threshold == 1.0
+
+    def at(threshold: float) -> list[Block]:
+        return [
+            b.model_copy(
+                update={"status": assign_status(b.confidence, b.has_numeric_spec, threshold)}
+            )
+            for b in spread
+        ]
+
+    loose = scope_summary(everything, groups, {"clean": at(0.5)}, threshold=0.5)
+    strict = scope_summary(everything, groups, {"clean": at(0.85)}, threshold=0.85)
+    assert strict.review_load.queued > loose.review_load.queued > 0
+    assert loose.review_load.queued == loose.review_load.numeric_queued  # only numeric specs left
+    assert strict.review_load.threshold == 0.85 and loose.review_load.threshold == 0.5
 
 
 def test_scope_summary_counts(grouped: Grouped) -> None:
@@ -98,3 +114,29 @@ def test_scope_summary_counts(grouped: Grouped) -> None:
     if t000.block_ids:
         only = select_blocks(Selection(block_ids=[]), t000.block_ids[:1])
         assert scope_summary(only, groups, blocks, threshold=0.85).articles_per_topic == 1
+
+
+def test_subtree_select_takes_the_whole_section(grouped: Grouped) -> None:
+    gf = grouped.gf("clean")
+    safety = next(g for g in gf.structure if g.title == "1. Safety and Preparation")
+    single = select_group(Selection(block_ids=[]), safety)
+    assert single.block_ids == safety.block_ids  # literal behaviour kept
+    full = select_group(Selection(block_ids=[]), safety.id, subtree=True, gf=gf)
+    kids = [g for g in gf.structure if g.parent_id == safety.id]
+    assert kids and len(set(full.block_ids)) == len(full.block_ids) == 26
+    assert set(full.block_ids) > set(safety.block_ids)
+    from manuallabor.grouping.coverage import coverage
+
+    cov = next(
+        c for c in coverage(frozenset(full.block_ids), gf).structure if c.group_id == safety.id
+    )
+    assert cov.subtree_fraction == 1.0
+    out = deselect_group(full, safety.id, subtree=True, gf=gf)
+    assert out.block_ids == []
+    # a topic has no subtree: the id's own blocks
+    t = gf.topics[1]
+    assert select_group(Selection(block_ids=[]), t.id, subtree=True, gf=gf).block_ids == t.block_ids
+    with pytest.raises(KeyError):
+        select_group(Selection(block_ids=[]), "g-clean-s999", subtree=True, gf=gf)
+    with pytest.raises(ValueError):
+        select_group(Selection(block_ids=[]), safety.id, subtree=True)  # needs the groups file

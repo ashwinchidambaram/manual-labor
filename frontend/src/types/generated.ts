@@ -97,7 +97,7 @@ export type TitleSource = 'heading' | 'llm' | 'fallback' | 'human';
  * This interface was referenced by `_All`'s JSON-Schema
  * via the `definition` "UnassignedReason".
  */
-export type UnassignedReason = 'header_footer' | 'low_similarity' | 'no_text' | 'topic_failed';
+export type UnassignedReason = 'header_footer' | 'low_similarity' | 'no_text' | 'topic_failed' | 'do_not_merge';
 /**
  * This interface was referenced by `_All`'s JSON-Schema
  * via the `definition` "Task".

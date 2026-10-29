@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from typing import Literal
 
 import numpy as np
+from scipy.cluster.hierarchy import linkage
 
 from manuallabor import ids
 from manuallabor.contracts.block import Block
@@ -27,9 +28,10 @@ from manuallabor.contracts.group import (
     StragglerRecord,
     UnassignedEntry,
 )
-from manuallabor.grouping.cluster import center, centroid, cluster, cohesion
+from manuallabor.grouping.cluster import _split_tree, center, centroid, cluster, cohesion
 from manuallabor.grouping.embed import embed_blocks
 from manuallabor.grouping.label import (
+    NamedTopic,
     StragglerItem,
     name_topic,
     rank_headings,
@@ -41,7 +43,9 @@ from manuallabor.grouping.structure import is_header_footer, page_ranges
 from manuallabor.grouping.summary import block_summaries, bound_captions, is_no_text
 from manuallabor.grouping.types import (
     MAX_EXAMPLES,
+    MAX_GROUPS,
     MIN_FINAL_TOPIC_BLOCKS,
+    MIN_TOPIC_BLOCKS,
     UNASSIGNED_TITLE,
     Assembly,
     GroupingError,
@@ -170,6 +174,193 @@ def _bind(
         asm.reasons.pop(head, None)
 
 
+def _name_cluster(
+    chat: Provider,
+    c: np.ndarray,
+    cand_ids: Sequence[str],
+    summaries: Mapping[str, str],
+    group_title: Mapping[str, str],
+    structure: StructureResult,
+    rows: Sequence[int],
+    cent: np.ndarray,
+    number: int,
+    params: GroupingParams,
+    examples: Sequence[Mapping[str, str]],
+    stats: GroupStats,
+) -> NamedTopic:
+    heads = rank_headings([group_title[structure.section_of[cand_ids[r]]] for r in rows])
+    sims = np.round(c[list(rows)] @ cent, 9)
+    near = sorted(range(len(rows)), key=lambda j: (-float(sims[j]), cand_ids[rows[j]]))
+    samples = [summaries[cand_ids[rows[j]]] for j in near[: params.name_sample]]
+    named = name_topic(chat, heads, samples, number=number, examples=examples)
+    if named.source == TitleSource.fallback:
+        stats.llm_fallbacks += 1
+    return named
+
+
+def _enforce_do_not_merge(
+    asm: Assembly,
+    pairs: Sequence[tuple[str, str]],
+    movable: set[str],
+    c: np.ndarray,
+    row_of: Mapping[str, int],
+    params: GroupingParams,
+) -> None:
+    """The cannot-link constraint on the FINAL assignment. Clustering keeps the pairs apart, but
+    a straggler or a bound heading/caption may land beside its partner. Such a block (the
+    later one of the pair when both can move) takes its next-best topic that holds none of its
+    partners, else goes to t000 with reason `do_not_merge`."""
+    partners: dict[str, set[str]] = {}
+    for a, b in pairs:
+        if a != b and a in asm.placed and b in asm.placed:
+            partners.setdefault(a, set()).add(b)
+            partners.setdefault(b, set()).add(a)
+    if not partners:
+        return
+    ordered = sorted(partners, key=ids.block_sort_key)
+    for _ in range(sum(len(v) for v in partners.values()) + 1):
+        hit: tuple[str, str] | None = None
+        for a in ordered:
+            ka = asm.placed[a]
+            if ka is None:
+                continue
+            for b in sorted(partners[a], key=ids.block_sort_key):
+                if ids.block_sort_key(b) > ids.block_sort_key(a) and asm.placed[b] == ka:
+                    hit = (a, b)
+                    break
+            if hit:
+                break
+        if hit is None:
+            return
+        a, b = hit
+        mover = b if b in movable or a not in movable else a
+        banned = {asm.placed[p] for p in partners[mover]} - {None}
+        members = asm.members()
+        target: str | None = None
+        if mover in row_of:
+            ranked: list[tuple[float, str]] = []
+            for k, mem in members.items():
+                rows = [row_of[x] for x in mem if x != mover and x in row_of]
+                if k in banned or not rows:
+                    continue
+                ranked.append((float(c[row_of[mover]] @ centroid(c, rows)), k))
+            ranked.sort(key=lambda t: (-t[0], t[1]))
+            target = next((k for sim, k in ranked if sim >= params.t_candidate), None)
+        asm.placed[mover] = target
+        if target is None:
+            asm.reasons[mover] = UnassignedReason.do_not_merge
+        else:
+            asm.reasons.pop(mover, None)
+
+
+def _reading_chunks(members: Sequence[str], cap: int) -> list[list[str]]:
+    """Even consecutive chunks, none above `cap` and (for len > cap) none below cap/2."""
+    n = -(-len(members) // cap)
+    size, extra = divmod(len(members), n)
+    out: list[list[str]] = []
+    at = 0
+    for i in range(n):
+        end = at + size + (1 if i < extra else 0)
+        out.append(list(members[at:end]))
+        at = end
+    return out
+
+
+def _split_oversized(
+    members: Sequence[str],
+    pos: Mapping[str, int],
+    c: np.ndarray,
+    row_of: Mapping[str, int],
+    cap: int,
+    cannot: Sequence[tuple[str, str]],
+) -> list[list[str]]:
+    """Chunks of at most `cap` blocks: along the dendrogram of the members' embeddings, or
+    (when it cannot be built, or a chunk is still too big) by reading order."""
+    mem = sorted(members, key=lambda b: pos[b])
+    with_row = [b for b in mem if b in row_of]
+    chunks: list[list[str]]
+    if len(with_row) >= 2:
+        local = {b: i for i, b in enumerate(with_row)}
+        y = np.clip(np.round(_pdist(c[[row_of[b] for b in with_row]]), 9), 0.0, 2.0) + 0.0
+        z = linkage(y, method="average")
+        pairs = [(local[a], local[b]) for a, b in cannot if a in local and b in local]
+        n = len(with_row)
+        parts = _split_tree(z, n, np.zeros(n, dtype=np.int64), cap, pairs)
+        groups = sorted((sorted(with_row[i] for i in p) for p in parts), key=lambda g: pos[g[0]])
+        firsts = [pos[g[0]] for g in groups]
+        chunks = [list(g) for g in groups]
+        for b in mem:  # blocks without an embedding row ride with the preceding chunk
+            if b in row_of:
+                continue
+            idx = max((i for i, f in enumerate(firsts) if f <= pos[b]), default=0)
+            chunks[idx].append(b)
+    else:
+        chunks = [mem]
+    if any(len(ch) < MIN_TOPIC_BLOCKS for ch in chunks):
+        chunks = [mem]  # a lopsided tree (e.g. all-identical rows): fall back to reading order
+    out: list[list[str]] = []
+    for ch in chunks:
+        out.extend(
+            [sorted(ch, key=lambda b: pos[b])]
+            if len(ch) <= cap
+            else _reading_chunks(sorted(ch, key=lambda b: pos[b]), cap)
+        )
+    return out
+
+
+def _pdist(m: np.ndarray) -> np.ndarray:
+    from scipy.spatial.distance import pdist
+
+    return np.asarray(pdist(m, "cosine"))
+
+
+def _straggler_records(
+    decisions: Sequence[StragglerDecision],
+    asm: Assembly,
+    final_id: Mapping[str, str],
+    c: np.ndarray | None,
+    row_of: Mapping[str, int],
+    moved: set[str],
+    origin: Mapping[str, str],
+    origin_centroid: Mapping[str, np.ndarray],
+) -> list[StragglerRecord]:
+    """One record per straggler (similarity to the topic it FINALLY sits in) and per cluster
+    member that fell out of a dissolved topic (similarity to the cluster it came from)."""
+    final_members = asm.members()
+    out: list[StragglerRecord] = []
+    seen: set[str] = set()
+    for d in decisions:
+        seen.add(d.block_id)
+        if d.block_id in moved:
+            continue
+        key = asm.placed[d.block_id]
+        sim = d.similarity
+        if key is not None and key != d.topic_key and c is not None and d.block_id in row_of:
+            rows = [row_of[b] for b in final_members[key] if b in row_of]
+            if rows:
+                sim = round(float(c[row_of[d.block_id]] @ centroid(c, rows)), 9)
+        out.append(
+            StragglerRecord(
+                block_id=d.block_id,
+                topic_id=None if key is None else final_id[key],
+                similarity=max(-1.0, min(1.0, sim)),
+                by=d.by,
+            )
+        )
+    if c is not None:
+        for b, k in origin.items():
+            if b in seen or b in moved or asm.placed.get(b) is not None:
+                continue
+            sim = round(float(c[row_of[b]] @ origin_centroid[k]), 9)
+            out.append(
+                StragglerRecord(
+                    block_id=b, topic_id=None, similarity=max(-1.0, min(1.0, sim)), by="centroid"
+                )
+            )
+    out.sort(key=lambda r: ids.block_sort_key(r.block_id))
+    return out
+
+
 def _dissolve_small(asm: Assembly) -> None:
     for key, members in asm.members().items():
         if len(members) < MIN_FINAL_TOPIC_BLOCKS:
@@ -218,6 +409,8 @@ def build_topics(
     decisions: list[StragglerDecision] = []
     c: np.ndarray | None = None
     row_of: dict[str, int] = {}
+    origin: dict[str, str] = {}
+    origin_centroid: dict[str, np.ndarray] = {}
 
     if cand_ids:
         embedder = _provider(providers, Task.embeddings)
@@ -248,16 +441,15 @@ def build_topics(
             for i, (key, m) in enumerate(zip(keys, clusters, strict=True)):
                 for r in m:
                     asm.placed[cand_ids[r]] = key
-                heads = rank_headings([group_title[structure.section_of[cand_ids[r]]] for r in m])
-                sims = np.round(c[m] @ cents[i], 9)
-                near = sorted(range(len(m)), key=lambda j: (-float(sims[j]), cand_ids[m[j]]))
-                samples = [summaries[cand_ids[m[j]]] for j in near[: params.name_sample]]
-                named = name_topic(chat, heads, samples, number=i + 1, examples=examples)
+                    origin[cand_ids[r]] = key
+                origin_centroid[key] = cents[i]
+                named = _name_cluster(
+                    chat, c, cand_ids, summaries, group_title, structure, m, cents[i],
+                    i + 1, params, examples, stats,
+                )  # fmt: skip
                 asm.titles[key] = named.title
                 raw_slugs[key] = named.slug
                 asm.sources[key] = named.source
-                if named.source == TitleSource.fallback:
-                    stats.llm_fallbacks += 1
             in_cluster = {r for m in clusters for r in m}
             decisions = _place_stragglers(
                 c,
@@ -277,6 +469,35 @@ def build_topics(
                 if d.topic_key is None:
                     asm.reasons[d.block_id] = UnassignedReason.low_similarity
             _bind(asm, captions, structure)
+            cannot = list(learned.do_not_merge) if learned is not None else []
+            movable = (
+                {d.block_id for d in decisions}
+                | set(captions.values())
+                | set(structure.heading_of.values())
+            )
+            _enforce_do_not_merge(asm, cannot, movable, c, row_of, params)
+            number = len(keys)
+            for key, mem in sorted(asm.members().items()):
+                if len(mem) <= params.max_topic_blocks:
+                    continue
+                chunks = _split_oversized(mem, pos, c, row_of, params.max_topic_blocks, cannot)
+                asm.titles.pop(key, None)
+                asm.sources.pop(key, None)
+                raw_slugs.pop(key, None)
+                for ch in chunks:
+                    number += 1
+                    nk = f"c{number:02d}"
+                    rows = [row_of[b] for b in ch if b in row_of]
+                    cent = centroid(c, rows) if rows else cents[0]
+                    named = _name_cluster(
+                        chat, c, cand_ids, summaries, group_title, structure, rows, cent,
+                        number, params, examples, stats,
+                    )  # fmt: skip
+                    asm.titles[nk], raw_slugs[nk], asm.sources[nk] = (
+                        named.title, named.slug, named.source,
+                    )  # fmt: skip
+                    for bid in ch:
+                        asm.placed[bid] = nk
             _dissolve_small(asm)
             # unique slugs in final-id order (first member in block order)
             alive = sorted(asm.members().items(), key=lambda kv: min(pos[b] for b in kv[1]))
@@ -287,13 +508,23 @@ def build_topics(
                 asm.slugs[key] = s
 
     applied, stale, moved = apply_overrides(asm, overrides)
+    before = dict(asm.slugs)
     _dissolve_small(asm)
+    gone = {slug for key, slug in before.items() if key not in asm.slugs}
+    if gone:  # an override aimed at a topic that no longer exists did not take effect
+        late = [
+            i
+            for i, o in enumerate(overrides)
+            if i not in stale and (o.to_topic_slug if o.kind == "move" else o.topic_slug) in gone
+        ]
+        stale = sorted([*stale, *late])
+        applied -= len(late)
 
     # -- final ids and groups -----------------------------------------------------------------
     members = {k: sorted(v, key=lambda b: pos[b]) for k, v in asm.members().items()}
     order = sorted(members, key=lambda k: pos[members[k][0]])
     final_id = {k: ids.group_id(slug, "topic", i + 1) for i, k in enumerate(order)}
-    if len(order) > 998:
+    if len(order) > MAX_GROUPS - 1:
         raise GroupingError(f"{slug}: {len(order)} topics exceed the id space")
 
     def make_group(
@@ -345,20 +576,9 @@ def build_topics(
     ] + [UnassignedEntry(block_id=b, view=GroupView.topic, reason=asm.reasons[b]) for b in t000_ids]
     entries.sort(key=lambda e: ids.block_sort_key(e.block_id))
 
-    records = []
-    for d in decisions:
-        if d.block_id in moved:
-            continue
-        placed_key = asm.placed[d.block_id]
-        records.append(
-            StragglerRecord(
-                block_id=d.block_id,
-                topic_id=None if placed_key is None else final_id[placed_key],
-                similarity=max(-1.0, min(1.0, d.similarity)),
-                by=d.by,
-            )
-        )
-    records.sort(key=lambda r: ids.block_sort_key(r.block_id))
+    records = _straggler_records(
+        decisions, asm, final_id, c, row_of, moved, origin, origin_centroid
+    )
     return TopicResult(
         topics=groups,
         unassigned=entries,

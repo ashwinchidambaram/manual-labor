@@ -71,6 +71,7 @@ class UnassignedReason(StrEnum):
     low_similarity = "low_similarity"
     no_text = "no_text"
     topic_failed = "topic_failed"
+    do_not_merge = "do_not_merge"
 
 
 class TitleSource(StrEnum):

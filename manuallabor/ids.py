@@ -32,6 +32,7 @@ RESERVED_SLUGS = frozenset({UNASSIGNED})
 
 
 def slugify(text: str, max_len: int = MAX_SLUG_LEN) -> str:
+    text = re.sub(r"[\u2010-\u2015\u2212]", "-", text)  # hyphens, en/em dashes, minus
     ascii_text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode("ascii")
     s = re.sub(r"[^a-z0-9]+", "-", ascii_text.lower()).strip("-")
     if len(s) > max_len:

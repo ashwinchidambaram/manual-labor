@@ -110,3 +110,32 @@ $ cd frontend && npm run gen-types && git diff --stat -- src/types/generated.ts;
       Tests  1 passed (1)
 $ gate numbers (tests/scoring/test_harness.py, test_corrupting_mock.py, test_recall.py): H1-H9 corruptions all < 0.85 (H1 0.0, H2 0.5, H3 0.5, H4 0.47/0.0, H5 0.0/0.48/0.0, H6 0.0, H8a 0.0, H9 0.25); legit edits >= 0.854; CorruptingMockProvider rejected 436/436 across 4 fixtures x 4 modes; numeric-spec blocks always queued; scanned.pdf SPEC 11.2 recall 1.000; real manual (TM 5-3895-332-12) recall 16/16; 1,000 blocks 1.18 s
 ```
+
+## M4 — Grouping (structure + topic views) — PASSED 2026-10-29
+
+Design: docs/design/04-grouping.md (document-mean-centered embeddings, average-linkage agglomerative, deterministic cut/cap/dissolve rules; measured on MockProvider and Ollama nomic-embed-text). Review: fresh Opus agent — gate PASS; 1 dormant major (do-not-merge pairs re-merged by straggler placement) + minors (no subtree-select op, cap not re-applied after stragglers, untested branches); all fixed failing-test-first (106 grouping tests). Gate run was interrupted twice by a full disk (Docker auto-updater); completed on the third run.
+
+Commands: `uv run labor group <project> [--force]`; live clustering `MANUALLABOR_LIVE=1 uv run pytest tests/grouping -k live -s`.
+
+```
+$ uv run ruff check manuallabor/ tests/ && uv run mypy manuallabor/
+All checks passed!
+Success: no issues found in 90 source files
+$ MANUALLABOR_REQUIRE_DOCLING=1 uv run pytest tests/grouping
+106 passed, 2 skipped, 14 warnings in 106.94s (0:01:46)
+$ MANUALLABOR_REQUIRE_DOCLING=1 uv run pytest -m "not slow"
+838 passed, 3 skipped, 2 deselected, 19 warnings in 266.84s (0:04:26)
+$ MANUALLABOR_REQUIRE_DOCLING=1 MANUALLABOR_LIVE=1 uv run pytest tests/grouping -k live -s
+LIVE clean: n=128 topics=11 t000=0
+LIVE clean: cohesion min=0.314 max=0.557
+LIVE twocol: n=85 topics=10 t000=0
+LIVE twocol: cohesion min=0.266 max=0.678
+2 passed, 106 deselected, 7 warnings in 4.35s
+$ uv run labor schemas export --check && uv run python -m tests.fixtures.gen.make_fixtures --check
+schemas up to date
+ok: 15 files match CHECKSUMS.json
+$ cd frontend && npm run gen-types && git diff --stat -- src/types/generated.ts; npm run typecheck && npm test -- --run
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+      Tests  1 passed (1)
+$ gate (tests/grouping + reviewer checks): partition invariant exact on all 6 fixtures in both views; structure tree 0 mismatches vs GT on clean/twocol/tables/figures; coverage mapping exact + symmetric; cohesion computed for every topic in [0,1]; groups.json byte-identical across PYTHONHASHSEED/cwd/cold cache; do-not-merge 0/42 leaks; topic cap enforced after stragglers
+```

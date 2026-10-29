@@ -44,7 +44,7 @@ Implementer: one Sonnet agent. Report anything you cannot satisfy instead of cha
 ### 1.1 Contract additions (schemas + TS types regenerated; `00-contracts.md` §3/§4.4/§4.5/§4.11 updated)
 | Where | Addition |
 |---|---|
-| `enums.py` | `UnassignedReason` = header_footer, low_similarity, no_text, topic_failed · `TitleSource` = heading, llm, fallback, human |
+| `enums.py` | `UnassignedReason` = header_footer, low_similarity, no_text, topic_failed, do_not_merge · `TitleSource` = heading, llm, fallback, human |
 | `group.py` | `UnassignedEntry{block_id, view: GroupView, reason: UnassignedReason}` · `GroupOverlap{topic_id, section_id, blocks: int ≥1}` · `StragglerRecord{block_id, topic_id: GroupId\|None, similarity: float (round6, −1..1), by: Literal["centroid","llm"]}` · `GroupingParams` (every constant of §9, frozen into the file) · `GroupOverride` (§7.1) · `GroupsFile` (below) |
 | `selection.py` | `GroupCoverage`, `CoverageReport`, `ReviewLoad`, `ScopeSummary` (§4, §5) |
 | `config.py` | `LearningConfig{enabled: bool = False}`; `ProjectConfig.learning: LearningConfig = LearningConfig()`. Module 7 extends `LearningConfig` (snapshots); this is the minimal toggle module 4 must read. |
@@ -113,7 +113,7 @@ Input: the doc's blocks sorted by `reading_order`. "Body" = every block whose ty
 
 ### 3.3 Clustering (deterministic, no random seeds)
 1. **Center**: `C = V − mean(V, axis 0)`, then L2-normalize rows. A row with norm < 1e-12 becomes `e_0`. Reason (§0): anisotropic models put every pair at 0.8–0.9 raw cosine; centering is the only thing that made one threshold work for both mock and nomic.
-2. **Small doc**: `n < SMALL_DOC = 12` candidates → one cluster with everything; go to step 6.
+2. **Small doc**: `n < SMALL_DOC = 12` candidates → one cluster with everything; go to step 6. (`manual.docx` has 13 candidates, one above the threshold, so it is clustered normally and gets 3 topics; the rule is not tuned to it. Test 13 uses synthetic docs of 3, 8 and 11 blocks.)
 3. `y = round(pdist(C, "cosine"), 9)`; `Z = scipy.cluster.hierarchy.linkage(y, method="average")`. The input order is `block_sort_key`, so ties resolve identically on every run (the average linkage dendrogram is unique except for ties, and those follow input order).
 4. **Cut**: `labels = fcluster(Z, D_CUT = 0.80, "distance")`. If the cluster count `k > K_MAX = max(1, n // 4)`, re-cut with `fcluster(Z, K_MAX, "maxclust")`.
 5. **Size cap and cannot-link**: walk `to_tree(Z)`. Any cluster with more than `MAX_TOPIC_BLOCKS = 60` members, or containing both ends of a do-not-merge pair (§7.2), is replaced by its two dendrogram children, recursively until neither condition holds (a leaf always satisfies both).
@@ -141,7 +141,9 @@ Input: the doc's blocks sorted by `reading_order`. "Body" = every block whose ty
 1. Members = cluster members + stragglers assigned to them.
 2. **Caption follows figure**: a bound caption (§3.1) moves to its figure's topic (or to t000 if the figure is unassigned).
 3. **Heading follows its section**: a heading block whose structure group has ≥ 1 other own body block moves to the topic holding the plurality of those blocks. Ties go to the topic of the first such block, and a t000 plurality is ignored.
-4. Drop topics left with < 2 members; their blocks become `low_similarity` stragglers in t000.
+4. **Do-not-merge on the final assignment** (§7.2): clustering keeps a pair apart, but a straggler or a bound heading/caption may land beside its partner. For each pair that now shares a topic, the later movable block (straggler, heading, caption) moves to its next-best topic (centroid similarity ≥ `T_CANDIDATE`) holding none of its partners; if none exists it goes to t000 with reason `do_not_merge`. Repeated until no pair shares a topic.
+4a. **Size cap**: any topic with > `MAX_TOPIC_BLOCKS` members after steps 1-4 is re-split along the dendrogram of its own members (cannot-link pairs respected), or, when the tree is lopsided (a chunk < `MIN_TOPIC_BLOCKS`) or a chunk is still too big, into even consecutive chunks in reading order. Chunks are re-named like clusters. The partition invariant is unaffected.
+4b. Drop topics left with < 2 members; their blocks become `low_similarity` stragglers in t000. Each such block that came from a cluster gets a `StragglerRecord(topic_id=None)` with its similarity to the cluster it left. A straggler whose final topic differs from its first decision (moved by binding, enforcement or the cap) records its similarity to the final topic. An override whose target topic is dissolved afterwards is counted in `overrides_stale`, not `overrides_applied`.
 5. **Final ids** `t001…` by each topic's first block in `block_sort_key` order. Slug uniqueness (§3.4) is applied in this order.
 6. Topic `Group` fields: `level = 0`, `parent_id = None`, `section_ids` = sorted structure ids of members, `page_ranges`, `figure_count`, `cohesion` (§3.3).
 7. **t000** "Unassigned blocks", slug `unassigned`, `is_unassigned = True`, `cohesion = None`; it holds `no_text` and `low_similarity` blocks. Header/footer blocks are **not** in t000; they appear only as `UnassignedEntry(view=topic, reason=header_footer)`, exactly mirroring the structure view, so t000 contains only selectable blocks.
@@ -165,7 +167,7 @@ Partition per view (§6): **structure** groups ⊎ header_footer = all blocks; *
 ## 5. Selection and review load (`selection.py`)
 
 - Storage: `<project>/selection.json` (`Selection`, `write_json`, atomic). Module 7 may move it into SQLite; the model stays the same. If the file is missing, `default_selection(paths)` = every selectable block of every grouped doc, `article_split = config.article_split`, `active_view = topic`. It is not written until the first user action; `labor group` never writes selection.
-- Pure ops (return a new `Selection`, never mutate): `select_blocks(sel, ids)`, `deselect_blocks(sel, ids)`, `select_group(sel, group)` / `deselect_group` (the group's block_ids), `set_view(sel, view)`, which changes only `active_view` and so **leaves `block_ids` byte-identical** (SPEC §7.1, §11.6), and `set_split(sel, split)`.
+- Pure ops (return a new `Selection`, never mutate): `select_blocks(sel, ids)`, `deselect_blocks(sel, ids)`, `select_group(sel, group_or_id, *, subtree=False, gf=None)` / `deselect_group` (`subtree=False`: literally the group's own `block_ids`; `subtree=True`: for a structure group, its own blocks plus every descendant's, which needs `gf`). **The Scope UI uses `subtree=True` for structure rows** (selecting "1. Safety" selects the section and all its subsections) and `subtree=False` for topic rows (topics have no subtree), `set_view(sel, view)`, which changes only `active_view` and so **leaves `block_ids` byte-identical** (SPEC §7.1, §11.6), and `set_split(sel, split)`.
 - `normalize(sel, blocks_by_id) -> (Selection, dropped: list[BlockId])` removes unknown ids (a removed doc) and header/footer ids. It runs on load and before every save.
 - `scope_summary(sel, groups: Mapping[slug, GroupsFile], blocks: Mapping[slug, list[Block]]) -> ScopeSummary`, with blocks from `load_scored_blocks`:
 
@@ -234,7 +236,7 @@ Fixtures: lift `figproj_scoring`/`scoredproj`/`scored_copy` from `tests/scoring/
 | 10 | no headings → page windows | synthetic 25 pages, no headings | 3 groups `pages-001-010`, `pages-011-020`, `pages-021-025` |
 | 11 | topics, mock | all 6 | every non-t000 topic has ≥ 2 blocks, cohesion ∈ [0,1]; no empty topics; `section_ids`/`page_ranges`/`figure_count` match members |
 | 12 | clustering core | synthetic vectors: 3 tight groups + 2 outliers | 3 clusters; outliers become stragglers; result unchanged when input rows are permuted then re-sorted by id |
-| 13 | small doc / all dissolved | manual (13 blocks); synthetic 5 orthogonal blocks | one topic with all candidates; no crash on n ∈ {0,1,2} |
+| 13 | small doc / all dissolved | synthetic docs of 3, 8, 11 blocks (< `SMALL_DOC`); synthetic 5 orthogonal blocks | one topic with all candidates; no crash on n ∈ {0,1,2} |
 | 14 | size cap + cannot-link | synthetic 130 near-identical vectors; a do-not-merge pair inside one cluster | every topic ≤ 60; the pair ends in different topics |
 | 15 | straggler rule | synthetic straggler with best sim 0.31 / 0.29 / 0.10 | assigned / `low_similarity` (candidate shown) / no candidates, LLM not called |
 | 16 | straggler LLM validation | canned replies: unknown topic, block missing, extra block, valid non-default candidate | invalid → retry once (different input hash) → defaults; valid → applied with `by=llm` |

@@ -39,7 +39,7 @@ def load_learned_grouping(paths: ProjectPaths, config: ProjectConfig) -> Learned
     try:
         return read_json(path, LearnedGrouping)
     except (ValidationError, ValueError) as exc:
-        raise GroupingError(f"learned grouping snapshot is invalid: {exc}") from exc
+        raise GroupingError(f"{path}: learned grouping snapshot is invalid: {exc}") from exc
 
 
 def pick_examples(learned: LearnedGrouping | None, doc_id: str, limit: int) -> list[dict[str, str]]:

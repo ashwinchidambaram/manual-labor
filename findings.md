@@ -127,3 +127,4 @@ All GT model-transcribed; needs human spot-check. The real set now covers: scan 
 
 ## Disk-full incidents (2026-10-29, 00:30–02:15)
 Root cause: `/private/var/folders/.../T/com.docker.install` — a Docker Desktop installer/updater unpacking 8.6 GB into the user temp dir (not ours; left in place). It filled the disk twice overnight, each time blocking every tool (the harness cannot open its output file at ENOSPC). Recovery took ~90 min of polling. Build-side mitigations already in place: pytest temp dirs cleared after each gate; one test run at a time. User should finish or cancel the Docker update.
+- 2026-10-29 ~04:30: disk filled a third time mid-gate. On recovery, `com.docker.install` (8.6 GB) had no open files (lsof 0) and no installer process (only the running Docker backend), so the orchestrator deleted it as a stale installer temp dir. Docker will re-download its update; nothing installed is affected. Free space after: see progress.md.

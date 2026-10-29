@@ -169,6 +169,13 @@ No field has a default, so every sidecar contains every key. The dedupe link liv
 
 Validators: `block_count == len(block_ids)`. The view must match the id letter (`s`/`t`). `is_unassigned` requires `view == topic`, id `t000` and slug `unassigned`. `parent_id` set requires `view == structure`.
 
+Grouping models (module 4; field-level detail in `04-grouping.md` §1.1, all in `group.py` unless noted):
+- `UnassignedEntry{block_id, view: GroupView, reason: UnassignedReason}`; `UnassignedReason` = header_footer, low_similarity, no_text, topic_failed, do_not_merge.
+- `StragglerRecord{block_id, topic_id: GroupId | None, similarity: float in [-1,1] (round6), by: "centroid" | "llm"}`: one per straggler, plus one per cluster member dropped from a dissolved topic.
+- `GroupOverlap{topic_id, section_id, blocks >= 1}`, `GroupOverride{seq, kind: move | rename, block_id, to_topic_slug, title, topic_slug}`, `GroupingParams` (every grouping constant, frozen into the file).
+- `GroupsFile` (`docs/<slug>/groups.json`): `doc_id, algo_version, fingerprint, embedding_model, embedding_dim, grouping_model, learning_snapshot, params, structure, topics (t000 first), unassigned, stragglers, overlap, title_sources, topic_status: ok | failed, topic_error, overrides_applied, overrides_stale`. Its validator checks only internal consistency; the partition against `blocks.json` is `check_partition`.
+- `selection.py`: `GroupCoverage` / `CoverageReport` (per-group and per-doc selected/total/fraction, with `subtree_*` for structure groups), `ReviewLoad{queued, numeric_queued, threshold}`, `ScopeSummary{docs, articles_per_topic, articles_per_document, articles, blocks, figures, pages, review_load}`.
+
 ### 4.5 `Selection` (selection.py)
 `block_ids: list[BlockId]` (a before-validator deduplicates and sorts with `ids.block_sort_key` = (slug, page, n)), `article_split: ArticleSplit = per_topic`, `active_view: GroupView = topic`. Code uses `frozenset(sel.block_ids)`. Storing a sorted list keeps the JSON byte-stable.
 
@@ -237,6 +244,7 @@ Manifest validators:
 - `TaskModels`: `cleanup`, `grouping`, `vision`, `embeddings: ModelRef`; `verifier: ModelRef | None`; `metadata: ModelRef | None = None` (falls back to grouping); `agent: ModelRef | None = None` (falls back to cleanup).
 - `ProjectConfig`: `schema_version: Literal["1.0"]="1.0"`, `name: str`, `threshold: Unit = 0.85`, `models: TaskModels = <defaults>`, `article_split: ArticleSplit = per_topic`, `parsers: list[str] = ["pymupdf", "docling"]` (≥2, unique, order = primary first), `ocr_engine: OcrEngine = rapidocr`, `ocr_dpi: int ≥300 = 300`, `background_ocr_born_digital: bool = True`, `target_edit_rate: Unit = 0.02`.
 - The default `TaskModels` are all `ollama`: cleanup/grouping/vision `gemma4:e4b-it-q4_K_M`, verifier `llama3.2:1b`, embeddings `nomic-embed-text`.
+- `LearningConfig{enabled: bool = False}` as `ProjectConfig.learning` (default `LearningConfig()`); the grouping stage reads the learned snapshot only when `enabled`.
 - `model_for(task: Task) -> ModelRef | None` resolves the fallbacks. `verifier=None` means the signal is skipped.
 
 ### 4.12 LLM records (llm.py)

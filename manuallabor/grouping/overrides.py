@@ -9,12 +9,17 @@ from manuallabor import ids
 from manuallabor.contracts.enums import TitleSource, UnassignedReason
 from manuallabor.contracts.group import GroupOverride
 from manuallabor.contracts.io import read_json_list
-from manuallabor.grouping.types import TITLE_MAX, Assembly
+from manuallabor.grouping.types import TITLE_MAX, Assembly, GroupingError
 from manuallabor.parse.text import collapse_ws
 
 
 def load_overrides(path: Path) -> list[GroupOverride]:
-    return read_json_list(path, GroupOverride) if Path(path).is_file() else []
+    if not Path(path).is_file():
+        return []
+    try:
+        return read_json_list(path, GroupOverride)
+    except ValueError as exc:  # pydantic's ValidationError and JSON errors are ValueErrors
+        raise GroupingError(f"{path}: invalid group overrides: {exc}") from exc
 
 
 def apply_overrides(
