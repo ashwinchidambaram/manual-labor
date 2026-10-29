@@ -206,6 +206,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/docs/{slug}/figures": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Doc Figures
+         * @description Every figure of the document with all of its attachments (articles), sorted by figure id.
+         */
+        get: operations["get_doc_figures"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/docs/{slug}/pages/{page}.png": {
         parameters: {
             query?: never;
@@ -1259,6 +1279,22 @@ export interface components {
          * @enum {string}
          */
         DiffOpKind: "equal" | "insert" | "delete" | "replace" | "reorder";
+        /**
+         * DocFigure
+         * @description One figure of a document with every article it is attached to (the Verify re-attach picker).
+         */
+        DocFigure: {
+            /** Attachments */
+            attachments?: components["schemas"]["FigureAttachment"][];
+            /** Block Id */
+            block_id: string;
+            /** Figure Id */
+            figure_id: string;
+            /** Image Url */
+            image_url: string;
+            record: components["schemas"]["FigureRecord"];
+            status: components["schemas"]["BlockStatus"];
+        };
         /** DocGroups */
         DocGroups: {
             coverage: components["schemas"]["CoverageReport"];
@@ -3071,6 +3107,37 @@ export interface operations {
                 };
                 content: {
                     "application/x-ndjson": string;
+                };
+            };
+        };
+    };
+    get_doc_figures: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocFigure"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

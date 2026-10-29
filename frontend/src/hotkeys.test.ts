@@ -13,7 +13,7 @@ describe("U1 HOTKEYS map", () => {
   it("has no key collisions between overlapping scopes", () => {
     for (const [ia, a] of entries)
       for (const [ib, b] of entries) {
-        if (ia >= ib || !scopesOverlap(a.scope, b.scope)) continue;
+        if (ia >= ib || !scopesOverlap(a.scope, b.scope) || !!a.mod !== !!b.mod) continue;
         const shared = a.keys.filter((k) => b.keys.includes(k));
         expect(shared, `${ia} vs ${ib}`).toEqual([]);
       }
@@ -46,5 +46,22 @@ describe("U2 scope overlap across screens and zones", () => {
     expect(scopesOverlap("global", "flagDialog")).toBe(false);
     expect(scopesOverlap("picker", "flagDialog")).toBe(false);
     expect(scopesOverlap("flagDialog", "flagDialog")).toBe(true);
+  });
+});
+
+describe("VU5 verify keys", () => {
+  const entries = Object.entries(HOTKEYS) as [HotkeyId, (typeof HOTKEYS)[HotkeyId]][];
+  it("only Escape and Mod+Enter work inside inputs", () => {
+    for (const [id, h] of entries)
+      if (h.allowInInputs) expect(h.keys[0] === "escape" || (h.mod && h.keys[0] === "enter"), id).toBe(true);
+  });
+  it("flag dialog digits shadow the global screen keys without colliding in other scopes", () => {
+    expect(HOTKEYS.vFlagCat1.keys).toEqual(HOTKEYS.goScope.keys);
+    expect(scopesOverlap("flagDialog", "global")).toBe(false);
+  });
+  it("covers every key of the design table (a e f j k t s g / [ ] z, arrows, x, c)", () => {
+    const all = new Set(entries.flatMap(([, h]) => (h.scope.startsWith("verify") || h.scope === "flagDialog" ? h.keys : [])));
+    for (const k of ["a", "e", "f", "j", "k", "t", "s", "g", "/", "[", "]", "z", "escape", "x", "c", "arrowdown", "home", "end", "enter", "1", "5"])
+      expect(all.has(k), k).toBe(true);
   });
 });

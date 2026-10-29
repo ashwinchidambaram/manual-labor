@@ -1,0 +1,140 @@
+{
+ "dehyphenation": {
+  "raw_text": "Use only M8 fasteners when refitting the pressure valve. Wear protective gloves when handling the\nmounting bracket. Compare the wiring harness against the reference illustration before refitting. The lubri-\ncation procedure for the fuel filter is described in the paragraphs below.",
+  "clean_text": "Use only M8 fasteners when refitting the pressure valve. Wear protective gloves when handling the mounting bracket. Compare the wiring harness against the reference illustration before refitting. The lubrication procedure for the fuel filter is described in the paragraphs below.",
+  "diff": [
+   {
+    "op": "equal",
+    "raw": "Use only M8 fasteners when refitting the pressure valve. Wear protective gloves when handling the",
+    "clean": "Use only M8 fasteners when refitting the pressure valve. Wear protective gloves when handling the",
+    "raw_start": 0,
+    "raw_end": 97,
+    "clean_start": 0,
+    "clean_end": 97,
+    "allowed": true
+   },
+   {
+    "op": "replace",
+    "raw": "\n",
+    "clean": " ",
+    "raw_start": 97,
+    "raw_end": 98,
+    "clean_start": 97,
+    "clean_end": 98,
+    "allowed": true
+   },
+   {
+    "op": "equal",
+    "raw": "mounting bracket. Compare the wiring harness against the reference illustration before refitting. The lubri",
+    "clean": "mounting bracket. Compare the wiring harness against the reference illustration before refitting. The lubri",
+    "raw_start": 98,
+    "raw_end": 205,
+    "clean_start": 98,
+    "clean_end": 205,
+    "allowed": true
+   },
+   {
+    "op": "delete",
+    "raw": "-\n",
+    "clean": "",
+    "raw_start": 205,
+    "raw_end": 207,
+    "clean_start": 205,
+    "clean_end": 205,
+    "allowed": true
+   },
+   {
+    "op": "equal",
+    "raw": "cation procedure for the fuel filter is described in the paragraphs below.",
+    "clean": "cation procedure for the fuel filter is described in the paragraphs below.",
+    "raw_start": 207,
+    "raw_end": 281,
+    "clean_start": 205,
+    "clean_end": 279,
+    "allowed": true
+   }
+  ]
+ },
+ "headerRemoval": {
+  "raw_text": "ACME Service Manual 2024\nDrain the coolant before removal.\nPage 3 of 12",
+  "clean_text": "Drain the coolant before removal.",
+  "diff": [
+   {
+    "op": "delete",
+    "raw": "ACME Service Manual 2024\n",
+    "clean": "",
+    "raw_start": 0,
+    "raw_end": 25,
+    "clean_start": 0,
+    "clean_end": 0,
+    "allowed": false
+   },
+   {
+    "op": "equal",
+    "raw": "Drain the coolant before removal.",
+    "clean": "Drain the coolant before removal.",
+    "raw_start": 25,
+    "raw_end": 58,
+    "clean_start": 0,
+    "clean_end": 33,
+    "allowed": true
+   },
+   {
+    "op": "delete",
+    "raw": "\nPage 3 of 12",
+    "clean": "",
+    "raw_start": 58,
+    "raw_end": 71,
+    "clean_start": 33,
+    "clean_end": 33,
+    "allowed": false
+   }
+  ]
+ },
+ "moved": {
+  "raw_text": "Step 1. Remove the cover plate.\nStep 2. Drain the coolant.\nStep 3. Refit the valve with 0.25 mm clearance.",
+  "clean_text": "Step 1. Remove the cover plate.\nStep 3. Refit the valve with 0.25 mm clearance.\nStep 2. Drain the coolant.",
+  "diff": [
+   {
+    "op": "equal",
+    "raw": "Step 1. Remove the cover plate",
+    "clean": "Step 1. Remove the cover plate",
+    "raw_start": 0,
+    "raw_end": 30,
+    "clean_start": 0,
+    "clean_end": 30,
+    "allowed": true
+   },
+   {
+    "op": "delete",
+    "raw": ".\nStep 2. Drain the coolant",
+    "clean": "",
+    "raw_start": 30,
+    "raw_end": 57,
+    "clean_start": 30,
+    "clean_end": 30,
+    "allowed": true
+   },
+   {
+    "op": "equal",
+    "raw": ".\nStep 3. Refit the valve with 0.25 mm clearance.",
+    "clean": ".\nStep 3. Refit the valve with 0.25 mm clearance.",
+    "raw_start": 57,
+    "raw_end": 106,
+    "clean_start": 30,
+    "clean_end": 79,
+    "allowed": true
+   },
+   {
+    "op": "insert",
+    "raw": "",
+    "clean": "\nStep 2. Drain the coolant.",
+    "raw_start": 106,
+    "raw_end": 106,
+    "clean_start": 79,
+    "clean_end": 106,
+    "allowed": true
+   }
+  ]
+ }
+}

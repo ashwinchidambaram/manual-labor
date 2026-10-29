@@ -262,6 +262,38 @@ def _skip_if_current(dp: DocPaths, doc: Document, versions: dict[str, str], forc
     )
 
 
+def parse_is_current(paths: ProjectPaths, slug: str, cfg: ProjectConfig) -> bool:
+    """True when the document's parse is complete and made from the current source, config and
+    parser versions. Same decision as the stage's own skip check, minus the OCR engine
+    versions (those need the OCR runtime); the config fingerprint already carries the
+    resolved OCR engine, so an engine switch is still caught. Pure: runs no parser."""
+    dp = paths.doc(slug)
+    try:
+        doc = paths.load_document(slug)
+        st = read_json(dp.state, ParseState)
+    except (OSError, ValueError):
+        return False
+    if not (st.complete and dp.blocks.is_file() and st.sha256 == doc.sha256):
+        return False
+    expected: dict[str, str] = {
+        "ocr_engine": resolved_ocr_engine(cfg),
+        "parse_algo": PARSE_ALGO_VERSION,
+        "config": config_fingerprint(cfg),
+    }
+    if doc.kind == DocKind.docx:
+        expected["docx"] = _pkg("python-docx")
+        expected["docling"] = _pkg("docling")
+    else:
+        for name in cfg.parsers:
+            if name == "pymupdf":
+                expected[name] = pymupdf_version()
+            elif name == "docling":
+                expected[name] = docling_version_string()
+    return st.config_fingerprint == expected["config"] and all(
+        st.parser_versions.get(k) == v for k, v in expected.items()
+    )
+
+
 # ---------------------------------------------------------------------------------------------
 # DOCX
 

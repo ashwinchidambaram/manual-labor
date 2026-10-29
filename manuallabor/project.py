@@ -89,6 +89,19 @@ class DocPaths:
     def score_history(self) -> Path:
         return self.root / "score_history.jsonl"
 
+    @property
+    def stages(self) -> Path:
+        """Executor bookkeeping (module 7): per-node seq/status; no timestamps."""
+        return self.root / "stages.json"
+
+    @property
+    def figure_overrides(self) -> Path:
+        """Projection of the human crop-bbox overrides (module 7); read by the figures stage."""
+        return self.root / "figure_overrides.json"
+
+    def page_view(self, page: int, dpi: int) -> Path:
+        return self.root / "pages_view" / f"p{page:03d}-{dpi}.png"
+
     def page_png(self, page: int) -> Path:
         return self.pages_dir / f"p{page:03d}.png"
 
@@ -132,14 +145,59 @@ class ProjectPaths:
         return self.root / "selection.json"
 
     @property
+    def db(self) -> Path:
+        return self.root / "project.db"
+
+    @property
+    def lock(self) -> Path:
+        return self.root / ".labor.lock"
+
+    @property
+    def worker_lock(self) -> Path:
+        return self.root / ".labor.worker.lock"
+
+    @property
+    def logs(self) -> Path:
+        return self.root / "logs"
+
+    def job_log(self, job_id: str) -> Path:
+        return self.logs / "jobs" / f"{job_id}.jsonl"
+
+    def job_plan(self, job_id: str) -> Path:
+        return self.logs / "jobs" / f"{job_id}.plan.json"
+
+    @property
+    def uploads(self) -> Path:
+        return self.root / ".uploads"
+
+    @property
+    def llm_log(self) -> Path:
+        return self.root / "llm_calls.jsonl"
+
+    @property
+    def learning(self) -> Path:
+        return self.root / "learning"
+
+    @property
+    def learning_active(self) -> Path:
+        return self.learning / "active.json"
+
+    def snapshot_dir(self, snapshot_id: str) -> Path:
+        return self.learning / "snapshots" / snapshot_id
+
+    @property
+    def learned_calibration(self) -> Path:
+        return self.learning / "calibration.json"
+
+    @property
     def learned_grouping(self) -> Path:
-        """Stand-in for module 7's learning layer: the grouping snapshot, if one exists."""
-        return self.root / "learning" / "grouping.json"
+        """Materialized active learning snapshot (module 7): grouping layer, if one is active."""
+        return self.learning / "grouping.json"
 
     @property
     def learned_cleanup(self) -> Path:
-        """Stand-in for module 7's learning layer: the cleanup snapshot, if one exists."""
-        return self.root / "learning" / "cleanup.json"
+        """Materialized active learning snapshot (module 7): cleanup layer, if one is active."""
+        return self.learning / "cleanup.json"
 
     @property
     def figures_index(self) -> Path:

@@ -15,4 +15,11 @@ afterAll(() => server.close());
 
 // jsdom lacks these
 Element.prototype.scrollIntoView = () => {};
+Element.prototype.scrollTo = () => {};
 if (!("CSS" in globalThis)) (globalThis as unknown as { CSS: { escape: (s: string) => string } }).CSS = { escape: (s) => s };
+if (typeof ResizeObserver === "undefined")
+  (globalThis as unknown as { ResizeObserver: unknown }).ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };

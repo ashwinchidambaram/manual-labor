@@ -12,9 +12,13 @@ from fastapi.responses import FileResponse
 
 from manuallabor.api.deps import Ctx, HooksDep
 from manuallabor.api.errors import ApiError
-from manuallabor.api.models import ApiErrorBody, PageBlock, SourceInfo
+from manuallabor.api.models import ApiErrorBody, DocFigure, PageBlock, SourceInfo
+from manuallabor.contracts.block import Block
+from manuallabor.contracts.enums import BlockStatus, BlockType
+from manuallabor.contracts.figure import FigureRecord
+from manuallabor.contracts.io import read_json, read_json_list
 from manuallabor.project import ProjectPaths
-from manuallabor.state.models import JobInfo, RunPlanIn
+from manuallabor.state.models import FigureAttachment, JobInfo, RunPlanIn
 
 router = APIRouter(prefix="/api", tags=["sources"])
 
@@ -98,3 +102,49 @@ def get_page_png(
 def get_page_blocks(slug: str, page: int, ctx: Ctx) -> list[PageBlock]:
     _known_slug(ctx.paths, slug)
     return [PageBlock.model_validate(b) for b in ctx.review.page_blocks(slug, page)]
+
+
+@router.get("/docs/{slug}/figures", response_model=list[DocFigure])
+def get_doc_figures(slug: str, ctx: Ctx) -> list[DocFigure]:
+    """Every figure of the document with all of its attachments (articles), sorted by figure id."""
+    _known_slug(ctx.paths, slug)
+    from manuallabor.cleanup.types import AttachFile
+
+    dp = ctx.paths.doc(slug)
+    attachments: dict[str, list[FigureAttachment]] = {}
+    if dp.attach.is_file():
+        af = read_json(dp.attach, AttachFile)
+        for art in af.articles:
+            for a in art.figures:
+                attachments.setdefault(a.figure_id, []).append(
+                    FigureAttachment(
+                        article_id=art.article_id,
+                        rule=a.rule.value,
+                        confidence=a.confidence,
+                        anchor_block_id=a.anchor_block_id,
+                    )
+                )
+    blocks = read_json_list(dp.blocks, Block) if dp.blocks.is_file() else []
+    block_of = {b.figure_id: b for b in blocks if b.type == BlockType.figure and b.figure_id}
+    status: dict[int, dict[str, BlockStatus]] = {}
+    out: list[DocFigure] = []
+    for path in sorted(ctx.paths.figure_dir(slug).glob("FIG-*.json")):
+        rec = read_json(path, FigureRecord)
+        blk = block_of.get(rec.id)
+        if blk is None:
+            continue
+        if blk.page not in status:
+            status[blk.page] = {
+                str(r["block_id"]): r["status"] for r in ctx.review.page_blocks(slug, blk.page)
+            }
+        out.append(
+            DocFigure(
+                figure_id=rec.id,
+                block_id=blk.id,
+                record=rec,
+                image_url=f"/api/figures/{rec.id}/image",
+                attachments=attachments.get(rec.id, []),
+                status=BlockStatus(status[blk.page].get(blk.id, BlockStatus.queued)),
+            )
+        )
+    return sorted(out, key=lambda f: f.figure_id)

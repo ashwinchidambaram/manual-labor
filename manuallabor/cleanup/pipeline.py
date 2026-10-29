@@ -55,6 +55,7 @@ from manuallabor.contracts.io import (
     read_json,
     read_json_list,
     write_json,
+    write_text_atomic,
 )
 from manuallabor.contracts.selection import Selection
 from manuallabor.figures.types import FigureReport
@@ -70,7 +71,13 @@ from manuallabor.scoring.faithfulness import glyph_identity, hf_tables
 from manuallabor.scoring.pipeline import block_contexts, run_score
 from manuallabor.scoring.types import SCORING_ALGO_VERSION, BlockContext, ScoreFile
 
-__all__ = ["clean_document", "fingerprint", "run_clean"]
+__all__ = [
+    "clean_document",
+    "clean_fingerprints",
+    "clean_provenance",
+    "fingerprint",
+    "run_clean",
+]
 
 STAGES = ("clean", "attach", "describe", "score")
 
@@ -154,35 +161,37 @@ def cleanable(block: Block) -> bool:
     return block.type in CLEANABLE and bool(collapse_ws(block.raw_text))
 
 
-def clean_document(
+@dataclass
+class _Planned:
+    block: Block
+    ctx: BlockContext
+    passes: Any
+    pctx: PassCtx
+    variants: list[NumericVariant]
+    chosen: list[Any]
+    input_hash: str
+
+
+def _plan_blocks(
     doc: Document,
     blocks: Sequence[Block],
     layouts: Sequence[PageLayout],
     selected: set[str],
     *,
-    variants: Mapping[str, Sequence[NumericVariant]] | None = None,
-    mode: LlmMode = "residual",
-    provider: Provider | None = None,
-    cleanup_ref: str | None = None,
-    learned: LearnedCleanup | None = None,
-    prior: Mapping[str, CleanEntry] | None = None,
-    prefilter: bool = True,
-    stats: CleanStats | None = None,
-) -> tuple[list[CleanEntry], str]:
-    """Clean every selected cleanable block in reading order. Returns the entries (sorted by
-    block id) and the clean fingerprint. ``prior`` entries whose input hash is unchanged are
-    reused as they are."""
-    stats = stats if stats is not None else CleanStats()
-    variants = variants or {}
-    prior = prior or {}
+    variants: Mapping[str, Sequence[NumericVariant]],
+    mode: LlmMode,
+    cleanup_ref: str | None,
+    learned: LearnedCleanup | None,
+) -> tuple[list[_Planned], dict[str, BlockContext]]:
+    """Per selected cleanable block (reading order): passes, context, chosen few-shot examples
+    and the input hash. Deterministic and LLM-free."""
     ordered = sorted(blocks, key=lambda b: b.reading_order)
     ctxs = block_contexts(doc, blocks, layouts)
     lexicon = doc_lexicon(b.raw_text for b in ordered)
     rules = list(learned.rules) if learned is not None else []
     examples = list(learned.examples) if learned is not None else []
     hf_cache: dict[str, Any] = {}
-    entries: list[CleanEntry] = []
-    hashes: list[str] = []
+    planned: list[_Planned] = []
     for b in ordered:
         if b.id not in selected or not cleanable(b):
             continue
@@ -210,6 +219,55 @@ def clean_document(
             examples=chosen,
             lexicon=lexicon,
         )
+        planned.append(_Planned(b, ctx, passes, pctx, bv, chosen, h))
+    return planned, ctxs
+
+
+def _clean_fp(selected: set[str], ctxs: Mapping[str, Any], hashes: Sequence[str]) -> str:
+    return fingerprint(
+        {
+            "algo": CLEANUP_ALGO_VERSION,
+            "scoring_algo": SCORING_ALGO_VERSION,
+            "selected": sorted((s for s in selected if s in ctxs), key=ids.block_sort_key),
+            "input_hashes": list(hashes),
+        }
+    )
+
+
+def clean_document(
+    doc: Document,
+    blocks: Sequence[Block],
+    layouts: Sequence[PageLayout],
+    selected: set[str],
+    *,
+    variants: Mapping[str, Sequence[NumericVariant]] | None = None,
+    mode: LlmMode = "residual",
+    provider: Provider | None = None,
+    cleanup_ref: str | None = None,
+    learned: LearnedCleanup | None = None,
+    prior: Mapping[str, CleanEntry] | None = None,
+    prefilter: bool = True,
+    stats: CleanStats | None = None,
+) -> tuple[list[CleanEntry], str]:
+    """Clean every selected cleanable block in reading order. Returns the entries (sorted by
+    block id) and the clean fingerprint. ``prior`` entries whose input hash is unchanged are
+    reused as they are."""
+    stats = stats if stats is not None else CleanStats()
+    prior = prior or {}
+    planned, ctxs = _plan_blocks(
+        doc,
+        blocks,
+        layouts,
+        selected,
+        variants=variants or {},
+        mode=mode,
+        cleanup_ref=cleanup_ref,
+        learned=learned,
+    )
+    entries: list[CleanEntry] = []
+    hashes: list[str] = []
+    for pl in planned:
+        b, h = pl.block, pl.input_hash
         hashes.append(h)
         old = prior.get(b.id)
         if old is not None and old.input_hash == h:
@@ -220,14 +278,14 @@ def clean_document(
             continue
         res = clean_block(
             b,
-            ctx,
+            pl.ctx,
             input_hash=h,
-            passes=passes,
-            pctx=pctx,
-            variants=bv,
+            passes=pl.passes,
+            pctx=pl.pctx,
+            variants=pl.variants,
             mode=mode,
             provider=provider,
-            examples=chosen,
+            examples=pl.chosen,
             prefilter=prefilter,
         )
         e = res.entry
@@ -241,14 +299,7 @@ def clean_document(
             stats.llm_accepted += 1
         if e.llm is not None and e.llm.outcome == "rejected":
             stats.llm_rejected[e.llm.reason or "rejected"] += 1
-    fp = fingerprint(
-        {
-            "algo": CLEANUP_ALGO_VERSION,
-            "scoring_algo": SCORING_ALGO_VERSION,
-            "selected": sorted((s for s in selected if s in ctxs), key=ids.block_sort_key),
-            "input_hashes": hashes,
-        }
-    )
+    fp = _clean_fp(selected, ctxs, hashes)
     return sorted(entries, key=lambda e: ids.block_sort_key(e.block_id)), fp
 
 
@@ -302,7 +353,7 @@ def _write_sidecar(path: Path, rec: FigureRecord, update: Mapping[str, Any]) -> 
     data = dump_json(new)
     if path.read_text(encoding="utf-8") == data:
         return False
-    path.write_text(data, encoding="utf-8", newline="\n")
+    write_text_atomic(path, data)
     return True
 
 
@@ -455,6 +506,23 @@ def _figure_infos(
     return infos, recs
 
 
+def _attach_fp(run: DocRun, infos: Sequence[FigureInfo]) -> str:
+    dp = run.dp
+    return fingerprint(
+        {
+            "algo": CLEANUP_ALGO_VERSION,
+            "grouping_algo": GROUPING_ALGO_VERSION,
+            "groups_sha": _sha(dp.groups),
+            "blocks_sha": _sha(dp.blocks),
+            "selected": sorted(run.selected(), key=ids.block_sort_key),
+            "split": run.selection.article_split.value,
+            "captions": {f.figure_id: [f.caption, f.failed] for f in infos},
+            "figures_report_sha": _sha(dp.figure_report),
+            "overrides_sha": _sha(dp.attach_overrides),
+        }
+    )
+
+
 def _stage_attach(run: DocRun, blocks: Sequence[Block]) -> AttachFile:
     t0 = time.perf_counter()
     dp = run.dp
@@ -462,19 +530,7 @@ def _stage_attach(run: DocRun, blocks: Sequence[Block]) -> AttachFile:
     infos, recs = _figure_infos(run, blocks)
     selected = run.selected()
     split = run.selection.article_split
-    fp = fingerprint(
-        {
-            "algo": CLEANUP_ALGO_VERSION,
-            "grouping_algo": GROUPING_ALGO_VERSION,
-            "groups_sha": _sha(dp.groups),
-            "blocks_sha": _sha(dp.blocks),
-            "selected": sorted(selected, key=ids.block_sort_key),
-            "split": split.value,
-            "captions": {f.figure_id: [f.caption, f.failed] for f in infos},
-            "figures_report_sha": _sha(dp.figure_report),
-            "overrides_sha": _sha(dp.attach_overrides),
-        }
-    )
+    fp = _attach_fp(run, infos)
     prior = _load_model(dp.attach, AttachFile)
     if not run.force and prior is not None and prior.fingerprint == fp:
         af, status = prior, "skip"
@@ -516,9 +572,19 @@ def _stage_attach(run: DocRun, blocks: Sequence[Block]) -> AttachFile:
     return af
 
 
-def _stage_describe(run: DocRun, blocks: Sequence[Block], af: AttachFile) -> None:
-    t0 = time.perf_counter()
-    dp = run.dp
+@dataclass
+class _DescribeInputs:
+    fp: str
+    infos: list[FigureInfo]
+    recs: dict[str, FigureRecord]
+    images: dict[str, bytes]
+    shas: dict[str, str]
+    in_scope: set[str]
+    enabled: bool
+    vref: ModelRef | None
+
+
+def _describe_inputs(run: DocRun, blocks: Sequence[Block], af: AttachFile) -> _DescribeInputs:
     infos, recs = _figure_infos(run, blocks)
     in_scope = set(figure_projection(af))
     vref = run.config.model_for(Task.vision)
@@ -541,6 +607,15 @@ def _stage_describe(run: DocRun, blocks: Sequence[Block], af: AttachFile) -> Non
             ],
         }
     )
+    return _DescribeInputs(fp, infos, recs, images, shas, in_scope, enabled, vref)
+
+
+def _stage_describe(run: DocRun, blocks: Sequence[Block], af: AttachFile) -> None:
+    t0 = time.perf_counter()
+    dp = run.dp
+    di = _describe_inputs(run, blocks, af)
+    infos, recs, images, shas = di.infos, di.recs, di.images, di.shas
+    in_scope, enabled, fp, vref = di.in_scope, di.enabled, di.fp, di.vref
     prior = _load_model(dp.describe, DescribeFile)
     counts: Counter[str] = Counter()
     if not run.force and prior is not None and prior.fingerprint == fp:
@@ -627,6 +702,86 @@ def _stage_describe(run: DocRun, blocks: Sequence[Block], af: AttachFile) -> Non
             "detail": None,
         }
     )
+
+
+# ---------------------------------------------------------------------------------------------
+# fingerprints of the current inputs (module 7: stage graph freshness, pure)
+
+
+def _noop_providers() -> ProviderSet:
+    raise CleanupError("fingerprints never call a model")
+
+
+def _doc_run(paths: ProjectPaths, slug: str, config: ProjectConfig) -> DocRun:
+    learned, rejected = load_learned_cleanup_ex(paths, config)
+    selection, _ = load_selection(paths)
+    return DocRun(
+        paths=paths,
+        slug=slug,
+        config=config,
+        selection=selection,
+        mode=config.cleanup.llm,
+        describe=config.cleanup.describe,
+        force=False,
+        learned=learned,
+        get_providers=_noop_providers,
+        emit=lambda _o: None,
+        learned_rejected=rejected,
+    )
+
+
+def clean_provenance(
+    paths: ProjectPaths, config: ProjectConfig
+) -> tuple[str, list[str], list[str]]:
+    """(learning snapshot, rejected rule ids, rejected example ids) the stage would record."""
+    learned, rejected = load_learned_cleanup_ex(paths, config)
+    snap = learned.snapshot if learned is not None else BASELINE
+    return snap, list(rejected.rules), list(rejected.examples)
+
+
+def clean_fingerprints(
+    paths: ProjectPaths, slug: str, config: ProjectConfig
+) -> tuple[str, str, str]:
+    """The fingerprints `clean.json`, `attach.json` and `describe.json` must carry to be
+    current: (clean, attach, describe). Runs no pass and no model."""
+    run = _doc_run(paths, slug, config)
+    dp = run.dp
+    if not dp.blocks.is_file():
+        raise CleanupError("document is not parsed (blocks.json missing)")
+    blocks = read_json_list(dp.blocks, Block)
+    sf = _scores(dp)
+    gf = _groups(dp)
+    doc = paths.load_document(slug)
+    layouts = read_json_list(dp.layout, PageLayout) if dp.layout.is_file() else []
+    selected = run.selected()
+    cref = config.model_for(Task.cleanup)
+    planned, ctxs = _plan_blocks(
+        doc,
+        blocks,
+        layouts,
+        selected,
+        variants=_variants(sf),
+        mode=run.mode,
+        cleanup_ref=_ref(cref),
+        learned=run.learned,
+    )
+    fp_clean = _clean_fp(selected, ctxs, [p.input_hash for p in planned])
+    infos, _recs = _figure_infos(run, blocks)
+    fp_attach = _attach_fp(run, infos)
+    af = _load_model(dp.attach, AttachFile)
+    if af is None or af.fingerprint != fp_attach:
+        af = attach_document(
+            slug,
+            blocks,
+            gf,
+            selected,
+            run.selection.article_split,
+            infos,
+            _load_overrides(dp.attach_overrides),
+            fp_attach,
+        )
+    fp_desc = _describe_inputs(run, blocks, af).fp
+    return fp_clean, fp_attach, fp_desc
 
 
 # ---------------------------------------------------------------------------------------------

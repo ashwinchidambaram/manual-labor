@@ -77,7 +77,39 @@ export type HotkeyId =
   | "collapse"
   | "toggleRow"
   | "selectOnly"
-  | "selectWholeDoc";
+  | "selectWholeDoc"
+  | "vApprove"
+  | "vEdit"
+  | "vFlag"
+  | "vSkip"
+  | "vBack"
+  | "vToggleDiff"
+  | "vFocusSource"
+  | "vFocusRail"
+  | "vSort"
+  | "vViewDown"
+  | "vViewUp"
+  | "vZoom"
+  | "vEscape"
+  | "vBrowseNext"
+  | "vBrowsePrev"
+  | "vFirst"
+  | "vLast"
+  | "vSrcNext"
+  | "vSrcPrev"
+  | "vSrcJump"
+  | "vRailNext"
+  | "vRailPrev"
+  | "vRailDetach"
+  | "vRailCrop"
+  | "vSaveEdit"
+  | "vFlagCat1"
+  | "vFlagCat2"
+  | "vFlagCat3"
+  | "vFlagCat4"
+  | "vFlagCat5"
+  | "vFlagSubmit"
+  | "vFlagSubmitMod";
 
 export interface Hotkey {
   keys: string[];
@@ -116,6 +148,40 @@ export const HOTKEYS: Record<HotkeyId, Hotkey> = {
   toggleRow: { keys: ["space"], scope: "tree", label: "Toggle the row (partial selects the rest)", nativeButtons: true },
   selectOnly: { keys: ["enter"], scope: "tree", label: "Select only this row", nativeButtons: true },
   selectWholeDoc: { keys: ["shift+a"], scope: "tree", label: "Select the whole document of this row" },
+
+  // Verify (module 9). Esc is one entry: it cancels an edit, closes a mode, else returns focus to the queue.
+  vApprove: { keys: ["a"], scope: "verify", label: "Approve the current block" },
+  vEdit: { keys: ["e"], scope: "verify", label: "Edit the current block (Ctrl or Cmd + Enter saves)" },
+  vFlag: { keys: ["f"], scope: "verify", label: "Flag the current block" },
+  vSkip: { keys: ["j"], scope: "verify", label: "Skip the current block" },
+  vBack: { keys: ["k"], scope: "verify", label: "Go back to the previous block" },
+  vToggleDiff: { keys: ["t"], scope: "verify", label: "Switch between text and diff against raw" },
+  vFocusSource: { keys: ["s"], scope: "verify", label: "Focus the current block on the source page" },
+  vFocusRail: { keys: ["g"], scope: "verify", label: "Focus the figure rail" },
+  vSort: { keys: ["/"], scope: "verify", label: "Cycle the queue sort" },
+  vViewDown: { keys: ["["], scope: "verify", label: "Review fewer auto-approved blocks (view filter down)" },
+  vViewUp: { keys: ["]"], scope: "verify", label: "Review more auto-approved blocks (view filter up)" },
+  vZoom: { keys: ["z"], scope: "verify", label: "Zoom the source page" },
+  vEscape: { keys: ["escape"], scope: "verify", label: "Cancel the edit or mode, else back to the queue", allowInInputs: true },
+  vBrowseNext: { keys: ["arrowdown"], scope: "verifyQueue", label: "Next block in the queue" },
+  vBrowsePrev: { keys: ["arrowup"], scope: "verifyQueue", label: "Previous block in the queue" },
+  vFirst: { keys: ["home"], scope: "verifyQueue", label: "First block in the queue" },
+  vLast: { keys: ["end"], scope: "verifyQueue", label: "Last block in the queue" },
+  vSrcNext: { keys: ["arrowright", "arrowdown"], scope: "verifySource", label: "Next block on the page" },
+  vSrcPrev: { keys: ["arrowleft", "arrowup"], scope: "verifySource", label: "Previous block on the page" },
+  vSrcJump: { keys: ["enter"], scope: "verifySource", label: "Make the focused block current", nativeButtons: true },
+  vRailNext: { keys: ["arrowdown"], scope: "verifyRail", label: "Next figure" },
+  vRailPrev: { keys: ["arrowup"], scope: "verifyRail", label: "Previous figure" },
+  vRailDetach: { keys: ["x"], scope: "verifyRail", label: "Detach the focused figure from this article" },
+  vRailCrop: { keys: ["c"], scope: "verifyRail", label: "Adjust the crop of the focused figure" },
+  vSaveEdit: { keys: ["enter"], scope: "verifyEdit", label: "Save the edit", mod: true, allowInInputs: true },
+  vFlagCat1: { keys: ["1"], scope: "flagDialog", label: "Category: wrong text" },
+  vFlagCat2: { keys: ["2"], scope: "flagDialog", label: "Category: missing figure" },
+  vFlagCat3: { keys: ["3"], scope: "flagDialog", label: "Category: wrong grouping" },
+  vFlagCat4: { keys: ["4"], scope: "flagDialog", label: "Category: bad crop" },
+  vFlagCat5: { keys: ["5"], scope: "flagDialog", label: "Category: table structure" },
+  vFlagSubmit: { keys: ["enter"], scope: "flagDialog", label: "Submit the flag (when not typing a note)", nativeButtons: true },
+  vFlagSubmitMod: { keys: ["enter"], scope: "flagDialog", label: "Submit the flag from anywhere", mod: true, allowInInputs: true },
 };
 
 /**

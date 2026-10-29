@@ -48,3 +48,37 @@ export async function waitForTree(page: Page): Promise<void> {
 export async function waitSettled(page: Page): Promise<void> {
   await expect(page.locator("[data-testid=coverage-chip][data-stale=true]")).toHaveCount(0);
 }
+
+/** Wait until no job is queued or running. */
+export async function waitJobsIdle(request: APIRequestContext, ms = 180_000): Promise<void> {
+  await expect
+    .poll(
+      async () => {
+        const r = await request.get("/api/jobs?status=queued&status=running");
+        return ((await r.json()) as unknown[]).length;
+      },
+      { timeout: ms, intervals: [500, 1000] },
+    )
+    .toBe(0);
+}
+
+/** Small typed JSON helpers over the request context. */
+export function api(request: APIRequestContext) {
+  return {
+    get: async <T>(url: string): Promise<T> => {
+      const r = await request.get(url);
+      expect(r.ok(), `${url}: ${await r.text()}`).toBeTruthy();
+      return (await r.json()) as T;
+    },
+    put: async <T>(url: string, data: unknown): Promise<T> => {
+      const r = await request.put(url, { data });
+      expect(r.ok(), `${url}: ${await r.text()}`).toBeTruthy();
+      return (await r.json()) as T;
+    },
+    post: async <T>(url: string, data: unknown): Promise<T> => {
+      const r = await request.post(url, { data });
+      expect(r.ok(), `${url}: ${await r.text()}`).toBeTruthy();
+      return (await r.json()) as T;
+    },
+  };
+}

@@ -2,6 +2,7 @@ import { createBrowserRouter, createMemoryRouter, Navigate, type RouteObject } f
 import ScopeScreen from "./scope/ScopeScreen";
 import AppShell from "./shell/AppShell";
 import { ComingSoon, NotFound } from "./shell/Stubs";
+import VerifyScreen from "./verify/VerifyScreen";
 
 export const routes: RouteObject[] = [
   {
@@ -9,7 +10,7 @@ export const routes: RouteObject[] = [
     children: [
       { path: "/", element: <Navigate to="/scope" replace /> },
       { path: "/scope", element: <ScopeScreen /> },
-      { path: "/verify", element: <ComingSoon name="Verify" /> },
+      { path: "/verify", element: <VerifyScreen /> },
       { path: "/agent", element: <ComingSoon name="Agent" /> },
       { path: "/export", element: <ComingSoon name="Export" /> },
       { path: "*", element: <NotFound /> },

@@ -205,3 +205,58 @@ async def test_a9_learning_round_trip(env: Env, api: httpx.AsyncClient) -> None:
     assert (await api.post("/api/learning/publish/001")).json()["id"] == "001"
     assert (await api.post("/api/learning/activate/099")).status_code == 404
     assert env.st.learning.enabled is True
+
+
+async def test_doc_figures_lists_every_attachment(env: Env, api: httpx.AsyncClient) -> None:
+    """G2: the re-attach picker lists the document's figures with all of their attachments."""
+    from manuallabor.cleanup.types import ArticleAttachments, AttachFile, Attachment
+    from manuallabor.contracts.block import Block
+    from manuallabor.contracts.enums import AttachRule, BlockType
+    from manuallabor.contracts.io import write_json
+    from tests.api.fakes import FakeFigures
+
+    paths = env.paths
+    dp = paths.doc("doc")
+    fid_block = Block(
+        id=bid(9),
+        doc_id="doc",
+        page=1,
+        bbox=[0, 0, 10, 10],
+        type=BlockType.figure,
+        reading_order=0,
+        raw_text="",
+        raw_source="pymupdf",
+        figure_id=FIG,
+    )
+    dp.blocks.write_text("[" + fid_block.model_dump_json() + "]")
+    paths.figure_dir("doc").mkdir(parents=True)
+    write_json(paths.figure_file("doc", FIG, "json"), FakeFigures(env.st)._record())
+    att = lambda a: ArticleAttachments(  # noqa: E731
+        article_id=a,
+        figures=[
+            Attachment(
+                figure_id=FIG, rule=AttachRule.proximity, confidence=0.9, anchor_block_id=None
+            )
+        ],
+    )
+    write_json(
+        dp.attach,
+        AttachFile(
+            doc_id="doc",
+            algo_version="2",
+            fingerprint="0" * 64,
+            article_split="per_topic",
+            articles=[att("doc--a"), att("doc--b")],
+            unattached=[],
+            unresolved_refs=[],
+            overrides_applied=0,
+            overrides_stale=[],
+        ),
+    )
+    r = await api.get("/api/docs/doc/figures")
+    assert r.status_code == 200, r.text
+    (item,) = r.json()
+    assert item["figure_id"] == FIG and item["block_id"] == bid(9)
+    assert [a["article_id"] for a in item["attachments"]] == ["doc--a", "doc--b"]
+    assert item["image_url"] == f"/api/figures/{FIG}/image"
+    assert (await api.get("/api/docs/nope/figures")).status_code == 404

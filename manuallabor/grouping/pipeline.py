@@ -45,6 +45,7 @@ __all__ = [
     "fingerprint",
     "group_document",
     "group_document_ex",
+    "group_fingerprint",
     "run_group",
 ]
 
@@ -237,22 +238,13 @@ def _load_prior(path: Path) -> GroupsFile | None:
     return gf if gf.algo_version == GROUPING_ALGO_VERSION else None
 
 
-def _group_doc(
-    paths: ProjectPaths,
-    slug: str,
-    config: ProjectConfig,
-    force: bool,
-    get_providers: Callable[[], ProviderSet],
-    emit: Emit,
-) -> bool:
-    """True when the document is fully grouped (or up to date)."""
-    t0 = time.perf_counter()
+def _group_fp(
+    paths: ProjectPaths, slug: str, config: ProjectConfig
+) -> tuple[str, GroupingParams, LearnedGrouping | None]:
+    """(fingerprint, params, learned layer) of one document."""
     dp = paths.doc(slug)
     if not dp.blocks.is_file():
         raise GroupingError("document is not parsed (blocks.json missing)")
-    blocks = load_scored_blocks(paths, slug)
-    doc = paths.load_document(slug)
-    overrides = load_overrides(dp.group_overrides)
     learned = load_learned_grouping(paths, config)
     eref = config.model_for(Task.embeddings)
     gref = config.model_for(Task.grouping)
@@ -272,6 +264,29 @@ def _group_doc(
             "learning_snapshot": learned.snapshot if learned is not None else BASELINE,
         }
     )
+    return fp, params, learned
+
+
+def group_fingerprint(paths: ProjectPaths, slug: str, config: ProjectConfig) -> str:
+    """The fingerprint `groups.json` must carry to be current (pure; no stage runs)."""
+    return _group_fp(paths, slug, config)[0]
+
+
+def _group_doc(
+    paths: ProjectPaths,
+    slug: str,
+    config: ProjectConfig,
+    force: bool,
+    get_providers: Callable[[], ProviderSet],
+    emit: Emit,
+) -> bool:
+    """True when the document is fully grouped (or up to date)."""
+    t0 = time.perf_counter()
+    dp = paths.doc(slug)
+    fp, params, learned = _group_fp(paths, slug, config)
+    blocks = load_scored_blocks(paths, slug)
+    doc = paths.load_document(slug)
+    overrides = load_overrides(dp.group_overrides)
     prior = _load_prior(dp.groups)
     if not force and prior is not None and prior.fingerprint == fp:
         emit(_progress(slug, "skip", prior, None, t0, "up to date"))

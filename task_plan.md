@@ -60,14 +60,14 @@ Detailed tasks, model assignments, and gates: docs/plans/2026-10-28-manual-labor
 - **Status:** in_progress
 
 ### Phase 8: UI Scope
-- [ ] Design (Sonnet) · Implement (Sonnet) · UX check (Sonnet) · Review (Sonnet) · Fix
-- [ ] Gate: Playwright: toggle preserves selection, counts live, keyboard nav
-- **Status:** pending
+- [x] Design (Sonnet) · Implement (Sonnet) · UX check (Sonnet) · Review (Opus) · Fix (Sonnet)
+- [x] Gate: 98 vitest + 29 Playwright; toggle/counts/keyboard proven against the server
+- **Status:** complete
 
 ### Phase 9: UI Verify
-- [ ] Design (Opus) · Implement (Opus) · UX check (Sonnet) · Review (Sonnet) · Fix
+- [x] Design (Opus) · [ ] Implement (Sonnet) · UX check (Sonnet) · Review (Opus) · Fix
 - [ ] Gate: Playwright: 20 blocks keyboard-only; diff view correct; figure re-attach persists
-- **Status:** pending
+- **Status:** in_progress
 
 ### Phase 10: Agent pass + calibration
 - [ ] Design (Opus) — include VLM (vision provider) as an optional third reader for flagged numeric blocks; it has no per-word confidence so it is never the primary OCR · Implement (Sonnet) · Review (Opus) · Fix

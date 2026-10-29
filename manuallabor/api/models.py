@@ -23,8 +23,10 @@ from manuallabor.contracts import (
 )
 from manuallabor.contracts._base import ArticleId, BlockId, DocSlug, Unit
 from manuallabor.contracts.enums import BlockStatus, BlockType, DocKind
+from manuallabor.contracts.figure import FigureRecord
 from manuallabor.state.models import (
     EditConflict,
+    FigureAttachment,
     JobInfo,
     LearningState,
     NodeState,
@@ -100,6 +102,17 @@ class PageBlock(ContractModel):
     block_id: BlockId
     bbox: list[float]
     type: BlockType
+    status: BlockStatus
+
+
+class DocFigure(ContractModel):
+    """One figure of a document with every article it is attached to (the Verify re-attach picker)."""
+
+    figure_id: str
+    block_id: BlockId
+    record: FigureRecord
+    image_url: str
+    attachments: list[FigureAttachment] = Field(default_factory=list)
     status: BlockStatus
 
 

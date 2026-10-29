@@ -278,3 +278,57 @@ def _tmp_footprint_guard(tmp_path_factory: pytest.TempPathFactory) -> Any:
     print(f"\n[tmp footprint] {base}: {size / 1024**2:.0f} MiB")
     if size > MAX_TMP_BYTES:
         pytest.fail(f"pytest basetemp {base} is {size / 1024**3:.2f} GiB (> 2 GiB cap)")
+
+
+# --- module 7 fixtures: a two-document project (clean.pdf + scanned.pdf), mock models ---------
+
+
+def labor_copy(src: Path, dst: Path, *, db: bool = False) -> Path:
+    """Copy a project minus page renders, logs, locks and (unless `db`) the state database."""
+    patterns = ["pages", "pages_view", "logs", ".labor*.lock", ".uploads", "sources"]
+    if not db:
+        patterns += ["project.db", "project.db-*"]
+    shutil.copytree(src, dst, ignore=shutil.ignore_patterns(*patterns))
+    if (src / "sources").is_dir():  # the PDFs are read-only inputs: share them (disk guard)
+        (dst / "sources").symlink_to((src / "sources").resolve(), target_is_directory=True)
+    return dst
+
+
+@pytest.fixture(scope="session")
+def labor_template(requires_docling: None, tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """Ingested, parsed and figure-extracted clean.pdf + scanned.pdf (no scoring yet).
+    MANUALLABOR_TEST_TEMPLATE=<dir> reuses a prebuilt one (a development shortcut)."""
+    prebuilt = os.environ.get("MANUALLABOR_TEST_TEMPLATE")
+    if prebuilt:
+        return Path(prebuilt)
+    root = tmp_path_factory.mktemp("labor-template") / "proj"
+    root.mkdir(parents=True)
+    shutil.copyfile(FIXTURES / "project-a" / "project.json", root / "project.json")
+    paths = ProjectPaths(root)
+    ingest_files(paths, [FIXTURES / "clean.pdf", FIXTURES / "scanned.pdf"], emit=lambda _o: None)
+    assert parse_project(paths, emit=lambda _o: None) == 0
+    assert run_figures(paths, emit=lambda _o: None) == []
+    return root
+
+
+@pytest.fixture(scope="session")
+def labor_scored(labor_template: Path, tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """labor_template run through score2 by the executor (mock models), with its project.db."""
+    from manuallabor.jobs.inline import run_inline
+    from manuallabor.state.models import RunPlanIn
+    from manuallabor.state.store import Store
+
+    root = tmp_path_factory.mktemp("labor-scored") / "proj"
+    labor_copy(labor_template, root)
+    paths = ProjectPaths(root)
+    store = Store.open(paths)
+    res = run_inline(paths, RunPlanIn(to="score2"), mode="mock", emit=lambda _o: None, store=store)
+    store.close()
+    assert res.ok
+    return root
+
+
+@pytest.fixture
+def lp(labor_scored: Path, tmp_path: Path) -> ProjectPaths:
+    """A fresh copy of the scored project (no project.db)."""
+    return ProjectPaths(labor_copy(labor_scored, tmp_path / "proj"))

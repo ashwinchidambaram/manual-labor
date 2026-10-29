@@ -1,0 +1,180 @@
+import { useCallback, useEffect, useRef } from "react";
+import type { BlockDetail, DiffOp, EditConflict } from "../api/schema";
+import DiffView, { Marked } from "./DiffView";
+import EditConflictPanel from "./EditConflictPanel";
+import { numericRanges } from "./diffSegments";
+import { FOCUS, STATUS_LABEL } from "./labels";
+import LearningChip from "./LearningChip";
+import ParserCompare from "./ParserCompare";
+import { reasonChips } from "./reasons";
+import WhyList from "./WhyList";
+
+export interface EditState {
+  text: string;
+  error: string | null;
+  conflict: EditConflict | null;
+  busy: boolean;
+}
+
+/** Source of the diff ops (design 09 section 4): the human edit, else the machine cleanup, else nothing. */
+export function diffOps(d: BlockDetail): DiffOp[] | null {
+  if (d.block.status === "edited") {
+    const h = [...(d.history ?? [])].reverse().find((x) => x.human_edit_diff);
+    if (h?.human_edit_diff) return h.human_edit_diff;
+  }
+  return d.block.faithfulness?.diff ?? null;
+}
+
+interface Props {
+  detail: BlockDetail | undefined;
+  loading: boolean;
+  error: string | null;
+  view: "text" | "diff";
+  onView: (v: "text" | "diff") => void;
+  edit: EditState | null;
+  onEditText: (t: string) => void;
+  onConfirmConflict: () => void;
+  onKeepEditing: () => void;
+  threshold: number;
+}
+
+export default function ExtractedPane({ detail, loading, error, view, onView, edit, onEditText, onConfirmConflict, onKeepEditing, threshold }: Props) {
+  const area = useRef<HTMLTextAreaElement | null>(null);
+  // focus on mount: the textarea may appear after the edit started (the block's detail arrives late)
+  const setArea = useCallback((el: HTMLTextAreaElement | null) => {
+    area.current = el;
+    if (el) {
+      el.focus();
+      el.setSelectionRange(el.value.length, el.value.length);
+    }
+  }, []);
+  const editing = edit !== null;
+  useEffect(() => {
+    if (editing && !edit?.conflict) {
+      const el = area.current;
+      if (el && document.activeElement !== el) {
+        el.focus();
+        el.setSelectionRange(el.value.length, el.value.length);
+      }
+    }
+  }, [editing, edit?.conflict]);
+
+  if (!detail)
+    return (
+      <section role="region" aria-label="Extracted text" className="min-h-0 overflow-auto p-3 text-sm" data-zone="extracted">
+        {error ? <p role="alert" className="text-red-800">{error}</p> : <p className="text-slate-600">{loading ? "Loading block..." : "No block selected"}</p>}
+      </section>
+    );
+
+  const b = detail.block;
+  const ops = diffOps(detail);
+  const display = b.clean_text ?? b.raw_text;
+  const isFigure = b.type === "figure";
+  const chips = reasonChips({ why: (detail.why ?? []).map((w) => ({ kind: w.kind, name: w.name, value: w.value ?? null, critical: w.critical })), hasNumeric: b.has_numeric_spec, max: 6 });
+  const fig = isFigure ? (detail.figures ?? []).find((f) => f.block_id === b.id) : undefined;
+  const figUrl = b.figure_id ? `/api/figures/${b.figure_id}/image${fig ? `?v=${fig.record.phash}` : ""}` : null;
+
+  return (
+    <section role="region" aria-label="Extracted text" className="flex min-h-0 flex-col gap-3 overflow-auto p-3" data-zone="extracted" data-testid="extracted-pane">
+      <header className="flex flex-wrap items-center gap-2">
+        <span className="font-mono text-sm" data-testid="block-id">
+          {b.id}
+        </span>
+        <span className="text-xs text-slate-600">{b.type}</span>
+        <span className="text-xs tabular-nums text-slate-700" data-testid="block-confidence">
+          {b.confidence === null || b.confidence === undefined ? "n/a" : b.confidence.toFixed(2)}
+        </span>
+        <span className="rounded bg-slate-200 px-1.5 text-xs" data-testid="block-status">
+          {STATUS_LABEL[b.status] ?? b.status}
+        </span>
+        {b.numbers_verified ? <span className="rounded bg-emerald-100 px-1.5 text-xs text-emerald-900">numbers verified</span> : null}
+        {chips.status.map((c) => (
+          <span key={c.name} data-testid="stale-chip" className="rounded bg-amber-100 px-1.5 text-xs text-amber-950">
+            {c.text}
+          </span>
+        ))}
+        {chips.reasons.map((c) => (
+          <span key={c.name} className={`rounded px-1.5 text-xs ${c.tone === "critical" ? "bg-red-100 text-red-900" : c.tone === "rule" ? "bg-violet-100 text-violet-900" : "bg-slate-200"}`}>
+            {c.text}
+          </span>
+        ))}
+        <span className="ml-auto flex gap-1">
+          <button
+            type="button"
+            data-testid="view-text"
+            aria-pressed={view === "text"}
+            onClick={() => onView("text")}
+            className={`rounded border px-2 text-xs ${view === "text" ? "border-slate-900 bg-slate-900 text-white" : "border-slate-400"} ${FOCUS}`}
+          >
+            Text
+          </button>
+          <button
+            type="button"
+            data-testid="view-diff"
+            aria-pressed={view === "diff"}
+            disabled={ops === null}
+            title={ops === null ? "No cleanup yet; text is raw" : undefined}
+            onClick={() => onView("diff")}
+            className={`rounded border px-2 text-xs disabled:opacity-50 ${view === "diff" ? "border-slate-900 bg-slate-900 text-white" : "border-slate-400"} ${FOCUS}`}
+          >
+            Diff vs raw
+          </button>
+        </span>
+      </header>
+
+      {isFigure ? (
+        <div data-testid="figure-block" className="space-y-1 text-sm">
+          {figUrl ? <img src={figUrl} alt={`Figure ${b.figure_id}`} className="max-h-72 max-w-full border border-slate-300 bg-white" /> : null}
+          <p>{fig?.record.caption_original ?? b.raw_text}</p>
+          {fig ? (
+            <dl className="grid grid-cols-[7rem_1fr] text-xs text-slate-700">
+              <dt>Extraction</dt>
+              <dd>{fig.record.extraction}</dd>
+              <dt>Page</dt>
+              <dd>{fig.record.page}</dd>
+              <dt>Size</dt>
+              <dd>
+                {fig.record.width} x {fig.record.height}
+              </dd>
+            </dl>
+          ) : null}
+          <p className="text-xs text-slate-600">Figure blocks are fixed via the rail</p>
+        </div>
+      ) : edit ? (
+        <div data-zone="edit" className="space-y-2">
+          {edit.conflict ? (
+            <EditConflictPanel conflict={edit.conflict} onConfirm={onConfirmConflict} onKeep={onKeepEditing} busy={edit.busy} />
+          ) : null}
+          <textarea
+            ref={setArea}
+            aria-label="Edit block text"
+            value={edit.text}
+            onChange={(e) => onEditText(e.target.value)}
+            rows={10}
+            className={`w-full rounded border border-slate-400 p-2 font-mono text-sm ${FOCUS}`}
+          />
+          {edit.error ? (
+            <p role="alert" data-testid="edit-error" className="text-sm text-red-800">
+              {edit.error}
+            </p>
+          ) : null}
+          <p className="text-xs text-slate-600">Ctrl or Cmd + Enter saves, Esc cancels</p>
+        </div>
+      ) : view === "diff" && ops ? (
+        <DiffView ops={ops} />
+      ) : (
+        <p className="whitespace-pre-wrap break-words text-sm leading-relaxed" data-testid="block-text">
+          <Marked text={display} ranges={numericRanges(display)} />
+        </p>
+      )}
+      {!isFigure && b.clean_text === null && view === "diff" ? <p className="text-sm text-slate-600">No cleanup yet; text is raw</p> : null}
+
+      <WhyList
+        why={detail.why ?? []}
+        autoApproved={b.status === "auto_approved" ? { confidence: b.confidence ?? null, threshold } : null}
+      />
+      <ParserCompare texts={detail.parser_texts ?? {}} block={b} />
+      <LearningChip learning={detail.learning ?? { provenance: "baseline", learned_rules: [], few_shot: [] }} slug={b.doc_id} />
+    </section>
+  );
+}

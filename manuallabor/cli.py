@@ -19,6 +19,19 @@ schemas_app = typer.Typer(help="Schema utilities.", no_args_is_help=True)
 app.add_typer(schemas_app, name="schemas")
 
 
+def _register_serve() -> None:
+    """`labor serve` and `labor openapi export` live in cli_serve (module 7, implementer B)."""
+    import importlib
+
+    try:
+        cli_serve = importlib.import_module("manuallabor.cli_serve")
+    except ModuleNotFoundError as exc:
+        if exc.name != "manuallabor.cli_serve":
+            raise
+        return
+    cli_serve.register(app)
+
+
 def _not_implemented(name: str) -> None:
     print(f"{name}: not implemented", file=sys.stderr)
     raise typer.Exit(2)
@@ -47,18 +60,15 @@ def schemas_export(
 def check(
     project: Annotated[Path, typer.Argument(help="Project directory.")],
     live: Annotated[bool, typer.Option("--live", help="Use real local models.")] = False,
+    keep: Annotated[bool, typer.Option("--keep", help="Keep the temporary copy.")] = False,
 ) -> None:
-    """Run the end-to-end smoke check on a project."""
-    _not_implemented("check")
+    """Run the end-to-end smoke check on a temporary copy of a project."""
+    if not project.is_dir():
+        print(f"project directory not found: {project}", file=sys.stderr)
+        raise typer.Exit(2)
+    from manuallabor.check import run_check
 
-
-@app.command()
-def serve(
-    project: Annotated[Path, typer.Argument(help="Project directory.")],
-    port: Annotated[int, typer.Option("--port", help="Port to listen on.")] = 8765,
-) -> None:
-    """Start the local API and UI server."""
-    _not_implemented("serve")
+    raise typer.Exit(run_check(project, live=live, keep=keep))
 
 
 @app.command()
@@ -79,6 +89,51 @@ def ingest(
         raise typer.Exit(1) from exc
 
 
+def _stage(
+    project: Path,
+    node: str | list[str],
+    *,
+    only: str | None,
+    force: bool,
+    extra: dict[str, object] | None = None,
+) -> list[str]:
+    """Run one node (or several, document-major) through the executor (keeps
+    docs/<slug>/stages.json true); the output lines are the stage's own."""
+    from manuallabor.jobs.executor import run_node, run_nodes
+    from manuallabor.jobs.providers import provider_set_factory
+    from manuallabor.parse.pipeline import stdout_emit
+    from manuallabor.project import ProjectPaths
+    from manuallabor.providers.sinks import JsonlSink
+    from manuallabor.state.errors import LockHeld
+    from manuallabor.state.lock import ProjectLock
+
+    paths = ProjectPaths(project)
+    cfg = paths.ensure_config()
+    lock = ProjectLock(paths.worker_lock, cmd=" ".join(sys.argv))
+    try:
+        lock.acquire()
+    except LockHeld as exc:
+        print(f"{exc}", file=sys.stderr)
+        raise typer.Exit(3) from exc
+    try:
+        providers = provider_set_factory(paths, cfg, "config", JsonlSink(paths.llm_log))
+        if isinstance(node, list):
+            return run_nodes(
+                paths,
+                node,
+                only=only,
+                force=[node[0]] if force else [],
+                emit=stdout_emit,
+                providers=providers,
+                extra=extra,
+            )
+        return run_node(
+            paths, node, only=only, force=force, emit=stdout_emit, providers=providers, extra=extra
+        )
+    finally:
+        lock.release()
+
+
 @app.command()
 def parse(
     project: Annotated[Path, typer.Argument(help="Project directory.")],
@@ -90,10 +145,7 @@ def parse(
     ] = None,
 ) -> None:
     """Parse ingested sources into blocks (one JSON progress line per stage)."""
-    from manuallabor.parse.pipeline import parse_project
-    from manuallabor.project import ProjectPaths
-
-    failed = parse_project(ProjectPaths(project), force=force, only=doc, workers=workers)
+    failed = _stage(project, "parse", only=doc, force=force, extra={"workers": workers})
     if failed:
         raise typer.Exit(1)
 
@@ -105,11 +157,7 @@ def figures(
     doc: Annotated[str | None, typer.Option("--doc", help="Only this document slug.")] = None,
 ) -> None:
     """Extract figures from parsed documents (one JSON progress line per document)."""
-    from manuallabor.figures.pipeline import run_figures
-    from manuallabor.project import ProjectPaths
-
-    failed = run_figures(ProjectPaths(project), only=doc, force=force)
-    if failed:
+    if _stage(project, "figures", only=doc, force=force):
         raise typer.Exit(1)
 
 
@@ -120,11 +168,7 @@ def score(
     doc: Annotated[str | None, typer.Option("--doc", help="Only this document slug.")] = None,
 ) -> None:
     """Score parsed blocks and run the faithfulness check (one JSON progress line per doc)."""
-    from manuallabor.project import ProjectPaths
-    from manuallabor.scoring.pipeline import run_score
-
-    failed = run_score(ProjectPaths(project), only=doc, force=force)
-    if failed:
+    if _stage(project, "score", only=doc, force=force):
         raise typer.Exit(1)
 
 
@@ -135,11 +179,7 @@ def group(
     doc: Annotated[str | None, typer.Option("--doc", help="Only this document slug.")] = None,
 ) -> None:
     """Build the structure and topic views (one JSON progress line per document)."""
-    from manuallabor.grouping.pipeline import run_group
-    from manuallabor.project import ProjectPaths
-
-    failed = run_group(ProjectPaths(project), only=doc, force=force)
-    if failed:
+    if _stage(project, "group", only=doc, force=force):
         raise typer.Exit(1)
 
 
@@ -161,21 +201,105 @@ def clean(
 ) -> None:
     """Clean selected blocks, attach figures to articles, describe figures, re-score (one JSON
     progress line per document and stage)."""
-    from manuallabor.cleanup.pipeline import run_clean
-    from manuallabor.project import ProjectPaths
-
     if llm is not None and llm not in ("off", "residual", "always"):
         print(f"--llm must be off, residual or always, got {llm!r}", file=sys.stderr)
         raise typer.Exit(2)
-    failed = run_clean(
-        ProjectPaths(project),
+    failed = _stage(
+        project,
+        "clean" if no_score else ["clean", "score2"],
         only=doc,
         force=force,
-        llm_mode=llm,  # type: ignore[arg-type]
-        describe=False if no_describe else None,
-        rescore=not no_score,
+        extra={"llm_mode": llm, "describe": False if no_describe else None},
     )
     if failed:
+        raise typer.Exit(1)
+
+
+@app.command()
+def status(
+    project: Annotated[Path, typer.Argument(help="Project directory.")],
+    json_out: Annotated[
+        bool, typer.Option("--json", help="Print JSON instead of a table.")
+    ] = False,
+    verbose: Annotated[
+        bool, typer.Option("-v", "--verbose", help="Show the reason per node.")
+    ] = False,
+) -> None:
+    """Per-document stage states (fresh / stale / missing / failed). Read-only."""
+    from manuallabor.jobs.graph import project_status
+    from manuallabor.jobs.render import render_status
+    from manuallabor.project import ProjectPaths
+
+    if not project.is_dir():
+        print(f"project directory not found: {project}", file=sys.stderr)
+        raise typer.Exit(2)
+    st = project_status(ProjectPaths(project), None)
+    if json_out:
+        sys.stdout.write(json.dumps(st.model_dump(mode="json"), sort_keys=True, indent=2) + "\n")
+    else:
+        sys.stdout.write(render_status(st, verbose=verbose))
+
+
+@app.command()
+def run(
+    project: Annotated[Path, typer.Argument(help="Project directory.")],
+    to: Annotated[
+        str, typer.Option("--to", help="Last node: parse, figures, score, group, clean or score2.")
+    ] = "score2",
+    doc: Annotated[
+        list[str] | None, typer.Option("--doc", help="Only this document (repeatable).")
+    ] = None,
+    force: Annotated[
+        list[str] | None, typer.Option("--force", help="Force this node (repeatable).")
+    ] = None,
+    allow_reparse: Annotated[
+        bool,
+        typer.Option("--allow-reparse", help="Allow a re-parse of documents that have decisions."),
+    ] = False,
+    mock: Annotated[bool, typer.Option("--mock", help="Mock every model call.")] = False,
+) -> None:
+    """Run every stale stage up to --to (resumable: a killed run continues where it stopped)."""
+    from manuallabor.jobs.inline import run_inline
+    from manuallabor.parse.pipeline import stdout_emit
+    from manuallabor.project import ProjectPaths
+    from manuallabor.state.errors import LockHeld
+    from manuallabor.state.lock import ProjectLock
+    from manuallabor.state.models import RunPlanIn
+    from manuallabor.state.store import Store
+
+    if not project.is_dir():
+        print(f"project directory not found: {project}", file=sys.stderr)
+        raise typer.Exit(2)
+    paths = ProjectPaths(project)
+    paths.ensure_config()
+    cmd = " ".join(sys.argv)
+    plock, wlock = ProjectLock(paths.lock, cmd=cmd), ProjectLock(paths.worker_lock, cmd=cmd)
+    try:
+        plock.acquire()
+        wlock.acquire()
+    except LockHeld as exc:
+        plock.release()
+        print(f"{exc}", file=sys.stderr)
+        raise typer.Exit(3) from exc
+    try:
+        store = Store.open(paths)
+        try:
+            res = run_inline(
+                paths,
+                RunPlanIn(to=to, docs=doc, force=list(force or []), allow_reparse=allow_reparse),
+                mode="mock" if mock else "config",
+                emit=lambda o: stdout_emit(o),
+                store=store,
+            )
+        except ValueError as exc:
+            print(str(exc), file=sys.stderr)
+            raise typer.Exit(2) from exc
+        finally:
+            store.close()
+    finally:
+        wlock.release()
+        plock.release()
+    if not res.ok:
         raise typer.Exit(1)
 
 
@@ -250,3 +374,158 @@ def probe(
         sys.stdout.write(dump_json({"probe": result, "suggestions": table}))
     else:
         sys.stdout.write(pr.render_table(result, table, apply))  # type: ignore[arg-type]
+
+
+learning_app = typer.Typer(help="The reversible learning layer.", no_args_is_help=True)
+app.add_typer(learning_app, name="learning")
+decisions_app = typer.Typer(help="Decision log.", no_args_is_help=True)
+app.add_typer(decisions_app, name="decisions")
+
+
+def _locked_services(project: Path):  # type: ignore[no-untyped-def]
+    """Take the project lock and open store + learning service (exit 3 when held)."""
+    from manuallabor.project import ProjectPaths
+    from manuallabor.state.errors import LockHeld
+    from manuallabor.state.learning import LearningService
+    from manuallabor.state.lock import ProjectLock
+    from manuallabor.state.store import Store
+
+    if not project.is_dir():
+        print(f"project directory not found: {project}", file=sys.stderr)
+        raise typer.Exit(2)
+    paths = ProjectPaths(project)
+    paths.ensure_config()
+    lock = ProjectLock(paths.lock, cmd=" ".join(sys.argv))
+    try:
+        lock.acquire()
+    except LockHeld as exc:
+        print(f"{exc}", file=sys.stderr)
+        raise typer.Exit(3) from exc
+    store = Store.open(paths)
+    return paths, store, LearningService(paths, store), lock
+
+
+def _learning_op(project: Path, op: str, arg: str | None = None) -> None:
+    import uuid
+
+    from manuallabor.state.errors import InvalidOp, NotFound
+
+    _paths, store, svc, lock = _locked_services(project)
+    rid = f"cli-{uuid.uuid4().hex}"
+    try:
+        if op == "list":
+            st = svc.state()
+            print(
+                f"enabled={st.enabled} use_global={st.use_global} "
+                f"active={st.active} provenance={st.provenance}"
+            )
+            for sn in st.snapshots:
+                mark = "*" if sn.active else " "
+                print(
+                    f"{mark} {sn.id}  parent={sn.parent or '-'}  "
+                    f"origin={sn.origin}  counts={sn.counts}"
+                )
+        elif op == "snapshot":
+            print(f"snapshot {svc.snapshot(rid).id} created (not activated)")
+        elif op in ("activate", "rollback"):
+            assert arg is not None
+            print(f"active={svc.activate(arg, rid).active}")
+        elif op == "reset":
+            svc.reset(rid)
+            print("learning reset: decisions and snapshots kept; baseline behaviour restored")
+        elif op == "disable":
+            assert arg is not None
+            print(f"snapshot {svc.disable_item(arg, rid).id} active (item {arg} disabled)")
+        elif op == "publish":
+            assert arg is not None
+            print(f"published {svc.publish(arg, rid).origin}")
+    except (InvalidOp, NotFound) as exc:
+        print(str(exc), file=sys.stderr)
+        raise typer.Exit(1) from exc
+    finally:
+        store.close()
+        lock.release()
+
+
+@learning_app.command("list")
+def learning_list(project: Annotated[Path, typer.Argument(help="Project directory.")]) -> None:
+    """Snapshots, the active one and the provenance stages would record."""
+    _learning_op(project, "list")
+
+
+@learning_app.command("snapshot")
+def learning_snapshot(project: Annotated[Path, typer.Argument(help="Project directory.")]) -> None:
+    """Derive a new immutable snapshot from every recorded action (does not activate it)."""
+    _learning_op(project, "snapshot")
+
+
+@learning_app.command("activate")
+def learning_activate(
+    project: Annotated[Path, typer.Argument(help="Project directory.")],
+    snapshot_id: Annotated[str, typer.Argument(help="Snapshot id, e.g. 002.")],
+) -> None:
+    """Make a snapshot the active learned layer."""
+    _learning_op(project, "activate", snapshot_id)
+
+
+@learning_app.command("rollback")
+def learning_rollback(
+    project: Annotated[Path, typer.Argument(help="Project directory.")],
+    snapshot_id: Annotated[str, typer.Argument(help="Snapshot id to return to.")],
+) -> None:
+    """Return to an earlier snapshot (same operation as activate)."""
+    _learning_op(project, "rollback", snapshot_id)
+
+
+@learning_app.command("reset")
+def learning_reset(project: Annotated[Path, typer.Argument(help="Project directory.")]) -> None:
+    """Remove the active learned layer; decisions and snapshots are kept."""
+    _learning_op(project, "reset")
+
+
+@learning_app.command("disable")
+def learning_disable(
+    project: Annotated[Path, typer.Argument(help="Project directory.")],
+    item_id: Annotated[str, typer.Argument(help="Rule or example id.")],
+) -> None:
+    """Disable one rule or example (a new child snapshot becomes active)."""
+    _learning_op(project, "disable", item_id)
+
+
+@learning_app.command("publish")
+def learning_publish(
+    project: Annotated[Path, typer.Argument(help="Project directory.")],
+    snapshot_id: Annotated[str, typer.Argument(help="Snapshot id.")],
+) -> None:
+    """Copy a snapshot to the global store (needs learning.contribute_global)."""
+    _learning_op(project, "publish", snapshot_id)
+
+
+@decisions_app.command("export")
+def decisions_export(
+    project: Annotated[Path, typer.Argument(help="Project directory.")],
+    out: Annotated[Path | None, typer.Option("--out", help="Output file (default stdout).")] = None,
+) -> None:
+    """Every recorded action as canonical NDJSON, sorted by id."""
+    from manuallabor.contracts.io import canonical_json
+    from manuallabor.project import ProjectPaths
+    from manuallabor.state.store import Store
+
+    paths = ProjectPaths(project)
+    if not paths.db.is_file():
+        print("no project.db yet", file=sys.stderr)
+        raise typer.Exit(1)
+    store = Store.open(paths, readonly=True)
+    try:
+        text = "".join(
+            canonical_json(a.model_dump(mode="json")).decode() + "\n" for a in store.iter_actions()
+        )
+    finally:
+        store.close()
+    if out is None:
+        sys.stdout.write(text)
+    else:
+        out.write_text(text, encoding="utf-8")
+
+
+_register_serve()

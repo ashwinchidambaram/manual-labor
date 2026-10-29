@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.metadata as md
+import json
 import shutil
 import time
 from dataclasses import dataclass
@@ -152,18 +153,39 @@ def _file_sha(path: Path) -> str:
     return sha256_bytes(path.read_bytes())
 
 
+def _overrides_sha(dp: DocPaths) -> str | None:
+    return _file_sha(dp.figure_overrides) if dp.figure_overrides.is_file() else None
+
+
 def _fingerprint(doc: Document, dp: DocPaths) -> str:
-    return sha256_bytes(
-        canonical_json(
-            {
-                "versions": _versions(),
-                "doc_sha256": doc.sha256,
-                "parser_versions": doc.parser_versions,
-                "figures_json": _file_sha(dp.figures),
-                "blocks_json": _file_sha(dp.blocks),
-            }
-        )
-    )
+    payload: dict[str, Any] = {
+        "versions": _versions(),
+        "doc_sha256": doc.sha256,
+        "parser_versions": doc.parser_versions,
+        "figures_json": _file_sha(dp.figures),
+        "blocks_json": _file_sha(dp.blocks),
+    }
+    ov = _overrides_sha(dp)
+    if ov is not None:  # absent file keeps every pre-module-7 fingerprint unchanged
+        payload["figure_overrides"] = ov
+    return sha256_bytes(canonical_json(payload))
+
+
+def figures_fingerprint(paths: ProjectPaths, slug: str) -> str:
+    """The fingerprint `figures_report.json` must carry to be current (pure)."""
+    dp = paths.doc(slug)
+    return _fingerprint(paths.load_document(slug), dp)
+
+
+def load_bbox_overrides(dp: DocPaths) -> dict[str, list[float]]:
+    """figure_id -> human crop bbox (module 7 projection); the latest entry per figure wins."""
+    if not dp.figure_overrides.is_file():
+        return {}
+    rows = json.loads(dp.figure_overrides.read_text(encoding="utf-8"))
+    out: dict[str, list[float]] = {}
+    for row in sorted(rows, key=lambda r: int(r["seq"])):
+        out[str(row["figure_id"])] = [float(v) for v in row["bbox"]]
+    return out
 
 
 def _load_report(dp: DocPaths) -> FigureReport | None:
@@ -214,6 +236,7 @@ def _extract_doc(
         raise FiguresError(f"source file missing: {src}")
     figs: list[FigureExtraction] = []
     failures: list[FigureFailure] = []
+    overrides = load_bbox_overrides(dp)
     no_text = set(doc.pages_without_text_layer)
     pdf: Any = None
     docx_imgs: DocxImages | None = None
@@ -227,19 +250,24 @@ def _extract_doc(
         for b in fig_blocks:
             fid = str(b.figure_id)
             cand = cand_by_id[fid]
+            use_bbox = b.bbox
             try:
                 if docx_imgs is not None:
                     ex = _extract_docx(docx_imgs, cand)
                 else:
                     if b.bbox is None:
                         raise FiguresError(f"{fid}: PDF figure block without bbox")
+                    human = overrides.get(fid)
+                    use_bbox = human if human is not None else b.bbox
                     pno = b.page - 1
                     if pno not in pcs:
                         pcs.clear()
                         pcs[pno] = load_page_content(
                             pdf, pdf[pno], has_text_layer=b.page not in no_text
                         )
-                    ex = extract_pdf_figure(pdf, pno, list(b.bbox), pc=pcs[pno], cache=cache)
+                    ex = extract_pdf_figure(pdf, pno, list(use_bbox), pc=pcs[pno], cache=cache)
+                    if human is not None:
+                        ex.reason = "human_bbox"
             except UnsupportedImage as exc:
                 failures.append(
                     FigureFailure(figure_id=fid, block_id=b.id, page=b.page, reason=str(exc))
@@ -253,15 +281,15 @@ def _extract_doc(
                 svg_sha = sha256_bytes(ex.svg)
             cap = captions.get(fid)
             area_frac = None
-            if b.bbox is not None and pdf is not None:
+            if use_bbox is not None and pdf is not None:
                 pr = pcs[b.page - 1].page_rect
-                area_frac = round(g.area(b.bbox) / g.area(pr), 6) if g.area(pr) > 0 else None
+                area_frac = round(g.area(use_bbox) / g.area(pr), 6) if g.area(pr) > 0 else None
             figs.append(
                 FigureExtraction(
                     figure_id=fid,
                     block_id=b.id,
                     page=b.page,
-                    bbox=b.bbox,
+                    bbox=use_bbox,
                     method=ex.method,
                     reason=ex.reason,
                     crop_source=ex.crop_source,  # type: ignore[arg-type]

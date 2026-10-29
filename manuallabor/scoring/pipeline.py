@@ -8,10 +8,11 @@ import json
 import time
 from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from manuallabor import ids
+from manuallabor import faults, ids
 from manuallabor.cleanup.types import CleanFile, fallback_detail, raw_sha256
 from manuallabor.contracts.block import Block, NumericVariant, Signal
 from manuallabor.contracts.config import ProjectConfig
@@ -24,6 +25,7 @@ from manuallabor.contracts.io import (
     read_json,
     read_json_list,
     write_json,
+    write_text_atomic,
 )
 from manuallabor.figures.types import FigureIndex, FigureReport
 from manuallabor.parse.pipeline import Emit, stdout_emit
@@ -66,6 +68,7 @@ __all__ = [
     "run_score",
     "score_block",
     "score_document",
+    "score_fingerprint",
 ]
 
 NO_VERIFIER = VerifierPlan(None, "skip_no_verifier", None)
@@ -410,7 +413,7 @@ def _apply_sidecars(
         new = FigureRecord.model_validate({**rec.model_dump(), **upd})
         data = dump_json(new)
         if sc.read_text(encoding="utf-8") != data:
-            sc.write_text(data, encoding="utf-8", newline="\n")
+            write_text_atomic(sc, data)
             n += 1
     return n
 
@@ -426,16 +429,28 @@ def _history_key(confidence: float | None, status: str, signals: Sequence[Signal
     )
 
 
+def _repair_history(path: Path) -> list[str]:
+    """The complete lines of the history. A trailing line without its newline (a kill during an
+    append) is cut off the file first, so a replay appends exactly what the killed run would
+    have."""
+    if not path.is_file():
+        return []
+    data = path.read_bytes()
+    if data and not data.endswith(b"\n"):
+        cut = data.rfind(b"\n") + 1
+        with open(path, "r+b") as f:
+            f.truncate(cut)
+        data = data[:cut]
+    return [ln for ln in data.decode("utf-8").splitlines() if ln.strip()]
+
+
 def _append_history(path: Path, fp: str, scores: Sequence[BlockScore]) -> int:
     last: dict[str, str] = {}
     seq = 0
-    if path.is_file():
-        for line in path.read_text(encoding="utf-8").splitlines():
-            if not line.strip():
-                continue
-            h = HistoryEntry.model_validate_json(line)
-            seq = max(seq, h.seq)
-            last[h.block_id] = _history_key(h.confidence, h.status, h.signals)
+    for line in _repair_history(path):
+        h = HistoryEntry.model_validate_json(line)
+        seq = max(seq, h.seq)
+        last[h.block_id] = _history_key(h.confidence, h.status, h.signals)
     lines: list[str] = []
     for s in scores:
         key = _history_key(s.confidence, s.status, s.signals)
@@ -515,8 +530,12 @@ def _write_outputs(
     threshold: float,
     scores: list[BlockScore],
 ) -> None:
-    """scores.json (atomic), then sidecars (only changed bytes), then history."""
+    """History first, then scores.json (atomic), then sidecars (only changed bytes). A kill
+    between any two steps heals on replay: the history only appends lines that differ from a
+    block's last line, and the skip path restores sidecars (module 7, kill-safe resume)."""
     dp = paths.doc(slug)
+    _append_history(dp.score_history, fp, scores)
+    faults.fault("score.after_history")
     write_json(
         dp.scores,
         ScoreFile(
@@ -527,19 +546,23 @@ def _write_outputs(
             blocks=scores,
         ),
     )
+    faults.fault("score.after_scores")
     _apply_sidecars(paths, slug, blocks, scores)
-    _append_history(dp.score_history, fp, scores)
 
 
-def _score_doc(
-    paths: ProjectPaths,
-    slug: str,
-    config: ProjectConfig,
-    force: bool,
-    plan: VerifierPlan,
-    emit: Emit,
-) -> None:
-    t0 = time.perf_counter()
+@dataclass
+class _ScoreInputs:
+    doc: Document
+    blocks: list[Block]
+    layouts: list[PageLayout]
+    fig_inputs: dict[str, FigureInputs]
+    variants: dict[str, list[NumericVariant]]
+    fallbacks: dict[str, str]
+    prior: ScoreFile | None
+    fp: str
+
+
+def _score_inputs(paths: ProjectPaths, slug: str, config: ProjectConfig) -> _ScoreInputs:
     dp = paths.doc(slug)
     if not dp.blocks.is_file():
         raise ScoringError("document is not parsed (blocks.json missing)")
@@ -575,6 +598,27 @@ def _score_doc(
             },
         }
     )
+    return _ScoreInputs(doc, blocks, layouts, fig_inputs, variants, fallbacks, prior, fp)
+
+
+def score_fingerprint(paths: ProjectPaths, slug: str, config: ProjectConfig) -> str:
+    """The fingerprint `scores.json` must carry to be current (pure; no stage runs)."""
+    return _score_inputs(paths, slug, config).fp
+
+
+def _score_doc(
+    paths: ProjectPaths,
+    slug: str,
+    config: ProjectConfig,
+    force: bool,
+    plan: VerifierPlan,
+    emit: Emit,
+) -> None:
+    t0 = time.perf_counter()
+    inp = _score_inputs(paths, slug, config)
+    doc, blocks, layouts = inp.doc, inp.blocks, inp.layouts
+    fig_inputs, variants, fallbacks = inp.fig_inputs, inp.variants, inp.fallbacks
+    prior, fp = inp.prior, inp.fp
     if not force and prior is not None and prior.fingerprint == fp:
         if prior.threshold != config.threshold:
             # design 6: a threshold change re-runs assign_status on the stored confidences only

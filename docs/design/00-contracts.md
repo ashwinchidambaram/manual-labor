@@ -321,7 +321,7 @@ Public method flow: build the key with `cache.key(...)`. On a hit, return the ca
 - `corrupting_providers(tmp_path)`: same, but `cleanup` uses CorruptingMockProvider.
 
 ### 6.2 `sinks.py`
-`ListSink(list)`. `JsonlSink(path)` appends `json.dumps(log.model_dump(mode="json"), sort_keys=True, separators=(",",":"), ensure_ascii=False)+"\n"` to `<project>/logs/llm_calls.jsonl`, using one line per call and flushing per call.
+`ListSink(list)`. `JsonlSink(path)` appends `json.dumps(log.model_dump(mode="json"), sort_keys=True, separators=(",",":"), ensure_ascii=False)+"\n"` to `<project>/llm_calls.jsonl` (module 7 fixes this path; `logs/` holds job logs only), using one line per call and flushing per call.
 
 ### 6.3 `cache.py`
 `LLMCache(root: Path)` with root `<project>/.llm_cache`, created lazily.

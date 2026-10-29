@@ -43,6 +43,7 @@ Reason = Literal[
     "smask_size",
     "single_image",
     "render_disagreement",
+    "human_bbox",
 ]
 CropSource = Literal["raster", "render"]
 DupKind = Literal["exact", "near"]

@@ -1,0 +1,331 @@
+// Verify data flow (design 09 section 3): queue + optimistic reducer + serial writes + cursor persistence.
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { ApiError, client, unwrap } from "../api/client";
+import { useProject } from "../api/queries";
+import type { BlockDetail, EditConflict, FlagCategory, PageBlock, QueueItem, QueuePage, QueueSort, ReviewActionOut } from "../api/schema";
+import { useToast } from "../shell/Toast";
+import { initialState, queueReducer, type ActKind, type QueueEvent, type QueueState } from "./queueReducer";
+import { CancelledError, useVerifyWrites } from "./useVerifyWrites";
+
+export const PAGE_LIMIT = 500;
+
+export interface Controls {
+  sort: QueueSort;
+  view: number | null;
+}
+type Applied = Controls | null;
+
+export const blockKey = (id: string | null) => ["verify", "block", id] as const;
+export const pageBlocksKey = (slug: string, page: number) => ["pageBlocks", slug, page] as const;
+
+export const fetchBlock = async (id: string): Promise<BlockDetail> =>
+  unwrap(await client.GET("/api/verify/blocks/{block_id}", { params: { path: { block_id: id } } }));
+
+export function itemFromDetail(d: BlockDetail): QueueItem {
+  const b = d.block;
+  return {
+    block_id: b.id,
+    doc_id: b.doc_id,
+    page: b.page,
+    type: b.type,
+    confidence: b.confidence ?? null,
+    status: b.status,
+    has_numeric_spec: b.has_numeric_spec,
+    reasons: d.why?.filter((w) => w.kind === "stale" || (w.kind === "signal" && (w.value ?? 1) < 1)).map((w) => w.name).slice(0, 3) ?? [],
+    stale_doc: false,
+  };
+}
+
+export interface ActOpts {
+  text?: string;
+  confirm?: boolean;
+  flag?: { category: FlagCategory; note: string | null; target_id?: string | null };
+}
+export type ActResult = { ok: true; out: ReviewActionOut } | { ok: false; error: unknown; conflict?: EditConflict };
+
+export function useVerifyState() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const writes = useVerifyWrites();
+  const project = useProject();
+  const T = project.data?.config.threshold ?? 0.85;
+
+  // the reducer runs synchronously so two fast key presses see each other's effects
+  const ref = useRef<QueueState>(initialState);
+  const [state, setState] = useState<QueueState>(initialState);
+  const dispatch = useCallback((e: QueueEvent) => {
+    ref.current = queueReducer(ref.current, e);
+    setState(ref.current);
+  }, []);
+
+  const controlsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [controls, setControls] = useState<Controls>({ sort: "worst_first", view: null });
+  const controlsRef = useRef(controls);
+  controlsRef.current = controls;
+  const [applied, setApplied] = useState<Applied>(null);
+  const [firstLoad, setFirstLoad] = useState(false);
+  const [focusTick, setFocusTick] = useState(0);
+  /** the next card that becomes current takes focus (consumed by QueueCard) */
+  const wantFocus = useRef(false);
+  const requestFocus = useCallback(() => {
+    wantFocus.current = true;
+    setFocusTick((t) => t + 1);
+  }, []);
+
+  const queueQ = useQuery({
+    queryKey: ["verify", "queue", applied] as const,
+    queryFn: async (): Promise<QueuePage> =>
+      unwrap(
+        await client.GET("/api/verify/queue", {
+          params: { query: { limit: PAGE_LIMIT, ...(applied ? { sort: applied.sort, ...(applied.view !== null ? { view_threshold: applied.view } : {}) } : {}) } },
+        }),
+      ),
+    staleTime: Infinity,
+    refetchInterval: (q) => (q.state.data?.docs.some((d) => d.state === "pending") ? 3000 : false),
+  });
+
+  // Apply server snapshots only while no write is in flight (the acks are authoritative until then).
+  const stash = useRef<QueuePage | null>(null);
+  const writesPending = useRef(0);
+  writesPending.current = writes.pending;
+  const apply = useCallback(
+    (d: QueuePage) => {
+      dispatch({ type: "loaded", items: d.items, total: d.total, counts: d.counts, docs: d.docs, cursor: d.cursor, replace: true });
+      if (!controlsTimer.current) setControls({ sort: d.cursor.sort, view: d.cursor.view_threshold ?? null });
+      setFirstLoad(true);
+    },
+    [dispatch],
+  );
+  useEffect(() => {
+    const d = queueQ.data;
+    if (!d) return;
+    if (writesPending.current > 0) stash.current = d;
+    else apply(d);
+  }, [queueQ.data, apply]);
+  useEffect(() => {
+    if (writes.pending === 0 && stash.current) {
+      const d = stash.current;
+      stash.current = null;
+      apply(d);
+    }
+  }, [writes.pending, apply]);
+
+  // -- cursor persistence --------------------------------------------------------------------------------------
+
+  const putCursor = useCallback(
+    (c: Controls = controlsRef.current) =>
+      writes.enqueue(async () =>
+        unwrap(
+          await client.PUT("/api/verify/cursor", {
+            body: {
+              sort: c.sort,
+              view_threshold: c.view,
+              doc_filter: ref.current.cursor.doc_filter ?? null,
+              current_block_id: ref.current.currentId,
+              request_id: crypto.randomUUID(),
+            },
+          }),
+        ),
+      ),
+    [writes],
+  );
+  const cursorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scheduleCursor = useCallback(() => {
+    if (cursorTimer.current) clearTimeout(cursorTimer.current);
+    cursorTimer.current = setTimeout(() => {
+      cursorTimer.current = null;
+      void putCursor().catch(() => undefined);
+    }, 300);
+  }, [putCursor]);
+  useEffect(
+    () => () => {
+      if (cursorTimer.current) clearTimeout(cursorTimer.current);
+    },
+    [],
+  );
+
+  const applyControls = useCallback(
+    (c: Controls, delay: number) => {
+      setControls(c);
+      controlsRef.current = c;
+      if (controlsTimer.current) clearTimeout(controlsTimer.current);
+      controlsTimer.current = setTimeout(() => {
+        controlsTimer.current = null;
+        void putCursor(c)
+          .then(() => setApplied(c))
+          .catch((e) => {
+            if (!(e instanceof CancelledError)) toast.error(`Not saved: ${e instanceof ApiError ? e.detail : "network error"}`);
+          });
+      }, delay);
+    },
+    [putCursor, toast],
+  );
+  useEffect(
+    () => () => {
+      if (controlsTimer.current) clearTimeout(controlsTimer.current);
+    },
+    [],
+  );
+  const setSort = useCallback((sort: QueueSort) => applyControls({ ...controlsRef.current, sort }, 0), [applyControls]);
+  const setView = useCallback((view: number | null) => applyControls({ ...controlsRef.current, view }, 250), [applyControls]);
+
+  // -- navigation -------------------------------------------------------------------------------------------
+
+  const browse = useCallback(
+    (id: string) => {
+      dispatch({ type: "browse", id });
+      scheduleCursor();
+    },
+    [dispatch, scheduleCursor],
+  );
+  const browseBy = useCallback(
+    (delta: number | "first" | "last") => {
+      const s = ref.current;
+      const all = s.pinned ? [s.pinned, ...s.items] : s.items;
+      if (!all.length) return;
+      const i = all.findIndex((x) => x.block_id === s.currentId);
+      const j = delta === "first" ? 0 : delta === "last" ? all.length - 1 : Math.min(all.length - 1, Math.max(0, (i < 0 ? 0 : i) + delta));
+      browse(all[j].block_id);
+    },
+    [browse],
+  );
+  const jumpTo = useCallback(
+    async (id: string) => {
+      const s = ref.current;
+      const listed = s.items.find((i) => i.block_id === id) ?? (s.pinned?.block_id === id ? s.pinned : undefined);
+      if (listed) {
+        browse(id);
+        requestFocus();
+        return;
+      }
+      try {
+        const d = await qc.fetchQuery({ queryKey: blockKey(id), queryFn: () => fetchBlock(id), staleTime: Infinity });
+        dispatch({ type: "jump", item: itemFromDetail(d) });
+        scheduleCursor();
+      } catch (e) {
+        if (e instanceof ApiError && (e.status === 422 || e.status === 404)) toast.info("Not in your selection");
+        else toast.error(`Could not open ${id}`);
+      }
+    },
+    [browse, dispatch, qc, requestFocus, scheduleCursor, toast],
+  );
+
+  // the server's current block may be missing from the loaded pages (reload, back, view change): pin it
+  useEffect(() => {
+    const s = state;
+    if (!s.currentId || s.pinned?.block_id === s.currentId || s.items.some((i) => i.block_id === s.currentId)) return;
+    let live = true;
+    qc.fetchQuery({ queryKey: blockKey(s.currentId), queryFn: () => fetchBlock(s.currentId!), staleTime: Infinity })
+      .then((d) => live && dispatch({ type: "pin", item: itemFromDetail(d) }))
+      .catch(() => live && s.items[0] && dispatch({ type: "browse", id: s.items[0].block_id }));
+    return () => {
+      live = false;
+    };
+  }, [state, qc, dispatch]);
+
+  const loadMore = useCallback(async () => {
+    const s = ref.current;
+    if (s.items.length >= s.total) return;
+    try {
+      const d = unwrap(
+        await client.GET("/api/verify/queue", {
+          params: {
+            query: {
+              limit: PAGE_LIMIT,
+              offset: s.items.length,
+              ...(applied ? { sort: applied.sort, ...(applied.view !== null ? { view_threshold: applied.view } : {}) } : {}),
+            },
+          },
+        }),
+      );
+      dispatch({ type: "loaded", items: d.items, total: d.total, counts: d.counts, docs: d.docs, cursor: ref.current.cursor, replace: false });
+    } catch {
+      /* the next browse retries */
+    }
+  }, [applied, dispatch]);
+
+  // -- actions ----------------------------------------------------------------------------------------------
+
+  const act = useCallback(
+    (kind: ActKind, opts: ActOpts = {}): Promise<ActResult> => {
+      const s = ref.current;
+      const id = kind === "back" ? null : s.currentId;
+      if (kind !== "back" && !id) return Promise.resolve({ ok: false, error: new Error("no current block") });
+      const rid = crypto.randomUUID();
+      const optimistic = kind !== "edit";
+      if (optimistic) dispatch({ type: "act", kind, blockId: id, rid });
+      const doc = id ? (s.items.find((i) => i.block_id === id) ?? s.seen[id] ?? s.pinned) : null;
+      return writes
+        .enqueue(async () => {
+          const out: ReviewActionOut = unwrap(
+            await client.POST("/api/verify/actions", {
+              body: {
+                kind,
+                ...(id ? { block_id: id } : {}),
+                ...(opts.text !== undefined ? { text: opts.text } : {}),
+                confirm_content_change: opts.confirm ?? false,
+                ...(opts.flag ? { flag: { category: opts.flag.category, note: opts.flag.note, target_id: opts.flag.target_id ?? null } } : {}),
+                request_id: rid,
+              },
+            }),
+          );
+          return out;
+        })
+        .then((out): ActResult => {
+          if (!optimistic) dispatch({ type: "act", kind, blockId: id, rid });
+          dispatch({ type: "ack", rid, out });
+          requestFocus();
+          if (id) {
+            void qc.invalidateQueries({ queryKey: blockKey(id) });
+            if (doc && out.block_status)
+              qc.setQueryData<PageBlock[]>(pageBlocksKey(doc.doc_id, doc.page), (rows) =>
+                rows?.map((r) => (r.block_id === id ? { ...r, status: out.block_status! } : r)),
+              );
+          }
+          return { ok: true, out };
+        })
+        .catch((error: unknown): ActResult => {
+          if (error instanceof CancelledError) return { ok: false, error };
+          if (!optimistic) {
+            const body = error instanceof ApiError ? (error.body as { conflict?: EditConflict } | undefined) : undefined;
+            if (error instanceof ApiError && (error.status === 409 || error.status === 422))
+              return { ok: false, error, conflict: body?.conflict };
+            toast.error(`Not saved: ${error instanceof ApiError ? error.detail : "network error"}`);
+            return { ok: false, error };
+          }
+          writes.cancelQueued();
+          dispatch({ type: "fail", rid });
+          toast.error(`Not saved: ${error instanceof ApiError ? error.detail : "network error"}`);
+          void qc.invalidateQueries({ queryKey: ["verify", "queue"] });
+          requestFocus();
+          return { ok: false, error };
+        });
+    },
+    [dispatch, qc, requestFocus, toast, writes],
+  );
+
+  const viewAdded = useMemo(() => state.items.filter((i) => i.status === "auto_approved").length, [state.items]);
+
+  return {
+    state,
+    stateRef: ref,
+    dispatch,
+    writes,
+    T,
+    controls,
+    setSort,
+    setView,
+    firstLoad,
+    queueQ,
+    browse,
+    browseBy,
+    jumpTo,
+    loadMore,
+    act,
+    viewAdded,
+    focusTick,
+    wantFocus,
+    requestFocus,
+  };
+}

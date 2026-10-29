@@ -89,6 +89,7 @@ CASES: dict[tuple[str, str], tuple[str, dict[str, Any], int]] = {
         404,
     ),
     ("GET", "/api/articles/{article_id}/figures"): ("/api/articles/doc/figures", {}, 200),
+    ("GET", "/api/docs/{slug}/figures"): ("/api/docs/doc/figures", {}, 200),
     ("GET", "/api/figures/{fid}/image"): (f"/api/figures/{FIG}/image", {}, 200),
     ("POST", "/api/figures/{fid}/attach"): (
         f"/api/figures/{FIG}/attach",

@@ -448,3 +448,22 @@ Exceptions (`state/errors.py`, day 0): `NotFound`, `OutOfScope`, `EditConflictEr
 12. **Parser-disagreement highlights on the page render** need word bboxes per parser, which blocks do not carry. v1 highlights disagreement spans in the *text* pane (`parser_texts` + diff); page-level highlighting is deferred.
 13. **Two generated TS type sets** (`generated.ts` from contracts, `schema.d.ts` from OpenAPI) overlap. Accepted: API code uses `schema.d.ts`; contract-only consumers keep `generated.ts`.
 14. **Windows.** `fcntl` locks and `killpg` make v1 macOS/Linux only; recorded, not addressed.
+
+## 13. Implementation notes (implementer A, 2026-10-29): where the code differs from or extends this design
+
+| Item | What the code does | Why |
+|---|---|---|
+| `ActionKind.import` | the enum member is `ActionKind.import_` with value `"import"` | `import` is a Python keyword |
+| `ReviewActionIn.request_id` | required, non-empty | idempotency is the point of the field |
+| `ReviewActionOut.block_status` | `None` after `back` | `back` records no decision |
+| Executor granularity | one stage call per (node, doc) unit, including `parse` | per-unit `stages.json` and fault points; `parse` builds its OCR runtime per call (cost: one pool start per document that needs OCR) |
+| `score` node when `clean.json` exists | the fingerprint check is left to `score2` (the file carries score2's fingerprint); the threshold check still applies to both | otherwise `score` would look stale after every clean |
+| Node `failed` vs `missing` | a recorded failure is reported as `failed` even when the output is absent | the reason is more useful than "missing" |
+| Fault points | `llm.after_calls:<node>:<n>` (calls inside one node) and `score.after_history` / `score.after_scores` were added; `faults.delay(point)` (`MANUALLABOR_DELAY=<point>=<s>`) holds a unit open for the cancel test | the R2 "during clean" case needs a per-node counter; cancel needs a unit that is still running |
+| `node.after:<node>:<slug>` | fires after the stage returned and before `stages.json` is written (as specified) | |
+| Projections | `selection.json`, overrides and `learning/*` are rewritten by `reconcile` on every writer `Store.open`; the project threshold and `learning.*` config writes happen after commit and are not reconciled | a crash between commit and the config write leaves the old config; the action row shows the intent |
+| `figure_overrides.json` | `[{seq, figure_id, bbox}]`, latest per figure; absent when there are no rows; its sha enters the figures fingerprint only when the file exists | pre-module-7 fingerprints stay valid |
+| `jobs` concurrency | 1; the worker lock is project-wide, so a second worker would be refused anyway (`MANUALLABOR_JOB_CONCURRENCY` is not read) | |
+| Learning example | `actions.example` also carries `raw_source` (needed to mark OCR examples) and `human_edit` | |
+| `labor run` / `labor check` | one `jobs` row per call (kind `run`) written by `jobs/inline.py`; progress lines are the stage lines plus `{"event":"unit_done",...}` | |
+| `labor check` K6 | re-runs every node through its skip path (`make_plan(include_fresh=True)`) and asserts only `skip`/`sidecars` statuses and unchanged hashes under `docs/` and `figures/` (stages.json excluded) | an empty plan would prove nothing |

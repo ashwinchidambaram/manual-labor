@@ -3,6 +3,7 @@ import { setupServer } from "msw/node";
 import type { DocGroups, JobInfo, ProjectStatus, ScopeBlocks, ScopeModels, SelectionOp, SelectionOut, SourceInfo } from "../api/schema";
 import { buildGroupsIndex } from "../scope/derive";
 import { reduce } from "../scope/selectionReducer";
+import { installVerifyFake } from "./verifyFake";
 import { coverageFor, makeBlocks, makeDocs, makeJob, makeModels, makeProject, makeSelectionOut, makeSources } from "./fixtures";
 
 export const server = setupServer();
@@ -142,5 +143,6 @@ export function installFake(over: Partial<Fake> = {}): Fake {
       return HttpResponse.json({ models: f.models.models, stale: [{ node: "clean", state: "stale" }, { node: "score2", state: "stale" }] });
     }),
   );
+  installVerifyFake(); // an empty review queue, so navigating to /verify from other tests is harmless
   return f;
 }

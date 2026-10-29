@@ -19,8 +19,8 @@ describe("App shell", () => {
     installFake();
     const { user, router } = renderApp("/scope");
     await screen.findByTestId("group-tree");
-    await user.click(screen.getByRole("link", { name: "Verify" }));
-    expect(screen.getByTestId("stub-verify")).toBeInTheDocument();
+    await user.click(screen.getByRole("link", { name: "Agent" }));
+    expect(screen.getByTestId("stub-agent")).toBeInTheDocument();
     await user.click(screen.getByRole("link", { name: "Back to Scope" }));
     expect(router.state.location.pathname).toBe("/scope");
     await router.navigate("/nope");

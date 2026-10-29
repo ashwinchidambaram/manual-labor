@@ -18,6 +18,8 @@
   },
   "dependencies": {
     "@tanstack/react-query": "5.105.0",
+    "@tanstack/react-virtual": "3.13.12",
+    "diff": "5.2.0",
     "openapi-fetch": "0.13.8",
     "react": "^18.3",
     "react-dom": "^18.3",
@@ -29,6 +31,7 @@
     "@testing-library/jest-dom": "^6",
     "@testing-library/react": "^16",
     "@testing-library/user-event": "14.6.8",
+    "@types/diff": "5.2.3",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "@vitejs/plugin-react": "^4",

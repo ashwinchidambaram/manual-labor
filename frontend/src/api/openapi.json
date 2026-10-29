@@ -1209,6 +1209,47 @@
         "title": "DiffOpKind",
         "type": "string"
       },
+      "DocFigure": {
+        "additionalProperties": false,
+        "description": "One figure of a document with every article it is attached to (the Verify re-attach picker).",
+        "properties": {
+          "attachments": {
+            "items": {
+              "$ref": "#/components/schemas/FigureAttachment"
+            },
+            "title": "Attachments",
+            "type": "array"
+          },
+          "block_id": {
+            "pattern": "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$",
+            "title": "Block Id",
+            "type": "string"
+          },
+          "figure_id": {
+            "title": "Figure Id",
+            "type": "string"
+          },
+          "image_url": {
+            "title": "Image Url",
+            "type": "string"
+          },
+          "record": {
+            "$ref": "#/components/schemas/FigureRecord"
+          },
+          "status": {
+            "$ref": "#/components/schemas/BlockStatus"
+          }
+        },
+        "required": [
+          "figure_id",
+          "block_id",
+          "record",
+          "image_url",
+          "status"
+        ],
+        "title": "DocFigure",
+        "type": "object"
+      },
       "DocGroups": {
         "additionalProperties": false,
         "properties": {
@@ -5837,6 +5878,53 @@
         "summary": "Export Decisions",
         "tags": [
           "learning"
+        ]
+      }
+    },
+    "/api/docs/{slug}/figures": {
+      "get": {
+        "description": "Every figure of the document with all of its attachments (articles), sorted by figure id.",
+        "operationId": "get_doc_figures",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DocFigure"
+                  },
+                  "title": "Response Get Doc Figures",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Doc Figures",
+        "tags": [
+          "sources"
         ]
       }
     },

@@ -58,9 +58,13 @@ class TaskModels(ContractModel):
 
 
 class LearningConfig(ContractModel):
-    """Self-improvement toggle (module 7 extends it with snapshot settings)."""
+    """Self-improvement settings (module 7). `enabled` off means baseline behaviour exactly,
+    even when learned state exists on disk. `use_global` / `contribute_global` opt in to the
+    cross-project store ($MANUALLABOR_HOME/learning)."""
 
     enabled: bool = False
+    use_global: bool = False
+    contribute_global: bool = False
 
 
 class CleanupConfig(ContractModel):

@@ -15,8 +15,11 @@ REQUIRED = {"doc", "stage", "status", "pages", "elapsed_ms", "detail"}
 
 
 def _snapshot(root: Path) -> dict[str, bytes]:
+    """Stage outputs; stages.json (executor bookkeeping, module 7) counts runs, so it is not one."""
     return {
-        str(p.relative_to(root)): p.read_bytes() for p in sorted((root / "docs").rglob("*.json"))
+        str(p.relative_to(root)): p.read_bytes()
+        for p in sorted((root / "docs").rglob("*.json"))
+        if p.name != "stages.json"
     }
 
 

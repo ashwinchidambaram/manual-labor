@@ -37,16 +37,28 @@
     },
     "LearningConfig": {
       "additionalProperties": false,
-      "description": "Self-improvement toggle (module 7 extends it with snapshot settings).",
+      "description": "Self-improvement settings (module 7). `enabled` off means baseline behaviour exactly,\neven when learned state exists on disk. `use_global` / `contribute_global` opt in to the\ncross-project store ($MANUALLABOR_HOME/learning).",
       "properties": {
+        "contribute_global": {
+          "default": false,
+          "title": "Contribute Global",
+          "type": "boolean"
+        },
         "enabled": {
           "default": false,
           "title": "Enabled",
           "type": "boolean"
+        },
+        "use_global": {
+          "default": false,
+          "title": "Use Global",
+          "type": "boolean"
         }
       },
       "required": [
-        "enabled"
+        "enabled",
+        "use_global",
+        "contribute_global"
       ],
       "title": "LearningConfig",
       "type": "object"

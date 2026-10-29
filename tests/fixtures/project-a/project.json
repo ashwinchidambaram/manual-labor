@@ -6,7 +6,9 @@
     "llm": "residual"
   },
   "learning": {
-    "enabled": false
+    "contribute_global": false,
+    "enabled": false,
+    "use_global": false
   },
   "models": {
     "agent": {
