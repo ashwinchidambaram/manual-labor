@@ -92,3 +92,12 @@
   - 2026-10-29: user proposed 3–4 more real manuals; orchestrator agreed (variety by layout class) and dispatched acquisition (Sonnet) in parallel with the M3.4 fix.
   - 2026-10-29: caffeinate -i -s started (PID 54839) at user request; private GitHub repo manual-labor created and main pushed (16 commits).
   - 4 more real fixtures acquired (Sonnet) and committed (scripts/GT only). M3.4 fix still running.
+  - M3.4 fix done (Opus): 7/7 failing-first; real recall 16/16; precision 0.47→0.93. Gate run by orchestrator (665 fast, 337 scoring); recorded; pushed.
+
+### Phase 4: Grouping
+- **Status:** in_progress
+- **Started:** 2026-10-29
+- Actions taken:
+  - Dispatched M3 fix re-review (Opus) ∥ M4.1 design (Opus).
+  - M4.1 design done (Opus, 276 lines, 36 tests; centered-embedding clustering measured). Dispatched M4.2 implement (Sonnet); M3 re-review still running.
+  - M3 re-review (Opus): all claimed fixes hold under attack; 1 medium-high hole (NumericVariant accepted ±1 token → 35→40 could pass) + 5 lows (page-number any-slot, reorder substring evidence, verifier drops 2-char numeric spans, unit gaps 5V/#10-32/1/4-20, figure labels released as paragraphs). Dispatched M3.5 fix (Opus) ∥ M4.2 implement (Sonnet, running).
