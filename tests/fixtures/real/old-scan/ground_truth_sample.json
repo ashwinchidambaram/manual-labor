@@ -1,0 +1,144 @@
+{
+  "source": "old-scan.pdf (built by fetch.py from archive.org micro_IA41152616_0619; TM 11-427)",
+  "coordinates": "PDF points, origin top-left, page sizes about 574-578 x 733-742 pt (p1 578.2x732.8, p10 574.0x741.6). bboxes taken from archive.org's hidden OCR line boxes in the source PDF (same page geometry as the built PDF), adjusted by eye; the 19.8 heading box is estimated",
+  "transcription": "Reduced sample (8 blocks) hand-transcribed by a model from 80-170 DPI renders of the image-only pages; not human verified. Dashes written as ASCII hyphens; line-end hyphenation removed ('applic-able' -> 'applicable', '38- 750' -> '38-750'); table cells joined by single spaces; dot leaders omitted; the bullet on the date line is written '-'.",
+  "numeric_token_rule": "whitespace-separated tokens containing a digit, leading/trailing . , ; : ( ) stripped",
+  "blocks": [
+    {
+      "id": "gt-01",
+      "page": 1,
+      "type": "title",
+      "text": "TM 11-427 WAR DEPARTMENT TECHNICAL MANUAL",
+      "bbox": [
+        105.0,
+        88.0,
+        384.0,
+        164.0
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "11-427"
+      ]
+    },
+    {
+      "id": "gt-02",
+      "page": 1,
+      "type": "title",
+      "text": "BAROMETERS ML-102-B, ML-102-D, ML-102-E, ML-102-F, AND ML-316/TM",
+      "bbox": [
+        104.0,
+        254.0,
+        386.0,
+        346.0
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "ML-102-B",
+        "ML-102-D",
+        "ML-102-E",
+        "ML-102-F",
+        "ML-316/TM"
+      ]
+    },
+    {
+      "id": "gt-03",
+      "page": 1,
+      "type": "note",
+      "text": "This reprint includes all changes in effect at the time of publication - Changes 2 and 3.",
+      "bbox": [
+        161.0,
+        469.0,
+        354.0,
+        499.0
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "2",
+        "3"
+      ]
+    },
+    {
+      "id": "gt-04",
+      "page": 1,
+      "type": "date_line",
+      "text": "WAR DEPARTMENT - NOVEMBER 1944",
+      "bbox": [
+        107.0,
+        564.0,
+        387.0,
+        578.0
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "1944"
+      ]
+    },
+    {
+      "id": "gt-05",
+      "page": 10,
+      "type": "heading",
+      "text": "19.7 Quarterly Preventive Maintenance Checks and Services Chart-Con't.",
+      "bbox": [
+        244.0,
+        85.0,
+        524.0,
+        107.0
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "19.7"
+      ]
+    },
+    {
+      "id": "gt-06",
+      "page": 10,
+      "type": "table_row",
+      "text": "3 Modifications Check DA Pam 310-4 to determine whether new applicable MWO's have been published. All URGENT MWO's must be applied immediately. All NORMAL MWO's must be scheduled (TM 38-750).",
+      "bbox": [
+        255.0,
+        145.0,
+        458.0,
+        213.0
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "3",
+        "310-4",
+        "38-750"
+      ]
+    },
+    {
+      "id": "gt-07",
+      "page": 10,
+      "type": "table_cell",
+      "text": "Check accuracy of barometer readings by comparing its readings with those of a barometer (mercury or aneroid type) known to be accurate. If readings are not within approximately 0.02 or 0.03 inch of each other, turn in barometer for higher echelon maintenance.",
+      "bbox": [
+        343.0,
+        323.0,
+        463.0,
+        410.0
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "0.02",
+        "0.03"
+      ]
+    },
+    {
+      "id": "gt-08",
+      "page": 10,
+      "type": "heading",
+      "text": "19.8 Touchup Painting",
+      "bbox": [
+        240.0,
+        490.0,
+        330.0,
+        503.0
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "19.8"
+      ]
+    }
+  ]
+}

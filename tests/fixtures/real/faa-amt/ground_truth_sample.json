@@ -1,0 +1,389 @@
+{
+  "source": "faa-amt.pdf (built by fetch.py from FAA-H-8083-30B AMT Handbook General, PDF pages 245-324 = Chapter 7; fixture page N = printed page 7-N)",
+  "coordinates": "PDF points, origin top-left, page size 594x774 pt; bboxes converted from 110 DPI render pixels (pt = px*0.6545); approximate",
+  "transcription": "Hand-transcribed by a model from 110 DPI renders of the pages; not human verified. Stacked fractions written 3/32; vulgar fraction glyphs kept (1¼); en-dash ranges written with ASCII hyphen; em dashes kept as U+2014; table cells joined by single spaces, newline separates rows. Printed typos kept ('22,00-3,000' in the 1-8 row; '45-49' in the 140,000-160,000 psi column of row ¼-20; '1/4-20' row has an empty second size cell). Table 7-34/7-36/7-37 are captioned 'Figure'.",
+  "numeric_token_rule": "whitespace-separated tokens containing a digit, leading/trailing . , ; : ( ) stripped",
+  "blocks": [
+    {
+      "id": "gt-01",
+      "page": 1,
+      "type": "title",
+      "text": "Chapter 7 Aircraft Materials, Hardware, & Processes",
+      "bbox": [
+        53.7,
+        42.5,
+        474.5,
+        117.8
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "7"
+      ]
+    },
+    {
+      "id": "gt-02",
+      "page": 1,
+      "type": "heading",
+      "text": "Aircraft Metals",
+      "bbox": [
+        53.7,
+        148.6,
+        138.8,
+        160.4
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": []
+    },
+    {
+      "id": "gt-03",
+      "page": 53,
+      "type": "table_header",
+      "text": "On standard bolts, studs, and screws having a tensile strength of 125,000 to 140,000 psi",
+      "bbox": [
+        163.6,
+        75.3,
+        351.5,
+        145.3
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "125,000",
+        "140,000"
+      ]
+    },
+    {
+      "id": "gt-04",
+      "page": 53,
+      "type": "table_row",
+      "text": "8-32 8-36 7-9 12-15 14-17 15-18",
+      "bbox": [
+        55.0,
+        210.8,
+        540.0,
+        227.8
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "8-32",
+        "8-36",
+        "7-9",
+        "12-15",
+        "14-17",
+        "15-18"
+      ]
+    },
+    {
+      "id": "gt-05",
+      "page": 53,
+      "type": "table_row",
+      "text": "¼-20 25-30 40-50 45-49 50-68",
+      "bbox": [
+        55.0,
+        248.7,
+        540.0,
+        265.1
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "¼-20",
+        "25-30",
+        "40-50",
+        "45-49",
+        "50-68"
+      ]
+    },
+    {
+      "id": "gt-06",
+      "page": 53,
+      "type": "table_row",
+      "text": "1-8 22,00-3,000 3,700-5,000 4,350-5,920 5,000-6,840",
+      "bbox": [
+        55.0,
+        605.5,
+        540.0,
+        620.5
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "1-8",
+        "22,00-3,000",
+        "3,700-5,000",
+        "4,350-5,920",
+        "5,000-6,840"
+      ]
+    },
+    {
+      "id": "gt-07",
+      "page": 53,
+      "type": "table_row",
+      "text": "1¼-12 5,400-6,600 9,000-11,000 10,000-16,750 11,000-22,500",
+      "bbox": [
+        55.0,
+        678.8,
+        540.0,
+        695.1
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "1¼-12",
+        "5,400-6,600",
+        "9,000-11,000",
+        "10,000-16,750",
+        "11,000-22,500"
+      ]
+    },
+    {
+      "id": "gt-08",
+      "page": 53,
+      "type": "figure_caption",
+      "text": "Figure 7-34. Standard torque table (inch-pounds).",
+      "bbox": [
+        53.7,
+        702.3,
+        235.6,
+        713.5
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "7-34"
+      ]
+    },
+    {
+      "id": "gt-09",
+      "page": 56,
+      "type": "paragraph",
+      "text": "The first number following the material composition letters expresses the diameter of the rivet shank in 32nds of an inch. For example, 3 indicates 3/32, 5 indicates 5/32, and so forth. [Figure 7-38]",
+      "bbox": [
+        303.1,
+        172.8,
+        540.7,
+        218.0
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "32nds",
+        "3",
+        "3/32",
+        "5",
+        "5/32",
+        "7-38]"
+      ]
+    },
+    {
+      "id": "gt-10",
+      "page": 56,
+      "type": "paragraph",
+      "text": "The last number(s), separated by a dash from the preceding number, expresses the length of the rivet shank in 16ths of an inch. For example, 3 indicates 3/16, 7 indicates 7/16, 11 indicates 11/16, and so forth. [Figure 7-38]",
+      "bbox": [
+        303.1,
+        229.7,
+        540.7,
+        273.6
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "16ths",
+        "3",
+        "3/16",
+        "7",
+        "7/16",
+        "11",
+        "11/16",
+        "7-38]"
+      ]
+    },
+    {
+      "id": "gt-11",
+      "page": 56,
+      "type": "list",
+      "text": "AN426 or MS20426—countersunk head rivets (100°)\nAN430 or MS20430—roundhead rivets\nAN441—flathead rivets\nAN456—brazier head rivets\nAN470 or MS20470—universal head rivets",
+      "bbox": [
+        55.0,
+        320.7,
+        292.6,
+        402.5
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "AN426",
+        "MS20426—countersunk",
+        "100°",
+        "AN430",
+        "MS20430—roundhead",
+        "AN441—flathead",
+        "AN456—brazier",
+        "AN470",
+        "MS20470—universal"
+      ]
+    },
+    {
+      "id": "gt-12",
+      "page": 56,
+      "type": "list",
+      "text": "AN470AD3-5—complete part number\nAN—Air Force-Navy standard number\n470—universal head rivet\nAD—2117-T aluminum alloy\n3—3/32 in diameter\n5—5/16 in length",
+      "bbox": [
+        303.1,
+        316.1,
+        540.7,
+        413.7
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "AN470AD3-5—complete",
+        "470—universal",
+        "AD—2117-T",
+        "3—3/32",
+        "5—5/16"
+      ]
+    },
+    {
+      "id": "gt-13",
+      "page": 56,
+      "type": "table",
+      "text": "Heating Time—Air Furnace\nRivet Alloy Time at Temperature Heat-Treating Temperature\n2024 1 hour 910 °F-930 °F\n2017 1 hour 925 °F-950 °F",
+      "bbox": [
+        54.3,
+        518.4,
+        291.3,
+        606.8
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "2024",
+        "1",
+        "910",
+        "°F-930",
+        "2017",
+        "1",
+        "925",
+        "°F-950"
+      ]
+    },
+    {
+      "id": "gt-14",
+      "page": 56,
+      "type": "table",
+      "text": "Group A Group B\n1100 2117\n3003 2017\n5052 2124\n6053 7075",
+      "bbox": [
+        303.7,
+        595.0,
+        540.0,
+        690.5
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "1100",
+        "2117",
+        "3003",
+        "2017",
+        "5052",
+        "2124",
+        "6053",
+        "7075"
+      ]
+    },
+    {
+      "id": "gt-15",
+      "page": 56,
+      "type": "figure_caption",
+      "text": "Figure 7-37. Aluminum groupings.",
+      "bbox": [
+        303.1,
+        698.4,
+        428.7,
+        708.9
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "7-37"
+      ]
+    },
+    {
+      "id": "gt-16",
+      "page": 63,
+      "type": "heading",
+      "text": "HI-TIGUE™ Fastening System",
+      "bbox": [
+        53.7,
+        416.9,
+        199.6,
+        430.7
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": []
+    },
+    {
+      "id": "gt-17",
+      "page": 63,
+      "type": "spec_list",
+      "text": "Shank diameter in 32nds of an inch:\n4 = 1/8\" 6 = 3/16\"\n5 = 5/32\" 8 = 1/4\"",
+      "bbox": [
+        322.7,
+        159.1,
+        533.5,
+        189.8
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "32nds",
+        "4",
+        "1/8\"",
+        "6",
+        "3/16\"",
+        "5",
+        "5/32\"",
+        "8",
+        "1/4\""
+      ]
+    },
+    {
+      "id": "gt-18",
+      "page": 63,
+      "type": "figure_caption",
+      "text": "Figure 7-51. Huck Manufacturing Company codes.",
+      "bbox": [
+        303.1,
+        219.3,
+        487.6,
+        229.1
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "7-51"
+      ]
+    },
+    {
+      "id": "gt-19",
+      "page": 63,
+      "type": "legend",
+      "text": "A = Thickness of material (grip range)\nB = 3/64 - 1/8\"\nC = Total rivet shank length",
+      "bbox": [
+        64.1,
+        663.1,
+        235.6,
+        691.9
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "3/64",
+        "1/8\""
+      ]
+    },
+    {
+      "id": "gt-20",
+      "page": 40,
+      "type": "figure_caption",
+      "text": "Figure 7-19. Aircraft bolt identification.",
+      "bbox": [
+        53.7,
+        589.1,
+        197.7,
+        598.9
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "7-19"
+      ]
+    }
+  ]
+}

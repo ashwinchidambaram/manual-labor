@@ -1,0 +1,367 @@
+{
+  "source": "parts-list.pdf (built by fetch.py from archive.org micro_IA41152645_0202; TM 5-4110-231-24P)",
+  "coordinates": "PDF points, origin top-left, page sizes about 564-569 x 733-742 pt (p5 569.2x741.6, p13 564.5x732.8). bboxes for pages 5, 7, 10, 12 and the p13 heading come from archive.org's hidden OCR line boxes in the source PDF (same page geometry as the built PDF) adjusted by eye; the p13 table-row bboxes are estimated from row pitch (about 11.4 pt) and are only good to about one row",
+  "transcription": "Hand-transcribed by a model from 130-200 DPI renders of the built (image-only) pages; not human verified. Table cells joined by single spaces (columns: fig no., item no., SMR code, NSN, part number, FSCM, description, U/M, qty); dot leaders omitted; leading '.' in descriptions (indenture) kept. Item rows whose digits were hard to read (dot-matrix print, blur) were deliberately left out. SMR codes use the letter O (e.g. XBOZZ, PAOZZ), not zero. Line-end hyphenation is removed (mainte-nance -> maintenance). Page 13 is the best-quality table page; page 11 and others are noticeably worse.",
+  "numeric_token_rule": "whitespace-separated tokens containing a digit, leading/trailing . , ; : ( ) stripped",
+  "blocks": [
+    {
+      "id": "gt-01",
+      "page": 5,
+      "type": "title",
+      "text": "TECHNICAL MANUAL No. 5-4110-231-24P",
+      "bbox": [
+        50.0,
+        56.0,
+        152.0,
+        95.0
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "5-4110-231-24P"
+      ]
+    },
+    {
+      "id": "gt-02",
+      "page": 5,
+      "type": "title",
+      "text": "ORGANIZATIONAL, DIRECT AND GENERAL SUPPORT MAINTENANCE REPAIR PARTS AND SPECIAL TOOLS LIST (INCLUDING DEPOT MAINTENANCE REPAIR PARTS AND SPECIAL TOOLS) FOR REFRIGERATION UNIT, ELECTRIC MOTOR DRIVEN 9,000 BTU MODEL CH609-31 NSN 4110-01-014-4646",
+      "bbox": [
+        121.0,
+        104.0,
+        422.0,
+        230.0
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "9,000",
+        "CH609-31",
+        "4110-01-014-4646"
+      ]
+    },
+    {
+      "id": "gt-03",
+      "page": 5,
+      "type": "heading",
+      "text": "REPORTING ERRORS AND RECOMMENDING IMPROVEMENTS",
+      "bbox": [
+        132.0,
+        255.0,
+        422.0,
+        270.0
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": []
+    },
+    {
+      "id": "gt-04",
+      "page": 5,
+      "type": "toc_row",
+      "text": "02. Control Panel and Wiring Harness 9 2",
+      "bbox": [
+        95.0,
+        440.0,
+        480.0,
+        456.0
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "02",
+        "9",
+        "2"
+      ]
+    },
+    {
+      "id": "gt-05",
+      "page": 5,
+      "type": "toc_row",
+      "text": "05. Refrigerant Piping and Valves 17 5, 6",
+      "bbox": [
+        95.0,
+        472.0,
+        483.0,
+        487.0
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "05",
+        "17",
+        "5",
+        "6"
+      ]
+    },
+    {
+      "id": "gt-06",
+      "page": 5,
+      "type": "toc_row",
+      "text": "Compressor, Belt Driven 32.1 10A",
+      "bbox": [
+        117.0,
+        516.0,
+        498.0,
+        531.0
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "32.1",
+        "10A"
+      ]
+    },
+    {
+      "id": "gt-07",
+      "page": 5,
+      "type": "toc_row",
+      "text": "09. Electric Motors and Controls 35 11, 12",
+      "bbox": [
+        93.0,
+        526.0,
+        484.0,
+        541.0
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "09",
+        "35",
+        "11",
+        "12"
+      ]
+    },
+    {
+      "id": "gt-08",
+      "page": 7,
+      "type": "table_row",
+      "text": "AD Item to be assembled at depot maintenance level.",
+      "bbox": [
+        341.0,
+        100.0,
+        550.0,
+        128.0
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": []
+    },
+    {
+      "id": "gt-09",
+      "page": 7,
+      "type": "note",
+      "text": "NOTE Cannibalization or salvage may be used as a source of supply for any items sourced coded above except those coded XA and aircraft support items as restricted by AR 700-41.",
+      "bbox": [
+        357.0,
+        341.0,
+        549.0,
+        407.0
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "700-41"
+      ]
+    },
+    {
+      "id": "gt-10",
+      "page": 7,
+      "type": "paragraph",
+      "text": "(2) Maintenance Code. Maintenance codes are assigned to indicate the levels of maintenance authorized to USE and REPAIR support items. The maintenance codes are entered in the third and fourth positions of the Uniform SMR Code format as follows:",
+      "bbox": [
+        334.0,
+        422.0,
+        549.0,
+        484.0
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "2"
+      ]
+    },
+    {
+      "id": "gt-11",
+      "page": 10,
+      "type": "figure_caption",
+      "text": "Figure 1. Frame Assembly, Doors, Panels, and Data Plates",
+      "bbox": [
+        230.0,
+        639.0,
+        444.0,
+        664.0
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "1"
+      ]
+    },
+    {
+      "id": "gt-12",
+      "page": 12,
+      "type": "figure_caption",
+      "text": "Figure 2. Control Panel",
+      "bbox": [
+        258.0,
+        569.0,
+        381.0,
+        578.0
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "2"
+      ]
+    },
+    {
+      "id": "gt-13",
+      "page": 13,
+      "type": "heading",
+      "text": "GROUP 02 CONTROL PANEL AND WIRING HARNESS",
+      "bbox": [
+        261.0,
+        123.0,
+        400.0,
+        131.0
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "02"
+      ]
+    },
+    {
+      "id": "gt-14",
+      "page": 13,
+      "type": "table_row",
+      "text": "2 XBOZZ A0206-01 90598 CONTROL PANEL EA 1",
+      "bbox": [
+        36.0,
+        143.5,
+        487.0,
+        153.5
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "2",
+        "A0206-01",
+        "90598",
+        "1"
+      ]
+    },
+    {
+      "id": "gt-15",
+      "page": 13,
+      "type": "table_row",
+      "text": "2 1 PAOZZ 5305-00-068-0504 MS90726-3 96906 SCREW,CAP,HEX EA 4",
+      "bbox": [
+        36.0,
+        154.9,
+        487.0,
+        164.9
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "2",
+        "1",
+        "5305-00-068-0504",
+        "MS90726-3",
+        "96906",
+        "4"
+      ]
+    },
+    {
+      "id": "gt-16",
+      "page": 13,
+      "type": "table_row",
+      "text": "2 11 PAOZZ 5310-00-081-8087 MS21044N06 96906 .NUT,SELF-LOCK EA 3",
+      "bbox": [
+        36.0,
+        268.9,
+        487.0,
+        278.9
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "2",
+        "11",
+        "5310-00-081-8087",
+        "MS21044N06",
+        "96906",
+        "3"
+      ]
+    },
+    {
+      "id": "gt-17",
+      "page": 13,
+      "type": "table_row",
+      "text": "2 16 XBOZZ 85-5710-0841-203 72619 .LIGHT,INDICATOR EA 1",
+      "bbox": [
+        36.0,
+        360.1,
+        487.0,
+        370.1
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "2",
+        "16",
+        "85-5710-0841-203",
+        "72619",
+        "1"
+      ]
+    },
+    {
+      "id": "gt-18",
+      "page": 13,
+      "type": "table_row",
+      "text": "2 27 PAOZZ 5305-00-993-1848 MS35207-265 96906 .SCREW,MACHINE EA 2",
+      "bbox": [
+        36.0,
+        519.7,
+        487.0,
+        529.7
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "2",
+        "27",
+        "5305-00-993-1848",
+        "MS35207-265",
+        "96906",
+        "2"
+      ]
+    },
+    {
+      "id": "gt-19",
+      "page": 13,
+      "type": "table_row",
+      "text": "2 29A PAOZZ 5310-00-877-5797 MS21044N3 96906 .NUT,SELF-LOCK EA 2",
+      "bbox": [
+        36.0,
+        553.9,
+        487.0,
+        563.9
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "2",
+        "29A",
+        "5310-00-877-5797",
+        "MS21044N3",
+        "96906",
+        "2"
+      ]
+    },
+    {
+      "id": "gt-20",
+      "page": 13,
+      "type": "table_row",
+      "text": "2 30 PAOZZ 5340-00-200-4114 321A 61463 .MOUNT,RESILIENT EA 2",
+      "bbox": [
+        36.0,
+        565.3,
+        487.0,
+        575.3
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "2",
+        "30",
+        "5340-00-200-4114",
+        "321A",
+        "61463",
+        "2"
+      ]
+    }
+  ]
+}

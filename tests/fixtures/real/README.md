@@ -37,3 +37,16 @@ Downloads into `source/`, verifies sha256, builds `real-manual.pdf`, prints the 
 `ground_truth_sample.json`: 20 blocks on pages 5, 6, 8, 9, 16, 25, 30 (headings, spec paragraphs and lists,
 torque table, table rows, figure captions) with approximate bboxes and numeric tokens. It was transcribed from
 page images by a model and should be spot-checked by a human before it is relied on. Page numbers are 1-based PDF page indices.
+
+## Index of real-document fixtures
+
+Each lives in its own subdirectory (the pile-driver fixture is the one in this directory) with `fetch.py`, `README.md`,
+`.gitignore` and `ground_truth_sample.json`. All are US government works; all ground truth was model-transcribed and needs a human spot-check.
+
+| Name | Kind | Pages | What it stresses |
+|---|---|---|---|
+| `real-manual.pdf` (this directory) | scanned, image-only (1970 Army TM, pile driver) | 64 | two-column typeset text, spec lists, torque table, figure captions, list of illustrations |
+| `faa-amt/` | born-digital, figure-heavy (FAA AMT Handbook General, ch. 7, 2023) | 80 | two-column text with live text layer, 233 embedded images, vector tables captioned "Figure", fraction glyphs, part-number lists |
+| `parts-list/` | scanned, image-only, table-heavy (TM 5-4110-231-24P RPSTL, 1979) | 61 | 9-column part-number tables, dot leaders, facing figure/table pages, uneven scan quality |
+| `old-scan/` | poor-quality scan, image-only (TM 11-427 Barometers, 1944) | 57 | faded low-contrast type, microfiche borders, off-center pages, near-blank pages, chart page |
+| `nist-handbook/` | born-digital, complex tables (NIST Handbook 44 2026, section 2.20 Scales) | 64 | side-by-side tolerance tables, space digit grouping, Word-export text-layer quirks, numbered paragraph hierarchy |
