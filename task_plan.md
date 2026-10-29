@@ -34,9 +34,9 @@ Detailed tasks, model assignments, and gates: docs/plans/2026-10-28-manual-labor
 - **Status:** complete
 
 ### Phase 3: Scoring + faithfulness check
-- [ ] Pre-req (user-agreed 2026-10-28): add a real scanned manual as 7th fixture (live-only, no checksum gate) — orchestrator picks a clearly public-domain US government/military technical manual, records the exact source URL + license in findings.md, and tells the user which before use and verify the RapidOCR adapter is not losing accuracy vs the raw engine; re-measure engine choice on it
-- [ ] Design (Opus) · Implement (Opus) · Review (Opus) · Fix
-- [ ] Gate: unit test per signal + combiner; seeded corruptions all < threshold; numeric blocks always queued
+- [x] Pre-req (user-agreed 2026-10-28): add a real scanned manual as 7th fixture (live-only, no checksum gate) — orchestrator picks a clearly public-domain US government/military technical manual, records the exact source URL + license in findings.md, and tells the user which before use and verify the RapidOCR adapter is not losing accuracy vs the raw engine; re-measure engine choice on it
+- [x] Design (Opus) · Implement (Opus) · Review (Opus) · Fix
+- [x] Gate: unit test per signal + combiner; seeded corruptions all < threshold; numeric blocks always queued
 - **Status:** pending
 
 ### Phase 4: Grouping
@@ -70,8 +70,8 @@ Detailed tasks, model assignments, and gates: docs/plans/2026-10-28-manual-labor
 - **Status:** complete
 
 ### Phase 10: Agent pass + calibration
-- [ ] Design (Opus) — include VLM (vision provider) as an optional third reader for flagged numeric blocks; it has no per-word confidence so it is never the primary OCR · Implement (Sonnet) · Review (Opus) · Fix
-- [ ] Gate: proposals re-checked and displayed with pass/fail; reject → queue with history; threshold suggestion from seeded decisions
+- [x] Design (Opus) — include VLM (vision provider) as an optional third reader for flagged numeric blocks; it has no per-word confidence so it is never the primary OCR · Implement (Sonnet) · Review (Opus) · Fix
+- [x] Gate: proposals re-checked and displayed with pass/fail; reject → queue with history; threshold suggestion from seeded decisions
 - **Status:** pending
 
 ### Phase 11: Assemble + export + acceptance
