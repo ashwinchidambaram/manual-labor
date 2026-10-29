@@ -24,6 +24,7 @@
     "react-router-dom": "6.30.6"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.10.2",
     "@playwright/test": "^1.47",
     "@testing-library/jest-dom": "^6",
     "@testing-library/react": "^16",
