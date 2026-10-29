@@ -457,6 +457,27 @@ def test_e12_partition_reasons() -> None:
         bid(5): "header_footer",
     }
     assert all(acc.assignments[b] == "unassigned" for b in acc.unassigned_reasons)
+    sel = inp.docs["doc"].selected
+    assert all(b not in sel for b, why in acc.unassigned_reasons.items() if why == "not_selected")
+
+
+def test_a_selected_block_in_no_topic_is_an_assembly_error_not_unselected() -> None:
+    """A topic view that lost a selected block (a hand-edited or corrupt groups.json) must not
+    turn it into `not_selected`: the export refuses and names it."""
+    blocks = [blk(1, "One."), blk(2, "Two."), blk(3, "Three."), blk(4, "Four.")]
+    inp = synth_inputs(blocks, topics={"a": ("Topic A", [bid(1), bid(2)])})
+    assert bid(3) in inp.docs["doc"].selected and bid(4) in inp.docs["doc"].selected
+    with pytest.raises(ExportError, match="in no article") as ei:
+        run(inp)
+    assert bid(3) in str(ei.value) and bid(4) in str(ei.value)
+    # the same blocks, unselected, are accounted as `not_selected`
+    ok = run(
+        synth_inputs(
+            blocks, topics={"a": ("Topic A", [bid(1), bid(2)])}, selected={bid(1), bid(2)}
+        )
+    )
+    reasons = ok.manifest.accounting.unassigned_reasons
+    assert reasons == {bid(3): "not_selected", bid(4): "not_selected"}
 
 
 def test_an_article_with_only_empty_members_is_not_written() -> None:

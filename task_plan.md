@@ -65,9 +65,9 @@ Detailed tasks, model assignments, and gates: docs/plans/2026-10-28-manual-labor
 - **Status:** complete
 
 ### Phase 9: UI Verify
-- [x] Design (Opus) · [ ] Implement (Sonnet) · UX check (Sonnet) · Review (Opus) · Fix
-- [ ] Gate: Playwright: 20 blocks keyboard-only; diff view correct; figure re-attach persists
-- **Status:** in_progress
+- [x] Design (Opus) · Implement (Sonnet) · UX check (Sonnet) · Review (Opus) · Fix (Sonnet ×3)
+- [x] Gate: 216 vitest + 55/55 Playwright
+- **Status:** complete
 
 ### Phase 10: Agent pass + calibration
 - [ ] Design (Opus) — include VLM (vision provider) as an optional third reader for flagged numeric blocks; it has no per-word confidence so it is never the primary OCR · Implement (Sonnet) · Review (Opus) · Fix
@@ -75,9 +75,9 @@ Detailed tasks, model assignments, and gates: docs/plans/2026-10-28-manual-labor
 - **Status:** pending
 
 ### Phase 11: Assemble + export + acceptance
-- [ ] Design (Sonnet) · Implement (Sonnet, README Haiku) · Review (Opus) · Fix
+- [x] Design (Sonnet) · [x] Implement (Sonnet) · [ ] Review (Opus, in flight) · Fix · full-suite failures (a14/f2/p6) · acceptance run
 - [ ] Gate: zip validates; every FIG resolves; README; SPEC §11 checklist in docs/ACCEPTANCE.md incl. offline `--live` run
-- **Status:** pending
+- **Status:** in_progress
 
 ## Schedule change (user asked to speed up, 2026-10-29)
 - Two tracks after M7: frontend (M8 → M9) ∥ backend (M10 → M11). Designs start while the previous module is in review. One Docling-bearing test run and one Playwright run at a time. M8.1 design started during M7 implementation.

@@ -21,7 +21,9 @@ from manuallabor.contracts.enums import (
     AttachRule,
     BlockStatus,
     BlockType,
+    GroupView,
     Task,
+    UnassignedReason,
 )
 from manuallabor.contracts.figure import FigureRecord
 from manuallabor.contracts.io import dump_json
@@ -181,6 +183,32 @@ def _proximity_key(
     return (_END, 0, idx)
 
 
+def _check_every_selected_block_placed(
+    d: DocInput, selected: set[str], members: dict[str, list[str]], ctx: _Ctx
+) -> None:
+    """A selected block lands in an article, or is unassigned for a reason the grouping
+    recorded (a topic-view header/footer entry). Anything else is an assembly error: calling it
+    `not_selected` would drop selected content silently."""
+    placed = {b for m in members.values() for b in m}
+    recorded_hf = {
+        u.block_id
+        for u in d.groups.unassigned
+        if u.view == GroupView.topic and u.reason == UnassignedReason.header_footer
+    }
+    missing: list[str] = []
+    for b in sorted(selected - placed, key=ids.block_sort_key):
+        if b in recorded_hf:
+            ctx.reasons[b] = "header_footer"
+        else:
+            missing.append(b)
+    if missing:
+        shown = ", ".join(missing[:20]) + (f" (+{len(missing) - 20} more)" if len(missing) > 20 else "")
+        raise ExportError(
+            f"{d.doc.slug}: {len(missing)} selected block(s) in no article and not unassigned "
+            f"with a recorded reason (groups.json does not place them): {shown}"
+        )
+
+
 def _build_doc_articles(ctx: _Ctx, d: DocInput) -> list[BuiltArticle]:
     inp = ctx.inp
     slug = d.doc.slug
@@ -189,6 +217,7 @@ def _build_doc_articles(ctx: _Ctx, d: DocInput) -> list[BuiltArticle]:
     hf = {b.id for b in d.blocks if b.type in (BlockType.header, BlockType.footer)}
     selected = {b for b in d.selected if b in by_id and b not in hf}
     members = build_articles(slug, d.groups, selected, inp.split, order)
+    _check_every_selected_block_placed(d, selected, members, ctx)
     levels = _heading_levels(d, order)
     sec_of = {b: g for g in d.groups.structure for b in g.block_ids}
     titles = _topic_titles(d)
@@ -363,7 +392,10 @@ def _manifest(
                 assignments[bid] = ctx.assignments[bid]
                 continue
             assignments[bid] = ids.UNASSIGNED
-            reasons[bid] = fixed_reason.get(bid) or ctx.reasons.get(bid, "not_selected")
+            why = fixed_reason.get(bid) or ctx.reasons.get(bid)
+            if why is None:  # selected, yet in no article and without a reason
+                raise ExportError(f"{bid} is selected but was placed in no article")
+            reasons[bid] = why
     overrides: list[Override] = []
     for a in articles:
         for bid in a.block_ids:

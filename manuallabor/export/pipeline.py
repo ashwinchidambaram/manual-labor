@@ -43,11 +43,14 @@ from manuallabor.state.review import load_review_blocks
 from manuallabor.state.store import Store
 
 __all__ = [
+    "EXPORT_RUN_EVENT",
     "ExportState",
+    "export_cutoff",
     "export_status",
     "fingerprint",
     "node_states",
     "read_state",
+    "record_export_run",
     "record_override",
     "resolve_clock",
     "run_assemble",
@@ -63,8 +66,8 @@ class _Rec(BaseModel):
 
 
 class AssembleRecord(_Rec):
-    fingerprint: str
-    max_action_id: int  # the newest action the assemble saw; an export moves the cutoff here
+    fingerprint: str  # everything but the clock and the overrides
+    override_ids: list[int] = []  # the export_override actions that were active at assemble
 
 
 class ExportRecord(_Rec):
@@ -74,11 +77,34 @@ class ExportRecord(_Rec):
 
 
 class ExportState(_Rec):
-    """export/state.json: what the last assemble and export were built from."""
+    """export/state.json: what the last assemble and export were built from. A cache for
+    skipping work and for the Export screen only: the override cutoff (P3) is never read from
+    here, it is the last `export_run` action in the store (`export_cutoff`)."""
 
     assemble: AssembleRecord | None = None
     export: ExportRecord | None = None
-    after_action_id: int = 0  # overrides at or below this id belong to an earlier export
+
+
+EXPORT_RUN_EVENT = "export_run"  # the worker's log event the supervisor turns into the action
+
+
+def export_cutoff(store: Store) -> int:
+    """P3: overrides count only when their action id is greater than this, the id of the last
+    successful export (`export_run` action) in the action log; 0 before the first export."""
+    runs = store.actions_of((ActionKind.export_run,))
+    return runs[-1].id if runs else 0
+
+
+def record_export_run(store: Store, payload: dict[str, Any], *, request_id: str | None) -> int:
+    """Append the `export_run` action (inside its own transaction); idempotent per
+    `request_id`, so a supervisor that re-reads a worker log records it once."""
+    prev = store.action_by_request(request_id, (ActionKind.export_run,))
+    if prev is not None:
+        return prev.id
+    with store.tx():
+        return store.append_action(
+            ActionKind.export_run, "export", payload=payload, request_id=request_id
+        )
 
 
 def read_state(paths: ProjectPaths) -> ExportState:
@@ -130,9 +156,11 @@ def _check_fresh(paths: ProjectPaths) -> None:
             raise ExportError(f"stale: {slug}: not processed to score2")
 
 
-def fingerprint(paths: ProjectPaths, store: Store, after_action_id: int) -> str:
-    """Everything an assemble depends on except the clock (a new clock is a skip)."""
-    from manuallabor.export.load import active_overrides, last_models
+def fingerprint(paths: ProjectPaths, store: Store) -> str:
+    """Everything an assemble depends on except the clock (a new clock is a skip) and the
+    overrides, which `_assemble_fresh` compares separately so that the export that spends
+    them does not make its own output stale."""
+    from manuallabor.export.load import last_models
 
     cfg = paths.load_config()
     docs: dict[str, Any] = {}
@@ -165,7 +193,6 @@ def fingerprint(paths: ProjectPaths, store: Store, after_action_id: int) -> str:
         "figures_index": _sha_file(paths.figures_index),
         "selection": store.get_selection_json() or "",
         "open_flags": sorted(f.id for f in store.flags() if f.status.value == "open"),
-        "overrides": [o.action_id for o in active_overrides(store, after_action_id)],
         "models": last_models(paths),
         "config": {
             "name": cfg.name,
@@ -178,6 +205,18 @@ def fingerprint(paths: ProjectPaths, store: Store, after_action_id: int) -> str:
     return hashlib.sha256(canonical_json(payload)).hexdigest()
 
 
+def _active_ids(store: Store, cutoff: int) -> list[int]:
+    from manuallabor.export.load import active_overrides
+
+    return [o.action_id for o in active_overrides(store, cutoff)]
+
+
+def _assemble_fresh(rec: AssembleRecord, fp: str, active: list[int], cutoff: int) -> bool:
+    """The staging tree is current when its inputs are unchanged and no override was added
+    since it was built; overrides it used that an export has since spent do not count."""
+    return rec.fingerprint == fp and [i for i in rec.override_ids if i > cutoff] == active
+
+
 def _tree_hash(root: Path) -> str:
     h = hashlib.sha256()
     for name, p in sorted(tree_files(root).items()):
@@ -188,7 +227,7 @@ def _tree_hash(root: Path) -> str:
 # -- the gate and the status -------------------------------------------------------------------
 
 
-def _gate(paths: ProjectPaths, store: Store, after_action_id: int) -> Gate:
+def _gate(paths: ProjectPaths, store: Store, cutoff: int) -> Gate:
     from manuallabor.export.load import active_overrides
 
     data = ProjectData(paths, store)
@@ -199,17 +238,18 @@ def _gate(paths: ProjectPaths, store: Store, after_action_id: int) -> Gate:
         if doc_ready(paths, slug):
             blocks[slug] = load_review_blocks(paths, store, slug)
             scope[slug] = data.scope_ids(slug, selected)
-    return export_gate(blocks, scope, store.flags(), active_overrides(store, after_action_id))
+    return export_gate(blocks, scope, store.flags(), active_overrides(store, cutoff))
 
 
 def export_status(paths: ProjectPaths, store: Store) -> ExportStatus:
     st = read_state(paths)
-    g = _gate(paths, store, st.after_action_id)
+    cutoff = export_cutoff(store)
+    g = _gate(paths, store, cutoff)
     from manuallabor.export.load import active_overrides
 
     overrides = [
         Override(target_id=o.target_id, flag_id=o.flag_id, reason=o.reason, at=o.ts)
-        for o in active_overrides(store, st.after_action_id)
+        for o in active_overrides(store, cutoff)
     ]
     zip_path = None
     summary = None
@@ -303,22 +343,23 @@ def run_assemble(
     st = store if store is not None else _open_readonly(paths)
     try:
         state = read_state(paths)
-        cutoff = state.after_action_id
-        fp = fingerprint(paths, st, cutoff)
+        cutoff = export_cutoff(st)
+        # the gate first, also before a skip: a spent override never re-covers anything
+        gate = _gate(paths, st, cutoff)
+        if not gate.allowed:
+            raise GateLocked(gate.open_flags, gate.queued, gate.blockers)
+        fp = fingerprint(paths, st)
+        active = _active_ids(st, cutoff)
         staged = paths.assembled / "manifest.json"
         if (
             not force
             and state.assemble is not None
-            and state.assemble.fingerprint == fp
+            and _assemble_fresh(state.assemble, fp, active, cutoff)
             and staged.is_file()
         ):
             emit({"stage": "assemble", "status": "skip", "doc": ""})
             return "skip"
-        max_action = st.max_action_id()
         inputs = load_inputs(paths, st, cutoff)
-        gate = _gate(paths, st, cutoff)
-        if not gate.allowed:
-            raise GateLocked(gate.open_flags, gate.queued, gate.blockers)
         asm = assemble(inputs, clock if clock is not None else resolve_clock())
         _verify_files(asm)
         tmp = paths.export_dir / ".assembled.tmp"
@@ -327,7 +368,7 @@ def run_assemble(
         shutil.rmtree(paths.assembled, ignore_errors=True)
         os.replace(tmp, paths.assembled)
         state = read_state(paths)
-        state.assemble = AssembleRecord(fingerprint=fp, max_action_id=max_action)
+        state.assemble = AssembleRecord(fingerprint=fp, override_ids=active)
         _write_state(paths, state)
         emit(
             {
@@ -420,21 +461,20 @@ def run_export(
         summary=summarize(paths.assembled, len(data), sha),
     )
     state.export = rec
-    state.after_action_id = state.assemble.max_action_id
     _write_state(paths, state)
     dest.with_name(dest.name + ".rejected").unlink(missing_ok=True)
+    run_payload: dict[str, Any] = {
+        "zip_sha256": sha,
+        "articles": rec.summary.articles,
+        "figures": rec.summary.figures,
+        "overrides": rec.summary.review.overrides,
+    }
     if store is not None and store.writer:
-        with store.tx():
-            store.append_action(
-                ActionKind.export_run,
-                "export",
-                payload={
-                    "zip_sha256": sha,
-                    "articles": rec.summary.articles,
-                    "figures": rec.summary.figures,
-                    "overrides": rec.summary.review.overrides,
-                },
-            )
+        record_export_run(store, run_payload, request_id=None)
+    else:
+        # no DB writer here (a job worker): the supervisor, the single writer, records the
+        # action from this log event (idempotent per job), which moves the override cutoff
+        emit({"event": EXPORT_RUN_EVENT, "doc": "", "payload": run_payload})
     emit(
         {
             "stage": "export",
@@ -465,7 +505,12 @@ def node_states(paths: ProjectPaths, store: Store | None = None) -> list[NodeSta
             out.append(NodeState(node="assemble", state="missing"))
         elif st is None:
             out.append(NodeState(node="assemble", state="stale", reason="no project.db"))
-        elif fingerprint(paths, st, state.after_action_id) != state.assemble.fingerprint:
+        elif not _assemble_fresh(
+            state.assemble,
+            fingerprint(paths, st),
+            _active_ids(st, cutoff := export_cutoff(st)),
+            cutoff,
+        ):
             out.append(NodeState(node="assemble", state="stale", reason="inputs changed"))
         else:
             out.append(NodeState(node="assemble", state="fresh"))

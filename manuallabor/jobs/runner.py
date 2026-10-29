@@ -118,6 +118,17 @@ class JobRunner:
         self.event_handlers: dict[str, Callable[[str, dict[str, Any]], None]] = dict(
             event_handlers or {}
         )
+        # module 11: an export job's worker cannot write the `export_run` action (no DB
+        # access); the supervisor records it, once per job, which moves the override cutoff
+        self.event_handlers.setdefault("export_run", self._export_run)
+
+    def _export_run(self, job_id: str, o: dict[str, Any]) -> None:
+        from manuallabor.export.pipeline import record_export_run
+
+        payload = o.get("payload")
+        if not isinstance(payload, dict):
+            return
+        record_export_run(self.store, payload, request_id=f"{job_id}:export_run")
 
     # -- public API (JobRunnerP) ------------------------------------------------------------
 

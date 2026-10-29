@@ -60,6 +60,25 @@ def unreviewed_env(unreviewed: ProjectPaths) -> Iterator[Env]:
     e.close()
 
 
+def supervise(env: Env, job_id: str) -> None:
+    """What the serve process's JobRunner does with a worker that has exited: read its log
+    (handing events to their handlers) and finalize the row. Run twice: replay-safe."""
+    store = env.ctx.store
+    assert isinstance(store, Store)
+    store.update_job(job_id, status="running", pid=None)
+    env.ctx.runner.poll()
+    assert env.ctx.runner.get(job_id).status == "done"
+    from manuallabor.jobs.runner import _Tail
+
+    env.ctx.runner._read(job_id, _Tail())  # an adopted job re-reads its log from the start
+
+
+def export_runs(env: Env) -> list[dict[str, object]]:
+    store = env.ctx.store
+    assert isinstance(store, Store)
+    return [a.payload for a in store.iter_actions() if a.kind.value == "export_run"]
+
+
 def approve_everything(env: Env) -> None:
     from tests.export.helpers import approve_queued
 
@@ -132,8 +151,14 @@ def test_e22_post_runs_the_export_in_the_worker_and_download_matches(unreviewed_
     log = env.ctx.runner.log(job["id"], 0)
     stages = [(o["stage"], o["status"]) for o in log if "stage" in o]
     assert ("assemble", "built") in stages and ("export", "built") in stages
+    assert export_runs(env) == []  # the worker has no DB access; the supervisor records it
+    supervise(env, job["id"])
+    runs = export_runs(env)
+    assert len(runs) == 1, runs  # exactly one `export_run` action, even after a re-read
     assert any(o.get("event") == "unit_done" and o["node"] == "export" for o in log)
     st = c.get("/api/export/status").json()
+    assert runs[0]["zip_sha256"] == st["summary"]["zip_sha256"]
+    assert runs[0]["articles"] == st["summary"]["articles"] and runs[0]["overrides"] == 0
     assert st["summary"]["articles"] > 0 and st["zip_path"].endswith("project-a-kb.zip")
     assert st["summary"]["generated_at"] == NOW
     d = c.get("/api/export/download")
@@ -161,10 +186,14 @@ def test_e22_unreviewed_blocks_can_go_out_with_a_blanket_override(unreviewed_env
         assert run_job(env.paths.root, r.json()["id"]) == 0
     finally:
         del os.environ["MANUALLABOR_NOW"]
+    supervise(env, r.json()["id"])
+    runs = export_runs(env)
+    assert len(runs) == 1 and int(runs[0]["overrides"]) > 0  # type: ignore[call-overload]
     st = c.get("/api/export/status").json()
     assert st["summary"]["review"]["overrides"] > 0
-    # the override was spent by this export: the gate is closed again
+    # the override was spent by this export: the gate is closed again, also for a second job
     assert st["overrides"] == [] and st["blockers"]
+    assert c.post("/api/export").status_code == 409
 
 
 def test_the_export_job_is_cancel_safe_when_blocked(unreviewed_env: Env) -> None:

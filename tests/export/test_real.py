@@ -202,6 +202,14 @@ def test_e12_every_block_is_accounted_for(exported_a: Exported, ro_store: Store)
         else:
             assert bid in in_art and bid not in acc.unassigned_reasons
     assert any(r == "header_footer" for r in acc.unassigned_reasons.values())
+    from manuallabor.state.data import ProjectData
+
+    selected = set(ProjectData(exported_a.paths, ro_store).selection().block_ids)
+    not_sel = [b for b, r in acc.unassigned_reasons.items() if r == "not_selected"]
+    assert all(b not in selected for b in not_sel)  # `not_selected` means just that
+    for bid, where in acc.assignments.items():
+        if bid in selected and parsed[bid].type not in (BlockType.header, BlockType.footer):
+            assert where != ids.UNASSIGNED or acc.unassigned_reasons[bid] in ("empty", "rejected")
     assert {a.id: a.block_ids for a in m.articles}
     Manifest.model_validate(json.loads(exported_a.read("manifest.json")))
     for a in m.articles:

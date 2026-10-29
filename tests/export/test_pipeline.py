@@ -320,3 +320,130 @@ def test_resolve_clock() -> None:
     with pytest.raises(ExportError):
         resolve_clock("yesterday")
     assert resolve_clock(None).microsecond == 0
+
+
+# -- P3: the override cutoff lives in the action log (review fix) --------------------------------
+
+
+def test_p3_the_cutoff_is_the_last_export_run_action_not_a_state_file(
+    unreviewed: ProjectPaths,
+) -> None:
+    r = labor("export", str(unreviewed.root), "--now", CLOCK, "--override", "blanket")
+    assert r.returncode == 0, r.stdout + r.stderr
+    again = labor("export", str(unreviewed.root), "--now", CLOCK2)
+    assert again.returncode == 2, again.stdout + again.stderr
+    # a lost or deleted state file must not revive the spent override
+    for p in unreviewed.export_dir.glob("*.json"):
+        p.unlink()
+    assert not unreviewed.export_state.exists()
+    gone = labor("export", str(unreviewed.root), "--now", CLOCK2)
+    assert gone.returncode == 2, gone.stdout + gone.stderr
+    assert "blocker: b-" in gone.stderr
+    store = Store.open(unreviewed, readonly=True)
+    try:
+        st = export_status(unreviewed, store)
+        assert st.overrides == [] and st.blockers
+        runs = store.actions_of((ActionKind.export_run,))
+        assert len(runs) == 1
+        ov = store.actions_of((ActionKind.export_override,))
+        assert len(ov) == 1 and ov[0].id < runs[0].id
+    finally:
+        store.close()
+
+
+def test_p3_a_corrupt_state_file_does_not_revive_a_spent_override(
+    unreviewed: ProjectPaths,
+) -> None:
+    store = Store.open(unreviewed)
+    try:
+        record_override(unreviewed, store, "blanket", request_id="ov-c")
+        run_export(unreviewed, store, clock=resolve_clock(CLOCK))
+        unreviewed.export_state.write_text("{not json", encoding="utf-8")
+        with pytest.raises(GateLocked):
+            run_export(unreviewed, store, clock=resolve_clock(CLOCK2))
+    finally:
+        store.close()
+
+
+def test_p3_without_a_store_the_export_refuses(work: ProjectPaths) -> None:
+    work.db.unlink()
+    for side in work.root.glob("project.db-*"):
+        side.unlink()
+    with pytest.raises(ExportError, match=r"project\.db"):
+        run_export(work, None, clock=resolve_clock(CLOCK))
+    assert not work.assembled.exists()
+
+
+def test_after_an_override_export_the_nodes_are_fresh_not_stale(unreviewed: ProjectPaths) -> None:
+    store = Store.open(unreviewed)
+    try:
+        record_override(unreviewed, store, "blanket", request_id="ov-f")
+        run_export(unreviewed, store, clock=resolve_clock(CLOCK))
+        assert [s.state for s in node_states(unreviewed, store)] == ["fresh", "fresh"]
+        # ... but the spent override still covers nothing: a re-export is refused
+        with pytest.raises(GateLocked):
+            run_export(unreviewed, store, clock=resolve_clock(CLOCK2))
+        # a new override is new input: the nodes go stale and the export rebuilds
+        record_override(unreviewed, store, "again", request_id="ov-g")
+        assert [s.state for s in node_states(unreviewed, store)] == ["stale", "stale"]
+        lines: list[dict[str, object]] = []
+        run_export(unreviewed, store, clock=resolve_clock(CLOCK), emit=lines.append)
+        assert [o["status"] for o in lines if "stage" in o] == ["built", "built"]
+        assert len(store.actions_of((ActionKind.export_run,))) == 2
+        assert [s.state for s in node_states(unreviewed, store)] == ["fresh", "fresh"]
+    finally:
+        store.close()
+
+
+def test_a_selected_block_missing_from_every_topic_is_refused_by_name(work: ProjectPaths) -> None:
+    """The reviewer's mutation: groups.json loses a selected block from its topic, with the
+    counts kept consistent. The export must refuse and name it, never call it `not_selected`."""
+    from manuallabor.contracts.enums import BlockType
+    from manuallabor.contracts.group import GroupsFile
+    from manuallabor.contracts.io import read_json, write_json
+    from manuallabor.export.assemble import assemble
+    from manuallabor.export.load import load_inputs
+    from manuallabor.grouping.pipeline import overlap
+    from manuallabor.state.data import ProjectData
+    from manuallabor.state.review import load_review_blocks
+
+    dp = work.doc("clean")
+    gf = read_json(dp.groups, GroupsFile)
+    store = Store.open(work)
+    try:
+        selected = set(ProjectData(work, store).selection().block_ids)
+        types = {b.id: b.type for b in load_review_blocks(work, store, "clean")}
+    finally:
+        store.close()
+    topic = next(t for t in gf.topics if not t.is_unassigned and len(t.block_ids) >= 3)
+    victim = next(
+        b for b in topic.block_ids if b in selected and types[b] == BlockType.paragraph
+    )
+    topics = [
+        t.model_copy(
+            update={
+                "block_ids": [b for b in t.block_ids if b != victim],
+                "block_count": t.block_count - (victim in t.block_ids),
+            }
+        )
+        for t in gf.topics
+    ]
+    gf = gf.model_copy(update={"topics": topics, "overlap": overlap(gf.structure, topics)})
+    write_json(dp.groups, GroupsFile.model_validate(gf.model_dump(mode="json")))
+    store = Store.open(work)
+    try:
+        with pytest.raises(ExportError, match=victim):
+            assemble(load_inputs(work, store), resolve_clock(CLOCK))
+    finally:
+        store.close()
+    # through the CLI the edited groups.json first makes the downstream nodes stale ...
+    r = labor("export", str(work.root), "--now", CLOCK)
+    assert r.returncode == 1 and "stale" in r.stderr, r.stdout + r.stderr
+    # ... and once they are re-run on it, the export refuses with the block's id
+    from tests.export.helpers import labor_run
+
+    labor_run(work.root, "--to", "score2")
+    r = labor("export", str(work.root), "--now", CLOCK)
+    assert r.returncode == 1, r.stdout + r.stderr
+    assert victim in r.stderr and "in no article" in r.stderr
+    assert not work.zip_path.exists()

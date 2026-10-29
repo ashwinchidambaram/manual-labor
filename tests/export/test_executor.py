@@ -51,6 +51,9 @@ def test_execute_runs_the_units_and_reports_them(
         "export",
     ) in stage_lines
     assert work.zip_path.is_file()
+    # no DB writer in the executor: the export is announced for the supervisor to record
+    runs = [o for o in lines if o.get("event") == "export_run"]
+    assert len(runs) == 1 and runs[0]["payload"]["articles"] > 0  # type: ignore[index,operator]
     states = {s.node: s.state for s in graph.project_node_states(work)}
     assert states == {"assemble": "fresh", "export": "fresh"}
     # a second run skips both
