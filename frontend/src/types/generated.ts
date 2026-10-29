@@ -334,6 +334,15 @@ export interface GroupCoverage {
 }
 /**
  * This interface was referenced by `_All`'s JSON-Schema
+ * via the `definition` "CpuInfo".
+ */
+export interface CpuInfo {
+  cores_logical: number | null;
+  cores_physical: number | null;
+  model: string;
+}
+/**
+ * This interface was referenced by `_All`'s JSON-Schema
  * via the `definition` "Decision".
  */
 export interface Decision {
@@ -406,6 +415,16 @@ export interface Flag {
   resolved_at: string | null;
   status: 'open' | 'resolved';
   target_id: string;
+}
+/**
+ * This interface was referenced by `_All`'s JSON-Schema
+ * via the `definition` "GpuInfo".
+ */
+export interface GpuInfo {
+  name: string;
+  unified: boolean;
+  vendor: 'nvidia' | 'amd' | 'apple' | 'none';
+  vram_gb: number | null;
 }
 /**
  * This interface was referenced by `_All`'s JSON-Schema
@@ -637,6 +656,34 @@ export interface ReviewStats {
 }
 /**
  * This interface was referenced by `_All`'s JSON-Schema
+ * via the `definition` "OllamaModel".
+ */
+export interface OllamaModel {
+  digest: string;
+  name: string;
+  size_gb: number;
+}
+/**
+ * This interface was referenced by `_All`'s JSON-Schema
+ * via the `definition` "OllamaStatus".
+ */
+export interface OllamaStatus {
+  host: string;
+  installed: boolean;
+  models: OllamaModel[];
+  reachable: boolean;
+  version: string | null;
+}
+/**
+ * This interface was referenced by `_All`'s JSON-Schema
+ * via the `definition` "PlatformInfo".
+ */
+export interface PlatformInfo {
+  machine: string;
+  system: string;
+}
+/**
+ * This interface was referenced by `_All`'s JSON-Schema
  * via the `definition` "PriorAttempt".
  */
 export interface PriorAttempt {
@@ -645,6 +692,24 @@ export interface PriorAttempt {
   proposal_text: string;
   rationale: string;
   status: ProposalStatus;
+}
+/**
+ * This interface was referenced by `_All`'s JSON-Schema
+ * via the `definition` "ProbeResult".
+ */
+export interface ProbeResult {
+  cpu: CpuInfo;
+  disk_free_gb: number;
+  disk_path: string;
+  effective_model_memory_gb: number;
+  gpu: GpuInfo | null;
+  litellm_version: string | null;
+  notes: string[];
+  ollama: OllamaStatus;
+  platform: PlatformInfo;
+  probed_at: string;
+  ram_gb: number;
+  schema_version: '1.0';
 }
 /**
  * This interface was referenced by `_All`'s JSON-Schema
@@ -742,4 +807,41 @@ export interface Selection {
   active_view: 'structure' | 'topic';
   article_split: 'per_topic' | 'per_document';
   block_ids: string[];
+}
+/**
+ * This interface was referenced by `_All`'s JSON-Schema
+ * via the `definition` "SuggestionTable".
+ */
+export interface SuggestionTable {
+  default_tier: 'small' | 'medium' | 'large' | 'api';
+  pull_commands: {
+    [k: string]: string[] | undefined;
+  };
+  rows: TaskSuggestion[];
+}
+/**
+ * This interface was referenced by `_All`'s JSON-Schema
+ * via the `definition` "TaskSuggestion".
+ */
+export interface TaskSuggestion {
+  api: TierOption;
+  large: TierOption;
+  medium: TierOption;
+  small: TierOption;
+  task: 'cleanup' | 'grouping' | 'vision' | 'verifier' | 'embeddings';
+}
+/**
+ * This interface was referenced by `_All`'s JSON-Schema
+ * via the `definition` "TierOption".
+ */
+export interface TierOption {
+  approx_gb: number;
+  est_tokens_per_s: number | null;
+  fits: boolean;
+  model: string;
+  note: string | null;
+  present: boolean;
+  provider: string;
+  pull_command: string | null;
+  speed_class: 'fast' | 'ok' | 'slow' | 'n/a';
 }

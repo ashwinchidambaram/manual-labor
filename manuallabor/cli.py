@@ -188,6 +188,54 @@ def export(
 
 
 @app.command()
-def probe() -> None:
-    """Probe local hardware and suggest model settings."""
-    _not_implemented("probe")
+def probe(
+    json_out: Annotated[
+        bool, typer.Option("--json", help="Print JSON instead of a table.")
+    ] = False,
+    apply: Annotated[
+        str | None,
+        typer.Option("--apply", help="Write this tier (small|medium|large|api) to --project."),
+    ] = None,
+    project: Annotated[
+        Path | None, typer.Option("--project", help="Project directory (writes probe.json).")
+    ] = None,
+    force: Annotated[
+        bool, typer.Option("--force", help="With --apply: write a tier that does not fit.")
+    ] = False,
+) -> None:
+    """Probe local hardware and suggest model settings (never installs anything)."""
+    from manuallabor.contracts.io import dump_json, write_json
+    from manuallabor.providers import probe as pr
+
+    if apply is not None and apply not in ("small", "medium", "large", "api"):
+        print(f"--apply must be small, medium, large or api, got {apply!r}", file=sys.stderr)
+        raise typer.Exit(2)
+    if apply is not None and project is None:
+        print("--apply requires --project", file=sys.stderr)
+        raise typer.Exit(2)
+    result = pr.run_probe(path=project)
+    table = pr.suggest(result)
+    if project is not None:
+        write_json(project / "probe.json", result)
+    if apply is not None and project is not None:
+        try:
+            chosen = pr.apply_tier(
+                project / "project.json",
+                table,
+                apply,  # type: ignore[arg-type]
+                force=force,
+            )
+        except pr.ApplyError as exc:
+            print(str(exc), file=sys.stderr)
+            raise typer.Exit(1) from exc
+        print(
+            "applied tier "
+            + apply
+            + ": "
+            + ", ".join(f"{t}={m['provider']}:{m['model']}" for t, m in chosen.items()),
+            file=sys.stderr,
+        )
+    if json_out:
+        sys.stdout.write(dump_json({"probe": result, "suggestions": table}))
+    else:
+        sys.stdout.write(pr.render_table(result, table, apply))  # type: ignore[arg-type]

@@ -1,0 +1,28 @@
+{
+  "json": {
+    "choices": [
+      {
+        "finish_reason": "stop",
+        "index": 0,
+        "message": {
+          "content": "{\"n\": 7}",
+          "role": "assistant"
+        }
+      }
+    ],
+    "created": 1,
+    "id": "chatcmpl-1",
+    "model": "gpt-test",
+    "object": "chat.completion",
+    "usage": {
+      "completion_tokens": 5,
+      "prompt_tokens": 10,
+      "total_tokens": 15
+    }
+  },
+  "match": {
+    "method": "POST",
+    "path": "/v1/chat/completions"
+  },
+  "status": 200
+}

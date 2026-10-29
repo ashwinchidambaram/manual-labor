@@ -4,7 +4,7 @@
 Deliver Manual Labor v1 per SPEC.md: every CLAUDE.md module gate (0–11) passed with its proving command pasted in docs/PROGRESS.md, and SPEC §11 acceptance recorded in docs/ACCEPTANCE.md.
 
 ## Current Phase
-Phase 5 (cleanup + figure attachment). Overnight autonomous 2026-10-29.
+Phase 6 (provider layer + hardware probe). Overnight autonomous 2026-10-29.
 
 ## Phases
 Detailed tasks, model assignments, and gates: docs/plans/2026-10-28-manual-labor-build.md. Decisions and environment: findings.md.
@@ -45,14 +45,14 @@ Detailed tasks, model assignments, and gates: docs/plans/2026-10-28-manual-labor
 - **Status:** complete
 
 ### Phase 5: Cleanup + figure attachment
-- [ ] Design (Opus) · Implement (Opus) · Review (Opus) · Fix
-- [ ] Gate: 0 faithfulness violations on auto-approved; attach rule recorded; caption-ref attachments correct
-- **Status:** in_progress
+- [x] Design (Opus) · Implement (Opus) · Review (Opus) · Fix (Opus)
+- [x] Gate: 1042 fast tests; 0 violations on auto-approved; corrupting cleanup 100% rejected; caption_ref 23/23
+- **Status:** complete
 
 ### Phase 6: Provider layer + hardware probe
-- [ ] Design (Sonnet) · Implement (Sonnet) · Review (Sonnet) · Fix
-- [ ] Gate: same contract test passes for ollama/anthropic/openai-compatible; probe table on macOS; `--live` with local Ollama models
-- **Status:** pending
+- [ ] Design (Sonnet) · Implement (Sonnet) · Review (Opus) · Fix
+- [ ] Gate: same contract test passes for ollama/anthropic/openai-compatible; probe table on macOS; `--live` with local Ollama models (needs a small chat + vision model pulled; gemma4 was removed overnight)
+- **Status:** in_progress
 
 ### Phase 7: API + project state
 - [ ] Design (Opus) · Implement (Sonnet ×2) · Review (Opus) · Fix

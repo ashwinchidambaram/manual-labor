@@ -478,6 +478,46 @@
       "title": "CoverageReport",
       "type": "object"
     },
+    "CpuInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "cores_logical": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Cores Logical"
+        },
+        "cores_physical": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Cores Physical"
+        },
+        "model": {
+          "title": "Model",
+          "type": "string"
+        }
+      },
+      "required": [
+        "model",
+        "cores_physical",
+        "cores_logical"
+      ],
+      "title": "CpuInfo",
+      "type": "object"
+    },
     "Decision": {
       "additionalProperties": false,
       "properties": {
@@ -1145,6 +1185,49 @@
       ],
       "title": "FlagStatus",
       "type": "string"
+    },
+    "GpuInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "unified": {
+          "title": "Unified",
+          "type": "boolean"
+        },
+        "vendor": {
+          "enum": [
+            "nvidia",
+            "amd",
+            "apple",
+            "none"
+          ],
+          "title": "Vendor",
+          "type": "string"
+        },
+        "vram_gb": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Vram Gb"
+        }
+      },
+      "required": [
+        "vendor",
+        "name",
+        "vram_gb",
+        "unified"
+      ],
+      "title": "GpuInfo",
+      "type": "object"
     },
     "Group": {
       "additionalProperties": false,
@@ -2114,6 +2197,75 @@
       "title": "OcrWord",
       "type": "object"
     },
+    "OllamaModel": {
+      "additionalProperties": false,
+      "properties": {
+        "digest": {
+          "title": "Digest",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "size_gb": {
+          "minimum": 0,
+          "title": "Size Gb",
+          "type": "number"
+        }
+      },
+      "required": [
+        "name",
+        "size_gb",
+        "digest"
+      ],
+      "title": "OllamaModel",
+      "type": "object"
+    },
+    "OllamaStatus": {
+      "additionalProperties": false,
+      "properties": {
+        "host": {
+          "title": "Host",
+          "type": "string"
+        },
+        "installed": {
+          "title": "Installed",
+          "type": "boolean"
+        },
+        "models": {
+          "items": {
+            "$ref": "#/$defs/OllamaModel"
+          },
+          "title": "Models",
+          "type": "array"
+        },
+        "reachable": {
+          "title": "Reachable",
+          "type": "boolean"
+        },
+        "version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Version"
+        }
+      },
+      "required": [
+        "installed",
+        "version",
+        "host",
+        "reachable",
+        "models"
+      ],
+      "title": "OllamaStatus",
+      "type": "object"
+    },
     "Override": {
       "additionalProperties": false,
       "properties": {
@@ -2183,6 +2335,25 @@
       "title": "PageRange",
       "type": "object"
     },
+    "PlatformInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "machine": {
+          "title": "Machine",
+          "type": "string"
+        },
+        "system": {
+          "title": "System",
+          "type": "string"
+        }
+      },
+      "required": [
+        "system",
+        "machine"
+      ],
+      "title": "PlatformInfo",
+      "type": "object"
+    },
     "PriorAttempt": {
       "additionalProperties": false,
       "properties": {
@@ -2215,6 +2386,94 @@
         "decided_at"
       ],
       "title": "PriorAttempt",
+      "type": "object"
+    },
+    "ProbeResult": {
+      "additionalProperties": false,
+      "properties": {
+        "cpu": {
+          "$ref": "#/$defs/CpuInfo"
+        },
+        "disk_free_gb": {
+          "minimum": 0,
+          "title": "Disk Free Gb",
+          "type": "number"
+        },
+        "disk_path": {
+          "title": "Disk Path",
+          "type": "string"
+        },
+        "effective_model_memory_gb": {
+          "minimum": 0,
+          "title": "Effective Model Memory Gb",
+          "type": "number"
+        },
+        "gpu": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GpuInfo"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "litellm_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Litellm Version"
+        },
+        "notes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Notes",
+          "type": "array"
+        },
+        "ollama": {
+          "$ref": "#/$defs/OllamaStatus"
+        },
+        "platform": {
+          "$ref": "#/$defs/PlatformInfo"
+        },
+        "probed_at": {
+          "format": "date-time",
+          "title": "Probed At",
+          "type": "string"
+        },
+        "ram_gb": {
+          "minimum": 0,
+          "title": "Ram Gb",
+          "type": "number"
+        },
+        "schema_version": {
+          "const": "1.0",
+          "default": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "probed_at",
+        "platform",
+        "cpu",
+        "ram_gb",
+        "gpu",
+        "effective_model_memory_gb",
+        "disk_free_gb",
+        "disk_path",
+        "ollama",
+        "litellm_version",
+        "notes"
+      ],
+      "title": "ProbeResult",
       "type": "object"
     },
     "ProjectConfig": {
@@ -2782,6 +3041,45 @@
       "title": "StragglerRecord",
       "type": "object"
     },
+    "SuggestionTable": {
+      "additionalProperties": false,
+      "properties": {
+        "default_tier": {
+          "enum": [
+            "small",
+            "medium",
+            "large",
+            "api"
+          ],
+          "title": "Default Tier",
+          "type": "string"
+        },
+        "pull_commands": {
+          "additionalProperties": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "title": "Pull Commands",
+          "type": "object"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/TaskSuggestion"
+          },
+          "title": "Rows",
+          "type": "array"
+        }
+      },
+      "required": [
+        "default_tier",
+        "rows",
+        "pull_commands"
+      ],
+      "title": "SuggestionTable",
+      "type": "object"
+    },
     "TableCell": {
       "additionalProperties": false,
       "properties": {
@@ -2962,6 +3260,127 @@
         "agent"
       ],
       "title": "TaskModels",
+      "type": "object"
+    },
+    "TaskSuggestion": {
+      "additionalProperties": false,
+      "properties": {
+        "api": {
+          "$ref": "#/$defs/TierOption"
+        },
+        "large": {
+          "$ref": "#/$defs/TierOption"
+        },
+        "medium": {
+          "$ref": "#/$defs/TierOption"
+        },
+        "small": {
+          "$ref": "#/$defs/TierOption"
+        },
+        "task": {
+          "enum": [
+            "cleanup",
+            "grouping",
+            "vision",
+            "verifier",
+            "embeddings"
+          ],
+          "title": "Task",
+          "type": "string"
+        }
+      },
+      "required": [
+        "task",
+        "small",
+        "medium",
+        "large",
+        "api"
+      ],
+      "title": "TaskSuggestion",
+      "type": "object"
+    },
+    "TierOption": {
+      "additionalProperties": false,
+      "properties": {
+        "approx_gb": {
+          "minimum": 0,
+          "title": "Approx Gb",
+          "type": "number"
+        },
+        "est_tokens_per_s": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Est Tokens Per S"
+        },
+        "fits": {
+          "title": "Fits",
+          "type": "boolean"
+        },
+        "model": {
+          "title": "Model",
+          "type": "string"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        },
+        "present": {
+          "title": "Present",
+          "type": "boolean"
+        },
+        "provider": {
+          "title": "Provider",
+          "type": "string"
+        },
+        "pull_command": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Pull Command"
+        },
+        "speed_class": {
+          "enum": [
+            "fast",
+            "ok",
+            "slow",
+            "n/a"
+          ],
+          "title": "Speed Class",
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider",
+        "model",
+        "approx_gb",
+        "fits",
+        "speed_class",
+        "est_tokens_per_s",
+        "pull_command",
+        "present",
+        "note"
+      ],
+      "title": "TierOption",
       "type": "object"
     },
     "TitleSource": {

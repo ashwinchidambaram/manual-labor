@@ -1,0 +1,162 @@
+{
+  "$defs": {
+    "TaskSuggestion": {
+      "additionalProperties": false,
+      "properties": {
+        "api": {
+          "$ref": "#/$defs/TierOption"
+        },
+        "large": {
+          "$ref": "#/$defs/TierOption"
+        },
+        "medium": {
+          "$ref": "#/$defs/TierOption"
+        },
+        "small": {
+          "$ref": "#/$defs/TierOption"
+        },
+        "task": {
+          "enum": [
+            "cleanup",
+            "grouping",
+            "vision",
+            "verifier",
+            "embeddings"
+          ],
+          "title": "Task",
+          "type": "string"
+        }
+      },
+      "required": [
+        "task",
+        "small",
+        "medium",
+        "large",
+        "api"
+      ],
+      "title": "TaskSuggestion",
+      "type": "object"
+    },
+    "TierOption": {
+      "additionalProperties": false,
+      "properties": {
+        "approx_gb": {
+          "minimum": 0,
+          "title": "Approx Gb",
+          "type": "number"
+        },
+        "est_tokens_per_s": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Est Tokens Per S"
+        },
+        "fits": {
+          "title": "Fits",
+          "type": "boolean"
+        },
+        "model": {
+          "title": "Model",
+          "type": "string"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        },
+        "present": {
+          "title": "Present",
+          "type": "boolean"
+        },
+        "provider": {
+          "title": "Provider",
+          "type": "string"
+        },
+        "pull_command": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Pull Command"
+        },
+        "speed_class": {
+          "enum": [
+            "fast",
+            "ok",
+            "slow",
+            "n/a"
+          ],
+          "title": "Speed Class",
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider",
+        "model",
+        "approx_gb",
+        "fits",
+        "speed_class",
+        "est_tokens_per_s",
+        "pull_command",
+        "present",
+        "note"
+      ],
+      "title": "TierOption",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "default_tier": {
+      "enum": [
+        "small",
+        "medium",
+        "large",
+        "api"
+      ],
+      "title": "Default Tier",
+      "type": "string"
+    },
+    "pull_commands": {
+      "additionalProperties": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "title": "Pull Commands",
+      "type": "object"
+    },
+    "rows": {
+      "items": {
+        "$ref": "#/$defs/TaskSuggestion"
+      },
+      "title": "Rows",
+      "type": "array"
+    }
+  },
+  "required": [
+    "default_tier",
+    "rows",
+    "pull_commands"
+  ],
+  "title": "SuggestionTable",
+  "type": "object"
+}

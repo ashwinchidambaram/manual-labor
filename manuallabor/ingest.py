@@ -18,7 +18,7 @@ from manuallabor.contracts.enums import DocKind, Task
 from manuallabor.contracts.io import write_json
 from manuallabor.parse.metadata import infer_metadata, page1_lines_pdf
 from manuallabor.project import ProjectPaths
-from manuallabor.providers.base import DEFAULT_FACTORIES, Provider
+from manuallabor.providers.base import DEFAULT_FACTORIES, Provider, ProviderError
 from manuallabor.providers.cache import LLMCache
 from manuallabor.providers.sinks import JsonlSink
 
@@ -130,7 +130,11 @@ def metadata_provider(paths: ProjectPaths, warn: Callable[[str], None]) -> Provi
     sink = JsonlSink(paths.root / "llm_calls.jsonl")
     from manuallabor.providers.base import utc_now
 
-    return factory(ref, sink, cache, utc_now)
+    try:
+        return factory(ref, sink, cache, utc_now)
+    except ProviderError as exc:
+        warn(f"metadata provider {ref.provider!r} is not usable ({exc}); skipping LLM inference")
+        return None
 
 
 def _docx_info(path: Path) -> tuple[int, str | None]:

@@ -16,7 +16,10 @@ from manuallabor.providers.base import (
 )
 from manuallabor.providers.cache import LLMCache
 from manuallabor.providers.mock import CorruptingMockProvider, MockProvider, corrupt
+from manuallabor.providers.registry import register_defaults
 from manuallabor.providers.sinks import JsonlSink, ListSink
+
+register_defaults(DEFAULT_FACTORIES)
 
 __all__ = [
     "DEFAULT_FACTORIES",

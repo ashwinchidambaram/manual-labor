@@ -402,7 +402,7 @@ def _mock_factory(ref: ModelRef, sink: LogSink, cache: LLMCache | None, clock: C
     return MockProvider(ref, sink=sink, cache=cache, clock=clock)
 
 
-DEFAULT_FACTORIES: Mapping[str, Factory] = {"mock": _mock_factory}
+DEFAULT_FACTORIES: dict[str, Factory] = {"mock": _mock_factory}
 
 
 def build_provider_set(

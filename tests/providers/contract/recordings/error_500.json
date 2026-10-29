@@ -1,0 +1,13 @@
+{
+  "json": {
+    "error": {
+      "message": "internal server error",
+      "type": "server_error"
+    }
+  },
+  "match": {
+    "method": "POST",
+    "path": "*"
+  },
+  "status": 500
+}

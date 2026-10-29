@@ -117,3 +117,11 @@
   - 05:2x: 4th disk-full, caused by tests/cleanup copying whole projects ~15×/run. pytest basetemp moved to .pytest_tmp (wiped per run). Ollama now lists only nomic-embed-text (gemma4/llama3.2 gone) — live LLM tests need a model pulled later. Dispatched M5.4a test-footprint + failures fix (Sonnet).
   - M5.2 implement done (Opus): 158 cleanup tests; corrupting mock 100% rejected on 6 fixtures × 4 modes; scanned auto-approved violations 0; caption_ref 23/23 GT refs; GT text clean 124/125 (fixed), twocol 82/82, tables 69/69, figures 65/65. M5.4a (Sonnet): footprint 2.1→0.68 GB cleanup / 1.7 GB full; 3 failures fixed; docs updated. Fast suite 996. Commit 0beebed. Dispatched M5.3 review (Opus, fresh).
   - M5.3 review (Opus): gate passes on reviewer's own run (0 auto-approved faithfulness failures / 0 numeric diffs across 6 fixtures × 3 LLM modes × corrupting modes). 3 majors: header string deleted mid-sentence auto-approved; table clean text never compared to raw_text (row drop at 1.0); 'Figure 1 to 2 mm' parsed as range. Minors: LLM bullet set wider than deterministic; LLM whitespace inside part numbers; stale clean.json detection by id only; invalid learned rule drops snapshot; residual trigger untested. Dispatched M5.4 fix (Opus).
+  - M5.4 fix done (Opus): 9/9; 204 cleanup tests. Gate run by orchestrator (1042 fast); M5 recorded + pushed.
+
+### Phase 6: Provider layer + hardware probe
+- **Status:** in_progress
+- **Started:** 2026-10-29
+- Actions taken:
+  - Dispatched M6.1 design (Sonnet).
+  - M6.1 design done (Sonnet, 227 lines, T1–T15). Defaults flipped to small tier. Pulling llama3.2:1b + moondream in background. Dispatched M6.2 implement (Sonnet).

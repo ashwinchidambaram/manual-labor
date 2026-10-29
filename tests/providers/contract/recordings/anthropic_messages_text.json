@@ -1,0 +1,25 @@
+{
+  "json": {
+    "content": [
+      {
+        "text": "ok",
+        "type": "text"
+      }
+    ],
+    "id": "msg_01",
+    "model": "claude-haiku-4-5",
+    "role": "assistant",
+    "stop_reason": "end_turn",
+    "stop_sequence": null,
+    "type": "message",
+    "usage": {
+      "input_tokens": 10,
+      "output_tokens": 5
+    }
+  },
+  "match": {
+    "method": "POST",
+    "path": "/v1/messages"
+  },
+  "status": 200
+}

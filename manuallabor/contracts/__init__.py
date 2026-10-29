@@ -80,6 +80,17 @@ from manuallabor.contracts.manifest import (
     Override,
     ReviewStats,
 )
+from manuallabor.contracts.probe import (
+    CpuInfo,
+    GpuInfo,
+    OllamaModel,
+    OllamaStatus,
+    PlatformInfo,
+    ProbeResult,
+    SuggestionTable,
+    TaskSuggestion,
+    TierOption,
+)
 from manuallabor.contracts.proposal import PriorAttempt, Proposal, RecheckResult
 from manuallabor.contracts.selection import (
     CoverageReport,
@@ -105,9 +116,20 @@ EXPORTED_MODELS: tuple[type[BaseModel], ...] = (
     Manifest,
     ProjectConfig,
     LLMCallLog,
+    ProbeResult,
+    SuggestionTable,
 )
 
 __all__ = [
+    "CpuInfo",
+    "GpuInfo",
+    "OllamaModel",
+    "OllamaStatus",
+    "PlatformInfo",
+    "ProbeResult",
+    "SuggestionTable",
+    "TaskSuggestion",
+    "TierOption",
     "UnassignedReason",
     "UnassignedEntry",
     "TitleSource",

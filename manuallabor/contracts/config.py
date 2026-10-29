@@ -9,7 +9,7 @@ from pydantic import Field, field_validator
 from manuallabor.contracts._base import ContractModel, Unit
 from manuallabor.contracts.enums import ArticleSplit, OcrEngine, Task
 
-KNOWN_PROVIDERS = ("mock", "ollama", "anthropic", "openai_compatible", "vllm", "llamacpp")
+KNOWN_PROVIDERS = ("mock", "ollama", "anthropic", "openai", "openai_compatible", "vllm", "llamacpp")
 
 
 class ModelRef(ContractModel):
@@ -19,20 +19,23 @@ class ModelRef(ContractModel):
     api_key_env: str | None = None
 
 
-def _default_cleanup() -> ModelRef:
-    return ModelRef(provider="ollama", model="gemma4:e4b-it-q4_K_M")
+def _default_chat() -> ModelRef:
+    """Small-tier default (fits a 16 GB machine); `labor probe --apply <tier>` changes it."""
+    return ModelRef(provider="ollama", model="llama3.2:1b")
+
+
+def _default_vision() -> ModelRef:
+    return ModelRef(provider="ollama", model="moondream")
 
 
 class TaskModels(ContractModel):
-    cleanup: ModelRef = Field(default_factory=_default_cleanup)
-    grouping: ModelRef = Field(default_factory=_default_cleanup)
-    vision: ModelRef = Field(default_factory=_default_cleanup)
+    cleanup: ModelRef = Field(default_factory=_default_chat)
+    grouping: ModelRef = Field(default_factory=_default_chat)
+    vision: ModelRef = Field(default_factory=_default_vision)
     embeddings: ModelRef = Field(
         default_factory=lambda: ModelRef(provider="ollama", model="nomic-embed-text")
     )
-    verifier: ModelRef | None = Field(
-        default_factory=lambda: ModelRef(provider="ollama", model="llama3.2:1b")
-    )
+    verifier: ModelRef | None = Field(default_factory=_default_chat)
     metadata: ModelRef | None = None
     agent: ModelRef | None = None
 

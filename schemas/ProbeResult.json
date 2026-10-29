@@ -1,0 +1,261 @@
+{
+  "$defs": {
+    "CpuInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "cores_logical": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Cores Logical"
+        },
+        "cores_physical": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Cores Physical"
+        },
+        "model": {
+          "title": "Model",
+          "type": "string"
+        }
+      },
+      "required": [
+        "model",
+        "cores_physical",
+        "cores_logical"
+      ],
+      "title": "CpuInfo",
+      "type": "object"
+    },
+    "GpuInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "unified": {
+          "title": "Unified",
+          "type": "boolean"
+        },
+        "vendor": {
+          "enum": [
+            "nvidia",
+            "amd",
+            "apple",
+            "none"
+          ],
+          "title": "Vendor",
+          "type": "string"
+        },
+        "vram_gb": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Vram Gb"
+        }
+      },
+      "required": [
+        "vendor",
+        "name",
+        "vram_gb",
+        "unified"
+      ],
+      "title": "GpuInfo",
+      "type": "object"
+    },
+    "OllamaModel": {
+      "additionalProperties": false,
+      "properties": {
+        "digest": {
+          "title": "Digest",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "size_gb": {
+          "minimum": 0,
+          "title": "Size Gb",
+          "type": "number"
+        }
+      },
+      "required": [
+        "name",
+        "size_gb",
+        "digest"
+      ],
+      "title": "OllamaModel",
+      "type": "object"
+    },
+    "OllamaStatus": {
+      "additionalProperties": false,
+      "properties": {
+        "host": {
+          "title": "Host",
+          "type": "string"
+        },
+        "installed": {
+          "title": "Installed",
+          "type": "boolean"
+        },
+        "models": {
+          "items": {
+            "$ref": "#/$defs/OllamaModel"
+          },
+          "title": "Models",
+          "type": "array"
+        },
+        "reachable": {
+          "title": "Reachable",
+          "type": "boolean"
+        },
+        "version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Version"
+        }
+      },
+      "required": [
+        "installed",
+        "version",
+        "host",
+        "reachable",
+        "models"
+      ],
+      "title": "OllamaStatus",
+      "type": "object"
+    },
+    "PlatformInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "machine": {
+          "title": "Machine",
+          "type": "string"
+        },
+        "system": {
+          "title": "System",
+          "type": "string"
+        }
+      },
+      "required": [
+        "system",
+        "machine"
+      ],
+      "title": "PlatformInfo",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "cpu": {
+      "$ref": "#/$defs/CpuInfo"
+    },
+    "disk_free_gb": {
+      "minimum": 0,
+      "title": "Disk Free Gb",
+      "type": "number"
+    },
+    "disk_path": {
+      "title": "Disk Path",
+      "type": "string"
+    },
+    "effective_model_memory_gb": {
+      "minimum": 0,
+      "title": "Effective Model Memory Gb",
+      "type": "number"
+    },
+    "gpu": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/GpuInfo"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "litellm_version": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Litellm Version"
+    },
+    "notes": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Notes",
+      "type": "array"
+    },
+    "ollama": {
+      "$ref": "#/$defs/OllamaStatus"
+    },
+    "platform": {
+      "$ref": "#/$defs/PlatformInfo"
+    },
+    "probed_at": {
+      "format": "date-time",
+      "title": "Probed At",
+      "type": "string"
+    },
+    "ram_gb": {
+      "minimum": 0,
+      "title": "Ram Gb",
+      "type": "number"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "probed_at",
+    "platform",
+    "cpu",
+    "ram_gb",
+    "gpu",
+    "effective_model_memory_gb",
+    "disk_free_gb",
+    "disk_path",
+    "ollama",
+    "litellm_version",
+    "notes"
+  ],
+  "title": "ProbeResult",
+  "type": "object"
+}

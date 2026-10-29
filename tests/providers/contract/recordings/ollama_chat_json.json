@@ -1,0 +1,19 @@
+{
+  "json": {
+    "created_at": "2026-01-01T00:00:00Z",
+    "done": true,
+    "done_reason": "stop",
+    "eval_count": 4,
+    "message": {
+      "content": "{\"n\": 7}",
+      "role": "assistant"
+    },
+    "model": "llama3.2:1b",
+    "prompt_eval_count": 12
+  },
+  "match": {
+    "method": "POST",
+    "path": "/api/chat"
+  },
+  "status": 200
+}

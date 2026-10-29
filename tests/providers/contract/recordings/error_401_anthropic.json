@@ -1,0 +1,14 @@
+{
+  "json": {
+    "error": {
+      "message": "invalid x-api-key: sk-test-SECRET",
+      "type": "authentication_error"
+    },
+    "type": "error"
+  },
+  "match": {
+    "method": "POST",
+    "path": "/v1/messages"
+  },
+  "status": 401
+}

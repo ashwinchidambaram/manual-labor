@@ -84,4 +84,7 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q -m 'not slow' --basetemp=.pytest_tmp"
-markers = ["slow: slow end-to-end tests (deselected by default)"]
+markers = [
+    "slow: slow end-to-end tests (deselected by default)",
+    "live: needs real local models; runs only with MANUALLABOR_LIVE=1",
+]

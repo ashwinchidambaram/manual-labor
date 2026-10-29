@@ -185,6 +185,74 @@ def test_c3_extra_forbidden(model: type[BaseModel]) -> None:
         },
         "Manifest": manifest_dict(),
         "ProjectConfig": {"name": "x"},
+        "ProbeResult": {
+            "probed_at": TS,
+            "platform": {"system": "Darwin", "machine": "arm64"},
+            "cpu": {"model": "Apple M3", "cores_physical": 8, "cores_logical": 8},
+            "ram_gb": 16.0,
+            "gpu": {"vendor": "apple", "name": "Apple M3", "vram_gb": None, "unified": True},
+            "effective_model_memory_gb": 10.6,
+            "disk_free_gb": 8.5,
+            "disk_path": "/tmp",
+            "ollama": {
+                "installed": True,
+                "version": "0.40.2",
+                "host": "http://localhost:11434",
+                "reachable": True,
+                "models": [{"name": "llama3.2:1b", "size_gb": 1.3, "digest": "baf6a787fdff"}],
+            },
+            "litellm_version": "1.106.5",
+            "notes": [],
+        },
+        "SuggestionTable": {
+            "default_tier": "small",
+            "rows": [
+                {
+                    "task": "cleanup",
+                    "small": {
+                        "provider": "ollama",
+                        "model": "m",
+                        "approx_gb": 1.3,
+                        "fits": True,
+                        "speed_class": "fast",
+                        "est_tokens_per_s": 38.5,
+                        "pull_command": None,
+                        "present": True,
+                    },
+                    "medium": {
+                        "provider": "ollama",
+                        "model": "m",
+                        "approx_gb": 1.3,
+                        "fits": True,
+                        "speed_class": "fast",
+                        "est_tokens_per_s": 38.5,
+                        "pull_command": None,
+                        "present": True,
+                    },
+                    "large": {
+                        "provider": "ollama",
+                        "model": "m",
+                        "approx_gb": 1.3,
+                        "fits": True,
+                        "speed_class": "fast",
+                        "est_tokens_per_s": 38.5,
+                        "pull_command": None,
+                        "present": True,
+                    },
+                    "api": {
+                        "provider": "ollama",
+                        "model": "m",
+                        "approx_gb": 1.3,
+                        "fits": True,
+                        "speed_class": "fast",
+                        "est_tokens_per_s": 38.5,
+                        "pull_command": None,
+                        "present": True,
+                    },
+                }
+            ],
+            "pull_commands": {},
+        },
         "LLMCallLog": {
             "task": "cleanup",
             "kind": "chat",
@@ -437,7 +505,8 @@ def test_c13_config() -> None:
     assert cfg.ocr_engine == c.OcrEngine.auto
     assert cfg.ocr_dpi == 300
     assert cfg.target_edit_rate == 0.02
-    assert cfg.models.cleanup.model == "gemma4:e4b-it-q4_K_M"
+    assert cfg.models.cleanup.model == "llama3.2:1b"
+    assert cfg.models.vision.model == "moondream"
     assert cfg.models.verifier is not None and cfg.models.verifier.model == "llama3.2:1b"
     assert cfg.models.embeddings.model == "nomic-embed-text"
     bad(c.ProjectConfig, {"name": "x", "parsers": ["pymupdf"]})

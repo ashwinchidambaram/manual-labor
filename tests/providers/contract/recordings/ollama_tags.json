@@ -1,0 +1,29 @@
+{
+  "json": {
+    "models": [
+      {
+        "digest": "baf6a787fdff0000000000000000000000000000000000000000000000000000",
+        "model": "llama3.2:1b",
+        "name": "llama3.2:1b",
+        "size": 1321098329
+      },
+      {
+        "digest": "55fc3abd38670000000000000000000000000000000000000000000000000000",
+        "model": "moondream:latest",
+        "name": "moondream:latest",
+        "size": 1738451197
+      },
+      {
+        "digest": "0a109f422b470000000000000000000000000000000000000000000000000000",
+        "model": "nomic-embed-text:latest",
+        "name": "nomic-embed-text:latest",
+        "size": 274302450
+      }
+    ]
+  },
+  "match": {
+    "method": "GET",
+    "path": "/api/tags"
+  },
+  "status": 200
+}
