@@ -524,7 +524,7 @@ def test_c18_enums() -> None:
     ]
     assert [e.value for e in c.Extraction] == ["native", "vector", "crop"]
     assert [e.value for e in c.AttachRule] == ["caption_ref", "caption_match", "proximity", "none"]
-    assert len(c.SignalName) == 12 and len(c.Task) == 7
+    assert len(c.SignalName) == 13 and len(c.Task) == 7
 
 
 def test_group_validators() -> None:

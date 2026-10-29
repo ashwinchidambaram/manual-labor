@@ -35,6 +35,7 @@ export type SignalName =
   | 'garbage_ratio'
   | 'faithfulness'
   | 'figure_method'
+  | 'figure_resolution'
   | 'figure_attach_rule'
   | 'has_numeric_spec'
   | 'llm_verifier';

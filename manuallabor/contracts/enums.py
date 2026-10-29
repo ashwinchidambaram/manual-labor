@@ -42,6 +42,7 @@ class SignalName(StrEnum):
     garbage_ratio = "garbage_ratio"
     faithfulness = "faithfulness"
     figure_method = "figure_method"
+    figure_resolution = "figure_resolution"
     figure_attach_rule = "figure_attach_rule"
     has_numeric_spec = "has_numeric_spec"
     llm_verifier = "llm_verifier"

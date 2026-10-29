@@ -56,7 +56,7 @@ class ContractModel(BaseModel):
 | `DocKind` | born_digital_pdf, scanned_pdf, docx |
 | `BlockType` | heading, paragraph, list, table, figure, caption, header, footer, other |
 | `BlockStatus` | auto_approved, queued, approved, edited, flagged, rejected |
-| `SignalName` | ocr_mean, ocr_min, textlayer_vs_ocr, parser_agreement, reading_order_risk, table_consistency, garbage_ratio, faithfulness, figure_method, figure_attach_rule, has_numeric_spec, llm_verifier |
+| `SignalName` | ocr_mean, ocr_min, textlayer_vs_ocr, parser_agreement, reading_order_risk, table_consistency, garbage_ratio, faithfulness, figure_method, figure_resolution, figure_attach_rule, has_numeric_spec, llm_verifier |
 | `Extraction` | native, vector, crop |
 | `AttachRule` | caption_ref, caption_match, proximity, none |
 | `GroupView` | structure, topic |
@@ -140,8 +140,8 @@ Block validators:
 ### 4.3 `FigureRecord` (figure.py): the SPEC §6.3 sidecar, exactly these fields and no others
 `id: FigureId`, `file: str`, `svg: str | None`, `source_doc: DocSlug`, `product_model: str | None`, `page: int ≥1`, `bbox: BBox | None`, `extraction: Extraction`, `width: int ≥1`, `height: int ≥1`, `phash: PHash`, `caption_original: str | None`, `description_generated: str | None`, `tags: list[str]`, `articles: list[ArticleId]`, `attach_rule: AttachRule`, `confidence: Unit`, `review: BlockStatus`.
 Validators:
-- `file` matches `^(\.\./[a-z0-9-]+/)?FIG-…\.(png|jpg)$`, using the full FIG pattern. The `../<slug>/` prefix is allowed only for phash duplicates stored once under another doc.
-- `svg` is non-None if and only if `extraction == vector`, and `svg == <id>.svg`.
+- `file` is either the figure's own `<id>.png` or `../<other-slug>/<FIG-other-id>.(png|svg)` (the other id's slug must equal the directory). The `../<slug>/` form is used only for deduplicated figures stored once under another doc. The code (`figure.py`) allows only `png|svg`; JPEG sources are re-encoded to PNG.
+- `svg` is non-None if and only if `extraction == vector`; it is either `<id>.svg` or `../<other-slug>/<FIG-other-id>.svg` and must point at the same figure as `file`.
 - `id`'s slug equals `source_doc` and its page equals `page`.
 - `tags` are lowercased, deduplicated and sorted. `articles` are sorted and unique.
 - `bbox` is None only for DOCX images.

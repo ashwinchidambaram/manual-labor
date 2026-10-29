@@ -73,3 +73,5 @@
   - Dispatched M2.1 design (Opus) ∥ focused re-review of M1.5 merge/OCR/classify changes (Sonnet).
   - M1 re-review (Sonnet): 5 small defects (order_by_parser min, column-aware piece sort, OCR bullet glyphs ¢/+, cover-page heading rule, Docling header_rows cap); merge order, heading recall 18/18, metadata validation confirmed. Dispatched M1.6 fix (Sonnet) in parallel with M2.1 design.
   - M2.1 design done (Opus, 323 lines, 22 tests): isolated-page SVG export, lossless JPEG→PNG, phash-64 near-dup threshold 8 (measured 0/2–6/10/12+), figures/<slug>/ layout, canonical = best method then area. Found module-1 fused caption on scanned p6 → added to M1.6 fixer. Commit 772b9c0.
+  - M1.6 fix done (Sonnet): 6/6 failing-first; scanned lists 8/8, captions own blocks. Full fast suite 280 passed; commit 87cbd81. Disk now 19 GB free (user cleared).
+  - Dispatched M2.2 implement (Sonnet).

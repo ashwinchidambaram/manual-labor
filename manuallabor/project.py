@@ -50,6 +50,10 @@ class DocPaths:
         return self.parse_dir / "figures.json"
 
     @property
+    def figure_report(self) -> Path:
+        return self.root / "figures_report.json"
+
+    @property
     def state(self) -> Path:
         return self.parse_dir / "state.json"
 
@@ -80,6 +84,20 @@ class ProjectPaths:
     @property
     def docs(self) -> Path:
         return self.root / "docs"
+
+    @property
+    def figures_root(self) -> Path:
+        return self.root / "figures"
+
+    def figure_dir(self, slug: str) -> Path:
+        return self.figures_root / slug
+
+    def figure_file(self, slug: str, fid: str, ext: str) -> Path:
+        return self.figure_dir(slug) / f"{fid}.{ext}"
+
+    @property
+    def figures_index(self) -> Path:
+        return self.figures_root / "index.json"
 
     def source(self, filename: str) -> Path:
         return self.sources / filename
