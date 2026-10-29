@@ -1,0 +1,31 @@
+// Short aliases over the generated OpenAPI types (src/api/types.ts). Never hand-write a payload type.
+import type { components } from "./types";
+
+type S = components["schemas"];
+export type ProjectInfo = S["ProjectInfo"];
+export type SourceInfo = S["SourceInfo"];
+export type ProjectStatus = S["ProjectStatus"];
+export type DocGroups = S["DocGroups"];
+export type GroupsFile = S["GroupsFile"];
+export type Group = S["Group"];
+export type GroupCoverage = S["GroupCoverage"];
+export type CoverageReport = S["CoverageReport"];
+export type Selection = S["Selection"];
+export type SelectionOut = S["SelectionOut"];
+export type SelectionOp = S["SelectionOp"];
+export type ScopeSummary = S["ScopeSummary"];
+export type ScopeBlocks = S["ScopeBlocks"];
+export type ScopeBlockRow = S["ScopeBlockRow"];
+export type ScopeModels = S["ScopeModels"];
+export type TaskModels = S["TaskModels"];
+export type ProbeResult = S["ProbeResult"];
+export type SuggestionTable = S["SuggestionTable"];
+export type TierOption = S["TierOption"];
+export type JobInfo = S["JobInfo"];
+export type NodeState = S["NodeState"];
+export type ApplyTierOut = S["ApplyTierOut"];
+export type ProbeOut = S["ProbeOut"];
+export type Tier = "small" | "medium" | "large" | "api";
+export type View = "structure" | "topic";
+export type Split = "per_topic" | "per_document";
+export type ModelRef = S["ModelRef"];

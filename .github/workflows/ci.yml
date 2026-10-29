@@ -23,6 +23,10 @@ jobs:
       # against those committed schemas, so a stale schema fails there too.
       - name: Schemas up to date
         run: uv run labor schemas export --check
+      # The committed OpenAPI document must match the FastAPI app; the frontend job checks
+      # that src/api/types.ts is generated from it.
+      - name: OpenAPI up to date
+        run: uv run python -m manuallabor.api.export_openapi --check
 
   frontend:
     runs-on: ubuntu-latest
@@ -39,5 +43,45 @@ jobs:
       # from the committed file. Needs only the committed schemas/ directory.
       - name: Generated types are fresh
         run: npm run check-types-fresh
+      - name: Generated API types are fresh
+        run: npm run check-api-fresh
       - run: npm run typecheck
       - run: npm test -- --run
+      - run: npm run build
+
+  # Playwright drives the real UI against `labor serve --mock` on a cached mock project built from
+  # tests/fixtures (scripts/e2e-project.sh). Chromium only. Python tests are not run here.
+  frontend-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Sync Python dependencies
+        run: uv sync --all-groups
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: frontend
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - name: Cache the e2e mock project
+        uses: actions/cache@v4
+        with:
+          path: frontend/e2e/.cache
+          key: e2e-project-${{ hashFiles('tests/fixtures/CHECKSUMS.json', 'tests/fixtures/project-a/project.json', 'scripts/e2e-project.sh', 'uv.lock') }}
+      - name: Playwright
+        run: npm run e2e
+        working-directory: frontend
+        env:
+          CI: "true"
+      - name: Upload Playwright artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results
+          path: |
+            frontend/test-results/
+            frontend/playwright-report/

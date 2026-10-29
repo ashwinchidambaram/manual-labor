@@ -1,7 +1,15 @@
-export default function App() {
+import { QueryClientProvider } from "@tanstack/react-query";
+import { useState } from "react";
+import { RouterProvider, type createBrowserRouter } from "react-router-dom";
+import { makeQueryClient } from "./queryClient";
+import { createRouter } from "./router";
+
+export default function App({ router }: { router?: ReturnType<typeof createBrowserRouter> }) {
+  const [qc] = useState(() => makeQueryClient());
+  const [r] = useState(() => router ?? createRouter());
   return (
-    <main className="p-4">
-      <h1 className="text-2xl font-semibold">Manual Labor</h1>
-    </main>
+    <QueryClientProvider client={qc}>
+      <RouterProvider router={r} />
+    </QueryClientProvider>
   );
 }

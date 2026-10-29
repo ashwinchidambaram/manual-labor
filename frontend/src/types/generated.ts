@@ -559,13 +559,17 @@ export interface LLMCallLog {
   truncated: boolean;
 }
 /**
- * Self-improvement toggle (module 7 extends it with snapshot settings).
+ * Self-improvement settings (module 7). `enabled` off means baseline behaviour exactly,
+ * even when learned state exists on disk. `use_global` / `contribute_global` opt in to the
+ * cross-project store ($MANUALLABOR_HOME/learning).
  *
  * This interface was referenced by `_All`'s JSON-Schema
  * via the `definition` "LearningConfig".
  */
 export interface LearningConfig {
+  contribute_global: boolean;
   enabled: boolean;
+  use_global: boolean;
 }
 /**
  * This interface was referenced by `_All`'s JSON-Schema
