@@ -156,3 +156,6 @@ Root cause: `/private/var/folders/.../T/com.docker.install` — a Docker Desktop
 | Selection lives in SQLite; `selection.json` is a derived copy for modules 4/5 | Single source of truth without changing earlier modules. |
 | Forced changes F1–F6: expose stage fingerprints as pure functions; figures reads `figure_overrides.json`; scoring appends history before writing scores.json (kill-safe); new paths; `LearningConfig.use_global/contribute_global`; stage CLI commands go through the executor | Kill-and-resume byte-identity. |
 | v1 macOS/Linux only (file locks, process groups) | SPEC §8 probe scope. |
+
+## Parallelism (user, 2026-10-29 mid-day)
+User freed disk and asked to run things in parallel wherever possible to finish ASAP. Binding constraint is now RAM (16 GB), not disk: at most one Docling-bearing pytest run + one Playwright run at a time; design/review agents that only read are unlimited. Two tracks after M7: frontend (M8→M9) ∥ backend (M10→M11), with designs started one step ahead on each track.

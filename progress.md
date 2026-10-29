@@ -137,3 +137,4 @@
   - M7.1 design done (Opus, 450 lines, 48 tests). Dispatched M7.2 implementer A (state/jobs/check, Sonnet) ∥ M7.3 implementer B (API/serve/client types, Sonnet).
   - M7.3 implementer B done (Sonnet): api/ routers + serve + openapi export + gen-api; 79 API tests; V1 real serve smoke passes. A still running.
   - User asked to speed up: two-track plan adopted (M8∥M10, then M9∥M11). Dispatched M8.1 Scope UI design (Sonnet) while M7 implementer A finishes.
+  - User freed disk and asked for maximum parallelism. Rule update: parallel tracks allowed; disk guard relaxed; still at most one Docling-bearing pytest + one Playwright run concurrently (RAM 16 GB is the binding constraint).
