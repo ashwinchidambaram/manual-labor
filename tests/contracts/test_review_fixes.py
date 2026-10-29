@@ -372,16 +372,21 @@ def test_d2_numeric_variant_and_violation_kinds() -> None:
         "alignment_ratio": 1.0,
         "violations": [],
         "diff": [],
-        "numeric_variant": nv,
+        "numeric_variants": [nv],
     }
     r = c.FaithfulnessResult.model_validate(ok)
-    assert r.numeric_variant is not None and r.numeric_variant.source == "textlayer"
-    assert (
-        c.FaithfulnessResult.model_validate({**ok, "numeric_variant": None}).numeric_variant is None
-    )
-    bad(c.FaithfulnessResult, {**ok, "numeric_variant": {**nv, "source": "guess"}})
+    assert len(r.numeric_variants) == 1 and r.numeric_variants[0].source == "textlayer"
+    empty = c.FaithfulnessResult.model_validate({**ok, "numeric_variants": []})
+    assert empty.numeric_variants == []
+    no_field = {k: v for k, v in ok.items() if k != "numeric_variants"}
+    assert c.FaithfulnessResult.model_validate(no_field).numeric_variants == []
+    bad(c.FaithfulnessResult, {**ok, "numeric_variants": [{**nv, "source": "guess"}]})
+    bad(c.FaithfulnessResult, {**ok, "numeric_variant": nv})  # singular field is gone
+    bad(c.FaithfulnessResult, {**ok, "numeric_variants": None})
     bad(c.FaithfulnessResult, {**ok, "numeric_variant_note": "x"})  # old field is gone
     bad(c.NumericVariant, {k: v for k, v in nv.items() if k != "reason"})
+    assert [k.value for k in c.DiffOpKind] == ["equal", "insert", "delete", "replace", "reorder"]
+    assert c.DiffOp.model_validate(_op(op="reorder")).op == c.DiffOpKind.reorder
 
 
 # -- document / group branches ------------------------------------------------------------------

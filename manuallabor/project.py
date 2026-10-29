@@ -57,6 +57,14 @@ class DocPaths:
     def state(self) -> Path:
         return self.parse_dir / "state.json"
 
+    @property
+    def scores(self) -> Path:
+        return self.root / "scores.json"
+
+    @property
+    def score_history(self) -> Path:
+        return self.root / "score_history.jsonl"
+
     def page_png(self, page: int) -> Path:
         return self.pages_dir / f"p{page:03d}.png"
 

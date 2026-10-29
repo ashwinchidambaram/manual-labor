@@ -69,7 +69,7 @@ class ContractModel(BaseModel):
 | `CallKind` | chat, vision, embed |
 | `OcrEngine` | rapidocr, tesseract |
 | `FaithViolationKind` | insertion, deletion, numeric_mismatch |
-| `DiffOpKind` | equal, insert, delete, replace |
+| `DiffOpKind` | equal, insert, delete, replace, reorder (module 3: a unit moved by an evidence-backed reading-order fix) |
 
 ## 4. Models (field order = declaration order = YAML/display order)
 
@@ -101,7 +101,7 @@ Validators: `product_model_inferred` implies `product_model is not None`. For `d
 - `TableData`: `n_rows: int ≥1`, `n_cols: int ≥1`, `cells: list[TableCell]`, `markdown: str`, `shape_by_parser: dict[str, TableShape] = {}`. Validators: cells are sorted by (row, col) and unique on (row, col), every `row+row_span ≤ n_rows`, and every `col+col_span ≤ n_cols`.
 - `DiffOp`: `op: DiffOpKind`, `raw: str`, `clean: str`.
 - `FaithfulnessViolation`: `kind: FaithViolationKind`, `raw_start: int|None`, `raw_end: int|None`, `clean_start: int|None`, `clean_end: int|None`, `raw: str`, `clean: str`.
-- `FaithfulnessResult`: `passed: bool`, `alignment_ratio: Unit`, `violations: list[FaithfulnessViolation]`, `diff: list[DiffOp]`, `numeric_variant: NumericVariant | None = None` (`NumericVariant{raw, chosen, source: "textlayer"|"ocr", reason}`). `DiffOp` carries `raw_start/raw_end/clean_start/clean_end` (ints >= 0, end >= start) and `allowed: bool` (op is in the allowed-edit classes). `FaithViolationKind` = insertion, deletion, numeric_mismatch, reorder. Validator: `passed` is True exactly when `violations == []`.
+- `FaithfulnessResult`: `passed: bool`, `alignment_ratio: Unit`, `violations: list[FaithfulnessViolation]`, `diff: list[DiffOp]`, `numeric_variants: list[NumericVariant] = []` (`NumericVariant{raw, chosen, source: "textlayer"|"ocr", reason}`; a list since module 3, so a block with several text-layer/OCR conflicts can record each choice). `DiffOp` carries `raw_start/raw_end/clean_start/clean_end` (ints >= 0, end >= start) and `allowed: bool` (op is in the allowed-edit classes). `FaithViolationKind` = insertion, deletion, numeric_mismatch, reorder. Validator: `passed` is True exactly when `violations == []`.
 
 | `Block` field | Type | Default | Notes |
 |---|---|---|---|

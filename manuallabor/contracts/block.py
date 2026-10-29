@@ -126,7 +126,7 @@ class FaithfulnessResult(ContractModel):
     alignment_ratio: Unit
     violations: list[FaithfulnessViolation]
     diff: list[DiffOp]
-    numeric_variant: NumericVariant | None = None
+    numeric_variants: list[NumericVariant] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _check_passed(self) -> FaithfulnessResult:

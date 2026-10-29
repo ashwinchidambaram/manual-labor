@@ -4,7 +4,7 @@
 Deliver Manual Labor v1 per SPEC.md: every CLAUDE.md module gate (0–11) passed with its proving command pasted in docs/PROGRESS.md, and SPEC §11 acceptance recorded in docs/ACCEPTANCE.md.
 
 ## Current Phase
-Phase 2 (figure extraction). User approved autonomous run on 2026-10-28.
+Phase 3 (scoring + faithfulness). User approved autonomous run on 2026-10-28.
 
 ## Phases
 Detailed tasks, model assignments, and gates: docs/plans/2026-10-28-manual-labor-build.md. Decisions and environment: findings.md.
@@ -29,9 +29,9 @@ Detailed tasks, model assignments, and gates: docs/plans/2026-10-28-manual-labor
 - **Status:** complete
 
 ### Phase 2: Figure extraction
-- [ ] Design (Opus) · Implement (Sonnet) · Review (Sonnet) · Fix
-- [ ] Gate: ≥95% native/vector on figures.pdf; phash dedupe across two copies
-- **Status:** in_progress
+- [x] Design (Opus) · Implement (Sonnet) · Review (Sonnet) · Fix (Sonnet)
+- [x] Gate: 14/14 native|vector; dedupe exact/near/cross-slug; 324 fast tests
+- **Status:** complete
 
 ### Phase 3: Scoring + faithfulness check
 - [ ] Pre-req (user-agreed 2026-10-28): add a real scanned manual as 7th fixture (live-only, no checksum gate) — orchestrator picks a clearly public-domain US government/military technical manual, records the exact source URL + license in findings.md, and tells the user which before use and verify the RapidOCR adapter is not losing accuracy vs the raw engine; re-measure engine choice on it

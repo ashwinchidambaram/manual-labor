@@ -132,3 +132,4 @@ class DiffOpKind(StrEnum):
     insert = "insert"
     delete = "delete"
     replace = "replace"  # type: ignore[assignment]
+    reorder = "reorder"

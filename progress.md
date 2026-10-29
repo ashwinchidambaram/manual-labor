@@ -77,3 +77,12 @@
   - Dispatched M2.2 implement (Sonnet).
   - M2.2 implement done (Sonnet): 14/14 methods match GT, dedupe exact+near+cross-slug, SVGs 2.5-3.3 KB, byte-identical across processes; 37 tests. Commit 2b99ca0. Dispatched M2.3 review (Sonnet, fresh).
   - M2.3 review (Sonnet): gate PASS (14/14, dedupe across copies, native sha == GT, byte-identical across hash seeds). 1 major (off-page bbox crashes doc instead of per-figure failure), minors (stale files, near-dup sidecar width/height, --force keeps confidence, zero-area bbox). Dispatched M2.4 fix (Sonnet).
+  - M2.4 fix done (Sonnet): 6/6; 44 figure tests. Gate run by orchestrator; M2 recorded + committed.
+
+### Phase 3: Scoring + faithfulness
+- **Status:** in_progress
+- **Started:** 2026-10-28
+- Actions taken:
+  - Dispatched M3.1 design (Opus) ∥ real scanned manual fixture acquisition (Sonnet, archive.org public-domain US Army TM, live-only, gitignored with fetch script).
+  - Real fixture acquired (Sonnet): TM 5-3895-332-12 pile driver manual, 64 p, image-only 300 DPI build, fetch.py + README + 20-block GT sample; orchestrator viewed p8. Commit 2435a43.
+  - M3.1 design done (Opus, 408 lines, 24 tests, prototype recall 24/24 on scanned). Decisions recorded in findings.md. Commit 41ecc83. Dispatched M3.2 implement (Opus).

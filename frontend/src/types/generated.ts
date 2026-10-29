@@ -15,7 +15,7 @@ export type AttachRule = 'caption_ref' | 'caption_match' | 'proximity' | 'none';
  * This interface was referenced by `_All`'s JSON-Schema
  * via the `definition` "DiffOpKind".
  */
-export type DiffOpKind = 'equal' | 'insert' | 'delete' | 'replace';
+export type DiffOpKind = 'equal' | 'insert' | 'delete' | 'replace' | 'reorder';
 /**
  * This interface was referenced by `_All`'s JSON-Schema
  * via the `definition` "FaithViolationKind".
@@ -170,7 +170,7 @@ export interface Block {
 export interface FaithfulnessResult {
   alignment_ratio: number;
   diff: DiffOp[];
-  numeric_variant: NumericVariant | null;
+  numeric_variants: NumericVariant[];
   passed: boolean;
   violations: FaithfulnessViolation[];
 }

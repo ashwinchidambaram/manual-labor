@@ -560,7 +560,8 @@
         "equal",
         "insert",
         "delete",
-        "replace"
+        "replace",
+        "reorder"
       ],
       "title": "DiffOpKind",
       "type": "string"
@@ -726,16 +727,12 @@
           "title": "Diff",
           "type": "array"
         },
-        "numeric_variant": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/NumericVariant"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null
+        "numeric_variants": {
+          "items": {
+            "$ref": "#/$defs/NumericVariant"
+          },
+          "title": "Numeric Variants",
+          "type": "array"
         },
         "passed": {
           "title": "Passed",
@@ -754,7 +751,7 @@
         "alignment_ratio",
         "violations",
         "diff",
-        "numeric_variant"
+        "numeric_variants"
       ],
       "title": "FaithfulnessResult",
       "type": "object"
