@@ -201,3 +201,16 @@ def test_19_ragged_rows_and_escaping() -> None:
     assert td.shape_by_parser["docling"] == TableShape(rows=0, cols=0)
     assert list(td.shape_by_parser) == ["docling", "pymupdf"]
     assert td.markdown == md
+
+
+def test_header_rows_never_swallow_the_whole_table() -> None:
+    from manuallabor.parse.tables import header_rows_of
+
+    full = [TableCell(row=0, col=0, row_span=3, col_span=1, text="side")] + [
+        TableCell(row=r, col=1, text=f"v{r}") for r in range(3)
+    ]
+    assert header_rows_of(full, 3, external=False) == 2  # capped at n_rows - 1
+    two = [TableCell(row=0, col=0, row_span=2, text="h")] + [TableCell(row=0, col=1, text="x")]
+    assert header_rows_of(two, 4, external=False) == 2
+    assert header_rows_of(full, 3, external=True) == 0
+    assert header_rows_of([TableCell(row=0, col=0, text="a")], 1, external=False) == 0

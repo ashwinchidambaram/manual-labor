@@ -38,3 +38,26 @@ $ (cd frontend && npm run gen-types >/dev/null && git diff --stat -- src/types/g
       Tests  1 passed (1)
 ```
 (The generated.ts diff line is against the previous commit; it is committed with this gate.)
+
+## M1 — Ingest + dual parse + block model — PASSED 2026-10-28
+
+Design: docs/design/01-parse.md (parser/OCR choices measured: Docling warm 0.25 s/page offline; Tesseract F1 0.987 vs RapidOCR 0.905 on scanned p2 → OCR default `auto`). Review: fresh Opus agent — gate met, 0 blockers, 4 majors (Docling text order in merge, scanned headings fused, unvalidated LLM metadata, weak tests 8/13/14) + minors; all fixed failing-test-first. Scanned bbox-match 0.50 → 0.9375, headings 12/18 → 18/18.
+
+Commands: `uv run labor ingest <project> <files...>`, `uv run labor parse <project> [--force] [--doc SLUG] [--workers N]` (env `MANUALLABOR_WORKERS`, `MANUALLABOR_REQUIRE_DOCLING=1`, `MANUALLABOR_ALLOW_MODEL_DOWNLOAD=1`). Slow tests: `-m slow` (200-page stress test ran once by implementer A: 172.7 s with 2 workers; not re-run by the orchestrator because the machine had <1 GB disk at the time).
+
+```
+$ uv run ruff check manuallabor/ tests/ && uv run mypy manuallabor/
+All checks passed!
+Success: no issues found in 46 source files
+$ MANUALLABOR_REQUIRE_DOCLING=1 uv run pytest -m "not slow"
+274 passed, 2 deselected, 18 warnings in 217.98s (0:03:37)
+$ MANUALLABOR_REQUIRE_DOCLING=1 uv run pytest -m slow -k scanned
+1 passed, 275 deselected, 7 warnings in 56.21s
+$ uv run labor schemas export --check && uv run python -m tests.fixtures.gen.make_fixtures --check
+schemas up to date
+ok: 15 files match CHECKSUMS.json
+$ cd frontend && npm run gen-types && git diff --stat -- src/types/generated.ts && npm run typecheck && npm test -- --run
+ 1 file changed, 1 insertion(+)
+      Tests  1 passed (1)
+$ gate numbers (from tests/parse): token F1 1.000 + exact header/footer on clean/twocol/tables/figures; scanned: headings 18/18, bbox-match 0.9375, F1 0.9665; determinism byte-identical across PYTHONHASHSEED (test 2 + reviewer check 1)
+```

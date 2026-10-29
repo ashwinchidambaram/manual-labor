@@ -56,3 +56,31 @@ def test_narrow_gutter_does_not_split() -> None:
         ("d", _box(306, 200, 226), "body"),
     ]
     assert _run(spec, 5) == ["a", "b", "c", "d"]
+
+
+def _ln(text: str, y: float, x1: float, size: float, i: int):  # type: ignore[no-untyped-def]
+    from manuallabor.parse.types import Line
+
+    return Line(text=text, bbox=[72, y, x1, y + size + 3], size=size, native_id=f"l{i}")
+
+
+def test_heading_line_breaks_out_of_paragraph_with_tight_spacing() -> None:
+    from manuallabor.parse.layout import group_lines_into_blocks
+
+    lines = [
+        _ln("2.2 Tension Adjustment", 72, 207, 8.0, 0),  # same size, numbered, short
+        _ln("Replace the coolant reservoir if it shows any sign of", 87, 520, 8.0, 1),
+        _ln("deformation. The control circuit runs from a 12 V supply,", 101, 520, 8.0, 2),
+        _ln("so disconnect it.", 115, 200, 8.0, 3),
+        _ln("Large Title", 140, 200, 11.0, 4),  # >= 1.25x the page's median size
+        _ln("Compare the coolant reservoir against the reference", 160, 520, 8.0, 5),
+        _ln("illustration before refitting the cover plate.", 174, 520, 8.0, 6),
+    ]
+    groups = group_lines_into_blocks(lines, 612)
+    assert [[ln.text for ln in g][0] for g in groups] == [
+        "2.2 Tension Adjustment",
+        "Replace the coolant reservoir if it shows any sign of",
+        "Large Title",
+        "Compare the coolant reservoir against the reference",
+    ]
+    assert [len(g) for g in groups] == [1, 3, 1, 2]

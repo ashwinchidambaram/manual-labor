@@ -16,6 +16,7 @@ class Document(ContractModel):
     sha256: Sha256Hex
     filename: str = Field(min_length=1)
     title: str | None = None
+    title_inferred: bool = False
     product_model: str | None = None
     product_model_inferred: bool = False
     kind: DocKind
@@ -58,6 +59,8 @@ class Document(ContractModel):
             raise ValueError("block_ids must be unique")
         if any(ids.parse_block_id(b)[0] != self.slug for b in self.block_ids):
             raise ValueError("block_ids: all blocks must belong to this document")
+        if self.title_inferred and self.title is None:
+            raise ValueError("title_inferred requires title")
         if self.product_model_inferred and self.product_model is None:
             raise ValueError("product_model_inferred requires product_model")
         if any(p < 1 or p > self.page_count for p in self.pages_without_text_layer):

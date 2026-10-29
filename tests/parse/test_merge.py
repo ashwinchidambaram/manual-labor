@@ -145,3 +145,21 @@ def test_shuffled_candidates_give_identical_output() -> None:
         b2, d2 = _merge(p2, s2)
         assert [repr(x) for x in b2] == [repr(x) for x in base_b]
         assert d2 == base_d
+
+
+def test_same_kind_multi_piece_text_in_geometric_order() -> None:
+    top = [_line("upper piece one", 100, i=0), _line("upper piece two", 112, i=1)]
+    low = [_line(f"lower piece {k}", 130 + 12 * k, i=k) for k in range(4)]
+    p = [_rb("pymupdf", 0, BlockType.paragraph, top + low)]
+    # Docling emits the big lower piece first (matched 1:1), the small upper one last (absorbed).
+    s = [
+        _rb("docling", 0, BlockType.paragraph, low),
+        _rb("docling", 1, BlockType.paragraph, top),
+    ]
+    blocks, disp = _merge(p, s)
+    assert len(blocks) == 1
+    b = blocks[0]
+    assert b.text_by_parser["docling"] == "\n".join(ln.text for ln in top + low)
+    assert b.text_by_parser["docling"].split() == b.text_by_parser["pymupdf"].split()
+    assert b.order_by_parser["docling"] == 1  # the first piece in reading position
+    assert {d.outcome for d in disp} == {"primary", "matched", "absorbed"}

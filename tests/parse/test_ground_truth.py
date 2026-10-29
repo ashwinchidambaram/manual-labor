@@ -156,3 +156,33 @@ def test_12_scanned_figures_from_docling(parsed: Parsed) -> None:
         assert b.bbox is not None
         area = (b.bbox[2] - b.bbox[0]) * (b.bbox[3] - b.bbox[1])
         assert area < 0.8 * w * h
+
+
+SCANNED_MATCH_FLOOR = 0.90  # was 0.50 before the OCR heading/paragraph grouping fix (now 0.9375)
+
+
+def test_13b_scanned_headings_and_bbox_match(parsed: Parsed) -> None:
+    """Scanned section headings stay separate heading blocks; GT bbox matching improves."""
+    gt = load_gt("scanned")
+    gb = gt["blocks"]
+    blocks = parsed.blocks("scanned")
+    heads = [b for b in gb if b["type"] == "heading"]
+    assert len(heads) == 18
+    hit = 0
+    for g in heads:
+        cands = [
+            b
+            for b in blocks
+            if b.page == g["page"] and b.bbox is not None and b.type.value == "heading"
+        ]
+        best = max(cands, key=lambda b: iou(g["bbox"], b.bbox or [0, 0, 0, 0]), default=None)
+        if best is None or best.bbox is None or iou(g["bbox"], best.bbox) < 0.3:
+            continue
+        tp, n_pred, n_ref = f1_counts(tokens(best.raw_text), tokens(gt_text(g)))
+        hit += f1(tp, n_pred, n_ref) >= 0.8
+    matched = match_blocks(gb, blocks)
+    idx = _non_hf(gt)
+    ratio = sum(1 for i in idx if i in matched) / len(idx)
+    print(f"scanned: headings {hit}/18, bbox-matched ratio {ratio:.4f}")
+    assert hit >= 16
+    assert ratio >= SCANNED_MATCH_FLOOR

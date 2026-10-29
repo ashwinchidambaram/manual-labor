@@ -228,6 +228,7 @@ def ingest_files(
             sha256=sha,
             filename=name,
             title=meta.title,
+            title_inferred=meta.title_inferred,
             product_model=meta.product_model,
             product_model_inferred=meta.product_model_inferred,
             kind=kind,

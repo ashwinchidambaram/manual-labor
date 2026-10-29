@@ -60,3 +60,7 @@
   - M1.1 design done (Opus, 373 lines, 31 tests, measured Docling/OCR). Orchestrator decision: OCR default 'auto' (tesseract if present else rapidocr). Commit d231ecd.
   - Dispatched M1.2 implementer A (Sonnet) ∥ M1.3 implementer B (Sonnet).
   - M1.3 implementer B done (Sonnet): tables/ocr/ocr_attach/textalign/docx + 32 tests; Tesseract F1 0.987 vs RapidOCR 0.905 on scanned p2; 6/6 tables exact in both parsers; 13/13 DOCX blocks. A still running.
+  - M1.2 implementer A done (Sonnet): token F1 1.000 and exact header/footer on clean/twocol/tables/figures; scanned F1 0.9665, bbox-matched 0.50 (not gated); scanned 53.6 s, 200-page 172.7 s with 2 workers. Disk hit ~700 MB free; orchestrator pruned to 1.0 GB. Gate commands run by orchestrator (fast suite 256 passed, scanned slow 1 passed; 200-page slow test taken from A's run due to disk). Commit 2482501.
+  - Dispatched M1.4 review (Opus, fresh).
+  - M1.4 review (Opus): gate met, 0 blockers, 4 majors (Docling text order in merge, scanned headings fused into paragraphs, unvalidated LLM metadata, weak tests 8/13/14), minors (header_rows, image-only-page figure skips, title-page heading, worker RSS ~2 GB during RapidOCR). Determinism byte-identical across hash seeds; all candidates accounted once.
+  - Dispatched M1.5 fix (Sonnet), failing-test-first on each item.

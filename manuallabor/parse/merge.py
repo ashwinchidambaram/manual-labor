@@ -512,6 +512,8 @@ def _merge_text(
             if v >= IOU_MATCH or only:
                 pairs.append((-v, p_list[i].order, s_list[j].order, i, j))
     pairs.sort()
+    matched_s: dict[int, _Cand] = {}
+    extra_s: dict[int, list[_Cand]] = {}
     for _, _, _, i, j in pairs:
         if i in p_taken or j in s_taken:
             continue
@@ -521,6 +523,7 @@ def _merge_text(
         mb = _from_text_cand(p, page)
         _add_text_from(mb, sc, sc.rb.text)
         blocks_for_p[i] = [mb]
+        matched_s[i] = sc
         disp(p.key, p.order, "primary")
         disp(sc.key, sc.order, "matched")
     # D. Leftover S fully inside a P block: absorb its text into that block.
@@ -535,13 +538,24 @@ def _merge_text(
             hp = p_list[host]
             blocks_for_p[host] = [_from_text_cand(hp, page)]
             disp(hp.key, hp.order, "primary")
-        target = blocks_for_p[host][0]
-        prev_text = target.text_by_parser.get(sc.key, "")
-        target.text_by_parser[sc.key] = (prev_text + "\n" + sc.rb.text) if prev_text else sc.rb.text
-        target.order_by_parser[sc.key] = min(sc.order, target.order_by_parser.get(sc.key, sc.order))
-        target.members.append((sc.key, sc.order))
+        extra_s.setdefault(host, []).append(sc)
+        blocks_for_p[host][0].members.append((sc.key, sc.order))
         s_taken.add(j)
         disp(sc.key, sc.order, "absorbed")
+    # Several same-parser pieces in one block: join them in the block's geometric order
+    # (top to bottom, then left to right), never in matching order.
+    for host, extras_s in extra_s.items():
+        target = blocks_for_p[host][0]
+        same_host = list(extras_s)
+        if host in matched_s:
+            same_host.append(matched_s[host])
+        for key in sorted({c.key for c in same_host}):
+            same = sorted(
+                (c for c in same_host if c.key == key),
+                key=lambda c: (round(c.bbox[1], 1), round(c.bbox[0], 1), c.order),
+            )
+            target.text_by_parser[key] = "\n".join(c.rb.text for c in same)
+            target.order_by_parser[key] = same[0].order
     s_done = s_taken
     # 6. alone
     for i, p in enumerate(p_list):

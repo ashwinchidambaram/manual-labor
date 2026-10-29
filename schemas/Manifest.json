@@ -149,6 +149,11 @@
           ],
           "default": null,
           "title": "Title"
+        },
+        "title_inferred": {
+          "default": false,
+          "title": "Title Inferred",
+          "type": "boolean"
         }
       },
       "required": [
@@ -156,6 +161,7 @@
         "sha256",
         "filename",
         "title",
+        "title_inferred",
         "product_model",
         "product_model_inferred",
         "kind",

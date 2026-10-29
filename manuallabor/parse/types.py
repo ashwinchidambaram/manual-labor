@@ -58,7 +58,12 @@ class RawBlock(ParseModel):
 
 
 SkipReason = Literal[
-    "empty_text", "scan_background", "tiny_drawing", "table_rule", "empty_paragraph"
+    "empty_text",
+    "scan_background",
+    "tiny_drawing",
+    "table_rule",
+    "empty_paragraph",
+    "scan_page_region",
 ]
 
 

@@ -124,5 +124,50 @@ def test_29_model_heuristics() -> None:
         find_product_model("Model X200 · Revision 4", "Acme X200 Service Manual", "a.pdf")
         == "Acme X200"
     )
-    assert find_product_model("hello", None, "x200-guide.pdf") == "X200-GUIDE" or True
+    assert find_product_model("hello", None, "x200-guide.pdf") == "X200"
+    assert find_product_model("hello", None, "ACME-2024-MANUAL.pdf") is None
+    assert find_product_model("hello", None, "MANUAL-V2.pdf") is None
+    assert find_product_model("hello", None, "service_guide_rev4.pdf") is None
     assert ProjectConfig(name="x").ocr_engine.value == "auto"
+
+
+_TEXT = "Ranger Pro mower guide\nOwner handbook for the Ranger Pro 3000 series"
+
+
+def _llm(canned: str, filename: str = "guide.pdf"):  # type: ignore[no-untyped-def]
+    warnings: list[str] = []
+    meta = infer_metadata(
+        page1_lines=[],
+        body=None,
+        embedded_title=None,
+        filename=filename,
+        provider=_provider(canned),
+        warn=warnings.append,
+        page1_text=_TEXT + "\n" + " ".join(["mower"] * 40),
+    )
+    return meta, warnings
+
+
+@pytest.mark.parametrize(
+    "title,model",
+    [
+        ("e", "e"),  # single characters that occur in any text
+        ("Ranger Pro mower guide\nOwner", "Ranger\nPro"),  # newlines
+        (" ".join(["mower"] * 40), " ".join(["mower"] * 40)),  # 40-word fragments
+        ("Ranger Pro mower guid", "Ranger Pr"),  # not whole-word sequences
+        ("Zeta handbook", "Zeta 9000"),  # not in the page text
+        ("Owner handbook for", "RP 3000!"),  # not model-shaped ("!") and absent
+    ],
+)
+def test_29_llm_rejects_ungrounded_or_malformed(title: str, model: str) -> None:
+    meta, warnings = _llm(json.dumps({"title": title, "product_model": model}))
+    assert meta.product_model is None and not meta.product_model_inferred
+    if title != "Owner handbook for":  # that one is a grounded, valid title
+        assert meta.title is None and not meta.title_inferred
+    assert warnings
+
+
+def test_29_llm_title_is_marked_inferred() -> None:
+    meta, _ = _llm('{"title": "Ranger Pro mower guide", "product_model": "Ranger Pro 3000"}')
+    assert meta.title == "Ranger Pro mower guide" and meta.title_inferred
+    assert meta.product_model == "Ranger Pro 3000" and meta.product_model_inferred

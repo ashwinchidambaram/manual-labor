@@ -12,6 +12,8 @@ from manuallabor.parse.types import Line
 CAPTION_REGION_GAP_PT = 48.0
 HEADING_MAX_LINES = 3
 HEADING_MAX_WORDS = 25
+HEADING_STRONG_FACTOR = 1.3
+BODY_SIZE_TOL = 0.5
 
 
 def body_size_of(lines: Iterable[Line]) -> float | None:
@@ -109,12 +111,41 @@ def _caption_near_region(
     return False
 
 
+def _heading_allowed(
+    it: ClassifyInput,
+    body: float | None,
+    page_has_body: dict[int, bool],
+    page_max: dict[int, float],
+) -> bool:
+    """A heading candidate is numbered, or bold / clearly larger than body text; on a page with
+    no body text (a title page) only the page's largest text may stand as an unnumbered heading."""
+    if SECTION_RE.match(it.text.strip()):
+        return True
+    if body is None or it.size is None:
+        return True  # no size evidence (DOCX): keep the parser's hint
+    if not (it.bold or it.size >= HEADING_STRONG_FACTOR * body):
+        return False
+    if not page_has_body.get(it.page, True):
+        return it.size >= page_max.get(it.page, it.size) - BODY_SIZE_TOL
+    return True
+
+
 def classify_blocks(items: Sequence[ClassifyInput], body: float | None) -> list[Classified]:
     """Apply the first-match rules, then derive heading level and section number."""
     regions_by_page: dict[int, list[Sequence[float]]] = {}
     for it in items:
         if it.region in ("table", "figure") and it.bbox is not None:
             regions_by_page.setdefault(it.page, []).append(it.bbox)
+
+    page_has_body: dict[int, bool] = {}
+    page_max: dict[int, float] = {}
+    for it in items:
+        if it.forced is not None or it.region != "text" or it.size is None or not it.text.strip():
+            continue
+        page_has_body.setdefault(it.page, False)
+        page_max[it.page] = max(page_max.get(it.page, 0.0), it.size)
+        if body is not None and abs(it.size - body) <= BODY_SIZE_TOL:
+            page_has_body[it.page] = True
 
     stage1: list[tuple[BlockType, str | None]] = []  # (type, section_number)
     for it in items:
@@ -139,7 +170,9 @@ def classify_blocks(items: Sequence[ClassifyInput], body: float | None) -> list[
         if it.docling_kind == BlockType.list or is_bullet_list(it.lines):
             stage1.append((BlockType.list, None))
             continue
-        if it.docling_kind == BlockType.heading or looks_like_heading(it.lines, text, body):
+        if (
+            it.docling_kind == BlockType.heading or looks_like_heading(it.lines, text, body)
+        ) and _heading_allowed(it, body, page_has_body, page_max):
             stage1.append((BlockType.heading, None))
             continue
         if it.docling_kind in (BlockType.other,) and not it.lines:

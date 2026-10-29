@@ -38,6 +38,47 @@ class Metadata:
     title: str | None = None
     product_model: str | None = None
     product_model_inferred: bool = False
+    title_inferred: bool = False
+
+
+TITLE_LEN = (3, 200)
+TITLE_MAX_WORDS = 30
+MODEL_LEN = (2, 60)
+MODEL_MAX_WORDS = 6
+# An LLM-supplied model name: starts alphanumeric; letters, digits, space, '-', '.', '/' after.
+MODEL_SHAPE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ./-]*$")
+_GENERIC_STEM_PART = re.compile(
+    r"^(?:manual|guide|service|rev|revision|user|owner|operator|handbook|man|doc|docs|"
+    r"v\d+|rev\d+|r\d+|\d{4}|final|draft|copy)$",
+    re.IGNORECASE,
+)
+
+
+def _printable_one_line(val: str) -> bool:
+    return val.isprintable()  # False for newlines, tabs and control characters
+
+
+def valid_title(val: str) -> bool:
+    return (
+        TITLE_LEN[0] <= len(val) <= TITLE_LEN[1]
+        and len(val.split()) <= TITLE_MAX_WORDS
+        and _printable_one_line(val)
+    )
+
+
+def valid_model(val: str) -> bool:
+    return (
+        MODEL_LEN[0] <= len(val) <= MODEL_LEN[1]
+        and len(val.split()) <= MODEL_MAX_WORDS
+        and _printable_one_line(val)
+        and MODEL_SHAPE_RE.match(val) is not None
+    )
+
+
+def _whole_sequence_in(val: str, haystack: str) -> bool:
+    """`val` occurs in `haystack` as whole words (case-insensitive, whitespace-collapsed)."""
+    pat = r"(?<![A-Za-z0-9])" + re.escape(_norm(val)).replace(r"\ ", r"\s+") + r"(?![A-Za-z0-9])"
+    return re.search(pat, _norm(haystack)) is not None
 
 
 def title_from_lines(lines: Sequence[Line], body: float | None) -> str | None:
@@ -86,9 +127,17 @@ def find_product_model(page1_text: str, title: str | None, filename: str) -> str
         m2 = MODEL_RE.search(title)
         if m2:
             return _from_title(title, m2.group(0))
-    stem = Path(filename).stem.upper()
-    m3 = MODEL_RE.search(stem)
-    return m3.group(0) if m3 else None
+    return _model_from_stem(Path(filename).stem)
+
+
+def _model_from_stem(stem: str) -> str | None:
+    """A filename-stem token that looks like a model once generic words and years are removed."""
+    for tok in re.split(r"[\s_.]+", stem.upper()):
+        parts = [p for p in tok.split("-") if p and not _GENERIC_STEM_PART.match(p)]
+        cand = "-".join(parts)
+        if cand and MODEL_RE.fullmatch(cand):
+            return cand
+    return None
 
 
 def _norm(s: str) -> str:
@@ -104,7 +153,8 @@ def llm_infer(
     want_model: bool = True,
 ) -> tuple[str | None, str | None]:
     """Ask the metadata model; accept a value only if it appears verbatim in the evidence."""
-    evidence = _norm(page1_text + " " + filename)
+    stem = Path(filename).stem
+    evidence = page1_text + "\n" + stem + "\n" + re.sub(r"[-_.]+", " ", stem)
     messages = [
         Message(
             role="system",
@@ -129,10 +179,14 @@ def llm_infer(
         val = data.get(key)
         if not wanted or not isinstance(val, str) or not val.strip():
             continue
-        if _norm(val) in evidence:
-            out[key] = collapse_ws(val)
+        shown = val[:60]
+        ok = valid_title(val) if key == "title" else valid_model(val)
+        if not ok:
+            warn(f"metadata LLM {key} {shown!r} rejected: not a plausible {key}")
+        elif not _whole_sequence_in(val, evidence):
+            warn(f"metadata LLM {key} {shown!r} rejected: not found in the document text")
         else:
-            warn(f"metadata LLM {key} {val!r} rejected: not found in the document text")
+            out[key] = collapse_ws(val)
     return out["title"], out["product_model"]
 
 
@@ -150,15 +204,21 @@ def infer_metadata(
     title = title_from_lines(page1_lines, body) or accept_embedded_title(embedded_title)
     model = find_product_model(text, title, filename)
     inferred = False
+    title_inferred = False
     if (title is None or model is None) and provider is not None:
         t, m = llm_infer(
             provider, text, filename, warn, want_title=title is None, want_model=model is None
         )
         if title is None and t is not None:
-            title = t
+            title, title_inferred = t, True
         if model is None and m is not None:
             model, inferred = m, True
-    return Metadata(title=title, product_model=model, product_model_inferred=inferred)
+    return Metadata(
+        title=title,
+        product_model=model,
+        product_model_inferred=inferred,
+        title_inferred=title_inferred,
+    )
 
 
 def page1_lines_pdf(

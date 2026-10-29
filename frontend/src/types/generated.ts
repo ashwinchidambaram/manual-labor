@@ -318,6 +318,7 @@ export interface Document {
   stripped_footers: string[];
   stripped_headers: string[];
   title: string | null;
+  title_inferred: boolean;
 }
 /**
  * This interface was referenced by `_All`'s JSON-Schema

@@ -286,6 +286,12 @@ class PyMuPdfAdapter:
                 skipped.extend(sk)
                 if has_text:
                     regions.extend(figs)
+                else:
+                    # Docling's layout-only regions cover these pages; record what PyMuPDF saw.
+                    skipped.extend(
+                        Skipped(page=page_no, order=0, bbox=fig.bbox, reason="scan_page_region")
+                        for fig in figs
+                    )
                 blocks = _assign_orders(texts, regions)
                 # skipped candidates get orders after the blocks so (page, order) stays unique
                 skipped = [

@@ -95,6 +95,14 @@ def _spans_from_gaps(
     return out
 
 
+def header_rows_of(cells: Sequence[TableCell], n_rows: int, external: bool) -> int:
+    """Header rows from row-0 spans, counted from row 0 downward and capped at n_rows - 1."""
+    if external:
+        return 0
+    deepest = max((c.row + c.row_span for c in cells if c.row == 0), default=0)
+    return max(0, min(deepest, n_rows - 1))
+
+
 def from_pymupdf(tab: Any, page: Any | None = None) -> TableCandidate:
     """Convert a ``pymupdf.table.Table`` into a TableCandidate.
 
@@ -119,10 +127,9 @@ def from_pymupdf(tab: Any, page: Any | None = None) -> TableCandidate:
             assert words is not None
             text = _word_text(words, rect)
         cells.append(TableCell(row=r, col=c, row_span=rs, col_span=cs, text=text))
-    header_rows = 0
-    if not bool(getattr(tab.header, "external", False)):
-        header_rows = max((cell.row + cell.row_span for cell in cells if cell.row == 0), default=0)
-    header_rows = min(header_rows, n_rows)
+    header_rows = header_rows_of(
+        cells, n_rows, external=bool(getattr(tab.header, "external", False))
+    )
     cells = [cell.model_copy(update={"is_header": cell.row < header_rows}) for cell in cells]
     return TableCandidate(n_rows=n_rows, n_cols=n_cols, cells=cells, header_rows=header_rows)
 

@@ -46,7 +46,7 @@ from manuallabor.parse.types import (
 )
 from manuallabor.project import DocPaths, ProjectPaths
 
-PARSE_ALGO_VERSION = "1"
+PARSE_ALGO_VERSION = "2"
 MAX_BLOCKS_PER_PAGE = 999
 OVERLAP_IOU = 0.05
 
@@ -387,12 +387,12 @@ def _parse_pdf(
     elif need_ocr:
         ocr_warnings.append("OCR module unavailable")
         ocr_versions = {"ocr": "unavailable", "ocr_alt": "unavailable"}
-    if "docling" in cfg.parsers:
-        ensure_models()
     versions = parser_versions_for(doc, cfg, ocr_versions)
     if _skip_if_current(dp, doc, versions, force):
         prog.line("parse", "skip", pages=n, detail="up to date")
         return
+    if "docling" in cfg.parsers:
+        ensure_models()
     for w in ocr_warnings:
         prog.line("ocr", "warning", detail=w)
 
@@ -612,13 +612,14 @@ def _parse_pdf(
         updates: dict[str, Any] = {}
         if doc.title is None and meta.title:
             updates["title"] = meta.title
+            updates["title_inferred"] = meta.title_inferred
         if doc.product_model is None and meta.product_model:
             updates["product_model"] = meta.product_model
             updates["product_model_inferred"] = meta.product_model_inferred
         if updates:
             new_doc = doc.model_copy(update=updates)
         for w in warns:
-            prog.line("metadata", "warning", detail=w)
+            prog.line("metadata", "warning", detail=w[:200])
         prog.line("metadata", "done", pages=1, t0=t0)
         stages.append("metadata")
 

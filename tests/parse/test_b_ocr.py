@@ -16,6 +16,7 @@ from manuallabor import ids
 from manuallabor.contracts import ProjectConfig
 from manuallabor.contracts.block import Block, OcrWord
 from manuallabor.contracts.enums import BlockType, OcrEngine
+from manuallabor.contracts.io import read_json
 from manuallabor.parse import ocr as ocr_mod
 from manuallabor.parse.ocr import (
     RapidOcrAdapter,
@@ -30,6 +31,7 @@ from manuallabor.parse.ocr import (
 )
 from manuallabor.parse.ocr_attach import attach_ocr
 from manuallabor.parse.types import Line, OcrOutput, OcrPage
+from tests.parse.conftest import Parsed
 
 FIX = Path(__file__).resolve().parents[1] / "fixtures"
 TOK = re.compile(r"[^\s|•]+")
@@ -114,6 +116,20 @@ def test_13_blocks_carry_words(scanned_p2: dict[str, OcrPage]) -> None:
             assert b.text == "\n".join(ln.text for ln in b.lines)
         covered = sum(len(b.lines) for b in pp.blocks)
         assert covered == len(op.lines)  # nothing dropped
+
+
+def test_13_parsed_scanned_blocks_carry_ocr_words(parsed: Parsed) -> None:
+    """Pipeline blocks (not raw OCR): every non-figure block has words with confidences in [0,1]."""
+    blocks = parsed.blocks("scanned")
+    assert blocks
+    for b in blocks:
+        assert b.ocr_words is not None, b.id
+        if b.type == BlockType.figure:
+            continue
+        assert b.ocr_words, f"{b.id} ({b.type.value}) has no OCR words"
+        assert "ocr" in b.raw_text_by_parser or "ocr_alt" in b.raw_text_by_parser, b.id
+        for w in b.ocr_words:
+            assert 0.0 <= w.confidence <= 1.0
 
 
 # ---------------------------------------------------------------- test 14 / attach
@@ -393,3 +409,23 @@ def test_17_both_engines_agree_on_structure(scanned_p2: dict[str, OcrPage]) -> N
         for ln in op.lines:
             for w in ln.words:
                 assert isinstance(w, OcrWord) and w.bbox is not None
+
+
+def test_14_pipeline_blocks_carry_ocr_agreeing_with_text_layer(parsed: Parsed) -> None:
+    """OCR attached to the pipeline's own clean.pdf blocks agrees with the text layer."""
+    blocks = parsed.blocks("clean")
+    ocr_out = read_json(parsed.paths.doc("clean").parser_output("ocr"), OcrOutput)
+    again = attach_ocr(blocks, ocr_out, [True] * len(ocr_out.pages))
+    assert [b.model_dump() for b in again] == [b.model_dump() for b in blocks]  # pure/idempotent
+    pymu, ocr = [], []
+    for b in blocks:
+        if b.type == BlockType.figure:
+            assert b.ocr_words is not None
+            continue
+        assert b.ocr_words, f"{b.id} ({b.type.value}) has no OCR words"
+        assert b.raw_text_by_parser["ocr"].split() == [w.text for w in b.ocr_words]
+        pymu.append(b.raw_text_by_parser["pymupdf"])
+        ocr.append(b.raw_text_by_parser["ocr"])
+    score = _f1("\n".join(pymu), "\n".join(ocr))
+    print(f"word agreement pymupdf vs ocr (pipeline clean blocks): {score:.4f}")
+    assert score >= 0.98

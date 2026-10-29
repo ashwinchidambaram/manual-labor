@@ -8,12 +8,16 @@ from dataclasses import dataclass
 from typing import Literal
 
 from manuallabor.parse import geometry as g
-from manuallabor.parse.text import BULLETS
+from manuallabor.parse.text import BULLETS, SECTION_RE
 from manuallabor.parse.types import Band, Line
 
 SPAN_FRACTION = 0.55
 GUTTER_PT = 10.0
-PITCH_FACTOR = 1.12
+PITCH_FACTOR = 1.09
+PITCH_QUANTILE = 0.25
+HEADING_SIZE_FACTOR = 1.25
+HEADING_MAX_WIDTH_FRAC = 0.6
+HEADING_MAX_WORDS = 12
 
 
 @dataclass(frozen=True)
@@ -164,9 +168,30 @@ def _baseline(ln: Line) -> float:
     return statistics.median(ys) if ys else ln.bbox[3]
 
 
+def _typical_pitch(pitches: Sequence[float]) -> float | None:
+    """The within-paragraph line pitch: a low quantile, so paragraph breaks do not inflate it."""
+    if len(pitches) < 3:
+        return None
+    ordered = sorted(pitches)
+    return ordered[min(len(ordered) - 1, int(PITCH_QUANTILE * len(ordered)))]
+
+
 def is_bullet_line(text: str) -> bool:
     t = text.lstrip()
     return len(t) >= 2 and t[0] in BULLETS and t[1] == " "
+
+
+def is_heading_line(ln: Line, med_size: float, column_width: float) -> bool:
+    """A short line that is clearly larger than the page's lines, or a short numbered title."""
+    if column_width <= 0 or (ln.bbox[2] - ln.bbox[0]) >= HEADING_MAX_WIDTH_FRAC * column_width:
+        return False
+    text = ln.text.strip()
+    if not text or len(text.split()) > HEADING_MAX_WORDS or text.endswith("."):
+        return False
+    if SECTION_RE.match(text):
+        return True
+    size = ln.size if ln.size else (ln.bbox[3] - ln.bbox[1])
+    return med_size > 0 and size >= HEADING_SIZE_FACTOR * med_size
 
 
 def group_lines_into_blocks(lines: Sequence[Line], page_w: float) -> list[list[Line]]:
@@ -197,6 +222,8 @@ def group_lines_into_blocks(lines: Sequence[Line], page_w: float) -> list[list[L
     def height(ln: Line) -> float:
         return ln.size if ln.size else (ln.bbox[3] - ln.bbox[1])
 
+    sizes = [ln.size if ln.size else (ln.bbox[3] - ln.bbox[1]) for ln in lines]
+    med_size = statistics.median(sizes)
     groups: list[list[Line]] = []
     start = 0
     # Walk contiguous runs sharing (band, kind, column); a spanning line is its own run.
@@ -211,9 +238,11 @@ def group_lines_into_blocks(lines: Sequence[Line], page_w: float) -> list[list[L
         med_h = statistics.median(heights)
         centers = [_baseline(ln) for ln in run]
         pitches = [y1 - y0 for y0, y1 in zip(centers, centers[1:], strict=False) if y1 > y0]
-        med_pitch = statistics.median(pitches) if len(pitches) >= 3 else None
+        med_pitch = _typical_pitch(pitches)
+        run_w = max(ln.bbox[2] for ln in run) - min(ln.bbox[0] for ln in run)
+        heading = [is_heading_line(ln, med_size, run_w) for ln in run]
         cur: list[Line] = [run[0]]
-        for prev, ln in zip(run, run[1:], strict=False):
+        for k, (prev, ln) in enumerate(zip(run, run[1:], strict=False), start=1):
             gap = ln.bbox[1] - prev.bbox[3]
             pitch = _baseline(ln) - _baseline(prev)
             hp, hc = height(prev), height(ln)
@@ -226,7 +255,7 @@ def group_lines_into_blocks(lines: Sequence[Line], page_w: float) -> list[list[L
                 med_pitch is not None and pitch > PITCH_FACTOR * med_pitch
             )
             size_break = hp > 0 and abs(hc - hp) / hp > 0.25
-            new = spacing_break or size_break or starts_bullets
+            new = spacing_break or size_break or starts_bullets or heading[k] or heading[k - 1]
             if not new and any(is_bullet_line(c.text) for c in cur) and not is_bullet_line(ln.text):
                 first_bullet = next(c for c in cur if is_bullet_line(c.text))
                 if ln.bbox[0] < first_bullet.bbox[0] + 2.0:
