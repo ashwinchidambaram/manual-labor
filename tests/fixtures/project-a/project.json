@@ -1,6 +1,9 @@
 {
   "article_split": "per_topic",
   "background_ocr_born_digital": true,
+  "learning": {
+    "enabled": false
+  },
   "models": {
     "agent": {
       "api_base": null,

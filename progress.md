@@ -101,3 +101,4 @@
   - Dispatched M3 fix re-review (Opus) ∥ M4.1 design (Opus).
   - M4.1 design done (Opus, 276 lines, 36 tests; centered-embedding clustering measured). Dispatched M4.2 implement (Sonnet); M3 re-review still running.
   - M3 re-review (Opus): all claimed fixes hold under attack; 1 medium-high hole (NumericVariant accepted ±1 token → 35→40 could pass) + 5 lows (page-number any-slot, reorder substring evidence, verifier drops 2-char numeric spans, unit gaps 5V/#10-32/1/4-20, figure labels released as paragraphs). Dispatched M3.5 fix (Opus) ∥ M4.2 implement (Sonnet, running).
+  - M3.5 fix done (Opus): 6/6 failing-first; 519 scoring+parse green; committed cc4db44. M4.2 still running.

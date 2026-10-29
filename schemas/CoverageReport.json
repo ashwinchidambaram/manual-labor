@@ -1,0 +1,139 @@
+{
+  "$defs": {
+    "GroupCoverage": {
+      "additionalProperties": false,
+      "properties": {
+        "fraction": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Fraction"
+        },
+        "group_id": {
+          "pattern": "^g-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-(?:[st])(?:\\d{3})$",
+          "title": "Group Id",
+          "type": "string"
+        },
+        "selected": {
+          "minimum": 0,
+          "title": "Selected",
+          "type": "integer"
+        },
+        "subtree_fraction": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Subtree Fraction"
+        },
+        "subtree_selected": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Subtree Selected"
+        },
+        "subtree_total": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Subtree Total"
+        },
+        "total": {
+          "minimum": 0,
+          "title": "Total",
+          "type": "integer"
+        },
+        "view": {
+          "$ref": "#/$defs/GroupView"
+        }
+      },
+      "required": [
+        "group_id",
+        "view",
+        "selected",
+        "total",
+        "fraction",
+        "subtree_selected",
+        "subtree_total",
+        "subtree_fraction"
+      ],
+      "title": "GroupCoverage",
+      "type": "object"
+    },
+    "GroupView": {
+      "enum": [
+        "structure",
+        "topic"
+      ],
+      "title": "GroupView",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "doc_id": {
+      "maxLength": 48,
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "title": "Doc Id",
+      "type": "string"
+    },
+    "selectable": {
+      "minimum": 0,
+      "title": "Selectable",
+      "type": "integer"
+    },
+    "selected": {
+      "minimum": 0,
+      "title": "Selected",
+      "type": "integer"
+    },
+    "structure": {
+      "items": {
+        "$ref": "#/$defs/GroupCoverage"
+      },
+      "title": "Structure",
+      "type": "array"
+    },
+    "topics": {
+      "items": {
+        "$ref": "#/$defs/GroupCoverage"
+      },
+      "title": "Topics",
+      "type": "array"
+    }
+  },
+  "required": [
+    "doc_id",
+    "selected",
+    "selectable",
+    "structure",
+    "topics"
+  ],
+  "title": "CoverageReport",
+  "type": "object"
+}

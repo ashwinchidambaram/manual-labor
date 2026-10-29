@@ -1,0 +1,85 @@
+{
+  "$defs": {
+    "ReviewLoad": {
+      "additionalProperties": false,
+      "properties": {
+        "numeric_queued": {
+          "minimum": 0,
+          "title": "Numeric Queued",
+          "type": "integer"
+        },
+        "queued": {
+          "minimum": 0,
+          "title": "Queued",
+          "type": "integer"
+        },
+        "threshold": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Threshold",
+          "type": "number"
+        }
+      },
+      "required": [
+        "queued",
+        "numeric_queued",
+        "threshold"
+      ],
+      "title": "ReviewLoad",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "articles": {
+      "minimum": 0,
+      "title": "Articles",
+      "type": "integer"
+    },
+    "articles_per_document": {
+      "minimum": 0,
+      "title": "Articles Per Document",
+      "type": "integer"
+    },
+    "articles_per_topic": {
+      "minimum": 0,
+      "title": "Articles Per Topic",
+      "type": "integer"
+    },
+    "blocks": {
+      "minimum": 0,
+      "title": "Blocks",
+      "type": "integer"
+    },
+    "docs": {
+      "minimum": 0,
+      "title": "Docs",
+      "type": "integer"
+    },
+    "figures": {
+      "minimum": 0,
+      "title": "Figures",
+      "type": "integer"
+    },
+    "pages": {
+      "minimum": 0,
+      "title": "Pages",
+      "type": "integer"
+    },
+    "review_load": {
+      "$ref": "#/$defs/ReviewLoad"
+    }
+  },
+  "required": [
+    "docs",
+    "articles_per_topic",
+    "articles_per_document",
+    "articles",
+    "blocks",
+    "figures",
+    "pages",
+    "review_load"
+  ],
+  "title": "ScopeSummary",
+  "type": "object"
+}

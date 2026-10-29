@@ -1,13 +1,13 @@
-"""User selection of blocks."""
+"""User selection of blocks, and the coverage / scope numbers derived from it."""
 
 from __future__ import annotations
 
 from typing import Any
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 
 from manuallabor import ids
-from manuallabor.contracts._base import BlockId, ContractModel
+from manuallabor.contracts._base import BlockId, ContractModel, DocSlug, GroupId, Unit
 from manuallabor.contracts.enums import ArticleSplit, GroupView
 
 
@@ -25,3 +25,39 @@ class Selection(ContractModel):
             except ValueError:
                 return list(v)
         return v
+
+
+class GroupCoverage(ContractModel):
+    group_id: GroupId
+    view: GroupView
+    selected: int = Field(ge=0)
+    total: int = Field(ge=0)
+    fraction: Unit | None
+    subtree_selected: int | None = Field(ge=0)
+    subtree_total: int | None = Field(ge=0)
+    subtree_fraction: Unit | None
+
+
+class CoverageReport(ContractModel):
+    doc_id: DocSlug
+    selected: int = Field(ge=0)
+    selectable: int = Field(ge=0)
+    structure: list[GroupCoverage]
+    topics: list[GroupCoverage]
+
+
+class ReviewLoad(ContractModel):
+    queued: int = Field(ge=0)
+    numeric_queued: int = Field(ge=0)
+    threshold: Unit
+
+
+class ScopeSummary(ContractModel):
+    docs: int = Field(ge=0)
+    articles_per_topic: int = Field(ge=0)
+    articles_per_document: int = Field(ge=0)
+    articles: int = Field(ge=0)
+    blocks: int = Field(ge=0)
+    figures: int = Field(ge=0)
+    pages: int = Field(ge=0)
+    review_load: ReviewLoad

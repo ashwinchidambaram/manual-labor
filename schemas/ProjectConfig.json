@@ -8,6 +8,22 @@
       "title": "ArticleSplit",
       "type": "string"
     },
+    "LearningConfig": {
+      "additionalProperties": false,
+      "description": "Self-improvement toggle (module 7 extends it with snapshot settings).",
+      "properties": {
+        "enabled": {
+          "default": false,
+          "title": "Enabled",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "title": "LearningConfig",
+      "type": "object"
+    },
     "ModelRef": {
       "additionalProperties": false,
       "properties": {
@@ -136,6 +152,9 @@
       "title": "Background Ocr Born Digital",
       "type": "boolean"
     },
+    "learning": {
+      "$ref": "#/$defs/LearningConfig"
+    },
     "models": {
       "$ref": "#/$defs/TaskModels"
     },
@@ -191,7 +210,8 @@
     "ocr_engine",
     "ocr_dpi",
     "background_ocr_born_digital",
-    "target_edit_rate"
+    "target_edit_rate",
+    "learning"
   ],
   "title": "ProjectConfig",
   "type": "object"

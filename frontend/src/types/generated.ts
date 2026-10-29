@@ -57,6 +57,11 @@ export type BlockStatus = 'auto_approved' | 'queued' | 'approved' | 'edited' | '
 export type CallKind = 'chat' | 'vision' | 'embed';
 /**
  * This interface was referenced by `_All`'s JSON-Schema
+ * via the `definition` "GroupView".
+ */
+export type GroupView = 'structure' | 'topic';
+/**
+ * This interface was referenced by `_All`'s JSON-Schema
  * via the `definition` "DecisionAction".
  */
 export type DecisionAction = 'approve' | 'edit' | 'flag' | 'skip';
@@ -81,10 +86,18 @@ export type FlagCategory = 'wrong_text' | 'missing_figure' | 'wrong_grouping' | 
  */
 export type FlagStatus = 'open' | 'resolved';
 /**
+ * This interface was referenced by `undefined`'s JSON-Schema definition
+ * via the `patternProperty` "^g-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-(?:[st])(?:\d{3})$".
+ *
  * This interface was referenced by `_All`'s JSON-Schema
- * via the `definition` "GroupView".
+ * via the `definition` "TitleSource".
  */
-export type GroupView = 'structure' | 'topic';
+export type TitleSource = 'heading' | 'llm' | 'fallback' | 'human';
+/**
+ * This interface was referenced by `_All`'s JSON-Schema
+ * via the `definition` "UnassignedReason".
+ */
+export type UnassignedReason = 'header_footer' | 'low_similarity' | 'no_text' | 'topic_failed';
 /**
  * This interface was referenced by `_All`'s JSON-Schema
  * via the `definition` "Task".
@@ -286,6 +299,31 @@ export interface BlockAccounting {
 }
 /**
  * This interface was referenced by `_All`'s JSON-Schema
+ * via the `definition` "CoverageReport".
+ */
+export interface CoverageReport {
+  doc_id: string;
+  selectable: number;
+  selected: number;
+  structure: GroupCoverage[];
+  topics: GroupCoverage[];
+}
+/**
+ * This interface was referenced by `_All`'s JSON-Schema
+ * via the `definition` "GroupCoverage".
+ */
+export interface GroupCoverage {
+  fraction: number | null;
+  group_id: string;
+  selected: number;
+  subtree_fraction: number | null;
+  subtree_selected: number | null;
+  subtree_total: number | null;
+  total: number;
+  view: GroupView;
+}
+/**
+ * This interface was referenced by `_All`'s JSON-Schema
  * via the `definition` "Decision".
  */
 export interface Decision {
@@ -390,6 +428,90 @@ export interface PageRange {
 }
 /**
  * This interface was referenced by `_All`'s JSON-Schema
+ * via the `definition` "GroupOverlap".
+ */
+export interface GroupOverlap {
+  blocks: number;
+  section_id: string;
+  topic_id: string;
+}
+/**
+ * Every grouping constant, frozen into groups.json so a result can be explained.
+ *
+ * This interface was referenced by `_All`'s JSON-Schema
+ * via the `definition` "GroupingParams".
+ */
+export interface GroupingParams {
+  d_cut: number;
+  embed_batch: number;
+  embed_prefix: string;
+  k_max_divisor: number;
+  llm_stragglers: boolean;
+  low_cohesion: number;
+  max_topic_blocks: number;
+  min_topic_blocks: number;
+  n_candidates: number;
+  name_sample: number;
+  name_tokens: number;
+  page_window: number;
+  small_doc: number;
+  straggler_batch: number;
+  summary_tokens: number;
+  t_assign: number;
+  t_candidate: number;
+  title_max: number;
+  topic_slug_max: number;
+}
+/**
+ * docs/<slug>/groups.json: both views of one document, the accounting of blocks that sit in
+ * no group, and the provenance needed to explain or reproduce the result.
+ *
+ * This interface was referenced by `_All`'s JSON-Schema
+ * via the `definition` "GroupsFile".
+ */
+export interface GroupsFile {
+  algo_version: string;
+  doc_id: string;
+  embedding_dim: number;
+  embedding_model: string;
+  fingerprint: string;
+  grouping_model: string;
+  learning_snapshot: string;
+  overlap: GroupOverlap[];
+  overrides_applied: number;
+  overrides_stale: number[];
+  params: GroupingParams;
+  stragglers: StragglerRecord[];
+  structure: Group[];
+  title_sources: {
+    [k: string]: TitleSource;
+  };
+  topic_error: string | null;
+  topic_status: 'ok' | 'failed';
+  topics: Group[];
+  unassigned: UnassignedEntry[];
+}
+/**
+ * This interface was referenced by `_All`'s JSON-Schema
+ * via the `definition` "StragglerRecord".
+ */
+export interface StragglerRecord {
+  block_id: string;
+  by: 'centroid' | 'llm';
+  similarity: number;
+  topic_id: string | null;
+}
+/**
+ * This interface was referenced by `_All`'s JSON-Schema
+ * via the `definition` "UnassignedEntry".
+ */
+export interface UnassignedEntry {
+  block_id: string;
+  reason: UnassignedReason;
+  view: GroupView;
+}
+/**
+ * This interface was referenced by `_All`'s JSON-Schema
  * via the `definition` "LLMCallLog".
  */
 export interface LLMCallLog {
@@ -405,6 +527,15 @@ export interface LLMCallLog {
   provider: string;
   task: Task;
   timestamp: string;
+}
+/**
+ * Self-improvement toggle (module 7 extends it with snapshot settings).
+ *
+ * This interface was referenced by `_All`'s JSON-Schema
+ * via the `definition` "LearningConfig".
+ */
+export interface LearningConfig {
+  enabled: boolean;
 }
 /**
  * This interface was referenced by `_All`'s JSON-Schema
@@ -512,6 +643,7 @@ export interface PriorAttempt {
 export interface ProjectConfig {
   article_split: 'per_topic' | 'per_document';
   background_ocr_born_digital: boolean;
+  learning: LearningConfig;
   models: TaskModels;
   name: string;
   ocr_dpi: number;
@@ -567,6 +699,29 @@ export interface RecheckResult {
   check: string;
   detail: string | null;
   passed: boolean;
+}
+/**
+ * This interface was referenced by `_All`'s JSON-Schema
+ * via the `definition` "ReviewLoad".
+ */
+export interface ReviewLoad {
+  numeric_queued: number;
+  queued: number;
+  threshold: number;
+}
+/**
+ * This interface was referenced by `_All`'s JSON-Schema
+ * via the `definition` "ScopeSummary".
+ */
+export interface ScopeSummary {
+  articles: number;
+  articles_per_document: number;
+  articles_per_topic: number;
+  blocks: number;
+  docs: number;
+  figures: number;
+  pages: number;
+  review_load: ReviewLoad;
 }
 /**
  * This interface was referenced by `_All`'s JSON-Schema

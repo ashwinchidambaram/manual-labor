@@ -66,6 +66,20 @@ class GroupView(StrEnum):
     topic = "topic"
 
 
+class UnassignedReason(StrEnum):
+    header_footer = "header_footer"
+    low_similarity = "low_similarity"
+    no_text = "no_text"
+    topic_failed = "topic_failed"
+
+
+class TitleSource(StrEnum):
+    heading = "heading"
+    llm = "llm"
+    fallback = "fallback"
+    human = "human"
+
+
 class ArticleSplit(StrEnum):
     per_topic = "per_topic"
     per_document = "per_document"

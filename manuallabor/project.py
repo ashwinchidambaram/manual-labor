@@ -62,6 +62,14 @@ class DocPaths:
         return self.root / "scores.json"
 
     @property
+    def groups(self) -> Path:
+        return self.root / "groups.json"
+
+    @property
+    def group_overrides(self) -> Path:
+        return self.root / "group_overrides.json"
+
+    @property
     def score_history(self) -> Path:
         return self.root / "score_history.jsonl"
 
@@ -102,6 +110,15 @@ class ProjectPaths:
 
     def figure_file(self, slug: str, fid: str, ext: str) -> Path:
         return self.figure_dir(slug) / f"{fid}.{ext}"
+
+    @property
+    def selection(self) -> Path:
+        return self.root / "selection.json"
+
+    @property
+    def learned_grouping(self) -> Path:
+        """Stand-in for module 7's learning layer: the grouping snapshot, if one exists."""
+        return self.root / "learning" / "grouping.json"
 
     @property
     def figures_index(self) -> Path:

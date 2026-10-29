@@ -129,6 +129,21 @@ def score(
 
 
 @app.command()
+def group(
+    project: Annotated[Path, typer.Argument(help="Project directory.")],
+    force: Annotated[bool, typer.Option("--force", help="Re-group even if up to date.")] = False,
+    doc: Annotated[str | None, typer.Option("--doc", help="Only this document slug.")] = None,
+) -> None:
+    """Build the structure and topic views (one JSON progress line per document)."""
+    from manuallabor.grouping.pipeline import run_group
+    from manuallabor.project import ProjectPaths
+
+    failed = run_group(ProjectPaths(project), only=doc, force=force)
+    if failed:
+        raise typer.Exit(1)
+
+
+@app.command()
 def export(
     project: Annotated[Path, typer.Argument(help="Project directory.")],
 ) -> None:

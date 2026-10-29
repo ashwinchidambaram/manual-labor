@@ -26,7 +26,13 @@ from manuallabor.contracts.block import (
     TableData,
     TableShape,
 )
-from manuallabor.contracts.config import KNOWN_PROVIDERS, ModelRef, ProjectConfig, TaskModels
+from manuallabor.contracts.config import (
+    KNOWN_PROVIDERS,
+    LearningConfig,
+    ModelRef,
+    ProjectConfig,
+    TaskModels,
+)
 from manuallabor.contracts.decision import Decision
 from manuallabor.contracts.document import Document
 from manuallabor.contracts.enums import (
@@ -47,10 +53,22 @@ from manuallabor.contracts.enums import (
     ProposalStatus,
     SignalName,
     Task,
+    TitleSource,
+    UnassignedReason,
 )
 from manuallabor.contracts.figure import FigureRecord
 from manuallabor.contracts.flag import Flag
-from manuallabor.contracts.group import Group, PageRange, Topic
+from manuallabor.contracts.group import (
+    Group,
+    GroupingParams,
+    GroupOverlap,
+    GroupOverride,
+    GroupsFile,
+    PageRange,
+    StragglerRecord,
+    Topic,
+    UnassignedEntry,
+)
 from manuallabor.contracts.llm import ChatResult, LLMCallLog, Message
 from manuallabor.contracts.manifest import (
     BlockAccounting,
@@ -62,14 +80,23 @@ from manuallabor.contracts.manifest import (
     ReviewStats,
 )
 from manuallabor.contracts.proposal import PriorAttempt, Proposal, RecheckResult
-from manuallabor.contracts.selection import Selection
+from manuallabor.contracts.selection import (
+    CoverageReport,
+    GroupCoverage,
+    ReviewLoad,
+    ScopeSummary,
+    Selection,
+)
 
 EXPORTED_MODELS: tuple[type[BaseModel], ...] = (
     Block,
     Document,
     FigureRecord,
     Group,
+    GroupsFile,
     Selection,
+    CoverageReport,
+    ScopeSummary,
     Flag,
     Decision,
     Proposal,
@@ -80,6 +107,19 @@ EXPORTED_MODELS: tuple[type[BaseModel], ...] = (
 )
 
 __all__ = [
+    "UnassignedReason",
+    "UnassignedEntry",
+    "TitleSource",
+    "StragglerRecord",
+    "ScopeSummary",
+    "ReviewLoad",
+    "LearningConfig",
+    "GroupsFile",
+    "GroupingParams",
+    "GroupOverride",
+    "GroupOverlap",
+    "GroupCoverage",
+    "CoverageReport",
     "EXPORTED_MODELS",
     "KNOWN_PROVIDERS",
     "ArticleFrontmatter",

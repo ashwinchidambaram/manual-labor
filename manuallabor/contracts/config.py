@@ -37,6 +37,12 @@ class TaskModels(ContractModel):
     agent: ModelRef | None = None
 
 
+class LearningConfig(ContractModel):
+    """Self-improvement toggle (module 7 extends it with snapshot settings)."""
+
+    enabled: bool = False
+
+
 class ProjectConfig(ContractModel):
     schema_version: Literal["1.0"] = "1.0"
     name: str
@@ -48,6 +54,7 @@ class ProjectConfig(ContractModel):
     ocr_dpi: int = Field(default=300, ge=300)
     background_ocr_born_digital: bool = True
     target_edit_rate: Unit = 0.02
+    learning: LearningConfig = Field(default_factory=LearningConfig)
 
     @field_validator("parsers")
     @classmethod

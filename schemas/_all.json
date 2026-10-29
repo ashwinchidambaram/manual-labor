@@ -406,6 +406,50 @@
       "title": "CallKind",
       "type": "string"
     },
+    "CoverageReport": {
+      "additionalProperties": false,
+      "properties": {
+        "doc_id": {
+          "maxLength": 48,
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "title": "Doc Id",
+          "type": "string"
+        },
+        "selectable": {
+          "minimum": 0,
+          "title": "Selectable",
+          "type": "integer"
+        },
+        "selected": {
+          "minimum": 0,
+          "title": "Selected",
+          "type": "integer"
+        },
+        "structure": {
+          "items": {
+            "$ref": "#/$defs/GroupCoverage"
+          },
+          "title": "Structure",
+          "type": "array"
+        },
+        "topics": {
+          "items": {
+            "$ref": "#/$defs/GroupCoverage"
+          },
+          "title": "Topics",
+          "type": "array"
+        }
+      },
+      "required": [
+        "doc_id",
+        "selected",
+        "selectable",
+        "structure",
+        "topics"
+      ],
+      "title": "CoverageReport",
+      "type": "object"
+    },
     "Decision": {
       "additionalProperties": false,
       "properties": {
@@ -1206,6 +1250,118 @@
       "title": "Group",
       "type": "object"
     },
+    "GroupCoverage": {
+      "additionalProperties": false,
+      "properties": {
+        "fraction": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Fraction"
+        },
+        "group_id": {
+          "pattern": "^g-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-(?:[st])(?:\\d{3})$",
+          "title": "Group Id",
+          "type": "string"
+        },
+        "selected": {
+          "minimum": 0,
+          "title": "Selected",
+          "type": "integer"
+        },
+        "subtree_fraction": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Subtree Fraction"
+        },
+        "subtree_selected": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Subtree Selected"
+        },
+        "subtree_total": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Subtree Total"
+        },
+        "total": {
+          "minimum": 0,
+          "title": "Total",
+          "type": "integer"
+        },
+        "view": {
+          "$ref": "#/$defs/GroupView"
+        }
+      },
+      "required": [
+        "group_id",
+        "view",
+        "selected",
+        "total",
+        "fraction",
+        "subtree_selected",
+        "subtree_total",
+        "subtree_fraction"
+      ],
+      "title": "GroupCoverage",
+      "type": "object"
+    },
+    "GroupOverlap": {
+      "additionalProperties": false,
+      "properties": {
+        "blocks": {
+          "minimum": 1,
+          "title": "Blocks",
+          "type": "integer"
+        },
+        "section_id": {
+          "pattern": "^g-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-(?:[st])(?:\\d{3})$",
+          "title": "Section Id",
+          "type": "string"
+        },
+        "topic_id": {
+          "pattern": "^g-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-(?:[st])(?:\\d{3})$",
+          "title": "Topic Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "topic_id",
+        "section_id",
+        "blocks"
+      ],
+      "title": "GroupOverlap",
+      "type": "object"
+    },
     "GroupView": {
       "enum": [
         "structure",
@@ -1213,6 +1369,266 @@
       ],
       "title": "GroupView",
       "type": "string"
+    },
+    "GroupingParams": {
+      "additionalProperties": false,
+      "description": "Every grouping constant, frozen into groups.json so a result can be explained.",
+      "properties": {
+        "d_cut": {
+          "minimum": 0.0,
+          "title": "D Cut",
+          "type": "number"
+        },
+        "embed_batch": {
+          "minimum": 1,
+          "title": "Embed Batch",
+          "type": "integer"
+        },
+        "embed_prefix": {
+          "title": "Embed Prefix",
+          "type": "string"
+        },
+        "k_max_divisor": {
+          "minimum": 1,
+          "title": "K Max Divisor",
+          "type": "integer"
+        },
+        "llm_stragglers": {
+          "title": "Llm Stragglers",
+          "type": "boolean"
+        },
+        "low_cohesion": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Low Cohesion",
+          "type": "number"
+        },
+        "max_topic_blocks": {
+          "minimum": 2,
+          "title": "Max Topic Blocks",
+          "type": "integer"
+        },
+        "min_topic_blocks": {
+          "minimum": 1,
+          "title": "Min Topic Blocks",
+          "type": "integer"
+        },
+        "n_candidates": {
+          "minimum": 1,
+          "title": "N Candidates",
+          "type": "integer"
+        },
+        "name_sample": {
+          "minimum": 1,
+          "title": "Name Sample",
+          "type": "integer"
+        },
+        "name_tokens": {
+          "minimum": 1,
+          "title": "Name Tokens",
+          "type": "integer"
+        },
+        "page_window": {
+          "minimum": 1,
+          "title": "Page Window",
+          "type": "integer"
+        },
+        "small_doc": {
+          "minimum": 0,
+          "title": "Small Doc",
+          "type": "integer"
+        },
+        "straggler_batch": {
+          "minimum": 1,
+          "title": "Straggler Batch",
+          "type": "integer"
+        },
+        "summary_tokens": {
+          "minimum": 1,
+          "title": "Summary Tokens",
+          "type": "integer"
+        },
+        "t_assign": {
+          "title": "T Assign",
+          "type": "number"
+        },
+        "t_candidate": {
+          "title": "T Candidate",
+          "type": "number"
+        },
+        "title_max": {
+          "minimum": 1,
+          "title": "Title Max",
+          "type": "integer"
+        },
+        "topic_slug_max": {
+          "minimum": 1,
+          "title": "Topic Slug Max",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "summary_tokens",
+        "name_sample",
+        "name_tokens",
+        "embed_batch",
+        "embed_prefix",
+        "small_doc",
+        "d_cut",
+        "k_max_divisor",
+        "min_topic_blocks",
+        "max_topic_blocks",
+        "t_assign",
+        "t_candidate",
+        "n_candidates",
+        "straggler_batch",
+        "low_cohesion",
+        "page_window",
+        "title_max",
+        "topic_slug_max",
+        "llm_stragglers"
+      ],
+      "title": "GroupingParams",
+      "type": "object"
+    },
+    "GroupsFile": {
+      "additionalProperties": false,
+      "description": "docs/<slug>/groups.json: both views of one document, the accounting of blocks that sit in\nno group, and the provenance needed to explain or reproduce the result.",
+      "properties": {
+        "algo_version": {
+          "title": "Algo Version",
+          "type": "string"
+        },
+        "doc_id": {
+          "maxLength": 48,
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "title": "Doc Id",
+          "type": "string"
+        },
+        "embedding_dim": {
+          "minimum": 0,
+          "title": "Embedding Dim",
+          "type": "integer"
+        },
+        "embedding_model": {
+          "title": "Embedding Model",
+          "type": "string"
+        },
+        "fingerprint": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Fingerprint",
+          "type": "string"
+        },
+        "grouping_model": {
+          "title": "Grouping Model",
+          "type": "string"
+        },
+        "learning_snapshot": {
+          "title": "Learning Snapshot",
+          "type": "string"
+        },
+        "overlap": {
+          "items": {
+            "$ref": "#/$defs/GroupOverlap"
+          },
+          "title": "Overlap",
+          "type": "array"
+        },
+        "overrides_applied": {
+          "minimum": 0,
+          "title": "Overrides Applied",
+          "type": "integer"
+        },
+        "overrides_stale": {
+          "items": {
+            "type": "integer"
+          },
+          "title": "Overrides Stale",
+          "type": "array"
+        },
+        "params": {
+          "$ref": "#/$defs/GroupingParams"
+        },
+        "stragglers": {
+          "items": {
+            "$ref": "#/$defs/StragglerRecord"
+          },
+          "title": "Stragglers",
+          "type": "array"
+        },
+        "structure": {
+          "items": {
+            "$ref": "#/$defs/Group"
+          },
+          "title": "Structure",
+          "type": "array"
+        },
+        "title_sources": {
+          "patternProperties": {
+            "^g-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-(?:[st])(?:\\d{3})$": {
+              "$ref": "#/$defs/TitleSource"
+            }
+          },
+          "title": "Title Sources",
+          "type": "object"
+        },
+        "topic_error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Topic Error"
+        },
+        "topic_status": {
+          "enum": [
+            "ok",
+            "failed"
+          ],
+          "title": "Topic Status",
+          "type": "string"
+        },
+        "topics": {
+          "items": {
+            "$ref": "#/$defs/Group"
+          },
+          "title": "Topics",
+          "type": "array"
+        },
+        "unassigned": {
+          "items": {
+            "$ref": "#/$defs/UnassignedEntry"
+          },
+          "title": "Unassigned",
+          "type": "array"
+        }
+      },
+      "required": [
+        "doc_id",
+        "algo_version",
+        "fingerprint",
+        "embedding_model",
+        "embedding_dim",
+        "grouping_model",
+        "learning_snapshot",
+        "params",
+        "structure",
+        "topics",
+        "unassigned",
+        "stragglers",
+        "overlap",
+        "title_sources",
+        "topic_status",
+        "topic_error",
+        "overrides_applied",
+        "overrides_stale"
+      ],
+      "title": "GroupsFile",
+      "type": "object"
     },
     "LLMCallLog": {
       "additionalProperties": false,
@@ -1305,6 +1721,22 @@
         "timestamp"
       ],
       "title": "LLMCallLog",
+      "type": "object"
+    },
+    "LearningConfig": {
+      "additionalProperties": false,
+      "description": "Self-improvement toggle (module 7 extends it with snapshot settings).",
+      "properties": {
+        "enabled": {
+          "default": false,
+          "title": "Enabled",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "title": "LearningConfig",
       "type": "object"
     },
     "Manifest": {
@@ -1769,6 +2201,9 @@
           "title": "Background Ocr Born Digital",
           "type": "boolean"
         },
+        "learning": {
+          "$ref": "#/$defs/LearningConfig"
+        },
         "models": {
           "$ref": "#/$defs/TaskModels"
         },
@@ -1824,7 +2259,8 @@
         "ocr_engine",
         "ocr_dpi",
         "background_ocr_born_digital",
-        "target_edit_rate"
+        "target_edit_rate",
+        "learning"
       ],
       "title": "ProjectConfig",
       "type": "object"
@@ -2036,6 +2472,34 @@
       "title": "ReviewCounts",
       "type": "object"
     },
+    "ReviewLoad": {
+      "additionalProperties": false,
+      "properties": {
+        "numeric_queued": {
+          "minimum": 0,
+          "title": "Numeric Queued",
+          "type": "integer"
+        },
+        "queued": {
+          "minimum": 0,
+          "title": "Queued",
+          "type": "integer"
+        },
+        "threshold": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Threshold",
+          "type": "number"
+        }
+      },
+      "required": [
+        "queued",
+        "numeric_queued",
+        "threshold"
+      ],
+      "title": "ReviewLoad",
+      "type": "object"
+    },
     "ReviewStats": {
       "additionalProperties": false,
       "properties": {
@@ -2100,6 +2564,61 @@
         "numbers_verified_blocks"
       ],
       "title": "ReviewStats",
+      "type": "object"
+    },
+    "ScopeSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "articles": {
+          "minimum": 0,
+          "title": "Articles",
+          "type": "integer"
+        },
+        "articles_per_document": {
+          "minimum": 0,
+          "title": "Articles Per Document",
+          "type": "integer"
+        },
+        "articles_per_topic": {
+          "minimum": 0,
+          "title": "Articles Per Topic",
+          "type": "integer"
+        },
+        "blocks": {
+          "minimum": 0,
+          "title": "Blocks",
+          "type": "integer"
+        },
+        "docs": {
+          "minimum": 0,
+          "title": "Docs",
+          "type": "integer"
+        },
+        "figures": {
+          "minimum": 0,
+          "title": "Figures",
+          "type": "integer"
+        },
+        "pages": {
+          "minimum": 0,
+          "title": "Pages",
+          "type": "integer"
+        },
+        "review_load": {
+          "$ref": "#/$defs/ReviewLoad"
+        }
+      },
+      "required": [
+        "docs",
+        "articles_per_topic",
+        "articles_per_document",
+        "articles",
+        "blocks",
+        "figures",
+        "pages",
+        "review_load"
+      ],
+      "title": "ScopeSummary",
       "type": "object"
     },
     "Selection": {
@@ -2186,6 +2705,50 @@
       ],
       "title": "SignalName",
       "type": "string"
+    },
+    "StragglerRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "block_id": {
+          "pattern": "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$",
+          "title": "Block Id",
+          "type": "string"
+        },
+        "by": {
+          "enum": [
+            "centroid",
+            "llm"
+          ],
+          "title": "By",
+          "type": "string"
+        },
+        "similarity": {
+          "maximum": 1.0,
+          "minimum": -1.0,
+          "title": "Similarity",
+          "type": "number"
+        },
+        "topic_id": {
+          "anyOf": [
+            {
+              "pattern": "^g-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-(?:[st])(?:\\d{3})$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Topic Id"
+        }
+      },
+      "required": [
+        "block_id",
+        "topic_id",
+        "similarity",
+        "by"
+      ],
+      "title": "StragglerRecord",
+      "type": "object"
     },
     "TableCell": {
       "additionalProperties": false,
@@ -2368,6 +2931,49 @@
       ],
       "title": "TaskModels",
       "type": "object"
+    },
+    "TitleSource": {
+      "enum": [
+        "heading",
+        "llm",
+        "fallback",
+        "human"
+      ],
+      "title": "TitleSource",
+      "type": "string"
+    },
+    "UnassignedEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "block_id": {
+          "pattern": "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$",
+          "title": "Block Id",
+          "type": "string"
+        },
+        "reason": {
+          "$ref": "#/$defs/UnassignedReason"
+        },
+        "view": {
+          "$ref": "#/$defs/GroupView"
+        }
+      },
+      "required": [
+        "block_id",
+        "view",
+        "reason"
+      ],
+      "title": "UnassignedEntry",
+      "type": "object"
+    },
+    "UnassignedReason": {
+      "enum": [
+        "header_footer",
+        "low_similarity",
+        "no_text",
+        "topic_failed"
+      ],
+      "title": "UnassignedReason",
+      "type": "string"
     }
   },
   "title": "ManualLaborContracts"

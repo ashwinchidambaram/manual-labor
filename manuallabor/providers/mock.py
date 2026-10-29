@@ -13,6 +13,7 @@ from typing import Any, Literal
 from manuallabor.contracts.config import ModelRef
 from manuallabor.contracts.enums import Task
 from manuallabor.contracts.llm import Message
+from manuallabor.grouping.mock_replies import mock_grouping_reply
 from manuallabor.providers.base import (
     RAW_CLOSE,
     RAW_OPEN,
@@ -43,6 +44,7 @@ def echo_cleanup(messages: Sequence[Message]) -> str:
 
 DEFAULT_MOCK_RESPONSES: dict[Task, str | Responder] = {
     Task.cleanup: echo_cleanup,
+    Task.grouping: mock_grouping_reply,
     Task.verifier: "NONE",
     Task.metadata: '{"title": null, "product_model": null}',
 }

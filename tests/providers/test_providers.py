@@ -99,8 +99,8 @@ def test_p5_canned() -> None:
 
 
 def test_p6_no_response() -> None:
-    with pytest.raises(ProviderError, match="grouping"):
-        MockProvider(sink=ListSink()).chat(Task.grouping, user("q"))
+    with pytest.raises(ProviderError, match="agent"):
+        MockProvider(sink=ListSink()).chat(Task.agent, user("q"))
 
 
 SCHEMA = {

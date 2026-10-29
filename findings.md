@@ -124,3 +124,6 @@ All GT model-transcribed; needs human spot-check. The real set now covers: scan 
 | `per_topic` articles come from the topic view only; structure view selects | Avoids two article sets. |
 | Human regroup/rename overrides in `docs/<slug>/group_overrides.json`, applied every run | Learning-hook data shape; applied only with `learning.enabled` for learned moves, always for explicit overrides. |
 | `GroupsFile` wrapper + `LearningConfig{enabled=False}` added to contracts; mock grouping reply registered in `providers/mock.py` (import-order-stable cache keys); grouping fingerprint excludes scores.json | Forced by current code; recorded in design §"changes". |
+
+## Disk-full incidents (2026-10-29, 00:30–02:15)
+Root cause: `/private/var/folders/.../T/com.docker.install` — a Docker Desktop installer/updater unpacking 8.6 GB into the user temp dir (not ours; left in place). It filled the disk twice overnight, each time blocking every tool (the harness cannot open its output file at ENOSPC). Recovery took ~90 min of polling. Build-side mitigations already in place: pytest temp dirs cleared after each gate; one test run at a time. User should finish or cancel the Docker update.
