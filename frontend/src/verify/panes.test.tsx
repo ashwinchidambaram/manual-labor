@@ -93,6 +93,40 @@ describe("VC4 ExtractedPane", () => {
     expect(screen.getByTestId("why-rule")).toHaveTextContent("Rule: always reviewed");
   });
 
+  it("M9.6 a late ack of an earlier approve does not steal focus from the open editor", async () => {
+    let release!: () => void;
+    const { f, r } = await mountVerify(4, (fk) => {
+      fk.actionGate = new Promise<void>((res) => (release = res));
+    });
+    await cardFocused(vid(1));
+    await r.user.keyboard("a");
+    await cardFocused(vid(2));
+    await r.user.keyboard("e");
+    const ta = await screen.findByLabelText("Edit block text");
+    await waitFor(() => expect(ta).toHaveFocus());
+    release(); // the approve's ack (and its focus request) lands while the editor is open
+    await waitFor(() => expect(f.actions).toHaveLength(1));
+    await new Promise((res) => setTimeout(res, 150));
+    expect(screen.getByLabelText("Edit block text")).toHaveFocus();
+  });
+
+  it("M9.6 a late ack of an earlier approve does not steal focus from the flag dialog", async () => {
+    let release!: () => void;
+    const { f, r } = await mountVerify(4, (fk) => {
+      fk.actionGate = new Promise<void>((res) => (release = res));
+    });
+    await cardFocused(vid(1));
+    await r.user.keyboard("a");
+    await cardFocused(vid(2));
+    await r.user.keyboard("f");
+    const group = await screen.findByRole("radiogroup");
+    await waitFor(() => expect(group).toHaveFocus());
+    release();
+    await waitFor(() => expect(f.actions).toHaveLength(1));
+    await new Promise((res) => setTimeout(res, 150));
+    expect(screen.getByRole("radiogroup")).toHaveFocus();
+  });
+
   it("e edits, Ctrl+Enter posts the text and focus returns to the queue", async () => {
     const { f, r } = await mountVerify(3);
     await cardFocused(vid(1));

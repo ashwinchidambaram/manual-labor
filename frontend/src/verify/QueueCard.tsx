@@ -19,6 +19,7 @@ interface Props {
   /** current card only: a changed value means "take focus now" */
   focusTick: number;
   wantFocus: React.MutableRefObject<boolean>;
+  focusBlocked?: React.MutableRefObject<boolean>;
   onSelect: (id: string) => void;
   /** row height in px */
   height: number;
@@ -28,7 +29,7 @@ interface Props {
   criticalReasons?: number;
 }
 
-function QueueCardImpl({ item, isCurrent, pos, size, focusTick, wantFocus, onSelect, height, offset, pinned, criticalReasons }: Props) {
+function QueueCardImpl({ item, isCurrent, pos, size, focusTick, wantFocus, focusBlocked, onSelect, height, offset, pinned, criticalReasons }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   // primitives in, stable style out: the object identity must not defeat memo()
   const style = useMemo<React.CSSProperties>(
@@ -36,11 +37,12 @@ function QueueCardImpl({ item, isCurrent, pos, size, focusTick, wantFocus, onSel
     [height, offset],
   );
   useLayoutEffect(() => {
-    if (isCurrent && wantFocus.current && ref.current) {
+    // a request made while an editor/dialog is open stays pending: it must not steal focus from it
+    if (isCurrent && wantFocus.current && !focusBlocked?.current && !document.querySelector("[aria-modal='true']") && ref.current) {
       wantFocus.current = false;
       ref.current.focus();
     }
-  }, [isCurrent, focusTick, wantFocus]);
+  }, [isCurrent, focusTick, wantFocus, focusBlocked]);
   const why = reasonsFromQueueItem(item.reasons ?? [], item.has_numeric_spec, criticalReasons);
   const chips = reasonChips({ why, hasNumeric: item.has_numeric_spec });
   const stale = (item.reasons ?? []).includes(STALE_NAME);

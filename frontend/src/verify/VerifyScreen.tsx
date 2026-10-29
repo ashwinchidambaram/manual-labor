@@ -35,6 +35,8 @@ export default function VerifyScreen() {
   const [flagOpen, setFlagOpen] = useState(false);
   const [crop, setCrop] = useState<CropMode | null>(null);
   const [live, setLive] = useState("");
+  // read by QueueCard layout effects during this same commit: while an editor or crop mode is open, no card takes focus
+  v.focusBlocked.current = edit !== null || crop !== null;
 
   const currentId = state.currentId;
   const detailQ = useQuery({
@@ -273,6 +275,7 @@ export default function VerifyScreen() {
             counts={state.counts}
             focusTick={v.focusTick}
             wantFocus={v.wantFocus}
+            focusBlocked={v.focusBlocked}
             onSelect={v.browse}
             onNearEnd={() => void v.loadMore()}
           />

@@ -15,11 +15,12 @@ interface Props {
   counts: ReviewCounts;
   focusTick: number;
   wantFocus: React.MutableRefObject<boolean>;
+  focusBlocked?: React.MutableRefObject<boolean>;
   onSelect: (id: string) => void;
   onNearEnd: () => void;
 }
 
-export default function Queue({ items, total, pinned, currentId, docs, counts, focusTick, wantFocus, onSelect, onNearEnd }: Props) {
+export default function Queue({ items, total, pinned, currentId, docs, counts, focusTick, wantFocus, focusBlocked, onSelect, onNearEnd }: Props) {
   const scroller = useRef<HTMLDivElement>(null);
   const v = useVirtualizer({
     count: items.length,
@@ -56,6 +57,7 @@ export default function Queue({ items, total, pinned, currentId, docs, counts, f
             size={total}
             focusTick={focusTick}
             wantFocus={wantFocus}
+            focusBlocked={focusBlocked}
             onSelect={onSelect}
             height={ROW}
           />
@@ -72,6 +74,7 @@ export default function Queue({ items, total, pinned, currentId, docs, counts, f
                 size={total}
                 focusTick={it.block_id === currentId ? focusTick : 0}
                 wantFocus={wantFocus}
+                focusBlocked={focusBlocked}
                 onSelect={onSelect}
                 height={ROW}
                 offset={row.start - (pinned ? ROW : 0)}

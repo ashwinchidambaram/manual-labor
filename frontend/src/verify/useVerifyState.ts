@@ -70,6 +70,8 @@ export function useVerifyState() {
   const [focusTick, setFocusTick] = useState(0);
   /** the next card that becomes current takes focus (consumed by QueueCard) */
   const wantFocus = useRef(false);
+  /** an editor, dialog or crop mode owns focus: a pending card-focus request waits until it closes */
+  const focusBlocked = useRef(false);
   const requestFocus = useCallback(() => {
     wantFocus.current = true;
     setFocusTick((t) => t + 1);
@@ -350,6 +352,7 @@ export function useVerifyState() {
     viewAdded,
     focusTick,
     wantFocus,
+    focusBlocked,
     requestFocus,
   };
 }
