@@ -82,7 +82,7 @@ part      := block_part | figure_part
 
 Several figures at one position keep attach order. `figure_part = "![" + alt + "](" + image_path + ")"`.
 - `image_path` = `images/<canon-slug>/<canon-id>.png` (**rewritten to the canonical** for duplicates; the alt text keeps the figure's own id).
-- `alt` = `f"{fid} — {cap}"`, ` — ` = U+2014 with single spaces. `cap` = `caption_original` (whitespace-collapsed) if present; else `"[generated] " + description_generated`; else `"(no caption)"`. `\`, `[`, `]` in `cap` are backslash-escaped; newlines become spaces. Alt text is metadata, not article text, so it is outside the byte-derivation rule except for its id prefix.
+- `alt` = `f"{fid} — {cap}"`, ` — ` = U+2014 with single spaces. `cap` = `caption_original` (whitespace-collapsed) if present; else `"[generated] " + description_generated`; else `"(no caption)"`. `\`, `[`, `]`, `(`, `)` in `cap` are backslash-escaped (CommonMark punctuation escapes, so a caption containing `](` can never break the link; review fix M11.4); newlines become spaces. Alt text is metadata, not article text, so it is outside the byte-derivation rule except for its id prefix.
 - Regex every figure line must satisfy: `^!\[FIG-[a-z0-9-]+-p\d{3,4}-\d{2,3} — .*\]\(images/[a-z0-9-]+/FIG-[a-z0-9-]+-p\d{3,4}-\d{2,3}\.png\)$`.
 
 ### 3.4 Frontmatter (`render.yaml_frontmatter`)
