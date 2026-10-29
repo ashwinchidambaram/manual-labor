@@ -161,5 +161,37 @@ def test_same_kind_multi_piece_text_in_geometric_order() -> None:
     b = blocks[0]
     assert b.text_by_parser["docling"] == "\n".join(ln.text for ln in top + low)
     assert b.text_by_parser["docling"].split() == b.text_by_parser["pymupdf"].split()
-    assert b.order_by_parser["docling"] == 1  # the first piece in reading position
+    assert b.order_by_parser["docling"] == 0  # the minimum parser index of the pieces
     assert {d.outcome for d in disp} == {"primary", "matched", "absorbed"}
+
+
+def test_multi_piece_order_is_min_parser_index() -> None:
+    a = [_line("piece A on top", 100, i=0)]
+    b_ = [_line("piece B in the middle", 120, i=1)]
+    c = [_line("piece C at the bottom", 140, i=2)]
+    p = [_rb("pymupdf", 0, BlockType.paragraph, a + b_ + c)]
+    # Docling delivers C (0), A (1), B (2); A is geometrically first.
+    s = [
+        _rb("docling", 0, BlockType.paragraph, c),
+        _rb("docling", 1, BlockType.paragraph, a),
+        _rb("docling", 2, BlockType.paragraph, b_),
+    ]
+    blocks, _ = _merge(p, s)
+    assert len(blocks) == 1
+    assert blocks[0].order_by_parser["docling"] == 0
+
+
+def test_multi_piece_text_is_column_aware() -> None:
+    l1 = _line("left one", 100, 72, 280, i=0)
+    l2 = _line("left two", 140, 72, 280, i=1)
+    r1 = _line("right one", 100, 320, 540, i=2)
+    # A PyMuPDF paragraph spans both columns; Docling splits it into per-column pieces.
+    p = [_rb("pymupdf", 0, BlockType.paragraph, [l1, l2, r1])]
+    s = [
+        _rb("docling", 0, BlockType.paragraph, [r1]),
+        _rb("docling", 1, BlockType.paragraph, [l2]),
+        _rb("docling", 2, BlockType.paragraph, [l1]),
+    ]
+    blocks, _ = _merge(p, s)
+    assert len(blocks) == 1
+    assert blocks[0].text_by_parser["docling"] == "left one\nleft two\nright one"

@@ -186,3 +186,28 @@ def test_13b_scanned_headings_and_bbox_match(parsed: Parsed) -> None:
     print(f"scanned: headings {hit}/18, bbox-matched ratio {ratio:.4f}")
     assert hit >= 16
     assert ratio >= SCANNED_MATCH_FLOOR
+
+
+def test_scanned_gt_lists_have_parsed_list_blocks(parsed: Parsed) -> None:
+    gt = load_gt("scanned")
+    gt_lists = [b for b in gt["blocks"] if b["type"] == "list"]
+    got = [b for b in parsed.blocks("scanned") if b.type == BlockType.list and b.bbox]
+    print(f"scanned lists: parsed {len(got)} vs GT {len(gt_lists)}")
+    assert abs(len(got) - len(gt_lists)) <= 1
+    for g in gt_lists:
+        best = max((iou(g["bbox"], b.bbox) for b in got if b.page == g["page"]), default=0.0)
+        assert best >= 0.3, (g["page"], g["raw_lines"][:2], best)
+
+
+def test_scanned_captions_are_their_own_blocks(parsed: Parsed) -> None:
+    gt = load_gt("scanned")
+    gt_caps = [b for b in gt["blocks"] if b["type"] == "caption"]
+    got = [b for b in parsed.blocks("scanned") if b.type == BlockType.caption and b.bbox]
+    assert gt_caps
+    for g in gt_caps:
+        cands = [b for b in got if b.page == g["page"] and iou(g["bbox"], b.bbox) >= 0.3]
+        assert cands, (g["page"], g["raw_lines"])
+        b = max(cands, key=lambda b: iou(g["bbox"], b.bbox))
+        ref, pred = tokens(gt_text(g)), tokens(b.raw_text)
+        assert f1(*f1_counts(pred, ref)) >= 0.8, (g["raw_lines"], b.raw_text)
+        assert len(pred) <= 2 * len(ref), (g["raw_lines"], b.raw_text)

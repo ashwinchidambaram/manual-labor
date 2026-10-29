@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 from manuallabor.parse import geometry as g
-from manuallabor.parse.text import BULLETS, SECTION_RE
+from manuallabor.parse.text import CAPTION_RE, SECTION_RE, starts_with_bullet
 from manuallabor.parse.types import Band, Line
 
 SPAN_FRACTION = 0.55
@@ -177,8 +177,7 @@ def _typical_pitch(pitches: Sequence[float]) -> float | None:
 
 
 def is_bullet_line(text: str) -> bool:
-    t = text.lstrip()
-    return len(t) >= 2 and t[0] in BULLETS and t[1] == " "
+    return starts_with_bullet(text)
 
 
 def is_heading_line(ln: Line, med_size: float, column_width: float) -> bool:
@@ -256,6 +255,15 @@ def group_lines_into_blocks(lines: Sequence[Line], page_w: float) -> list[list[L
             )
             size_break = hp > 0 and abs(hc - hp) / hp > 0.25
             new = spacing_break or size_break or starts_bullets or heading[k] or heading[k - 1]
+            # A caption line starts its own block and ends it, unless the next line is within
+            # 1.1x line pitch and the caption line has no terminal punctuation.
+            if CAPTION_RE.match(ln.text.strip()):
+                new = True
+            elif CAPTION_RE.match(prev.text.strip()):
+                ended = prev.text.rstrip().endswith((".", "!", "?", ":", ";"))
+                close = med_pitch is not None and pitch <= 1.1 * med_pitch
+                if ended or not close:
+                    new = True
             if not new and any(is_bullet_line(c.text) for c in cur) and not is_bullet_line(ln.text):
                 first_bullet = next(c for c in cur if is_bullet_line(c.text))
                 if ln.bbox[0] < first_bullet.bbox[0] + 2.0:

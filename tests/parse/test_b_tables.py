@@ -214,3 +214,27 @@ def test_header_rows_never_swallow_the_whole_table() -> None:
     assert header_rows_of(two, 4, external=False) == 2
     assert header_rows_of(full, 3, external=True) == 0
     assert header_rows_of([TableCell(row=0, col=0, text="a")], 1, external=False) == 0
+
+
+def test_docling_header_rows_capped_at_n_rows_minus_one() -> None:
+    from types import SimpleNamespace as NS
+
+    def cell(r0: int, r1: int, c0: int, c1: int, text: str, hdr: bool = False) -> NS:
+        return NS(
+            start_row_offset_idx=r0,
+            end_row_offset_idx=r1,
+            start_col_offset_idx=c0,
+            end_col_offset_idx=c1,
+            text=text,
+            column_header=hdr,
+        )
+
+    data = NS(
+        num_rows=3,
+        num_cols=2,
+        table_cells=[cell(0, 3, 0, 1, "A", True), cell(0, 1, 1, 2, "B", True)]
+        + [cell(r, r + 1, 1, 2, f"v{r}") for r in (1, 2)],
+    )
+    tc = from_docling(NS(data=data))
+    assert tc.header_rows == 2
+    assert not any(c.is_header for c in tc.cells if c.row == 2 and c.text.startswith("v"))

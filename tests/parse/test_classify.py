@@ -48,3 +48,15 @@ def test_unnumbered_mild_size_bump_is_not_a_heading() -> None:
         _item(2, "Torque the bolts to the listed value before restarting.", 10, False),
     ]
     assert classify_blocks(items, 10.0)[0].type == BlockType.paragraph
+
+
+def test_cover_page_with_one_small_body_line_keeps_subtitle_a_paragraph() -> None:
+    items = [
+        _item(1, "Acme X200 Service Manual", 28, True, BlockType.heading),
+        _item(1, "Model X200 · Revision 4", 14, False, BlockType.heading),
+        _item(1, "Copyright 2024", 10, False),
+        _item(2, "Use only M8 fasteners when refitting the plate and cover.", 10, False),
+    ]
+    got = classify_blocks(items, 10.0)
+    assert got[0].type == BlockType.heading
+    assert got[1].type == BlockType.paragraph

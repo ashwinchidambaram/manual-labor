@@ -170,6 +170,8 @@ def from_docling(item: Any) -> TableCandidate:
         )
         if is_header and r == 0:
             header_rows = max(header_rows, r + rs)
+    # Same cap as the PyMuPDF path (header_rows_of): never every row.
+    header_rows = max(0, min(header_rows, n_rows - 1))
 
     covered = [[False] * n_cols for _ in range(n_rows)]
     for (r, c), cell in sorted(by_origin.items()):
@@ -180,7 +182,10 @@ def from_docling(item: Any) -> TableCandidate:
         for c in range(n_cols):
             if not covered[r][c]:
                 by_origin[(r, c)] = TableCell(row=r, col=c, text="", is_header=r < header_rows)
-    cells = [by_origin[k] for k in sorted(by_origin)]
+    cells = [
+        c.model_copy(update={"is_header": c.row < header_rows})
+        for c in (by_origin[k] for k in sorted(by_origin))
+    ]
     return TableCandidate(n_rows=n_rows, n_cols=n_cols, cells=cells, header_rows=header_rows)
 
 

@@ -6,7 +6,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 
 from manuallabor.contracts.enums import BlockType
-from manuallabor.parse.text import BULLETS, CAPTION_RE, SECTION_RE
+from manuallabor.parse.text import CAPTION_RE, SECTION_RE, starts_with_bullet
 from manuallabor.parse.types import Line
 
 CAPTION_REGION_GAP_PT = 48.0
@@ -31,8 +31,7 @@ def body_size_of(lines: Iterable[Line]) -> float | None:
 
 
 def _starts_with_bullet(text: str) -> bool:
-    t = text.lstrip()
-    return len(t) >= 2 and t[0] in BULLETS and t[1].isspace()
+    return starts_with_bullet(text)
 
 
 def is_bullet_list(lines: Sequence[Line]) -> bool:
@@ -111,6 +110,12 @@ def _caption_near_region(
     return False
 
 
+# A page is a "title page" (only its largest text may be an unnumbered heading) unless it carries
+# real body text: at least this many body-size lines AND words. One threshold, two measures.
+TITLE_PAGE_BODY_LINES = 3
+TITLE_PAGE_BODY_WORDS = 40
+
+
 def _heading_allowed(
     it: ClassifyInput,
     body: float | None,
@@ -139,13 +144,18 @@ def classify_blocks(items: Sequence[ClassifyInput], body: float | None) -> list[
 
     page_has_body: dict[int, bool] = {}
     page_max: dict[int, float] = {}
+    body_lines: dict[int, int] = {}
+    body_words: dict[int, int] = {}
     for it in items:
         if it.forced is not None or it.region != "text" or it.size is None or not it.text.strip():
             continue
         page_has_body.setdefault(it.page, False)
         page_max[it.page] = max(page_max.get(it.page, 0.0), it.size)
         if body is not None and abs(it.size - body) <= BODY_SIZE_TOL:
-            page_has_body[it.page] = True
+            body_lines[it.page] = body_lines.get(it.page, 0) + max(1, len(it.lines))
+            body_words[it.page] = body_words.get(it.page, 0) + len(it.text.split())
+    for pg, nl in body_lines.items():
+        page_has_body[pg] = nl >= TITLE_PAGE_BODY_LINES and body_words[pg] >= TITLE_PAGE_BODY_WORDS
 
     stage1: list[tuple[BlockType, str | None]] = []  # (type, section_number)
     for it in items:

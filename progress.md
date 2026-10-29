@@ -64,3 +64,12 @@
   - Dispatched M1.4 review (Opus, fresh).
   - M1.4 review (Opus): gate met, 0 blockers, 4 majors (Docling text order in merge, scanned headings fused into paragraphs, unvalidated LLM metadata, weak tests 8/13/14), minors (header_rows, image-only-page figure skips, title-page heading, worker RSS ~2 GB during RapidOCR). Determinism byte-identical across hash seeds; all candidates accounted once.
   - Dispatched M1.5 fix (Sonnet), failing-test-first on each item.
+  - M1.5 fix done (Sonnet, after a disk-full interruption and brief re-send): FIX 1-5 done failing-first; FIX 6 (RapidOCR downscale) measured 1.64→1.47 GB only, reverted. Gate run by orchestrator and recorded; M1 committed.
+
+### Phase 2: Figure extraction
+- **Status:** in_progress
+- **Started:** 2026-10-28
+- Actions taken:
+  - Dispatched M2.1 design (Opus) ∥ focused re-review of M1.5 merge/OCR/classify changes (Sonnet).
+  - M1 re-review (Sonnet): 5 small defects (order_by_parser min, column-aware piece sort, OCR bullet glyphs ¢/+, cover-page heading rule, Docling header_rows cap); merge order, heading recall 18/18, metadata validation confirmed. Dispatched M1.6 fix (Sonnet) in parallel with M2.1 design.
+  - M2.1 design done (Opus, 323 lines, 22 tests): isolated-page SVG export, lossless JPEG→PNG, phash-64 near-dup threshold 8 (measured 0/2–6/10/12+), figures/<slug>/ layout, canonical = best method then area. Found module-1 fused caption on scanned p6 → added to M1.6 fixer. Commit 772b9c0.

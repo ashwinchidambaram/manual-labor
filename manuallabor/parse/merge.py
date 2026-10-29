@@ -9,7 +9,7 @@ from typing import Literal
 from manuallabor.contracts.block import OcrWord, TableData, TableShape
 from manuallabor.contracts.enums import BlockType
 from manuallabor.parse import geometry as g
-from manuallabor.parse.layout import group_lines_into_blocks
+from manuallabor.parse.layout import _column_of, detect_columns, group_lines_into_blocks
 from manuallabor.parse.types import (
     Disposition,
     Line,
@@ -402,6 +402,21 @@ def merge_page(
     return merged, sorted(dispositions.values(), key=lambda d: (d.page, d.parser, d.order))
 
 
+def _page_column_fn(boxes: Sequence[Sequence[float]]) -> Callable[[Sequence[float]], int]:
+    """Column index of a box on this page, from the layout module's column bands."""
+    bands = detect_columns(boxes, 0.0)
+
+    def col(b: Sequence[float]) -> int:
+        if not bands:
+            return 0
+        yc = (b[1] + b[3]) / 2.0
+        band = min(bands, key=lambda bd: max(bd.y0 - yc, yc - bd.y1, 0.0))
+        cols = [(a, z) for a, z in band.columns]
+        return _column_of(cols, (b[0] + b[2]) / 2.0)
+
+    return col
+
+
 def _merge_text(
     free: list[_Cand],
     rank: dict[str, int],
@@ -543,7 +558,8 @@ def _merge_text(
         s_taken.add(j)
         disp(sc.key, sc.order, "absorbed")
     # Several same-parser pieces in one block: join them in the block's geometric order
-    # (top to bottom, then left to right), never in matching order.
+    # (column, then top to bottom, then left to right), never in matching order.
+    col_of = _page_column_fn([c.bbox for c in free])
     for host, extras_s in extra_s.items():
         target = blocks_for_p[host][0]
         same_host = list(extras_s)
@@ -552,10 +568,10 @@ def _merge_text(
         for key in sorted({c.key for c in same_host}):
             same = sorted(
                 (c for c in same_host if c.key == key),
-                key=lambda c: (round(c.bbox[1], 1), round(c.bbox[0], 1), c.order),
+                key=lambda c: (col_of(c.bbox), round(c.bbox[1], 1), round(c.bbox[0], 1), c.order),
             )
             target.text_by_parser[key] = "\n".join(c.rb.text for c in same)
-            target.order_by_parser[key] = same[0].order
+            target.order_by_parser[key] = min(c.order for c in same)
     s_done = s_taken
     # 6. alone
     for i, p in enumerate(p_list):
