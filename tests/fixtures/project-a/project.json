@@ -1,10 +1,16 @@
 {
+  "agent": {
+    "max_rounds": 3,
+    "page_image": false,
+    "vision_reader": true
+  },
   "article_split": "per_topic",
   "background_ocr_born_digital": true,
   "cleanup": {
     "describe": true,
     "llm": "residual"
   },
+  "doc_thresholds": {},
   "learning": {
     "contribute_global": false,
     "enabled": false,

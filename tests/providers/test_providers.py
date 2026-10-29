@@ -99,8 +99,10 @@ def test_p5_canned() -> None:
 
 
 def test_p6_no_response() -> None:
+    # Every Task now has a canned reply (module 10 registered `agent`), so build
+    # a mock with an explicitly empty reply table to exercise the missing-reply path.
     with pytest.raises(ProviderError, match="agent"):
-        MockProvider(sink=ListSink()).chat(Task.agent, user("q"))
+        MockProvider(sink=ListSink(), responses={}).chat(Task.agent, user("q"))
 
 
 SCHEMA = {
