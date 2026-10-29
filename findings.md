@@ -77,3 +77,9 @@ Real public-domain scanned US Army/Air Force technical manual from archive.org (
 | Critical set: faithfulness, figure_method always; parser_agreement + textlayer_vs_ocr when numeric or < 0.8; ocr_min when numeric | SPEC §5.3 "single critical failure should dominate". |
 | `FaithfulnessResult.numeric_variant` → `numeric_variants: list[NumericVariant]` | A block can have two OCR conflicts. Contract change made in M3 implementation (nothing downstream uses it yet). |
 | Module 9: the threshold slider is a **view filter** over the queue; it never re-approves blocks | SPEC "drag to 0 to see everything" conflicts with "≥ threshold = auto-approved"; filtering preserves the audit trail. |
+
+## Real-fixture priorities (user, 2026-10-29)
+Optimize for: (1) modern born-digital figure-heavy two-column (FAA AMT handbook chapter), (2) table-heavy scanned parts list (Army -20P/-24P TM), (4) modern born-digital with complex tables (NIST/DOE/USGS). (3) poor 1940s–50s scan is a rare use case: acquire only if cheap, minimal GT, never a gate. Synthetic fixtures remain the deterministic gate set; real ones are live-only tests + calibration inputs.
+
+## Remote (2026-10-29)
+Private GitHub repo https://github.com/ashwinchidambaram/manual-labor (user chose private; name follows their short-lowercase convention and the spec's working name). Push `main` after every gate commit. CI (.github/workflows/ci.yml) now runs on push.
