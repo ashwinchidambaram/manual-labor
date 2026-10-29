@@ -86,3 +86,14 @@ Private GitHub repo https://github.com/ashwinchidambaram/manual-labor (user chos
 
 ## Overnight authorization (user, 2026-10-29)
 User went to bed; authorized: handle CI failures as needed; use Opus reviewers wherever the orchestrator sees fit (not only on the faithfulness path). Continue through gates autonomously; push after each gate.
+
+## Cross-cutting requirement: self-improvement from HIL feedback (user, 2026-10-29; "nice to have, not required")
+Principle: every human action is a labelled example. Learned behaviour may change proposals, ranking, and confidence; it may never bypass or weaken the deterministic faithfulness check (CLAUDE.md invariant). All learning is per-project by default with an opt-in global store; nothing leaves the machine.
+Slots, cheapest first:
+- **M7 (state store)**: capture is the prerequisite. Store every decision as a full example: block id, raw_text, raw_text_by_parser, clean_text before/after the human edit, signals snapshot, score, threshold, action, flag category + note, figure re-attach choices, regrouping moves, agent-pass accept/edit/reject with the proposal. One table, append-only, exportable as JSONL. (SPEC §5.4 already requires part of this.)
+- **M5 (cleanup)**: a `LearnedRules` hook read at cleanup time: (a) recurring human edits that are lossless by the §5.2 classes become deterministic rules for that project/doc family (e.g. a header remnant, a bullet glyph map, a de-hyphenation exception list); (b) approved (raw → clean) pairs become few-shot examples for the cleanup LLM prompt, nearest-neighbour by block type/signals. Both still go through faithfulness.
+- **M3/M10 (scoring + calibration)**: beyond the threshold, fit per-signal reliability from decisions (which signals predict "edited"), suggest weight changes with evidence, never apply silently; learn OCR confusion pairs from human corrections (`3S`→`35`) into the `NumericVariant`/confusable table per document family; learn numeric-spec lexicon additions from flagged "wrong text" notes.
+- **M4 (grouping)**: human regrouping moves become few-shot examples for topic naming/assignment and a per-project "do not merge" list.
+- **M10 (agent pass)**: prior accepted/rejected proposals for similar flags are shown to the model as examples; rejected proposals' rationale is excluded from re-use.
+- **UI (M8/M9)**: a "why did this change" chip when a learned rule or example influenced output, so the user can disable it.
+Design docs for M5, M7, M10 must include a "Learning hooks" section; M7's schema is the only part that is mandatory now (capture everything; learning can be added later without migration).

@@ -79,6 +79,9 @@ Detailed tasks, model assignments, and gates: docs/plans/2026-10-28-manual-labor
 - [ ] Gate: zip validates; every FIG resolves; README; SPEC §11 checklist in docs/ACCEPTANCE.md incl. offline `--live` run
 - **Status:** pending
 
+## Cross-cutting (user, 2026-10-29)
+- Self-improvement from HIL feedback: capture everything in M7's decision store (mandatory); learning hooks in M5 cleanup, M3/M10 calibration, M4 grouping, M10 agent pass (nice-to-have, never bypasses faithfulness). See findings.md.
+
 ## Key Questions
 1. Synthetic fixtures OK for gates? (assumed yes)
 2. Strict module order despite M6 independence? (assumed yes, MockProvider from M0 unblocks M4/M5)
