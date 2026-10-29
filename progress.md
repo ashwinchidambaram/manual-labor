@@ -113,3 +113,5 @@
 - Actions taken:
   - Dispatched M5.1 design (Opus).
   - Detached 3 stale Docker installer mounts; disk 11 GB free. M4 recorded (059c2c9). M5.1 design (Opus) running.
+  - M5.1 design done (Opus, 343 lines, 40 tests; measured dehyphenate+join = GT 192/192). Dispatched M5.2 implement (Opus).
+  - 05:2x: 4th disk-full, caused by tests/cleanup copying whole projects ~15×/run. pytest basetemp moved to .pytest_tmp (wiped per run). Ollama now lists only nomic-embed-text (gemma4/llama3.2 gone) — live LLM tests need a model pulled later. Dispatched M5.4a test-footprint + failures fix (Sonnet).
