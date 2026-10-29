@@ -313,3 +313,40 @@ dist/assets/index-jtyAfxb4.js   393.06 kB │ gzip: 124.17 kB
 ✓ built in 896ms
 $ gate: VE1 + UX-T6 — 20 queued blocks processed keyboard-only (A/E/F/J/K incl. a 409-then-confirm edit and digit-keyed flags), server-side decision counts asserted; VE2 + UX-T5 — diff view matches the 12-row DiffOp rendering table; VE3 + UX-T10 + VE12 — figure re-attach via keyboard picker persists across reload with rule human, detach, rail refresh after job; slider = view filter; numeric approve sets numbers_verified; reload resumes at the cursor; late acks never steal focus from the editor/dialog
 ```
+
+## M11 — Assemble + export + acceptance — PASSED 2026-10-29
+
+Design: docs/design/11-export.md. Review: fresh Opus agent (git worktree) — gate held back on 3 majors (override cutoff read from a loose state file instead of the action log; a selected block placed in no topic was labelled `not_selected`; API/job exports wrote no `export_run`) plus validator/acceptance gaps; all fixed failing-test-first (11 tests) in M11.4. Confirmed by the reviewer: byte-derivation of every article from its blocks (0 diffs), Z1–Z8 each caught by a seeded corruption, export determinism, offline guard blocks TCP (UDP/raw added in the fix). `render.alt_text` escaping set recorded in design 11 §3.3.
+
+Commands: `uv run labor assemble <project>`, `uv run labor export <project>` (exit 2 when the gate refuses), `uv run labor validate-export <zip>`, `bash scripts/acceptance.sh [--live]` (env `ACCEPT_ONLY/SKIP/KEEP/PYTEST_FLAGS`; renders docs/ACCEPTANCE.md via `scripts/render_acceptance.py`; INCOMPLETE exits 1).
+
+```
+$ MANUALLABOR_REQUIRE_DOCLING=1 bash scripts/acceptance.sh --live     # full run, 5735 s wall
+== 1-1: uv run labor check --keep '…/labor-acceptance.sUizMT/project-all'   rc=0 (629 s)
+K10 export gate         PASS      4518  refused with 329 queued block(s), 0 open flag(s); first b-clean-p002-04
+K11 review + export     PASS    118078  329 blocks approved by a scripted reviewer; exported 52 articles
+K12 zip validates       PASS       291  52 articles, 25 figures, 611728 bytes
+K13 export accounting   PASS       265  621 blocks: 537 in articles, 84 unassigned
+K14 round trip          PASS      1190  doc | blocks | auto_approved | faith_violations(auto) | articles | figures: clean | 150 | 65 | 0 | 15 | 3; figures | 95 | 57 | 0 | 5 | 14; manual | 13 | 7 | 0 | 3 | 2; scanned | 179 | 86 | 0 | 11 | 3; tables | 87 | 33 | 0 | 10 | 0; twocol | 97 | 44 | 0 | 8 | 3
+K15 export determinism  PASS      5565  sha256 12a04817641542c5 identical on a second export
+K16 figure references   PASS       102  48 figure references resolve to a file and a sidecar
+labor check: all checks passed
+== 7-1: uv run pytest tests/export -q                                  rc=0 (174 s)   124 passed, 1 skipped
+== 7-2: uv run labor validate-export '…/project-all/export/project-a-kb.zip'
+OK: 52 articles, 25 figures                                            # Z1–Z8 incl. Z8 README present and consistent
+== 7-3: shasum -a 256 …/project-a-kb.zip
+12a04817641542c5e08cd13bbdd259dd1f528fd4b0ed0e4f56d6dc4833bf3086
+== 8-2: MANUALLABOR_OFFLINE=1 … uv run labor check --live --keep …      rc=0 (1314 s)
+0 network violations; ollama=464 other=0; negative control: 1.1.1.1:443 blocked and logged
+$ MANUALLABOR_REQUIRE_DOCLING=1 ACCEPT_ONLY=0 ACCEPT_KEEP=1 bash scripts/acceptance.sh --live   # AC0 re-run alone
+== 0-1: env -u ACCEPT_ONLY -u ACCEPT_SKIP -u ACCEPT_KEEP -u ACCEPT_DRY_RUN uv run pytest -q   rc=0 (811 s)   1631 passed, 73 skipped
+== 0-2: uv run ruff check manuallabor tests   rc=0
+== 0-3: uv run mypy manuallabor               rc=0 (4 s)
+== 0-4: uv run labor schemas export --check   rc=0
+== 0-5: uv run labor openapi export --check   rc=0
+$ docs/ACCEPTANCE.md
+status: COMPLETE   generated: 2026-10-29T22:59:43Z   mode: live (local models)   host: Darwin 25.5.0 arm64, 16.0 GiB RAM   uv.lock sha256 918bc414…
+| 0 | Machine checks | VERIFIED | 1 | VERIFIED | 2 | VERIFIED | 3 | VERIFIED | 4 | VERIFIED | 5 | VERIFIED | 6 | VERIFIED | 7 | VERIFIED | 8 | VERIFIED |
+```
+
+Notes: the first full run's AC0 failed only on `test_three_thousand_blocks_under_five_seconds` (5.83 s under load average 7; 1.37 s isolated, budget 5 s). The AC0 re-run then exposed that `tests/export/test_acceptance_script.py` inherited the outer `ACCEPT_ONLY`; fixed by scrubbing `ACCEPT_*` in the test helper and in the script's pytest step. Known limits carried from M10: the 1B agent model cannot follow the proposal schema (`labor probe --apply medium`); agent table fixes never fully pass `table_consistency` (fail-safe).

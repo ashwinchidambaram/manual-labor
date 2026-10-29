@@ -87,7 +87,7 @@ step() {
 }
 
 # -- AC0: the whole machine is green -------------------------------------------------------------
-step 0 1 "uv run pytest -q $FLAGS"
+step 0 1 "env -u ACCEPT_ONLY -u ACCEPT_SKIP -u ACCEPT_KEEP -u ACCEPT_DRY_RUN uv run pytest -q $FLAGS"
 step 0 2 "uv run ruff check manuallabor tests"
 step 0 3 "uv run mypy manuallabor"
 step 0 4 "uv run labor schemas export --check"

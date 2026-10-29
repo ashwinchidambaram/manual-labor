@@ -178,3 +178,8 @@ User freed disk and asked to run things in parallel wherever possible to finish 
 ## Concurrency rules v2 (2026-10-29 afternoon, disk 39 GB free)
 - `--basetemp=.pytest_tmp` (addopts) is wiped at the start of every pytest session: a concurrent run deletes another's temp. Every agent-run pytest MUST pass `--basetemp=.pytest_tmp_<agent>` and delete it afterwards. The orchestrator's gate runs use the default.
 - At most two Docling-bearing pytest runs + one Playwright run at a time (RAM 16 GB). Check `pgrep -fl "uv run pytest" | wc -l` before starting.
+
+## 2026-10-29 18:10 — acceptance AC0 timing flake
+- `test_three_thousand_blocks_under_five_seconds` (design 04 budget: 3,000 blocks < 5 s, LLM excluded) measured 5.83 s inside the full `uv run pytest -q` acceptance step (two xdist workers + Docling fixtures, load average 7). All other tests passed; AC1 verified live.
+- Not a faithfulness or correctness test; the 5 s figure is our own design budget, not a SPEC number. Fix if it recurs: time the budget with `time.process_time()` (load-insensitive) rather than wall clock; do not raise the budget.
+- Follow-up found by the AC0 rerun: `tests/export/test_acceptance_script.py` inherited `ACCEPT_ONLY` from the enclosing acceptance run (the suite runs inside the script). Fixed on both sides (test scrubs `ACCEPT_*`; script unsets them for its pytest step). Lesson: any test that re-invokes a project script must build its env from a scrubbed base.

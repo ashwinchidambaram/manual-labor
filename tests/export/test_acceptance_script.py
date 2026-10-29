@@ -26,8 +26,11 @@ def dry_run(tmp: Path, *args: str, **env: str) -> list[str]:
         stub = bin_dir / tool
         stub.write_text('#!/bin/sh\necho "stub $0 $*"\nexit 0\n')
         stub.chmod(0o755)
+    # The outer environment may carry ACCEPT_* from a real `scripts/acceptance.sh` run that is
+    # executing this suite (e.g. ACCEPT_ONLY=0): drop every one so each dry run sees only `env`.
+    inherited = {k: v for k, v in os.environ.items() if not k.startswith("ACCEPT_")}
     e = {
-        **os.environ,
+        **inherited,
         "PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}",
         "ACCEPT_DRY_RUN": "1",
         "ACCEPT_OUT": str(tmp / "out"),

@@ -4,7 +4,7 @@
 Deliver Manual Labor v1 per SPEC.md: every CLAUDE.md module gate (0–11) passed with its proving command pasted in docs/PROGRESS.md, and SPEC §11 acceptance recorded in docs/ACCEPTANCE.md.
 
 ## Current Phase
-Phases 9/10/11 in parallel fix/review. Autonomous 2026-10-29.
+All 12 gates (M0–M11) passed and recorded in docs/PROGRESS.md; docs/ACCEPTANCE.md COMPLETE (AC0–AC8 VERIFIED, live). Build finished 2026-10-29.
 
 ## Phases
 Detailed tasks, model assignments, and gates: docs/plans/2026-10-28-manual-labor-build.md. Decisions and environment: findings.md.
@@ -75,9 +75,9 @@ Detailed tasks, model assignments, and gates: docs/plans/2026-10-28-manual-labor
 - **Status:** pending
 
 ### Phase 11: Assemble + export + acceptance
-- [x] Design (Sonnet) · [x] Implement (Sonnet) · [ ] Review (Opus, in flight) · Fix · full-suite failures (a14/f2/p6) · acceptance run
-- [ ] Gate: zip validates; every FIG resolves; README; SPEC §11 checklist in docs/ACCEPTANCE.md incl. offline `--live` run
-- **Status:** in_progress
+- [x] Design (Sonnet) · [x] Implement (Sonnet) · [x] Review (Opus) · [x] Fix (M11.4, Opus) · [x] full-suite drift fixed (a14/f2/p6) · [x] acceptance run (live)
+- [x] Gate: zip validates; every FIG resolves; README; SPEC §11 checklist in docs/ACCEPTANCE.md incl. offline `--live` run
+- **Status:** complete
 
 ## Schedule change (user asked to speed up, 2026-10-29)
 - Two tracks after M7: frontend (M8 → M9) ∥ backend (M10 → M11). Designs start while the previous module is in review. One Docling-bearing test run and one Playwright run at a time. M8.1 design started during M7 implementation.
