@@ -1,0 +1,2421 @@
+{
+  "dispositions": [
+    {
+      "block_id": "b-clean-p001-01",
+      "detail": null,
+      "order": 0,
+      "outcome": "matched",
+      "page": 1,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p001-02",
+      "detail": null,
+      "order": 1,
+      "outcome": "matched",
+      "page": 1,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p001-01",
+      "detail": null,
+      "order": 0,
+      "outcome": "primary",
+      "page": 1,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p001-02",
+      "detail": null,
+      "order": 1,
+      "outcome": "primary",
+      "page": 1,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p002-01",
+      "detail": null,
+      "order": 0,
+      "outcome": "matched",
+      "page": 2,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p002-02",
+      "detail": null,
+      "order": 1,
+      "outcome": "matched",
+      "page": 2,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p002-03",
+      "detail": null,
+      "order": 2,
+      "outcome": "matched",
+      "page": 2,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p002-04",
+      "detail": null,
+      "order": 3,
+      "outcome": "matched",
+      "page": 2,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p002-05",
+      "detail": null,
+      "order": 4,
+      "outcome": "matched",
+      "page": 2,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p002-06",
+      "detail": null,
+      "order": 5,
+      "outcome": "matched",
+      "page": 2,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p002-07",
+      "detail": null,
+      "order": 6,
+      "outcome": "matched",
+      "page": 2,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p002-08",
+      "detail": null,
+      "order": 7,
+      "outcome": "matched",
+      "page": 2,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p002-08",
+      "detail": null,
+      "order": 8,
+      "outcome": "absorbed",
+      "page": 2,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p002-09",
+      "detail": null,
+      "order": 9,
+      "outcome": "matched",
+      "page": 2,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p002-10",
+      "detail": null,
+      "order": 10,
+      "outcome": "matched",
+      "page": 2,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p002-11",
+      "detail": null,
+      "order": 11,
+      "outcome": "matched",
+      "page": 2,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p002-12",
+      "detail": null,
+      "order": 12,
+      "outcome": "matched",
+      "page": 2,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p002-13",
+      "detail": null,
+      "order": 13,
+      "outcome": "matched",
+      "page": 2,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p002-14",
+      "detail": null,
+      "order": 14,
+      "outcome": "matched",
+      "page": 2,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p002-15",
+      "detail": null,
+      "order": 15,
+      "outcome": "matched",
+      "page": 2,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p002-01",
+      "detail": null,
+      "order": 0,
+      "outcome": "primary",
+      "page": 2,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p002-02",
+      "detail": null,
+      "order": 1,
+      "outcome": "primary",
+      "page": 2,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p002-03",
+      "detail": null,
+      "order": 2,
+      "outcome": "primary",
+      "page": 2,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p002-04",
+      "detail": null,
+      "order": 3,
+      "outcome": "primary",
+      "page": 2,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p002-05",
+      "detail": null,
+      "order": 4,
+      "outcome": "primary",
+      "page": 2,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p002-06",
+      "detail": null,
+      "order": 5,
+      "outcome": "primary",
+      "page": 2,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p002-07",
+      "detail": null,
+      "order": 6,
+      "outcome": "primary",
+      "page": 2,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p002-08",
+      "detail": null,
+      "order": 7,
+      "outcome": "primary",
+      "page": 2,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p002-09",
+      "detail": null,
+      "order": 8,
+      "outcome": "primary",
+      "page": 2,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p002-10",
+      "detail": null,
+      "order": 9,
+      "outcome": "primary",
+      "page": 2,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p002-11",
+      "detail": null,
+      "order": 10,
+      "outcome": "primary",
+      "page": 2,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p002-12",
+      "detail": null,
+      "order": 11,
+      "outcome": "primary",
+      "page": 2,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p002-13",
+      "detail": null,
+      "order": 12,
+      "outcome": "primary",
+      "page": 2,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p002-14",
+      "detail": null,
+      "order": 13,
+      "outcome": "primary",
+      "page": 2,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p002-15",
+      "detail": null,
+      "order": 14,
+      "outcome": "primary",
+      "page": 2,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p003-01",
+      "detail": null,
+      "order": 0,
+      "outcome": "matched",
+      "page": 3,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p003-02",
+      "detail": null,
+      "order": 1,
+      "outcome": "matched",
+      "page": 3,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p003-03",
+      "detail": null,
+      "order": 2,
+      "outcome": "matched",
+      "page": 3,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p003-04",
+      "detail": null,
+      "order": 3,
+      "outcome": "matched",
+      "page": 3,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p003-05",
+      "detail": null,
+      "order": 4,
+      "outcome": "matched",
+      "page": 3,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p003-06",
+      "detail": null,
+      "order": 5,
+      "outcome": "matched",
+      "page": 3,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p003-07",
+      "detail": null,
+      "order": 6,
+      "outcome": "matched",
+      "page": 3,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p003-08",
+      "detail": null,
+      "order": 7,
+      "outcome": "matched",
+      "page": 3,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p003-09",
+      "detail": null,
+      "order": 8,
+      "outcome": "matched",
+      "page": 3,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p003-10",
+      "detail": null,
+      "order": 9,
+      "outcome": "matched",
+      "page": 3,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p003-11",
+      "detail": null,
+      "order": 10,
+      "outcome": "matched",
+      "page": 3,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p003-12",
+      "detail": null,
+      "order": 11,
+      "outcome": "matched",
+      "page": 3,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p003-13",
+      "detail": null,
+      "order": 12,
+      "outcome": "matched",
+      "page": 3,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p003-14",
+      "detail": null,
+      "order": 13,
+      "outcome": "matched",
+      "page": 3,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p003-15",
+      "detail": null,
+      "order": 14,
+      "outcome": "matched",
+      "page": 3,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p003-01",
+      "detail": null,
+      "order": 0,
+      "outcome": "primary",
+      "page": 3,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p003-02",
+      "detail": null,
+      "order": 1,
+      "outcome": "primary",
+      "page": 3,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p003-03",
+      "detail": null,
+      "order": 2,
+      "outcome": "primary",
+      "page": 3,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p003-04",
+      "detail": null,
+      "order": 3,
+      "outcome": "primary",
+      "page": 3,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p003-05",
+      "detail": null,
+      "order": 4,
+      "outcome": "primary",
+      "page": 3,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p003-06",
+      "detail": null,
+      "order": 5,
+      "outcome": "primary",
+      "page": 3,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p003-07",
+      "detail": null,
+      "order": 6,
+      "outcome": "primary",
+      "page": 3,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p003-08",
+      "detail": null,
+      "order": 7,
+      "outcome": "primary",
+      "page": 3,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p003-09",
+      "detail": null,
+      "order": 8,
+      "outcome": "primary",
+      "page": 3,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p003-10",
+      "detail": null,
+      "order": 9,
+      "outcome": "primary",
+      "page": 3,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p003-11",
+      "detail": null,
+      "order": 10,
+      "outcome": "primary",
+      "page": 3,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p003-12",
+      "detail": null,
+      "order": 11,
+      "outcome": "primary",
+      "page": 3,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p003-13",
+      "detail": null,
+      "order": 12,
+      "outcome": "primary",
+      "page": 3,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p003-14",
+      "detail": null,
+      "order": 13,
+      "outcome": "primary",
+      "page": 3,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p003-15",
+      "detail": null,
+      "order": 14,
+      "outcome": "primary",
+      "page": 3,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p004-01",
+      "detail": null,
+      "order": 0,
+      "outcome": "matched",
+      "page": 4,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p004-02",
+      "detail": null,
+      "order": 1,
+      "outcome": "matched",
+      "page": 4,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p004-03",
+      "detail": null,
+      "order": 2,
+      "outcome": "matched",
+      "page": 4,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p004-04",
+      "detail": null,
+      "order": 3,
+      "outcome": "matched",
+      "page": 4,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p004-05",
+      "detail": null,
+      "order": 4,
+      "outcome": "matched",
+      "page": 4,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p004-06",
+      "detail": null,
+      "order": 5,
+      "outcome": "matched",
+      "page": 4,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p004-07",
+      "detail": null,
+      "order": 6,
+      "outcome": "matched",
+      "page": 4,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p004-08",
+      "detail": null,
+      "order": 7,
+      "outcome": "matched",
+      "page": 4,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p004-09",
+      "detail": null,
+      "order": 8,
+      "outcome": "matched",
+      "page": 4,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p004-10",
+      "detail": null,
+      "order": 9,
+      "outcome": "matched",
+      "page": 4,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p004-11",
+      "detail": null,
+      "order": 10,
+      "outcome": "matched",
+      "page": 4,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p004-12",
+      "detail": null,
+      "order": 11,
+      "outcome": "matched",
+      "page": 4,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p004-13",
+      "detail": null,
+      "order": 12,
+      "outcome": "matched",
+      "page": 4,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p004-14",
+      "detail": null,
+      "order": 13,
+      "outcome": "matched",
+      "page": 4,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p004-01",
+      "detail": null,
+      "order": 0,
+      "outcome": "primary",
+      "page": 4,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p004-02",
+      "detail": null,
+      "order": 1,
+      "outcome": "primary",
+      "page": 4,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p004-03",
+      "detail": null,
+      "order": 2,
+      "outcome": "primary",
+      "page": 4,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p004-04",
+      "detail": null,
+      "order": 3,
+      "outcome": "primary",
+      "page": 4,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p004-05",
+      "detail": null,
+      "order": 4,
+      "outcome": "primary",
+      "page": 4,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p004-06",
+      "detail": null,
+      "order": 5,
+      "outcome": "primary",
+      "page": 4,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p004-07",
+      "detail": null,
+      "order": 6,
+      "outcome": "primary",
+      "page": 4,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p004-08",
+      "detail": null,
+      "order": 7,
+      "outcome": "primary",
+      "page": 4,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p004-09",
+      "detail": null,
+      "order": 8,
+      "outcome": "primary",
+      "page": 4,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p004-10",
+      "detail": null,
+      "order": 9,
+      "outcome": "primary",
+      "page": 4,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p004-11",
+      "detail": null,
+      "order": 10,
+      "outcome": "primary",
+      "page": 4,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p004-12",
+      "detail": null,
+      "order": 11,
+      "outcome": "primary",
+      "page": 4,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p004-13",
+      "detail": null,
+      "order": 12,
+      "outcome": "primary",
+      "page": 4,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p004-14",
+      "detail": null,
+      "order": 13,
+      "outcome": "primary",
+      "page": 4,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p005-01",
+      "detail": null,
+      "order": 0,
+      "outcome": "matched",
+      "page": 5,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p005-02",
+      "detail": null,
+      "order": 1,
+      "outcome": "matched",
+      "page": 5,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p005-03",
+      "detail": null,
+      "order": 2,
+      "outcome": "matched",
+      "page": 5,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p005-04",
+      "detail": null,
+      "order": 3,
+      "outcome": "matched",
+      "page": 5,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p005-05",
+      "detail": null,
+      "order": 4,
+      "outcome": "matched",
+      "page": 5,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p005-06",
+      "detail": null,
+      "order": 5,
+      "outcome": "matched",
+      "page": 5,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p005-07",
+      "detail": null,
+      "order": 6,
+      "outcome": "matched",
+      "page": 5,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p005-08",
+      "detail": null,
+      "order": 7,
+      "outcome": "matched",
+      "page": 5,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p005-09",
+      "detail": null,
+      "order": 8,
+      "outcome": "matched",
+      "page": 5,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p005-01",
+      "detail": null,
+      "order": 0,
+      "outcome": "primary",
+      "page": 5,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p005-02",
+      "detail": null,
+      "order": 1,
+      "outcome": "primary",
+      "page": 5,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p005-03",
+      "detail": null,
+      "order": 2,
+      "outcome": "primary",
+      "page": 5,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p005-04",
+      "detail": null,
+      "order": 3,
+      "outcome": "primary",
+      "page": 5,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p005-05",
+      "detail": null,
+      "order": 4,
+      "outcome": "primary",
+      "page": 5,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p005-06",
+      "detail": null,
+      "order": 5,
+      "outcome": "primary",
+      "page": 5,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p005-07",
+      "detail": null,
+      "order": 6,
+      "outcome": "primary",
+      "page": 5,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p005-08",
+      "detail": null,
+      "order": 7,
+      "outcome": "primary",
+      "page": 5,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p005-09",
+      "detail": null,
+      "order": 8,
+      "outcome": "primary",
+      "page": 5,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p006-01",
+      "detail": null,
+      "order": 0,
+      "outcome": "matched",
+      "page": 6,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p006-02",
+      "detail": null,
+      "order": 1,
+      "outcome": "matched",
+      "page": 6,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p006-03",
+      "detail": null,
+      "order": 2,
+      "outcome": "matched",
+      "page": 6,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p006-04",
+      "detail": null,
+      "order": 3,
+      "outcome": "matched",
+      "page": 6,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p006-05",
+      "detail": null,
+      "order": 4,
+      "outcome": "matched",
+      "page": 6,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p006-06",
+      "detail": null,
+      "order": 5,
+      "outcome": "matched",
+      "page": 6,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p006-07",
+      "detail": null,
+      "order": 6,
+      "outcome": "matched",
+      "page": 6,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p006-08",
+      "detail": null,
+      "order": 7,
+      "outcome": "matched",
+      "page": 6,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p006-09",
+      "detail": null,
+      "order": 8,
+      "outcome": "matched",
+      "page": 6,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p006-10",
+      "detail": null,
+      "order": 9,
+      "outcome": "matched",
+      "page": 6,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p006-01",
+      "detail": null,
+      "order": 0,
+      "outcome": "primary",
+      "page": 6,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p006-02",
+      "detail": null,
+      "order": 1,
+      "outcome": "primary",
+      "page": 6,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p006-03",
+      "detail": null,
+      "order": 2,
+      "outcome": "primary",
+      "page": 6,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p006-04",
+      "detail": null,
+      "order": 3,
+      "outcome": "primary",
+      "page": 6,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p006-05",
+      "detail": null,
+      "order": 4,
+      "outcome": "primary",
+      "page": 6,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p006-06",
+      "detail": null,
+      "order": 5,
+      "outcome": "primary",
+      "page": 6,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p006-07",
+      "detail": null,
+      "order": 6,
+      "outcome": "primary",
+      "page": 6,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p006-08",
+      "detail": null,
+      "order": 7,
+      "outcome": "primary",
+      "page": 6,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p006-09",
+      "detail": null,
+      "order": 8,
+      "outcome": "primary",
+      "page": 6,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p006-10",
+      "detail": null,
+      "order": 9,
+      "outcome": "primary",
+      "page": 6,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p007-01",
+      "detail": null,
+      "order": 0,
+      "outcome": "matched",
+      "page": 7,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p007-02",
+      "detail": null,
+      "order": 1,
+      "outcome": "matched",
+      "page": 7,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p007-03",
+      "detail": null,
+      "order": 2,
+      "outcome": "matched",
+      "page": 7,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p007-04",
+      "detail": null,
+      "order": 3,
+      "outcome": "matched",
+      "page": 7,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p007-05",
+      "detail": null,
+      "order": 4,
+      "outcome": "matched",
+      "page": 7,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p007-06",
+      "detail": null,
+      "order": 5,
+      "outcome": "matched",
+      "page": 7,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p007-07",
+      "detail": null,
+      "order": 6,
+      "outcome": "matched",
+      "page": 7,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p007-08",
+      "detail": null,
+      "order": 7,
+      "outcome": "matched",
+      "page": 7,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p007-09",
+      "detail": null,
+      "order": 8,
+      "outcome": "matched",
+      "page": 7,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p007-10",
+      "detail": null,
+      "order": 9,
+      "outcome": "matched",
+      "page": 7,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p007-11",
+      "detail": null,
+      "order": 10,
+      "outcome": "matched",
+      "page": 7,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p007-12",
+      "detail": null,
+      "order": 11,
+      "outcome": "matched",
+      "page": 7,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p007-13",
+      "detail": null,
+      "order": 12,
+      "outcome": "matched",
+      "page": 7,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p007-14",
+      "detail": null,
+      "order": 13,
+      "outcome": "matched",
+      "page": 7,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p007-01",
+      "detail": null,
+      "order": 0,
+      "outcome": "primary",
+      "page": 7,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p007-02",
+      "detail": null,
+      "order": 1,
+      "outcome": "primary",
+      "page": 7,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p007-03",
+      "detail": null,
+      "order": 2,
+      "outcome": "primary",
+      "page": 7,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p007-04",
+      "detail": null,
+      "order": 3,
+      "outcome": "primary",
+      "page": 7,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p007-05",
+      "detail": null,
+      "order": 4,
+      "outcome": "primary",
+      "page": 7,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p007-06",
+      "detail": null,
+      "order": 5,
+      "outcome": "primary",
+      "page": 7,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p007-07",
+      "detail": null,
+      "order": 6,
+      "outcome": "primary",
+      "page": 7,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p007-08",
+      "detail": null,
+      "order": 7,
+      "outcome": "primary",
+      "page": 7,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p007-09",
+      "detail": null,
+      "order": 8,
+      "outcome": "primary",
+      "page": 7,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p007-10",
+      "detail": null,
+      "order": 9,
+      "outcome": "primary",
+      "page": 7,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p007-11",
+      "detail": null,
+      "order": 10,
+      "outcome": "primary",
+      "page": 7,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p007-12",
+      "detail": null,
+      "order": 11,
+      "outcome": "primary",
+      "page": 7,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p007-13",
+      "detail": null,
+      "order": 12,
+      "outcome": "primary",
+      "page": 7,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p007-14",
+      "detail": null,
+      "order": 13,
+      "outcome": "primary",
+      "page": 7,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p008-01",
+      "detail": null,
+      "order": 0,
+      "outcome": "matched",
+      "page": 8,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p008-02",
+      "detail": null,
+      "order": 1,
+      "outcome": "matched",
+      "page": 8,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p008-03",
+      "detail": null,
+      "order": 2,
+      "outcome": "matched",
+      "page": 8,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p008-04",
+      "detail": null,
+      "order": 3,
+      "outcome": "matched",
+      "page": 8,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p008-05",
+      "detail": null,
+      "order": 4,
+      "outcome": "matched",
+      "page": 8,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p008-06",
+      "detail": null,
+      "order": 5,
+      "outcome": "matched",
+      "page": 8,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p008-07",
+      "detail": null,
+      "order": 6,
+      "outcome": "matched",
+      "page": 8,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p008-08",
+      "detail": null,
+      "order": 7,
+      "outcome": "matched",
+      "page": 8,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p008-09",
+      "detail": null,
+      "order": 8,
+      "outcome": "matched",
+      "page": 8,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p008-10",
+      "detail": null,
+      "order": 9,
+      "outcome": "matched",
+      "page": 8,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p008-11",
+      "detail": null,
+      "order": 10,
+      "outcome": "matched",
+      "page": 8,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p008-12",
+      "detail": null,
+      "order": 11,
+      "outcome": "matched",
+      "page": 8,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p008-13",
+      "detail": null,
+      "order": 12,
+      "outcome": "matched",
+      "page": 8,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p008-14",
+      "detail": null,
+      "order": 13,
+      "outcome": "matched",
+      "page": 8,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p008-15",
+      "detail": null,
+      "order": 14,
+      "outcome": "matched",
+      "page": 8,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p008-16",
+      "detail": null,
+      "order": 15,
+      "outcome": "matched",
+      "page": 8,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p008-01",
+      "detail": null,
+      "order": 0,
+      "outcome": "primary",
+      "page": 8,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p008-02",
+      "detail": null,
+      "order": 1,
+      "outcome": "primary",
+      "page": 8,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p008-03",
+      "detail": null,
+      "order": 2,
+      "outcome": "primary",
+      "page": 8,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p008-04",
+      "detail": null,
+      "order": 3,
+      "outcome": "primary",
+      "page": 8,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p008-05",
+      "detail": null,
+      "order": 4,
+      "outcome": "primary",
+      "page": 8,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p008-06",
+      "detail": null,
+      "order": 5,
+      "outcome": "primary",
+      "page": 8,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p008-07",
+      "detail": null,
+      "order": 6,
+      "outcome": "primary",
+      "page": 8,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p008-08",
+      "detail": null,
+      "order": 7,
+      "outcome": "primary",
+      "page": 8,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p008-09",
+      "detail": null,
+      "order": 8,
+      "outcome": "primary",
+      "page": 8,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p008-10",
+      "detail": null,
+      "order": 9,
+      "outcome": "primary",
+      "page": 8,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p008-11",
+      "detail": null,
+      "order": 10,
+      "outcome": "primary",
+      "page": 8,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p008-12",
+      "detail": null,
+      "order": 11,
+      "outcome": "primary",
+      "page": 8,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p008-13",
+      "detail": null,
+      "order": 12,
+      "outcome": "primary",
+      "page": 8,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p008-14",
+      "detail": null,
+      "order": 13,
+      "outcome": "primary",
+      "page": 8,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p008-15",
+      "detail": null,
+      "order": 14,
+      "outcome": "primary",
+      "page": 8,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p008-16",
+      "detail": null,
+      "order": 15,
+      "outcome": "primary",
+      "page": 8,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p009-01",
+      "detail": null,
+      "order": 0,
+      "outcome": "matched",
+      "page": 9,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p009-02",
+      "detail": null,
+      "order": 1,
+      "outcome": "matched",
+      "page": 9,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p009-03",
+      "detail": null,
+      "order": 2,
+      "outcome": "matched",
+      "page": 9,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p009-04",
+      "detail": null,
+      "order": 3,
+      "outcome": "matched",
+      "page": 9,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p009-05",
+      "detail": null,
+      "order": 4,
+      "outcome": "matched",
+      "page": 9,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p009-06",
+      "detail": null,
+      "order": 5,
+      "outcome": "matched",
+      "page": 9,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p009-07",
+      "detail": null,
+      "order": 6,
+      "outcome": "matched",
+      "page": 9,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p009-08",
+      "detail": null,
+      "order": 7,
+      "outcome": "matched",
+      "page": 9,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p009-09",
+      "detail": null,
+      "order": 8,
+      "outcome": "matched",
+      "page": 9,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p009-10",
+      "detail": null,
+      "order": 9,
+      "outcome": "matched",
+      "page": 9,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p009-11",
+      "detail": null,
+      "order": 10,
+      "outcome": "matched",
+      "page": 9,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p009-11",
+      "detail": null,
+      "order": 11,
+      "outcome": "absorbed",
+      "page": 9,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p009-12",
+      "detail": null,
+      "order": 12,
+      "outcome": "matched",
+      "page": 9,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p009-13",
+      "detail": null,
+      "order": 13,
+      "outcome": "matched",
+      "page": 9,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p009-14",
+      "detail": null,
+      "order": 14,
+      "outcome": "matched",
+      "page": 9,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p009-15",
+      "detail": null,
+      "order": 15,
+      "outcome": "matched",
+      "page": 9,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p009-16",
+      "detail": null,
+      "order": 16,
+      "outcome": "matched",
+      "page": 9,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p009-17",
+      "detail": null,
+      "order": 17,
+      "outcome": "matched",
+      "page": 9,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p009-01",
+      "detail": null,
+      "order": 0,
+      "outcome": "primary",
+      "page": 9,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p009-02",
+      "detail": null,
+      "order": 1,
+      "outcome": "primary",
+      "page": 9,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p009-03",
+      "detail": null,
+      "order": 2,
+      "outcome": "primary",
+      "page": 9,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p009-04",
+      "detail": null,
+      "order": 3,
+      "outcome": "primary",
+      "page": 9,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p009-05",
+      "detail": null,
+      "order": 4,
+      "outcome": "primary",
+      "page": 9,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p009-06",
+      "detail": null,
+      "order": 5,
+      "outcome": "primary",
+      "page": 9,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p009-07",
+      "detail": null,
+      "order": 6,
+      "outcome": "primary",
+      "page": 9,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p009-08",
+      "detail": null,
+      "order": 7,
+      "outcome": "primary",
+      "page": 9,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p009-09",
+      "detail": null,
+      "order": 8,
+      "outcome": "primary",
+      "page": 9,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p009-10",
+      "detail": null,
+      "order": 9,
+      "outcome": "primary",
+      "page": 9,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p009-11",
+      "detail": null,
+      "order": 10,
+      "outcome": "primary",
+      "page": 9,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p009-12",
+      "detail": null,
+      "order": 11,
+      "outcome": "primary",
+      "page": 9,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p009-13",
+      "detail": null,
+      "order": 12,
+      "outcome": "primary",
+      "page": 9,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p009-14",
+      "detail": null,
+      "order": 13,
+      "outcome": "primary",
+      "page": 9,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p009-15",
+      "detail": null,
+      "order": 14,
+      "outcome": "primary",
+      "page": 9,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p009-16",
+      "detail": null,
+      "order": 15,
+      "outcome": "primary",
+      "page": 9,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p009-17",
+      "detail": null,
+      "order": 16,
+      "outcome": "primary",
+      "page": 9,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p010-01",
+      "detail": null,
+      "order": 0,
+      "outcome": "matched",
+      "page": 10,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p010-02",
+      "detail": null,
+      "order": 1,
+      "outcome": "matched",
+      "page": 10,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p010-03",
+      "detail": null,
+      "order": 2,
+      "outcome": "matched",
+      "page": 10,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p010-04",
+      "detail": null,
+      "order": 3,
+      "outcome": "matched",
+      "page": 10,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p010-05",
+      "detail": null,
+      "order": 4,
+      "outcome": "matched",
+      "page": 10,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p010-06",
+      "detail": null,
+      "order": 5,
+      "outcome": "matched",
+      "page": 10,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p010-07",
+      "detail": null,
+      "order": 6,
+      "outcome": "matched",
+      "page": 10,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p010-08",
+      "detail": null,
+      "order": 7,
+      "outcome": "matched",
+      "page": 10,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p010-09",
+      "detail": null,
+      "order": 8,
+      "outcome": "matched",
+      "page": 10,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p010-10",
+      "detail": null,
+      "order": 9,
+      "outcome": "matched",
+      "page": 10,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p010-11",
+      "detail": null,
+      "order": 10,
+      "outcome": "matched",
+      "page": 10,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p010-12",
+      "detail": null,
+      "order": 11,
+      "outcome": "matched",
+      "page": 10,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p010-13",
+      "detail": null,
+      "order": 12,
+      "outcome": "matched",
+      "page": 10,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p010-14",
+      "detail": null,
+      "order": 13,
+      "outcome": "matched",
+      "page": 10,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p010-01",
+      "detail": null,
+      "order": 0,
+      "outcome": "primary",
+      "page": 10,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p010-02",
+      "detail": null,
+      "order": 1,
+      "outcome": "primary",
+      "page": 10,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p010-03",
+      "detail": null,
+      "order": 2,
+      "outcome": "primary",
+      "page": 10,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p010-04",
+      "detail": null,
+      "order": 3,
+      "outcome": "primary",
+      "page": 10,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p010-05",
+      "detail": null,
+      "order": 4,
+      "outcome": "primary",
+      "page": 10,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p010-06",
+      "detail": null,
+      "order": 5,
+      "outcome": "primary",
+      "page": 10,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p010-07",
+      "detail": null,
+      "order": 6,
+      "outcome": "primary",
+      "page": 10,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p010-08",
+      "detail": null,
+      "order": 7,
+      "outcome": "primary",
+      "page": 10,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p010-09",
+      "detail": null,
+      "order": 8,
+      "outcome": "primary",
+      "page": 10,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p010-10",
+      "detail": null,
+      "order": 9,
+      "outcome": "primary",
+      "page": 10,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p010-11",
+      "detail": null,
+      "order": 10,
+      "outcome": "primary",
+      "page": 10,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p010-12",
+      "detail": null,
+      "order": 11,
+      "outcome": "primary",
+      "page": 10,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p010-13",
+      "detail": null,
+      "order": 12,
+      "outcome": "primary",
+      "page": 10,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p010-14",
+      "detail": null,
+      "order": 13,
+      "outcome": "primary",
+      "page": 10,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p011-01",
+      "detail": null,
+      "order": 0,
+      "outcome": "matched",
+      "page": 11,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p011-02",
+      "detail": null,
+      "order": 1,
+      "outcome": "matched",
+      "page": 11,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p011-03",
+      "detail": null,
+      "order": 2,
+      "outcome": "matched",
+      "page": 11,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p011-04",
+      "detail": null,
+      "order": 3,
+      "outcome": "matched",
+      "page": 11,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p011-05",
+      "detail": null,
+      "order": 4,
+      "outcome": "matched",
+      "page": 11,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p011-06",
+      "detail": null,
+      "order": 5,
+      "outcome": "matched",
+      "page": 11,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p011-07",
+      "detail": null,
+      "order": 6,
+      "outcome": "matched",
+      "page": 11,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p011-08",
+      "detail": null,
+      "order": 7,
+      "outcome": "matched",
+      "page": 11,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p011-01",
+      "detail": null,
+      "order": 0,
+      "outcome": "primary",
+      "page": 11,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p011-02",
+      "detail": null,
+      "order": 1,
+      "outcome": "primary",
+      "page": 11,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p011-03",
+      "detail": null,
+      "order": 2,
+      "outcome": "primary",
+      "page": 11,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p011-04",
+      "detail": null,
+      "order": 3,
+      "outcome": "primary",
+      "page": 11,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p011-05",
+      "detail": null,
+      "order": 4,
+      "outcome": "primary",
+      "page": 11,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p011-06",
+      "detail": null,
+      "order": 5,
+      "outcome": "primary",
+      "page": 11,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p011-07",
+      "detail": null,
+      "order": 6,
+      "outcome": "primary",
+      "page": 11,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p011-08",
+      "detail": null,
+      "order": 7,
+      "outcome": "primary",
+      "page": 11,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p012-01",
+      "detail": null,
+      "order": 0,
+      "outcome": "matched",
+      "page": 12,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p012-02",
+      "detail": null,
+      "order": 1,
+      "outcome": "matched",
+      "page": 12,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p012-03",
+      "detail": null,
+      "order": 2,
+      "outcome": "matched",
+      "page": 12,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p012-04",
+      "detail": null,
+      "order": 3,
+      "outcome": "matched",
+      "page": 12,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p012-05",
+      "detail": null,
+      "order": 4,
+      "outcome": "matched",
+      "page": 12,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p012-06",
+      "detail": null,
+      "order": 5,
+      "outcome": "matched",
+      "page": 12,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p012-07",
+      "detail": null,
+      "order": 6,
+      "outcome": "matched",
+      "page": 12,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p012-08",
+      "detail": null,
+      "order": 7,
+      "outcome": "matched",
+      "page": 12,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p012-09",
+      "detail": null,
+      "order": 8,
+      "outcome": "matched",
+      "page": 12,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p012-10",
+      "detail": null,
+      "order": 9,
+      "outcome": "matched",
+      "page": 12,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p012-11",
+      "detail": null,
+      "order": 10,
+      "outcome": "matched",
+      "page": 12,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p012-12",
+      "detail": null,
+      "order": 11,
+      "outcome": "matched",
+      "page": 12,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p012-13",
+      "detail": null,
+      "order": 12,
+      "outcome": "matched",
+      "page": 12,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p012-14",
+      "detail": null,
+      "order": 13,
+      "outcome": "matched",
+      "page": 12,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p012-15",
+      "detail": null,
+      "order": 14,
+      "outcome": "matched",
+      "page": 12,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p012-16",
+      "detail": null,
+      "order": 15,
+      "outcome": "matched",
+      "page": 12,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-clean-p012-01",
+      "detail": null,
+      "order": 0,
+      "outcome": "primary",
+      "page": 12,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p012-02",
+      "detail": null,
+      "order": 1,
+      "outcome": "primary",
+      "page": 12,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p012-03",
+      "detail": null,
+      "order": 2,
+      "outcome": "primary",
+      "page": 12,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p012-04",
+      "detail": null,
+      "order": 3,
+      "outcome": "primary",
+      "page": 12,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p012-05",
+      "detail": null,
+      "order": 4,
+      "outcome": "primary",
+      "page": 12,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p012-06",
+      "detail": null,
+      "order": 5,
+      "outcome": "primary",
+      "page": 12,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p012-07",
+      "detail": null,
+      "order": 6,
+      "outcome": "primary",
+      "page": 12,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p012-08",
+      "detail": null,
+      "order": 7,
+      "outcome": "primary",
+      "page": 12,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p012-09",
+      "detail": null,
+      "order": 8,
+      "outcome": "primary",
+      "page": 12,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p012-10",
+      "detail": null,
+      "order": 9,
+      "outcome": "primary",
+      "page": 12,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p012-11",
+      "detail": null,
+      "order": 10,
+      "outcome": "primary",
+      "page": 12,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p012-12",
+      "detail": null,
+      "order": 11,
+      "outcome": "primary",
+      "page": 12,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p012-13",
+      "detail": null,
+      "order": 12,
+      "outcome": "primary",
+      "page": 12,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p012-14",
+      "detail": null,
+      "order": 13,
+      "outcome": "primary",
+      "page": 12,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p012-15",
+      "detail": null,
+      "order": 14,
+      "outcome": "primary",
+      "page": 12,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-clean-p012-16",
+      "detail": null,
+      "order": 15,
+      "outcome": "primary",
+      "page": 12,
+      "parser": "pymupdf"
+    }
+  ],
+  "doc_id": "clean"
+}

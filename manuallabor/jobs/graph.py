@@ -35,6 +35,7 @@ __all__ = [
     "doc_node_states",
     "load_stages",
     "node_state",
+    "project_node_states",
     "project_status",
     "save_stages",
     "upstream",
@@ -135,7 +136,7 @@ def _fingerprint_state(paths: ProjectPaths, slug: str, node: str, cfg: ProjectCo
         return None if rep.fingerprint == figures_fingerprint(paths, slug) else "inputs changed"
     if node in ("score", "score2"):
         sf = read_json(dp.scores, ScoreFile)
-        if sf.threshold != cfg.threshold:
+        if sf.threshold != cfg.threshold_for(slug):
             return "project threshold changed"
         if node == "score" and dp.clean.is_file():
             return None  # the file carries score2's fingerprint; score2 checks it
@@ -246,6 +247,13 @@ def doc_node_states(paths: ProjectPaths, slug: str, cfg: ProjectConfig) -> list[
     with _CACHE_LOCK:
         _CACHE[key] = (sg, states)
     return states
+
+
+def project_node_states(paths: ProjectPaths) -> list[NodeState]:
+    """State of the project-level nodes `assemble` and `export` (module 11)."""
+    from manuallabor.export.pipeline import node_states
+
+    return node_states(paths)
 
 
 # -- project status --------------------------------------------------------------------------

@@ -241,6 +241,25 @@
       "title": "ManifestArticle",
       "type": "object"
     },
+    "ManifestDocLearning": {
+      "additionalProperties": false,
+      "properties": {
+        "clean": {
+          "title": "Clean",
+          "type": "string"
+        },
+        "group": {
+          "title": "Group",
+          "type": "string"
+        }
+      },
+      "required": [
+        "group",
+        "clean"
+      ],
+      "title": "ManifestDocLearning",
+      "type": "object"
+    },
     "ManifestFigure": {
       "additionalProperties": false,
       "properties": {
@@ -285,6 +304,35 @@
         "duplicate_of"
       ],
       "title": "ManifestFigure",
+      "type": "object"
+    },
+    "ManifestLearning": {
+      "additionalProperties": false,
+      "description": "Which learning snapshot each document's grouping and cleanup used (module 11).",
+      "properties": {
+        "docs": {
+          "patternProperties": {
+            "^[a-z0-9]+(?:-[a-z0-9]+)*$": {
+              "$ref": "#/$defs/ManifestDocLearning"
+            }
+          },
+          "propertyNames": {
+            "maxLength": 48
+          },
+          "title": "Docs",
+          "type": "object"
+        },
+        "enabled": {
+          "default": false,
+          "title": "Enabled",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled",
+        "docs"
+      ],
+      "title": "ManifestLearning",
       "type": "object"
     },
     "ManifestProject": {
@@ -516,6 +564,9 @@
       "title": "Figures",
       "type": "array"
     },
+    "learning": {
+      "$ref": "#/$defs/ManifestLearning"
+    },
     "models": {
       "additionalProperties": {
         "$ref": "#/$defs/ModelRef"
@@ -563,7 +614,8 @@
     "threshold",
     "article_split",
     "overrides",
-    "accounting"
+    "accounting",
+    "learning"
   ],
   "title": "Manifest",
   "type": "object"

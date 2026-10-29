@@ -2,7 +2,8 @@
 
 Works on a temporary copy, so the project is never touched. Mock mode (default) mocks every
 model call; `--live` runs against real local models and skips cleanly when they are missing.
-Checks that exist now (module 7): K1-K9. Assemble/export checks arrive with module 11."""
+Checks: K1-K9 (module 7) and K10-K16 (module 11: gate, scripted review, export, validation,
+block accounting, per-document round trip, determinism, figure references)."""
 
 from __future__ import annotations
 
@@ -41,6 +42,7 @@ class CheckCtx:
     mode: ProviderMode
     live: bool
     lines: list[dict[str, Any]] = field(default_factory=list)
+    export: dict[str, Any] = field(default_factory=dict)  # filled by K11 for K12-K16
 
 
 Check = tuple[str, Callable[[CheckCtx], str | None]]
@@ -276,6 +278,166 @@ def k9_baseline(ctx: CheckCtx) -> str | None:
     return "learning provenance = baseline"
 
 
+CHECK_NOW = "2026-10-29T12:00:00Z"
+
+
+def k10_gate(ctx: CheckCtx) -> str | None:
+    from manuallabor.export.pipeline import export_status, run_assemble
+    from manuallabor.export.types import GateLocked
+
+    st = export_status(ctx.paths, ctx.store)
+    if st.unlocked:
+        return "no queued block or open flag: the gate is already open"
+    try:
+        run_assemble(ctx.paths, ctx.store, emit=lambda _o: None)
+    except GateLocked as exc:
+        if ctx.paths.assembled.exists():
+            raise AssertionError("a refused export left staging files") from exc
+        first = exc.blockers[0] if exc.blockers else "-"
+        return (
+            f"refused with {st.queued} queued block(s), {st.open_flags} open flag(s); first {first}"
+        )
+    raise AssertionError("export was not refused although blocks are queued")
+
+
+def k11_review_export(ctx: CheckCtx) -> str | None:
+    from manuallabor.contracts.io import read_json
+    from manuallabor.export.pipeline import resolve_clock, run_export
+    from manuallabor.state.data import ProjectData
+    from manuallabor.state.figures import FigureService
+    from manuallabor.state.models import ReviewActionIn
+    from manuallabor.state.review import ReviewService, load_review_blocks
+
+    data = ProjectData(ctx.paths, ctx.store)
+    review = ReviewService(ctx.paths, ctx.store, data, FigureService(ctx.paths, ctx.store, data))
+    selected = set(data.selection().block_ids)
+    n = 0
+    for slug in _slugs(ctx):
+        scope = data.scope_ids(slug, selected)
+        for b in load_review_blocks(ctx.paths, ctx.store, slug):
+            if b.id in scope and b.status == BlockStatus.queued:
+                review.act(
+                    ReviewActionIn(
+                        kind="approve", block_id=b.id, request_id=f"cli-check-approve-{b.id}"
+                    )
+                )
+                n += 1
+    rec = run_export(
+        ctx.paths, ctx.store, clock=resolve_clock(CHECK_NOW), emit=lambda _o: None, force=True
+    )
+    from manuallabor.contracts.manifest import Manifest
+
+    ctx.export.update(
+        zip=Path(rec.zip_path), sha=rec.summary.zip_sha256, summary=rec.summary,
+        manifest=read_json(ctx.paths.assembled / "manifest.json", Manifest),
+    )  # fmt: skip
+    return f"{n} blocks approved by a scripted reviewer; exported {rec.summary.articles} articles"
+
+
+def k12_validate(ctx: CheckCtx) -> str | None:
+    from manuallabor.export.validate import validate_zip
+
+    zp: Path = ctx.export["zip"]
+    problems = validate_zip(zp)
+    if problems:
+        raise AssertionError("; ".join(str(p) for p in problems[:3]))
+    s = ctx.export["summary"]
+    return f"{s.articles} articles, {s.figures} figures, {zp.stat().st_size} bytes"
+
+
+def k13_export_accounting(ctx: CheckCtx) -> str | None:
+    m = ctx.export["manifest"]
+    parsed: set[str] = set()
+    types: dict[str, str] = {}
+    for slug in _slugs(ctx):
+        for b in read_json_list(ctx.paths.doc(slug).blocks, Block):
+            parsed.add(b.id)
+            types[b.id] = b.type.value
+    got = set(m.accounting.assignments)
+    if got != parsed:
+        raise AssertionError(
+            f"manifest accounts for {len(got)} blocks, parse has {len(parsed)} "
+            f"(missing {sorted(parsed - got)[:3]}, extra {sorted(got - parsed)[:3]})"
+        )
+    in_articles = sorted(b for a in m.articles for b in a.block_ids)
+    unassigned = sorted(m.accounting.unassigned_reasons)
+    if sorted(in_articles + unassigned) != sorted(parsed):
+        raise AssertionError("a block is in an article and unassigned, or in two articles")
+    for b, why in m.accounting.unassigned_reasons.items():
+        if types[b] in ("header", "footer") and why != "header_footer":
+            raise AssertionError(f"{b}: header/footer block has reason {why}")
+    if m.review_stats.overrides != 0 or m.overrides:
+        raise AssertionError("the scripted review needed no override, but the manifest has some")
+    return f"{len(parsed)} blocks: {len(in_articles)} in articles, {len(unassigned)} unassigned"
+
+
+def k14_round_trip(ctx: CheckCtx) -> str | None:
+    from manuallabor.scoring.pipeline import load_scored_blocks
+
+    m = ctx.export["manifest"]
+    rows = []
+    bad = 0
+    for slug in _slugs(ctx):
+        blocks = load_scored_blocks(ctx.paths, slug)
+        auto = [b for b in blocks if b.status == BlockStatus.auto_approved]
+        viol = sum(
+            1
+            for b in auto
+            if b.clean_text is not None and (b.faithfulness is None or not b.faithfulness.passed)
+        )
+        bad += viol
+        arts = [a for a in m.articles if a.source_doc == slug]
+        figs = sum(1 for f in m.figures if f.source_doc == slug)
+        rows.append(f"{slug} | {len(blocks)} | {len(auto)} | {viol} | {len(arts)} | {figs}")
+    if bad:
+        raise AssertionError(
+            f"{bad} auto-approved block(s) violate faithfulness: " + "; ".join(rows)
+        )
+    return (
+        "doc | blocks | auto_approved | faith_violations(auto) | articles | figures: "
+        + "; ".join(rows)
+    )
+
+
+def k15_determinism(ctx: CheckCtx) -> str | None:
+    import hashlib
+
+    from manuallabor.export.pipeline import resolve_clock, run_assemble
+    from manuallabor.export.zip import tree_files, write_zip
+
+    run_assemble(
+        ctx.paths, ctx.store, clock=resolve_clock(CHECK_NOW), emit=lambda _o: None, force=True
+    )
+    second = ctx.paths.export_dir / "determinism-check.zip"
+    write_zip(tree_files(ctx.paths.assembled), second)
+    sha = hashlib.sha256(second.read_bytes()).hexdigest()
+    second.unlink()
+    if sha != ctx.export["sha"]:
+        raise AssertionError(f"second export differs: {sha[:12]} != {ctx.export['sha'][:12]}")
+    return f"sha256 {sha[:16]} identical on a second export"
+
+
+def k16_figure_refs(ctx: CheckCtx) -> str | None:
+    import re
+    import zipfile
+
+    ref = re.compile(r"!\[(FIG-[a-z0-9-]+-p\d+-\d+) [^\n]*?\]\((images/[^)\s]+)\)")
+    n = 0
+    with zipfile.ZipFile(ctx.export["zip"]) as zf:
+        names = set(zf.namelist())
+        for name in sorted(names):
+            if not name.startswith("articles/"):
+                continue
+            for fid, path in ref.findall(zf.read(name).decode("utf-8")):
+                slug = fid[4:].rsplit("-p", 1)[0]
+                if path not in names:
+                    raise AssertionError(f"{name}: {fid}: {path} is not in the zip")
+                if f"images/{slug}/{fid}.json" not in names:
+                    raise AssertionError(f"{name}: {fid}: no sidecar in the zip")
+                n += 1
+    return f"{n} figure references resolve to a file and a sidecar"
+
+
 CHECKS: list[Check] = [
     ("K1 nodes fresh", k1_fresh),
     ("K2 artifacts validate", k2_artifacts),
@@ -286,13 +448,27 @@ CHECKS: list[Check] = [
     ("K7 mock only", k7_mock_only),
     ("K8 state", k8_state),
     ("K9 baseline learning", k9_baseline),
+    ("K10 export gate", k10_gate),
+    ("K11 review + export", k11_review_export),
+    ("K12 zip validates", k12_validate),
+    ("K13 export accounting", k13_export_accounting),
+    ("K14 round trip", k14_round_trip),
+    ("K15 export determinism", k15_determinism),
+    ("K16 figure references", k16_figure_refs),
 ]
 
 
 # -- the driver --------------------------------------------------------------------------------
 
 _IGNORE = shutil.ignore_patterns(
-    "project.db", "project.db-*", "logs", ".labor*.lock", ".uploads", "pages", "pages_view"
+    "project.db",
+    "project.db-*",
+    "logs",
+    ".labor*.lock",
+    ".uploads",
+    "pages",
+    "pages_view",
+    "export",
 )
 
 
@@ -352,11 +528,21 @@ def run_check(
     from manuallabor.state.store import Store
 
     project = Path(project).resolve()
-    tmp_root = Path(tempfile.mkdtemp(prefix="labor-check-"))
+    # MANUALLABOR_TMP: where the temporary copy goes (default: the system temp dir)
+    tmp_root = Path(
+        tempfile.mkdtemp(prefix="labor-check-", dir=os.environ.get("MANUALLABOR_TMP") or None)
+    )
     work = tmp_root / project.name
     shutil.copytree(project, work, ignore=_IGNORE)
     paths = ProjectPaths(work)
-    cfg = paths.ensure_config()
+    try:
+        cfg = paths.ensure_config()
+    except Exception as exc:  # an invalid project.json is a FAIL row, not a traceback
+        detail = " ".join(f"{type(exc).__name__}: {exc}".split())[:300]
+        _print_table([Row("project.json", "FAIL", detail, 0)])
+        shutil.rmtree(tmp_root, ignore_errors=True)
+        print("\nFAIL: project.json is not a valid project config")
+        return 1
     rows: list[Row] = []
     mode: ProviderMode = "config" if live else "mock"
     if live:
@@ -457,7 +643,7 @@ def run_check(
             for name, fn in [*CHECKS, *extra_checks]:
                 timed(name, lambda fn=fn: fn(ctx))  # type: ignore[misc]
         else:
-            rows.append(Row("K1-K9", "SKIP", "pipeline did not complete", 0))
+            rows.append(Row("K1-K16", "SKIP", "pipeline did not complete", 0))
     finally:
         for lk in locks:
             lk.release()

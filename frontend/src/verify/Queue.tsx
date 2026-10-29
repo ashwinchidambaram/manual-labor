@@ -57,7 +57,7 @@ export default function Queue({ items, total, pinned, currentId, docs, counts, f
             focusTick={focusTick}
             wantFocus={wantFocus}
             onSelect={onSelect}
-            style={{ height: ROW }}
+            height={ROW}
           />
         ) : null}
         <div style={{ height: v.getTotalSize(), position: "relative" }}>
@@ -73,7 +73,8 @@ export default function Queue({ items, total, pinned, currentId, docs, counts, f
                 focusTick={it.block_id === currentId ? focusTick : 0}
                 wantFocus={wantFocus}
                 onSelect={onSelect}
-                style={{ position: "absolute", top: 0, left: 0, width: "100%", height: ROW, transform: `translateY(${row.start - (pinned ? ROW : 0)}px)` }}
+                height={ROW}
+                offset={row.start - (pinned ? ROW : 0)}
               />
             );
           })}

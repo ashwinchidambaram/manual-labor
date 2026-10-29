@@ -40,7 +40,7 @@ def get_figure_image(fid: str, ctx: Ctx) -> FileResponse:
 def attach_figure(fid: str, body: AttachIn, ctx: Ctx) -> AttachOut:
     slug = _slug(fid)
     override = ctx.figures.attach(fid, body.article_id, body.anchor_block_id, body.request_id)
-    job = ctx.runner.enqueue(RunPlanIn(to="score2", docs=[slug]))
+    job = ctx.runner.enqueue(RunPlanIn(to="score2", docs=[slug]), request_id=body.request_id)
     return AttachOut(override=override, job=job)
 
 
@@ -48,7 +48,7 @@ def attach_figure(fid: str, body: AttachIn, ctx: Ctx) -> AttachOut:
 def detach_figure(fid: str, body: AttachIn, ctx: Ctx) -> AttachOut:
     slug = _slug(fid)
     override = ctx.figures.detach(fid, body.article_id, body.request_id)
-    job = ctx.runner.enqueue(RunPlanIn(to="score2", docs=[slug]))
+    job = ctx.runner.enqueue(RunPlanIn(to="score2", docs=[slug]), request_id=body.request_id)
     return AttachOut(override=override, job=job)
 
 
@@ -56,5 +56,7 @@ def detach_figure(fid: str, body: AttachIn, ctx: Ctx) -> AttachOut:
 def put_bbox(fid: str, body: BboxIn, ctx: Ctx) -> BboxOut:
     slug = _slug(fid)
     ctx.figures.set_bbox(fid, list(body.bbox), body.request_id)
-    job = ctx.runner.enqueue(RunPlanIn(to="score2", docs=[slug], force=["figures"]))
+    job = ctx.runner.enqueue(
+        RunPlanIn(to="score2", docs=[slug], force=["figures"]), request_id=body.request_id
+    )
     return BboxOut(job=job)

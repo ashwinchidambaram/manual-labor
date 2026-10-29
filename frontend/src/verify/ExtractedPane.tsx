@@ -13,6 +13,8 @@ export interface EditState {
   text: string;
   error: string | null;
   conflict: EditConflict | null;
+  /** the exact text that produced `conflict`; Confirm sends this, never the live textarea value */
+  conflictText: string | null;
   busy: boolean;
 }
 
@@ -23,6 +25,13 @@ export function diffOps(d: BlockDetail): DiffOp[] | null {
     if (h?.human_edit_diff) return h.human_edit_diff;
   }
   return d.block.faithfulness?.diff ?? null;
+}
+
+/** The latest human edit was confirmed past a faithfulness violation (faith_passed=false on its decision record). */
+export function isContentChangeEdit(d: BlockDetail): boolean {
+  if (d.block.status !== "edited") return false;
+  const h = [...(d.history ?? [])].reverse().find((x) => x.human_edit_diff || x.faith_passed !== undefined);
+  return h?.faith_passed === false;
 }
 
 interface Props {
@@ -50,13 +59,18 @@ export default function ExtractedPane({ detail, loading, error, view, onView, ed
   }, []);
   const editing = edit !== null;
   useEffect(() => {
-    if (editing && !edit?.conflict) {
+    if (!editing || edit?.conflict) return;
+    const take = (): void => {
       const el = area.current;
       if (el && document.activeElement !== el) {
         el.focus();
         el.setSelectionRange(el.value.length, el.value.length);
       }
-    }
+    };
+    take();
+    // something else (a pending queue-card focus request) may grab focus in the same tick: take it back next frame
+    const raf = requestAnimationFrame(take);
+    return () => cancelAnimationFrame(raf);
   }, [editing, edit?.conflict]);
 
   if (!detail)
@@ -87,6 +101,11 @@ export default function ExtractedPane({ detail, loading, error, view, onView, ed
         <span className="rounded bg-slate-200 px-1.5 text-xs" data-testid="block-status">
           {STATUS_LABEL[b.status] ?? b.status}
         </span>
+        {isContentChangeEdit(detail) ? (
+          <span data-testid="content-change-marker" className="rounded border border-red-500 bg-red-100 px-1.5 text-xs font-semibold text-red-900">
+            human edit {"\u2014"} content changed
+          </span>
+        ) : null}
         {b.numbers_verified ? <span className="rounded bg-emerald-100 px-1.5 text-xs text-emerald-900">numbers verified</span> : null}
         {chips.status.map((c) => (
           <span key={c.name} data-testid="stale-chip" className="rounded bg-amber-100 px-1.5 text-xs text-amber-950">
@@ -147,18 +166,30 @@ export default function ExtractedPane({ detail, loading, error, view, onView, ed
           ) : null}
           <textarea
             ref={setArea}
+            autoFocus
             aria-label="Edit block text"
             value={edit.text}
             onChange={(e) => onEditText(e.target.value)}
+            readOnly={!!edit.conflict}
+            aria-readonly={!!edit.conflict}
+            onKeyDown={(e) => {
+              if (e.key === "Escape" && edit.conflict) {
+                e.preventDefault();
+                e.stopPropagation();
+                onKeepEditing();
+              }
+            }}
             rows={10}
-            className={`w-full rounded border border-slate-400 p-2 font-mono text-sm ${FOCUS}`}
+            className={`w-full rounded border border-slate-400 p-2 font-mono text-sm ${FOCUS} ${edit.conflict ? "bg-slate-100 text-slate-500 opacity-60" : ""}`}
           />
           {edit.error ? (
             <p role="alert" data-testid="edit-error" className="text-sm text-red-800">
               {edit.error}
             </p>
           ) : null}
-          <p className="text-xs text-slate-600">Ctrl or Cmd + Enter saves, Esc cancels</p>
+          <p className="text-xs text-slate-600">
+            {edit.conflict ? "Text is locked while the content change is open. Esc to dismiss and edit again" : "Ctrl or Cmd + Enter saves, Esc cancels"}
+          </p>
         </div>
       ) : view === "diff" && ops ? (
         <DiffView ops={ops} />

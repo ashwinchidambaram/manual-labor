@@ -112,6 +112,30 @@ class ProposalStatus(StrEnum):
     accepted = "accepted"
     edited = "edited"
     rejected = "rejected"
+    superseded = "superseded"
+
+
+class ProposalKind(StrEnum):
+    """What a proposal changes (module 10)."""
+
+    text = "text"
+    cells = "cells"
+    bbox = "bbox"
+    attach = "attach"
+    regroup = "regroup"
+
+
+class EvidenceSource(StrEnum):
+    """Where a proposal's evidence span was quoted from (module 10)."""
+
+    pymupdf = "pymupdf"
+    docling = "docling"
+    ocr = "ocr"
+    ocr_alt = "ocr_alt"
+    docx = "docx"
+    vision = "vision"
+    note = "note"
+    candidate = "candidate"
 
 
 class Task(StrEnum):

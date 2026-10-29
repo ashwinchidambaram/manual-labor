@@ -59,6 +59,51 @@ describe("VC1 StatusStrip", () => {
   });
 });
 
+describe("VC1 counts honesty (G1: no server view_added yet)", () => {
+  it("M3 with more pages than loaded, Queued is derived from the server counts and marked partial, never 1100", async () => {
+    // 1,200 listed in the view, 200 of them auto-approved; only the first page of 500 is loaded and it holds 100 of them
+    await mountVerify(1200, (f) => {
+      f.items = Array.from({ length: 1200 }, (_, i) => makeQueueItem(i + 1, i < 100 || (i >= 600 && i < 700) ? { status: "auto_approved", confidence: 0.9 } : {}));
+      f.cursor = cursor({ view_threshold: 0.95 });
+      f.counts = counts({ pending: 1200, auto_approved: 200, in_scope: 1500 });
+    });
+    await waitFor(() => expect(screen.getByTestId("cnt-queued")).toHaveTextContent("1000+"));
+    expect(screen.getByTestId("cnt-queued")).not.toHaveTextContent("1100");
+    expect(screen.getByTestId("view-copy")).toHaveTextContent("Showing 100+ auto-approved blocks below 0.95 (loaded)");
+  });
+
+  it("M3 with the view filter off, Queued is exactly the server's pending count", async () => {
+    await mountVerify(1200, (f) => {
+      f.counts = counts({ pending: 1200, auto_approved: 200, in_scope: 1500 });
+    });
+    await waitFor(() => expect(screen.getByTestId("cnt-queued")).toHaveTextContent(/^1200$/));
+  });
+});
+
+describe("VC2 resume beyond the first page", () => {
+  it("M5 a saved cursor on page 2 loads pages up to the cursor's page and lists it (not pinned); no further pages are fetched", async () => {
+    const { f } = await mountVerify(1200, (fk) => {
+      fk.cursor = cursor({ current_block_id: vid(700) });
+    });
+    await waitFor(() => expect(f.queueReqs.some((q) => q.includes("offset=500"))).toBe(true));
+    // the list now contains the cursor block, so the pinned copy is gone (rows are virtualised: no card lookup)
+    await waitFor(() => expect(document.querySelector("[data-pinned='true']")).toBeNull());
+    expect(screen.getByTestId("block-id")).toHaveTextContent(vid(700));
+    expect(f.queueReqs.some((q) => q.includes("offset=1000"))).toBe(false);
+  });
+
+  it("M5 an already-approved cursor block (not queued) does not pull in every page", async () => {
+    const { f } = await mountVerify(1200, (fk) => {
+      fk.cursor = cursor({ current_block_id: vid(900) });
+      fk.details[vid(900)] = makeBlockDetail(makeQueueItem(900, { status: "approved" }));
+    });
+    await screen.findByTestId(`card-${vid(900)}`);
+    await new Promise((r) => setTimeout(r, 300));
+    expect(f.queueReqs.some((q) => q.includes("offset=500"))).toBe(false);
+    expect(card(vid(900))).toHaveAttribute("data-pinned", "true");
+  });
+});
+
 describe("VC2 Queue", () => {
   it("virtualises 1,500 items into a few option nodes and exposes set size", async () => {
     await mountVerify(1500);
@@ -149,6 +194,22 @@ describe("VC3 SourcePane", () => {
     await waitFor(() => expect(img.getAttribute("src")).toBe("/api/docs/doc/pages/1.png?dpi=300"));
   });
 
+  it("M6 overlays are stacked largest first, so a block inside a table or figure is on top and clickable", async () => {
+    const { r } = await mountVerify(3, (f) => {
+      f.pageBlocks["doc:1"] = [
+        { block_id: vid(2), bbox: [100, 120, 200, 160], type: "paragraph", status: "queued" }, // small, inside the table
+        { block_id: vid(1), bbox: [61.2, 79.2, 306, 396], type: "table", status: "queued" }, // large, listed after the small one
+        { block_id: vid(3), bbox: [10, 600, 100, 650], type: "paragraph", status: "queued" },
+      ];
+    });
+    const big = await screen.findByTestId(`rect-${vid(1)}`);
+    const small = screen.getByTestId(`rect-${vid(2)}`);
+    // later in the DOM paints on top
+    expect(big.compareDocumentPosition(small) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    await r.user.click(small);
+    await waitFor(() => expect(screen.getByTestId("block-id")).toHaveTextContent(vid(2)));
+  });
+
   it("a click or Enter on a rect makes it current", async () => {
     const { r } = await mountVerify(3, withPage);
     await r.user.click(await screen.findByTestId(`rect-${vid(2)}`));
@@ -222,16 +283,20 @@ describe("VC8 VerifyScreen integration", () => {
     await cardFocused(vid(2));
   });
 
-  it("lets the server's next block win", async () => {
-    const { f, r } = await mountVerify(5);
-    f.actionHook = null;
-    // the server will answer with block 4 as next after approving 1
-    const orig = f.items;
-    f.items = orig;
+  it("lets the server's next block win over the optimistic guess", async () => {
+    let release!: () => void;
+    const { f, r } = await mountVerify(5, (fk) => {
+      fk.actionGate = new Promise<void>((res) => (release = res));
+      fk.nextFor = (a) => (a.kind === "approve" ? makeQueueItem(4) : undefined);
+    });
     await r.user.keyboard("a");
+    await cardFocused(vid(2)); // the optimistic guess, before the server answers
+    act(() => release());
     await waitFor(() => expect(f.actions).toHaveLength(1));
     await waitFor(() => expect(screen.getByTestId("save-state")).toHaveTextContent("Saved"));
-    expect(card(vid(2))).toHaveAttribute("aria-selected", "true");
+    await waitFor(() => expect(card(vid(4))).toHaveAttribute("aria-selected", "true"));
+    expect(card(vid(2))).toHaveAttribute("aria-selected", "false");
+    await cardFocused(vid(4));
   });
 
   it("rolls back, toasts and returns focus when the server fails", async () => {

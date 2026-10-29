@@ -21,7 +21,7 @@ from manuallabor.contracts import (
     SuggestionTable,
     TaskModels,
 )
-from manuallabor.contracts._base import ArticleId, BlockId, DocSlug, Unit
+from manuallabor.contracts._base import ArticleId, BlockId, DocSlug, FlagId, Unit
 from manuallabor.contracts.enums import BlockStatus, BlockType, DocKind
 from manuallabor.contracts.figure import FigureRecord
 from manuallabor.state.models import (
@@ -106,7 +106,8 @@ class PageBlock(ContractModel):
 
 
 class DocFigure(ContractModel):
-    """One figure of a document with every article it is attached to (the Verify re-attach picker)."""
+    """One figure of a document with every article it is attached to (the Verify \
+re-attach picker)."""
 
     figure_id: str
     block_id: BlockId
@@ -191,21 +192,38 @@ class LearningFlagsIn(ContractModel):
 
 class AgentRunIn(ContractModel):
     docs: list[DocSlug] | None = None
+    flag_ids: list[FlagId] | None = None
     request_id: str = Field(default_factory=_rid, min_length=1)
 
 
 class ProposalEditIn(ContractModel):
-    text: str = Field(min_length=1)
+    text: str | None = Field(default=None, min_length=1)
+    bbox: BBox | None = None
+    confirm_content_change: bool = False
+    request_id: str = Field(default_factory=_rid, min_length=1)
+
+
+class ProposalRejectIn(ContractModel):
+    reason: str | None = Field(default=None, max_length=300)
+    request_id: str = Field(default_factory=_rid, min_length=1)
+
+
+class AcceptAllIn(ContractModel):
+    docs: list[DocSlug] | None = None
     request_id: str = Field(default_factory=_rid, min_length=1)
 
 
 class CalibrationApplyIn(ContractModel):
     threshold: Unit
+    scope: Literal["next_docs", "project"] = "next_docs"
     request_id: str = Field(default_factory=_rid, min_length=1)
 
 
 class CalibrationApplyOut(ContractModel):
     threshold: Unit
+    scope: Literal["next_docs", "project"] = "next_docs"
+    pinned: list[DocSlug] = Field(default_factory=list)
+    job: JobInfo | None = None
 
 
 class OverrideIn(ContractModel):

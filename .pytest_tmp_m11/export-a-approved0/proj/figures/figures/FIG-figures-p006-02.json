@@ -1,0 +1,31 @@
+{
+  "articles": [
+    "figures--board-illustrations",
+    "figures--valve-illustrations"
+  ],
+  "attach_rule": "caption_ref",
+  "bbox": [
+    72.0,
+    334.375,
+    332.0,
+    494.375
+  ],
+  "caption_original": "Figure 10. Fuse box layout.",
+  "confidence": 0.95,
+  "description_generated": "Generated description (mock) of image 97ffdfd9.",
+  "extraction": "vector",
+  "file": "FIG-figures-p006-02.png",
+  "height": 684,
+  "id": "FIG-figures-p006-02",
+  "page": 6,
+  "phash": "b8c3dc3237c46c39",
+  "product_model": "Acme X200",
+  "review": "auto_approved",
+  "source_doc": "figures",
+  "svg": "FIG-figures-p006-02.svg",
+  "tags": [
+    "figure",
+    "mock"
+  ],
+  "width": 1100
+}

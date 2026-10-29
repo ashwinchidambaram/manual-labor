@@ -12,6 +12,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -73,9 +74,14 @@ def all_fresh(root: Path) -> bool:
     return all(n["state"] == "fresh" for d in st["docs"] for n in d["nodes"])
 
 
-def kill_when(root: Path, node: str, seed: int, env: dict[str, str] | None = None) -> int:
-    """Start `labor run`, SIGKILL its process group `uniform(0, 0.3)` s after the first stage
-    line of `node`. Returns the pgid."""
+def kill_when(
+    root: Path, node: str, seed: int, env: dict[str, str] | None = None
+) -> tuple[int, list[dict[str, Any]]]:
+    """Start `labor run`, SIGKILL its process group `uniform(0, 0.1)` s after the first stage
+    line of `node` (a stage reports a document when it is done, so the window has to be short
+    to land while the next document's unit runs). Returns the pgid and every progress line
+    printed before the kill (stage lines and `unit_done` events). Skips when the run finished
+    first."""
     e = {**os.environ, **(env or {})}
     p = subprocess.Popen(
         [*LABOR, "run", str(root), "--mock"],
@@ -86,14 +92,30 @@ def kill_when(root: Path, node: str, seed: int, env: dict[str, str] | None = Non
     )
     assert p.stdout is not None
     pgid = os.getpgid(p.pid)
+    seen: list[str] = []
     for line in p.stdout:
+        seen.append(line)
         if line.startswith("{") and json.loads(line).get("node") == node:
             break
-    time.sleep(random.Random(seed).uniform(0, 0.3))
+    time.sleep(random.Random(seed).uniform(0, 0.1))
     os.killpg(pgid, signal.SIGKILL)
+    seen.extend(p.stdout.read().splitlines())  # what was flushed before the kill
     p.wait()
-    assert p.returncode == -signal.SIGKILL, "the run finished before it was killed"
-    return pgid
+    if p.returncode != -signal.SIGKILL:
+        pytest.skip(f"the run finished (exit {p.returncode}) before the kill landed")
+    return pgid, [json.loads(x) for x in seen if x.startswith("{") and x.rstrip().endswith("}")]
+
+
+def assert_killed_during(root: Path, node: str, progress: list[dict[str, Any]]) -> None:
+    """The kill landed while `node` was running: it had started (a stage line of it) and not
+    every document's `node` unit was done. A kill that landed after `node` finished is skipped
+    (the window was missed, nothing about resuming `node` was tested)."""
+    assert any(o.get("node") == node and "stage" in o for o in progress), progress[-5:]
+    done = {o["doc"] for o in progress if o.get("event") == "unit_done" and o.get("node") == node}
+    slugs = set(ProjectPaths(root).list_slugs())
+    if done >= slugs:
+        pytest.skip(f"{node} had finished for every document before the kill landed")
+    assert done < slugs
 
 
 def assert_no_group_members(pgid: int) -> None:
@@ -122,7 +144,8 @@ def test_r1_random_sigkill_then_resume(
     labor_template: Path, reference: ProjectPaths, tmp_path: Path, node: str, seed: int
 ) -> None:
     p = fresh_copy(labor_template, tmp_path)
-    pgid = kill_when(p.root, node, seed)
+    pgid, progress = kill_when(p.root, node, seed)
+    assert_killed_during(p.root, node, progress)
     assert_no_group_members(pgid)
     r = run_to_completion(p.root)
     assert r.returncode == 0, r.stderr

@@ -108,7 +108,11 @@ class LearningServiceP(Protocol):
 
 class JobRunnerP(Protocol):
     def enqueue(
-        self, plan: RunPlanIn, kind: str = "run", files: Sequence[Path] = ()
+        self,
+        plan: RunPlanIn,
+        kind: str = "run",
+        files: Sequence[Path] = (),
+        request_id: str | None = None,
     ) -> JobInfo: ...
     def get(self, job_id: str) -> JobInfo: ...
     def list(self, status: set[str] | None = None) -> builtins.list[JobInfo]: ...
@@ -136,6 +140,10 @@ class AppServices:
     learning: LearningServiceP
     runner: JobRunnerP
     mock: bool
+    # module 10 (`manuallabor.agent.service.AgentService`, `manuallabor.calibration.apply.
+    # CalibrationService`); None in the fakes of the API tests that do not exercise them
+    agent: Any = None
+    calibration: Any = None
 
 
 def open_project(

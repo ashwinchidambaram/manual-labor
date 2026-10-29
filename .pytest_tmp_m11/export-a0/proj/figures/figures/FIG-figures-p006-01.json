@@ -1,0 +1,31 @@
+{
+  "articles": [
+    "figures--board-illustrations",
+    "figures--valve-illustrations"
+  ],
+  "attach_rule": "caption_ref",
+  "bbox": [
+    72.0,
+    154.05,
+    312.0,
+    314.05
+  ],
+  "caption_original": "Figure 9. Bearing carrier cross-section.",
+  "confidence": 1.0,
+  "description_generated": "Generated description (mock) of image f053a9ae.",
+  "extraction": "native",
+  "file": "../figures/FIG-figures-p002-01.png",
+  "height": 800,
+  "id": "FIG-figures-p006-01",
+  "page": 6,
+  "phash": "b089cff3583467a1",
+  "product_model": "Acme X200",
+  "review": "auto_approved",
+  "source_doc": "figures",
+  "svg": null,
+  "tags": [
+    "figure",
+    "mock"
+  ],
+  "width": 1200
+}

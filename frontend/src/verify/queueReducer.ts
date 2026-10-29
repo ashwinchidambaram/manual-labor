@@ -1,7 +1,8 @@
 // Optimistic queue state (design 09 section 3.2). Pure: the screen dispatches, the server `next` always wins.
-import type { Cursor, DocReadiness, QueueItem, ReviewActionOut, ReviewCounts } from "../api/schema";
+import type { Cursor, DocReadiness, QueueItem, ReviewActionIn, ReviewActionOut, ReviewCounts } from "../api/schema";
 
-export type ActKind = "approve" | "edit" | "flag" | "skip" | "back";
+/** Derived from the generated contract: a new server action kind is a compile error here, not a silent gap. */
+export type ActKind = ReviewActionIn["kind"];
 
 export interface QueueState {
   items: QueueItem[];

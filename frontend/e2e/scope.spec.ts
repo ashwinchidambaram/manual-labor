@@ -24,7 +24,7 @@ test.describe("E0 built dist", () => {
   });
 });
 
-test("E1 toggle preserves selection and shows coverage in the other view", async ({ page, request }) => {
+test("E1 toggle preserves selection and shows coverage in the other view @AC6", async ({ page, request }) => {
   await clearSelection(request);
   await page.goto("/scope");
   await waitForTree(page);

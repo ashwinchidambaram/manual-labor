@@ -226,3 +226,42 @@ dist/assets/index-CHvh8E8o.js   308.75 kB │ gzip: 97.83 kB
 ✓ built in 1.03s
 $ gate: E1/UX2 toggle preserves selection (server GET /api/scope/selection identical across toggle); E2/UX3 counts live (optimistic < 100 ms, equal to GET /api/scope/summary after debounce); E3/UX9 keyboard-only flow (Tab/j/k/space/t/s/g) ends on /verify with visible focus at every step; FX1-FX3 selection never lost on navigate/reload/stale refetch
 ```
+
+## M7 — API + project state + jobs + learning layer — PASSED 2026-10-29
+
+Design: docs/design/07-api-state.md (+§13 code differences). Implementers A (state/jobs/check) and B (API/serve/client types) in parallel. Review: fresh Opus agent in an isolated worktree — gate rejected as committed: concurrent selection PUTs overwrote each other (read outside the write tx), approve-after-edit discarded the human edit, `labor parse --force` bypassed the decisions guard; all fixed failing-test-first (178 tests), plus request-id reuse → 409, replays never re-enqueue jobs, real-services end-to-end API test. Reviewer-confirmed: 30 actions persisted + replay-equal; R1–R6 byte-identical; locks; learning toggle/snapshot/rollback/reset; `labor check --live` PASS (454 s).
+
+Commands: `uv run labor serve <project> [--port 8765] [--dev] [--mock]`, `labor status`, `labor run <project> [--to STAGE] [--force STAGE]`, `labor check [--live] <project>`, `labor learning list|reset|rollback <id>`, `labor decisions export`; OpenAPI: `uv run python -m manuallabor.api.export_openapi [--check]`, `cd frontend && npm run gen-api`.
+
+```
+$ uv run ruff check manuallabor/state manuallabor/jobs manuallabor/check.py manuallabor/api manuallabor/cli.py tests/state tests/jobs tests/check tests/api && uv run mypy manuallabor/
+All checks passed!
+Success: no issues found in 189 source files
+$ MANUALLABOR_REQUIRE_DOCLING=1 uv run pytest tests/state tests/jobs tests/check tests/api --basetemp=.pytest_tmp_gate
+178 passed, 1 skipped, 11 warnings in 376.84s (0:06:16)
+$ uv run labor check ./tests/fixtures/project-a
+check                   status      ms  detail
+pipeline run            PASS     24201  2 docs ingested, scored, grouped, selected, cleaned
+K1 nodes fresh          PASS       152  2 docs x 7 nodes fresh
+K2 artifacts validate   PASS       224  245 blocks, 17 sidecars, selection 207 blocks
+K3 faithfulness         PASS        56  0 violations in 69 auto-approved cleaned blocks
+K4 block accounting     PASS        23  245 blocks each in exactly one group per view
+K5 figures resolve      PASS         0  33 attachments resolved; 0 unresolved caption refs (reported)
+K6 idempotent rerun     PASS       773  16 stage calls, all skip; 93 files unchanged
+K7 mock only            PASS         0  183 LLM calls, all mock
+K8 state                PASS         0  integrity ok, 1 actions monotonic, selection == DB
+K9 baseline learning    PASS         0  learning provenance = baseline
+K10 export gate         PASS       567  refused with 123 queued block(s), 0 open flag(s); first b-clean-p002-04
+K11 review + export     PASS      5024  123 blocks approved by a scripted reviewer; exported 20 articles
+K12 zip validates       PASS        17  20 articles, 17 figures, 455799 bytes
+K13 export accounting   PASS        22  245 blocks: 207 in articles, 38 unassigned
+K14 round trip          PASS        54  doc | blocks | auto_approved | faith_violations(auto) | articles | figures: clean | 150 | 65 | 0 | 15 | 3; figures | 95 | 57 | 0 | 5 | 14
+K15 export determinism  PASS       499  sha256 a53de0326f07949d identical on a second export
+K16 figure references   PASS         0  33 figure references resolve to a file and a sidecar
+
+labor check: all checks passed
+$ uv run labor schemas export --check && uv run python -m manuallabor.api.export_openapi --check
+schemas up to date
+openapi up to date: /Users/ashwinchidambaram/dev/projects/doc-to-KB/frontend/src/api/openapi.json
+$ gate: tests/jobs R1–R6 kill-and-resume all byte-identical to an uninterrupted run (reviewer reproduced with 3 random SIGKILLs during parse + serve-only and serve+worker kills); every HIL action persisted append-only with monotonic id + request_id dedup (reviewer: 30 actions, replay-equal statuses, cursor restored); 20 concurrent selection PUTs all applied; approve-after-edit keeps the edited text; labor check K1–K16 PASS on a temp copy with forced mocks (and --live PASS in 454 s per the reviewer). Full fast suite is run at the module 11 gate once all in-flight modules are stable.
+```

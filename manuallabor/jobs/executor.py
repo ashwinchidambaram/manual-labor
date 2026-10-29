@@ -25,16 +25,19 @@ __all__ = [
     "Cancelled",
     "ExecResult",
     "Heartbeat",
+    "PROJECT_NODES",
     "Plan",
     "clean_stray_tmp",
     "execute",
     "make_plan",
+    "make_project_plan",
     "run_node",
     "run_nodes",
 ]
 
 Emit = Callable[[dict[str, Any]], None]
 EXEC_NODES = ("parse", "figures", "score", "group", "clean", "score2")
+PROJECT_NODES = ("assemble", "export")  # project-level (module 11): their unit slug is ""
 
 
 class Cancelled(BaseException):
@@ -79,10 +82,20 @@ class ExecResult:
     blocked: dict[str, list[str]] = field(default_factory=dict)
     refused: list[tuple[str, str]] = field(default_factory=list)
     units_done: int = 0
+    errors: list[str] = field(default_factory=list)  # "<node> <slug>: <message>" per failure
 
     @property
     def ok(self) -> bool:
         return not self.failed and not self.refused and not self.blocked
+
+    def error_message(self, limit: int = 500) -> str | None:
+        """The first failure's actual message (for the job row), at most `limit` chars."""
+        if self.errors:
+            return self.errors[0][:limit]
+        if self.refused:
+            slug, why = self.refused[0]
+            return f"plan {slug}: {why}"[:limit]
+        return None
 
 
 class Heartbeat:
@@ -139,21 +152,33 @@ def clean_stray_tmp(paths: ProjectPaths) -> int:
 # -- planning ----------------------------------------------------------------------------------
 
 
-def _has_decisions(paths: ProjectPaths, slug: str) -> bool:
+def _decision_count(paths: ProjectPaths, slug: str) -> int:
     if not paths.db.is_file():
-        return False
+        return 0
     from manuallabor.state.store import Store
 
     try:
         store = Store.open(paths, readonly=True)
     except Exception:
-        return False
+        return 0
     try:
-        return bool(store.decisions(doc_id=slug))
+        return len(store.decisions(doc_id=slug))
     except Exception:
-        return False
+        return 0
     finally:
         store.close()
+
+
+def _has_decisions(paths: ProjectPaths, slug: str) -> bool:
+    return _decision_count(paths, slug) > 0
+
+
+def reparse_refusal(n: int) -> str:
+    """The re-parse guard's message (01 section 14.12): names the decisions at stake."""
+    return (
+        f"parse would replace blocks that have {n} decision(s); they would be orphaned. "
+        "Use --discard-decisions to re-parse anyway"
+    )
 
 
 def make_plan(
@@ -191,10 +216,9 @@ def make_plan(
                 planning = True
             if planning:
                 chosen.append(node)
-        if "parse" in chosen and not allow_reparse and _has_decisions(paths, slug):
-            refused.append(
-                (slug, "parse would replace blocks that have decisions; use --allow-reparse")
-            )
+        n_dec = _decision_count(paths, slug) if "parse" in chosen and not allow_reparse else 0
+        if n_dec:
+            refused.append((slug, reparse_refusal(n_dec)))
             continue
         if chosen:
             per_doc[slug] = chosen
@@ -208,6 +232,43 @@ def make_plan(
         allow_reparse=allow_reparse,
         provider_mode=provider_mode,
         refused=refused,
+    )
+
+
+def make_project_plan(
+    paths: ProjectPaths,
+    cfg: ProjectConfig,
+    *,
+    to: str = "export",
+    docs: list[str] | None = None,
+    force: Collection[str] = (),
+    allow_reparse: bool = False,
+    provider_mode: ProviderMode = "config",
+    include_fresh: bool = False,
+) -> Plan:
+    """Every stale document node up to score2, then the project-level nodes up to `to`
+    (`assemble` or `export`; `export` includes `assemble`). Forcing a project node re-runs it."""
+    if to not in PROJECT_NODES:
+        raise ValueError(f"--to must be one of {', '.join(PROJECT_NODES)}, got {to!r}")
+    doc_force = [f for f in force if f not in PROJECT_NODES]
+    base = make_plan(
+        paths,
+        cfg,
+        to="score2",
+        docs=docs,
+        force=doc_force,
+        allow_reparse=allow_reparse,
+        provider_mode=provider_mode,
+        include_fresh=include_fresh,
+    )
+    tail = [(n, "") for n in PROJECT_NODES[: PROJECT_NODES.index(to) + 1]]
+    return Plan(
+        units=[*base.units, *tail],
+        to=to,
+        force=sorted(force),
+        allow_reparse=allow_reparse,
+        provider_mode=provider_mode,
+        refused=base.refused,
     )
 
 
@@ -259,6 +320,56 @@ def _stage(
     raise ValueError(node)
 
 
+def _project_unit(
+    paths: ProjectPaths,
+    node: str,
+    plan: Plan,
+    emit: Emit,
+    res: ExecResult,
+    extra: dict[str, Any],
+    tag_node: bool,
+    on_unit: Callable[[str, str, str], None] | None,
+) -> None:
+    """One project-level unit (`assemble` / `export`); blocked when any document unit failed."""
+    t0 = time.monotonic()
+
+    def tagged(obj: dict[str, Any]) -> None:
+        emit({**obj, "node": node} if tag_node else obj)
+
+    if res.failed or res.blocked or res.refused:
+        tagged({"doc": "", "stage": node, "status": "blocked"})
+        res.blocked.setdefault(node, []).append("")
+        status = "blocked"
+    else:
+        from manuallabor.export import pipeline as ep
+        from manuallabor.export.types import GateLocked
+
+        clock = extra.get("clock") or ep.resolve_clock()
+        force = node in plan.force
+        try:
+            if node == "assemble":
+                ep.run_assemble(paths, None, clock=clock, emit=tagged, force=force)
+            else:
+                ep.run_export(paths, None, clock=clock, emit=tagged, force=force)
+            res.units_done += 1
+            status = "done"
+        except Cancelled:
+            raise
+        except Exception as exc:
+            detail = f"{type(exc).__name__}: {exc}"
+            tagged({"doc": "", "stage": node, "status": "error", "detail": detail})
+            if isinstance(exc, GateLocked):
+                tagged(
+                    {"doc": "", "stage": node, "status": "locked", "blockers": exc.blockers[:20]}
+                )
+            res.failed.setdefault(node, []).append("")
+            status = "failed"
+    emit({"event": "unit_done", "node": node, "doc": "", "status": status,
+          "elapsed_ms": int((time.monotonic() - t0) * 1000)})  # fmt: skip
+    if on_unit is not None:
+        on_unit(node, "", status)
+
+
 def execute(
     paths: ProjectPaths,
     plan: Plan,
@@ -285,6 +396,9 @@ def execute(
             raise Cancelled()
         if heartbeat is not None:
             heartbeat.node = node
+        if node in PROJECT_NODES:
+            _project_unit(paths, node, plan, emit, res, extra, tag_node, on_unit)
+            continue
         if slug in blocked:
             if tag_node:
                 emit({"doc": slug, "stage": node, "status": "blocked", "node": node})
@@ -336,6 +450,13 @@ def execute(
         else:
             res.failed.setdefault(node, []).append(slug)
             blocked.add(slug)
+            details = [
+                str(o["detail"])
+                for o in unit_lines
+                if o.get("status") == "error" and o.get("detail") is not None
+            ]
+            msg = details[-1] if details else "stage failed"
+            res.errors.append(f"{node} {slug}: {msg}")
         status = "done" if ok else "failed"
         emit({"event": "unit_done", "node": node, "doc": slug, "status": status,
               "elapsed_ms": int((time.monotonic() - t0) * 1000)})  # fmt: skip
@@ -353,10 +474,12 @@ def run_node(
     emit: Emit,
     providers: Callable[[], ProviderSet] | None = None,
     extra: dict[str, Any] | None = None,
+    allow_reparse: bool = False,
 ) -> list[str]:
     """Run exactly one node for one or every document (the `labor parse|figures|...` commands)
-    and keep stages.json true. Returns the slugs that failed. Output lines are the stage's own
-    (no `node` tag), exactly as before module 7."""
+    and keep stages.json true. Returns the slugs that failed or were refused. Output lines are
+    the stage's own (no `node` tag), exactly as before module 7. A parse that would run on a
+    document with decisions is refused (the same guard as `make_plan`) unless `allow_reparse`."""
     slugs = paths.list_slugs()
     if only is not None:
         if only not in slugs:
@@ -370,7 +493,22 @@ def run_node(
             )
             return [only]
         slugs = [only]
-    plan = Plan(units=[(node, s) for s in slugs], to=node, force=[node] if force else [])
+    refused: list[tuple[str, str]] = []
+    if node == "parse" and not allow_reparse:
+        cfg = paths.load_config()
+        for s in slugs:
+            st = next(x for x in graph.doc_node_states(paths, s, cfg) if x.node == "parse")
+            n_dec = _decision_count(paths, s) if force or st.state != "fresh" else 0
+            if n_dec:
+                refused.append((s, reparse_refusal(n_dec)))
+        slugs = [s for s in slugs if s not in {r for r, _ in refused}]
+    plan = Plan(
+        units=[(node, s) for s in slugs],
+        to=node,
+        force=[node] if force else [],
+        allow_reparse=allow_reparse,
+        refused=refused,
+    )
     lines: list[dict[str, Any]] = []
 
     def out(o: dict[str, Any]) -> None:
@@ -380,7 +518,7 @@ def run_node(
         emit(o)
 
     res = execute(paths, plan, emit=out, providers=providers, tag_node=False, extra=extra)
-    return sorted(res.failed.get(node, []))
+    return sorted({*res.failed.get(node, []), *(s for s, _ in res.refused)})
 
 
 def run_nodes(

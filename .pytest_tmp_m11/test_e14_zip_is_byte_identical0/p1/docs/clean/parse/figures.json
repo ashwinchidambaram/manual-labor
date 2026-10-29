@@ -1,0 +1,62 @@
+[
+  {
+    "bbox": [
+      72.0,
+      286.1,
+      372.0,
+      486.1
+    ],
+    "block_id": "b-clean-p005-07",
+    "docx_image_rid": null,
+    "figure_id": "FIG-clean-p005-01",
+    "has_drawings": false,
+    "image_xrefs": [
+      8
+    ],
+    "page": 5,
+    "sources": [
+      "pymupdf",
+      "docling"
+    ]
+  },
+  {
+    "bbox": [
+      72.0,
+      164.35,
+      372.0,
+      364.35
+    ],
+    "block_id": "b-clean-p006-04",
+    "docx_image_rid": null,
+    "figure_id": "FIG-clean-p006-01",
+    "has_drawings": false,
+    "image_xrefs": [
+      11
+    ],
+    "page": 6,
+    "sources": [
+      "pymupdf",
+      "docling"
+    ]
+  },
+  {
+    "bbox": [
+      72.0,
+      384.675,
+      372.0,
+      584.675
+    ],
+    "block_id": "b-clean-p006-06",
+    "docx_image_rid": null,
+    "figure_id": "FIG-clean-p006-02",
+    "has_drawings": false,
+    "image_xrefs": [
+      12
+    ],
+    "page": 6,
+    "sources": [
+      "pymupdf",
+      "docling"
+    ]
+  }
+]

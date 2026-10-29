@@ -1,0 +1,41 @@
+{
+  "counter": 6,
+  "nodes": {
+    "clean": {
+      "error": null,
+      "fingerprint": null,
+      "seq": 5,
+      "status": "done"
+    },
+    "figures": {
+      "error": null,
+      "fingerprint": null,
+      "seq": 2,
+      "status": "done"
+    },
+    "group": {
+      "error": null,
+      "fingerprint": null,
+      "seq": 4,
+      "status": "done"
+    },
+    "parse": {
+      "error": null,
+      "fingerprint": null,
+      "seq": 1,
+      "status": "done"
+    },
+    "score": {
+      "error": null,
+      "fingerprint": null,
+      "seq": 3,
+      "status": "done"
+    },
+    "score2": {
+      "error": null,
+      "fingerprint": null,
+      "seq": 6,
+      "status": "done"
+    }
+  }
+}

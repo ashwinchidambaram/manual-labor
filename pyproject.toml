@@ -87,4 +87,8 @@ addopts = "-q -m 'not slow' --basetemp=.pytest_tmp"
 markers = [
     "slow: slow end-to-end tests (deselected by default)",
     "live: needs real local models; runs only with MANUALLABOR_LIVE=1",
+    "acc1: SPEC 11.1, the six-fixture round trip (scripts/acceptance.sh AC1)",
+    "acc2: SPEC 11.2, scanned-fixture recall (prints a RECALL line)",
+    "acc3: SPEC 11.3, figure methods and caption-reference attachment (prints evidence lines)",
+    "acc5: SPEC 11.5, agent proposals carry their re-check results (prints a PROPOSALS line)",
 ]

@@ -1,0 +1,39 @@
+{
+  "algo_version": "2",
+  "doc_id": "clean",
+  "figures": [
+    {
+      "description": "Generated description (mock) of image d265d929.",
+      "figure_id": "FIG-clean-p005-01",
+      "image_sha256": "d265d929a0a305e93f63c9caf3714080150536a678318112874da7eeb7e1161a",
+      "outcome": "ok",
+      "tags": [
+        "figure",
+        "mock"
+      ]
+    },
+    {
+      "description": "Generated description (mock) of image 418c5832.",
+      "figure_id": "FIG-clean-p006-01",
+      "image_sha256": "418c58326deeed9144dc33ae28473fb33dfe211cf4363e7927d578cb9e79ebc7",
+      "outcome": "ok",
+      "tags": [
+        "figure",
+        "mock"
+      ]
+    },
+    {
+      "description": "Generated description (mock) of image 73328a8a.",
+      "figure_id": "FIG-clean-p006-02",
+      "image_sha256": "73328a8ae2f8184eb5c633aa12d62d32115d1143171198d166d937732c0197f7",
+      "outcome": "ok",
+      "tags": [
+        "figure",
+        "mock"
+      ]
+    }
+  ],
+  "fingerprint": "0769f9a1d9d7f5a7c7797d67a10d83fe89a4674f9b57b2a4f3b94450fd6aea1b",
+  "prompt_version": "desc-v1",
+  "vision_model": "mock:mock-1"
+}

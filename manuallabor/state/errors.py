@@ -24,6 +24,10 @@ class InvalidOp(ValueError):
     pass
 
 
+class RequestIdReused(ValueError):
+    """A mutation's request id was already used by an action of another kind (HTTP 409)."""
+
+
 class EditConflictError(Exception):
     def __init__(self, conflict: EditConflict) -> None:
         super().__init__("edit changes content; confirm_content_change=true to store it")

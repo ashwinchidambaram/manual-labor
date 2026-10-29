@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from manuallabor import faults, ids
+from manuallabor.calibration.types import LexiconEntry
 from manuallabor.cleanup.types import CleanFile, fallback_detail, raw_sha256
 from manuallabor.contracts.block import Block, NumericVariant, Signal
 from manuallabor.contracts.config import ProjectConfig
@@ -40,6 +41,15 @@ from manuallabor.scoring.faithfulness import check_faithfulness_ex
 from manuallabor.scoring.figures import figure_attach_rule, figure_method, figure_resolution
 from manuallabor.scoring.garbage import garbage_ratio
 from manuallabor.scoring.layout import displaced_blocks, reading_order_risk
+from manuallabor.scoring.learned import (
+    LearnedScoring,
+    active_lexicon,
+    block_texts,
+    learned_confusables,
+    lexicon_specs,
+    load_learned_scoring,
+    promote,
+)
 from manuallabor.scoring.numeric import numeric_specs_for
 from manuallabor.scoring.ocr import ocr_signals
 from manuallabor.scoring.queue import assign_status
@@ -154,6 +164,8 @@ def score_block(
     plan: VerifierPlan = NO_VERIFIER,
     counters: Counter[str] | None = None,
     fallback: str | None = None,
+    learned: LearnedScoring | None = None,
+    lexicon: Sequence[LexiconEntry] = (),
 ) -> BlockScore:
     """All signals of one block, its confidence and machine status. Pure except the optional
     verifier call. ``fallback``: cleanup rejected a candidate for this block and kept its
@@ -179,6 +191,22 @@ def score_block(
         )
 
     numeric, specs = numeric_specs_for(block, ctx.product_model)
+    learned_why: list[str] = []
+    forced_queue = False
+    if learned is not None and block.type not in (BlockType.header, BlockType.footer):
+        extra: list[str] = []
+        for t in block_texts(block):
+            extra.extend(lexicon_specs(t, lexicon))
+        extra = [x for x in dict.fromkeys(extra) if x not in specs]
+        if extra:
+            if not numeric:
+                learned_why.append("learned: lexicon " + ", ".join(repr(x) for x in extra[:3]))
+            numeric = True
+            specs = [*specs, *extra]
+        conf_why = learned_confusables(block.raw_text, learned.confusions)
+        if conf_why:
+            forced_queue = True
+            learned_why.extend(conf_why)
     signals.extend(ocr_signals(block, numeric=numeric))
     pa, note = parser_agreement(block, ctx.parser_versions, numeric=numeric)
     if pa is not None:
@@ -246,14 +274,24 @@ def score_block(
     if vs is not None:
         signals.append(vs)
     conf = combine(signals)
+    if learned is not None and learned.promotions:
+        # a promoted signal can only lower confidence: take the promoted signals only when
+        # they do (the min-of-critical x geometric-mean combiner alone does not guarantee it)
+        promoted = promote(signals, learned.promotions)
+        if promoted != signals:
+            c2 = combine(promoted)
+            if conf is not None and c2 is not None and c2 < conf:
+                signals, conf = promoted, c2
+                learned_why.append("learned: promoted signal critical")
     return BlockScore(
         block_id=block.id,
         signals=sorted(signals, key=lambda s: s.name.value),
         confidence=conf,
-        status=assign_status(conf, numeric, threshold).value,  # type: ignore[arg-type]
+        status=assign_status(conf, numeric or forced_queue, threshold).value,  # type: ignore[arg-type]
         has_numeric_spec=numeric,
         numeric_specs=specs,
         faithfulness=faith_result,
+        learned_why=learned_why,
     )
 
 
@@ -267,10 +305,12 @@ def score_document(
     plan: VerifierPlan = NO_VERIFIER,
     counters: Counter[str] | None = None,
     fallbacks: Mapping[str, str] | None = None,
+    learned: LearnedScoring | None = None,
 ) -> list[BlockScore]:
     """Score every block of one document; sorted by block id."""
     ctxs = block_contexts(doc, blocks, layouts)
     fallbacks = fallbacks or {}
+    lexicon, _ignored = active_lexicon(learned, blocks)
     out = [
         score_block(
             b,
@@ -281,6 +321,8 @@ def score_document(
             plan=plan,
             counters=counters,
             fallback=fallbacks.get(b.id),
+            learned=learned,
+            lexicon=lexicon,
         )
         for b in sorted(blocks, key=lambda b: b.reading_order)
     ]
@@ -529,6 +571,7 @@ def _write_outputs(
     fp: str,
     threshold: float,
     scores: list[BlockScore],
+    learning_snapshot: str = "baseline",
 ) -> None:
     """History first, then scores.json (atomic), then sidecars (only changed bytes). A kill
     between any two steps heals on replay: the history only appends lines that differ from a
@@ -543,6 +586,7 @@ def _write_outputs(
             algo_version=SCORING_ALGO_VERSION,
             fingerprint=fp,
             threshold=threshold,
+            learning_snapshot=learning_snapshot,
             blocks=scores,
         ),
     )
@@ -560,6 +604,7 @@ class _ScoreInputs:
     fallbacks: dict[str, str]
     prior: ScoreFile | None
     fp: str
+    learned: LearnedScoring | None = None
 
 
 def _score_inputs(paths: ProjectPaths, slug: str, config: ProjectConfig) -> _ScoreInputs:
@@ -581,9 +626,11 @@ def _score_inputs(paths: ProjectPaths, slug: str, config: ProjectConfig) -> _Sco
     variants = _variants_from(prior)
     vref = config.model_for(Task.verifier)
     cref = config.model_for(Task.cleanup)
+    learned = load_learned_scoring(paths, config)
     fp = fingerprint(
         {
             "algo": SCORING_ALGO_VERSION,
+            "learned": [learned.snapshot, learned.sha] if learned is not None else None,
             "document_sha": _sha(dp.document),
             "blocks_sha": _sha(dp.blocks),
             "layout_sha": _sha(dp.layout),
@@ -598,7 +645,7 @@ def _score_inputs(paths: ProjectPaths, slug: str, config: ProjectConfig) -> _Sco
             },
         }
     )
-    return _ScoreInputs(doc, blocks, layouts, fig_inputs, variants, fallbacks, prior, fp)
+    return _ScoreInputs(doc, blocks, layouts, fig_inputs, variants, fallbacks, prior, fp, learned)
 
 
 def score_fingerprint(paths: ProjectPaths, slug: str, config: ProjectConfig) -> str:
@@ -619,20 +666,22 @@ def _score_doc(
     doc, blocks, layouts = inp.doc, inp.blocks, inp.layouts
     fig_inputs, variants, fallbacks = inp.fig_inputs, inp.variants, inp.fallbacks
     prior, fp = inp.prior, inp.fp
+    thr = config.threshold_for(slug)
+    snap = inp.learned.snapshot if inp.learned is not None else "baseline"
     if not force and prior is not None and prior.fingerprint == fp:
-        if prior.threshold != config.threshold:
+        if prior.threshold != thr:
             # design 6: a threshold change re-runs assign_status on the stored confidences only
             restated = [
                 s.model_copy(
                     update={
                         "status": assign_status(
-                            s.confidence, s.has_numeric_spec, config.threshold
+                            s.confidence, s.has_numeric_spec or bool(s.learned_why), thr
                         ).value
                     }
                 )
                 for s in prior.blocks
             ]
-            _write_outputs(paths, slug, blocks, fp, config.threshold, restated)
+            _write_outputs(paths, slug, blocks, fp, thr, restated, snap)
             emit(_progress(slug, "restatus", restated, blocks, t0, "threshold changed"))
             return
         n = _apply_sidecars(paths, slug, blocks, prior.blocks)
@@ -649,9 +698,9 @@ def _score_doc(
         return
     counters: Counter[str] = Counter()
     scores = score_document(
-        doc, blocks, layouts, fig_inputs, variants, config.threshold, plan, counters, fallbacks
+        doc, blocks, layouts, fig_inputs, variants, thr, plan, counters, fallbacks, inp.learned
     )
-    _write_outputs(paths, slug, blocks, fp, config.threshold, scores)
+    _write_outputs(paths, slug, blocks, fp, thr, scores, snap)
     emit(_progress(slug, "done", scores, blocks, t0, _detail(counters)))
 
 

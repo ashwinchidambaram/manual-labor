@@ -19,15 +19,15 @@ describe("VU2 diffSegments: the 12-row table", () => {
   const rows: [string, DiffOp, unknown[][]][] = [
     ["1 equal", op("equal", true, "abc", "abc"), [["equal", true, "abc", "abc", []]]],
     ["2 delete allowed", op("delete", true, "-\n", ""), [["del", true, "-\n", "-↵", []]]],
-    ["3 insert allowed", op("insert", true, "", " "), [["ins", true, " ", "·", []]]],
+    ["3 insert allowed", op("insert", true, "", " "), [["ins", true, " ", "␣", []]]],
     ["4 delete violation", op("delete", false, "35", ""), [["del", false, "35", "35", [[0, 2]]]]],
     ["5 insert violation", op("insert", false, "", "36"), [["ins", false, "36", "36", [[0, 2]]]]],
     [
       "6 replace violation",
       op("replace", false, "35 N·m", "36 N·m"),
       [
-        ["del", false, "35 N·m", "35·N·m", [[0, 2]]],
-        ["ins", false, "36 N·m", "36·N·m", [[0, 2]]],
+        ["del", false, "35 N·m", "35␣N·m", [[0, 2]]],
+        ["ins", false, "36 N·m", "36␣N·m", [[0, 2]]],
       ],
     ],
     [
@@ -35,11 +35,11 @@ describe("VU2 diffSegments: the 12-row table", () => {
       op("replace", true, "\n", " "),
       [
         ["del", true, "\n", "↵", []],
-        ["ins", true, " ", "·", []],
+        ["ins", true, " ", "␣", []],
       ],
     ],
-    ["8 reorder allowed", op("reorder", true, "Step 2.", "Step 2."), [["move", true, "Step 2.", "Step·2.", [[5, 6]]]]],
-    ["9 reorder violation, clean empty", op("reorder", false, "Then oil.", ""), [["move", false, "Then oil.", "Then·oil.", []]]],
+    ["8 reorder allowed", op("reorder", true, "Step 2.", "Step 2."), [["move", true, "Step 2.", "Step␣2.", [[5, 6]]]]],
+    ["9 reorder violation, clean empty", op("reorder", false, "Then oil.", ""), [["move", false, "Then oil.", "Then␣oil.", []]]],
     ["10 empty equal", op("equal", true, "", ""), []],
     ["11 insert tab", op("insert", false, "", "\t"), [["ins", false, "\t", "→", []]]],
     ["12 numeric ranges", op("equal", true, "0.25 mm ±0.05", "0.25 mm ±0.05"), [["equal", true, "0.25 mm ±0.05", "0.25 mm ±0.05", [[0, 4], [9, 13]]]]],
@@ -88,8 +88,12 @@ describe("VU3 diffSegments invariants on recorded diffs", () => {
 
 describe("VU4 visualize and numericRanges", () => {
   it("makes whitespace visible one for one", () => {
-    expect(visualize("a b\nc\td e")).toBe("a·b↵c→d⍽e");
+    expect(visualize("a b\nc\td e")).toBe("a␣b↵c→d⍽e");
     expect(visualize("a b").length).toBe(3);
+  });
+  it("the visible-space glyph cannot be confused with a middle dot in the text itself", () => {
+    expect(visualize("35 N·m")).toBe("35␣N·m");
+    expect(visualize("35 N·m")).not.toBe(visualize("35·N·m"));
   });
   it("finds numbers with units, tolerances, part numbers and thousands separators", () => {
     expect(numericRanges("10A")).toEqual([[0, 2]]);

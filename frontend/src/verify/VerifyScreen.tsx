@@ -101,12 +101,12 @@ export default function VerifyScreen() {
       return;
     }
     if (isFigure) return;
-    setEdit({ text: detail.block.clean_text ?? detail.block.raw_text, error: null, conflict: null, busy: false });
+    setEdit({ text: detail.block.clean_text ?? detail.block.raw_text, error: null, conflict: null, conflictText: null, busy: false });
   }, [detail, isFigure, state.currentId]);
   useEffect(() => {
     if (editWanted && detail) {
       setEditWanted(false);
-      if (!isFigure) setEdit({ text: detail.block.clean_text ?? detail.block.raw_text, error: null, conflict: null, busy: false });
+      if (!isFigure) setEdit({ text: detail.block.clean_text ?? detail.block.raw_text, error: null, conflict: null, conflictText: null, busy: false });
     }
   }, [editWanted, detail, isFigure]);
   useEffect(() => setEditWanted(false), [currentId]);
@@ -114,7 +114,8 @@ export default function VerifyScreen() {
   const saveEdit = useCallback(
     async (confirm: boolean) => {
       if (!edit) return;
-      const text = edit.text;
+      // a confirmation sends exactly the text the server flagged, never what the textarea holds now
+      const text = confirm && edit.conflict && edit.conflictText !== null ? edit.conflictText : edit.text;
       setEdit((e) => (e ? { ...e, busy: true, error: null } : e));
       const id = state.currentId;
       const r = await v.act("edit", { text, confirm });
@@ -124,7 +125,7 @@ export default function VerifyScreen() {
         announce(`Edited ${id}. Next: ${r.out.next?.block_id ?? "none"}`);
         return;
       }
-      if (r.conflict) setEdit((e) => (e ? { ...e, busy: false, conflict: r.conflict ?? null } : e));
+      if (r.conflict) setEdit((e) => (e ? { ...e, busy: false, conflict: r.conflict ?? null, conflictText: text } : e));
       else setEdit((e) => (e ? { ...e, busy: false, error: r.error instanceof ApiError ? r.error.detail : "Not saved" } : e));
     },
     [edit, state.currentId, v, announce],
@@ -194,7 +195,7 @@ export default function VerifyScreen() {
       vViewUp: () => v.stepView(1),
       vZoom: () => setZoom((z) => !z),
       vEscape: () => {
-        if (edit?.conflict) setEdit({ ...edit, conflict: null });
+        if (edit?.conflict) setEdit({ ...edit, conflict: null, conflictText: null });
         else if (edit) {
           setEdit(null);
           focusCard();
@@ -272,9 +273,7 @@ export default function VerifyScreen() {
             counts={state.counts}
             focusTick={v.focusTick}
             wantFocus={v.wantFocus}
-            onSelect={(id) => {
-              v.browse(id);
-            }}
+            onSelect={v.browse}
             onNearEnd={() => void v.loadMore()}
           />
         </div>
@@ -288,7 +287,7 @@ export default function VerifyScreen() {
             edit={edit}
             onEditText={(t) => setEdit((e) => (e ? { ...e, text: t, error: null } : e))}
             onConfirmConflict={() => void saveEdit(true)}
-            onKeepEditing={() => setEdit((e) => (e ? { ...e, conflict: null } : e))}
+            onKeepEditing={() => setEdit((e) => (e ? { ...e, conflict: null, conflictText: null } : e))}
             threshold={v.T}
           />
         </div>

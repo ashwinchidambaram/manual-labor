@@ -67,7 +67,7 @@ def get_summary(ctx: Ctx) -> ScopeSummary:
 @router.post("/regroup", status_code=202, response_model=RegroupOut)
 def post_regroup(body: RegroupIn, ctx: Ctx) -> RegroupOut:
     override = ctx.scope.regroup(body)
-    job = ctx.runner.enqueue(RunPlanIn(to="group", docs=[body.doc_id]))
+    job = ctx.runner.enqueue(RunPlanIn(to="group", docs=[body.doc_id]), request_id=body.request_id)
     return RegroupOut(override=override, job=job)
 
 

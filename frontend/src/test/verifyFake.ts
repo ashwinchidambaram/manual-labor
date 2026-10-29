@@ -152,6 +152,8 @@ export interface VerifyFake {
   actionGate: Promise<void> | null;
   /** per request-order failure/conflict: called with the action, may return an error response */
   actionHook: ((a: ReviewActionIn, n: number) => { status: number; body: Record<string, unknown> } | null) | null;
+  /** override the `next` the server answers with (undefined keeps the default); lets a test make the server disagree with the optimistic guess */
+  nextFor: ((a: ReviewActionIn) => QueueItem | null | undefined) | null;
   /** queue answers (in order, the last repeats); when empty the live item list is served */
   queueHook: ((search: URLSearchParams) => QueuePage | null) | null;
 }
@@ -177,6 +179,7 @@ export function installVerifyFake(over: Partial<VerifyFake> = {}): VerifyFake {
     disables: [],
     actionGate: null,
     actionHook: null,
+    nextFor: null,
     queueHook: null,
     ...over,
   };
@@ -236,6 +239,8 @@ export function installVerifyFake(over: Partial<VerifyFake> = {}): VerifyFake {
         trail = [...trail, x.block_id];
         status = a.kind === "approve" ? "approved" : a.kind === "edit" ? "edited" : a.kind === "flag" ? "flagged" : x.status;
       }
+      const forced = f.nextFor?.(a);
+      if (forced !== undefined) next = forced;
       f.cursor = { ...f.cursor, current_block_id: next?.block_id ?? null, trail };
       f.counts = { ...f.counts, approved: f.counts.approved + (a.kind === "approve" ? 1 : 0) };
       const out: ReviewActionOut = { action_id: actionN, next, cursor: f.cursor, counts: { ...f.counts, pending: f.items.length }, block_status: status };

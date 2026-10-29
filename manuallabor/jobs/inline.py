@@ -69,11 +69,13 @@ def run_inline(
         res = execute(paths, plan, emit=emit, providers=providers, heartbeat=hb, on_unit=on_unit)
         if not res.ok:
             status = "failed"
-            error = "failed: " + ", ".join(f"{n}={s}" for n, s in sorted(res.failed.items()))
+            error = res.error_message() or (
+                "failed: " + ", ".join(f"{n}={s}" for n, s in sorted(res.failed.items()))
+            )
     except Cancelled:
         status = "cancelled"
     except Exception as exc:
-        status, error = "failed", f"{type(exc).__name__}: {exc}"
+        status, error = "failed", f"{type(exc).__name__}: {exc}"[:500]
         raise
     finally:
         fields: dict[str, Any] = {"status": status, "finished_at": store.now(), "error": error}

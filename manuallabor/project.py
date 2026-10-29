@@ -200,8 +200,46 @@ class ProjectPaths:
         return self.learning / "cleanup.json"
 
     @property
+    def learned_agent(self) -> Path:
+        """Materialized active learning snapshot (module 10): agent examples."""
+        return self.learning / "agent.json"
+
+    @property
+    def agent(self) -> Path:
+        return self.root / "agent"
+
+    @property
+    def agent_proposals(self) -> Path:
+        """Projection of the proposals table (module 10); the DB is the truth."""
+        return self.agent / "proposals.json"
+
+    @property
+    def agent_outcomes(self) -> Path:
+        """Latest non-proposal outcome per flag (machine output, file only; module 10)."""
+        return self.agent / "outcomes.json"
+
+    @property
     def figures_index(self) -> Path:
         return self.figures_root / "index.json"
+
+    @property
+    def export_dir(self) -> Path:
+        return self.root / "export"
+
+    @property
+    def assembled(self) -> Path:
+        """Staging tree: the zip's exact layout (module 11)."""
+        return self.export_dir / "assembled"
+
+    @property
+    def export_state(self) -> Path:
+        return self.export_dir / "state.json"
+
+    @property
+    def zip_path(self) -> Path:
+        from manuallabor import ids
+
+        return self.export_dir / f"{ids.slugify(self.load_config().name)}-kb.zip"
 
     def source(self, filename: str) -> Path:
         return self.sources / filename

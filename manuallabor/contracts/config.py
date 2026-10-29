@@ -6,7 +6,7 @@ from typing import Literal
 
 from pydantic import Field, field_validator, model_validator
 
-from manuallabor.contracts._base import ContractModel, Unit
+from manuallabor.contracts._base import ContractModel, DocSlug, Unit
 from manuallabor.contracts.enums import ArticleSplit, OcrEngine, Task
 
 KNOWN_PROVIDERS = ("mock", "ollama", "anthropic", "openai", "openai_compatible", "vllm", "llamacpp")
@@ -74,6 +74,14 @@ class CleanupConfig(ContractModel):
     describe: bool = True
 
 
+class AgentConfig(ContractModel):
+    """Agent-pass settings (module 10)."""
+
+    page_image: bool = False
+    vision_reader: bool = True
+    max_rounds: int = Field(default=3, ge=1, le=10)
+
+
 class ProjectConfig(ContractModel):
     schema_version: Literal["1.0"] = "1.0"
     name: str
@@ -87,6 +95,13 @@ class ProjectConfig(ContractModel):
     target_edit_rate: Unit = 0.02
     learning: LearningConfig = Field(default_factory=LearningConfig)
     cleanup: CleanupConfig = Field(default_factory=CleanupConfig)
+    agent: AgentConfig = Field(default_factory=AgentConfig)
+    doc_thresholds: dict[DocSlug, Unit] = Field(default_factory=dict)
+
+    def threshold_for(self, slug: str) -> float:
+        """The review threshold of one document: its pin (set by a calibration apply to the
+        next documents) or the project threshold."""
+        return self.doc_thresholds.get(slug, self.threshold)
 
     @field_validator("parsers")
     @classmethod

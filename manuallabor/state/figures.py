@@ -109,9 +109,16 @@ class FigureService:
     # -- write ----------------------------------------------------------------------------------
 
     def _override(
-        self, op: str, figure_id: str, article_id: str, anchor: str | None, request_id: str
+        self,
+        op: str,
+        figure_id: str,
+        article_id: str,
+        anchor: str | None,
+        request_id: str,
+        screen: str = "verify",
+        meta: dict[str, Any] | None = None,
     ) -> AttachOverride:
-        prev = self.store.action_by_request(request_id)
+        prev = self.store.action_by_request(request_id, (ActionKind.attach, ActionKind.detach))
         if prev is not None:
             return AttachOverride.model_validate(prev.payload["_outcome"])
         slug = self._slug(figure_id)
@@ -139,6 +146,8 @@ class FigureService:
                 "rule_before": rec.attach_rule.value,
             },
         }
+        if meta is not None:
+            example["proposal"] = meta.get("proposal")
         with self.store.tx():
             aid = self.store.next_action_id()
             self.store.add_override(
@@ -150,11 +159,12 @@ class FigureService:
             )
             self.store.append_action(
                 ActionKind.attach if op == "attach" else ActionKind.detach,
-                "verify",
+                screen,
                 target_id=figure_id,
                 doc_id=slug,
                 payload={
                     "override": ov.model_dump(mode="json"),
+                    **{k: v for k, v in (meta or {}).items() if k != "proposal"},
                     "_outcome": ov.model_dump(mode="json"),
                 },
                 example=example,
@@ -165,15 +175,32 @@ class FigureService:
         return ov
 
     def attach(
-        self, figure_id: str, article_id: str, anchor: str | None, request_id: str
+        self,
+        figure_id: str,
+        article_id: str,
+        anchor: str | None,
+        request_id: str,
+        *,
+        screen: str = "verify",
+        meta: dict[str, Any] | None = None,
     ) -> AttachOverride:
-        return self._override("attach", figure_id, article_id, anchor, request_id)
+        return self._override(
+            "attach", figure_id, article_id, anchor, request_id, screen=screen, meta=meta
+        )
 
     def detach(self, figure_id: str, article_id: str, request_id: str) -> AttachOverride:
         return self._override("detach", figure_id, article_id, None, request_id)
 
-    def set_bbox(self, figure_id: str, bbox: list[float], request_id: str) -> None:
-        if self.store.action_by_request(request_id) is not None:
+    def set_bbox(
+        self,
+        figure_id: str,
+        bbox: list[float],
+        request_id: str,
+        *,
+        screen: str = "verify",
+        meta: dict[str, Any] | None = None,
+    ) -> None:
+        if self.store.action_by_request(request_id, (ActionKind.crop_bbox,)) is not None:
             return
         slug = self._slug(figure_id)
         bid = self._block_of(figure_id)
@@ -190,10 +217,15 @@ class FigureService:
             self.store.add_figure_override(seq, slug, figure_id, [float(v) for v in bbox], aid)
             self.store.append_action(
                 ActionKind.crop_bbox,
-                "verify",
+                screen,
                 target_id=figure_id,
                 doc_id=slug,
-                payload={"bbox": bbox, "before": blk.bbox, "_outcome": None},
+                payload={
+                    "bbox": bbox,
+                    "before": blk.bbox,
+                    **{k: v for k, v in (meta or {}).items() if k != "proposal"},
+                    "_outcome": None,
+                },
                 example={
                     "doc_id": slug,
                     "figure": {
@@ -202,6 +234,7 @@ class FigureService:
                         "to_article": None,
                         "rule_before": None,
                     },
+                    **({"proposal": meta.get("proposal")} if meta is not None else {}),
                 },
                 request_id=request_id,
                 action_id=aid,

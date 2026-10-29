@@ -19,6 +19,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/agent/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Items */
+        get: operations["list_items"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/agent/proposals": {
         parameters: {
             query?: never;
@@ -294,6 +311,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/export/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download Export */
+        get: operations["download_export"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/export/override": {
         parameters: {
             query?: never;
@@ -318,8 +352,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Export Status */
-        get: operations["export_status"];
+        /** Get Export Status */
+        get: operations["get_export_status"];
         put?: never;
         post?: never;
         delete?: never;
@@ -898,10 +932,54 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AcceptAllIn */
+        AcceptAllIn: {
+            /** Docs */
+            docs?: string[] | null;
+            /** Request Id */
+            request_id?: string;
+        };
+        /**
+         * AgentConfig
+         * @description Agent-pass settings (module 10).
+         */
+        AgentConfig: {
+            /**
+             * Max Rounds
+             * @default 3
+             */
+            max_rounds: number;
+            /**
+             * Page Image
+             * @default false
+             */
+            page_image: boolean;
+            /**
+             * Vision Reader
+             * @default true
+             */
+            vision_reader: boolean;
+        };
+        /** AgentItemView */
+        AgentItemView: {
+            flag: components["schemas"]["Flag"];
+            /** Last Detail */
+            last_detail?: string | null;
+            /** Last Outcome */
+            last_outcome?: string | null;
+            /** Pending Proposal Id */
+            pending_proposal_id?: string | null;
+            /** Round */
+            round: number;
+            /** Target Id */
+            target_id: string;
+        };
         /** AgentRunIn */
         AgentRunIn: {
             /** Docs */
             docs?: string[] | null;
+            /** Flag Ids */
+            flag_ids?: string[] | null;
             /** Request Id */
             request_id?: string;
         };
@@ -1081,25 +1159,52 @@ export interface components {
             baseline_edit_rate?: number | null;
             /** Baseline N */
             baseline_n: number;
+            discordant?: components["schemas"]["DiscordantPairs"] | null;
             /** Learned Edit Rate */
             learned_edit_rate?: number | null;
             /** Learned N */
             learned_n: number;
+            learned_queue?: components["schemas"]["LearnedQueue"] | null;
+            /**
+             * Method
+             * @default in_sample
+             * @enum {string}
+             */
+            method: "holdout" | "in_sample";
+            /** Observed */
+            observed?: components["schemas"]["ProvenanceRate"][];
+            /** Snapshot */
+            snapshot?: string | null;
             /**
              * Verdict
              * @enum {string}
              */
-            verdict: "learned_better" | "learned_worse" | "insufficient";
+            verdict: "learned_better" | "learned_worse" | "no_difference" | "insufficient";
         };
         /** CalibrationApplyIn */
         CalibrationApplyIn: {
             /** Request Id */
             request_id?: string;
+            /**
+             * Scope
+             * @default next_docs
+             * @enum {string}
+             */
+            scope: "next_docs" | "project";
             /** Threshold */
             threshold: number;
         };
         /** CalibrationApplyOut */
         CalibrationApplyOut: {
+            job?: components["schemas"]["JobInfo"] | null;
+            /** Pinned */
+            pinned?: string[];
+            /**
+             * Scope
+             * @default next_docs
+             * @enum {string}
+             */
+            scope: "next_docs" | "project";
             /** Threshold */
             threshold: number;
         };
@@ -1115,16 +1220,60 @@ export interface components {
             lo: number;
             /** N */
             n: number;
+            /**
+             * Sparse
+             * @default false
+             */
+            sparse: boolean;
+            /**
+             * Wilson Hi
+             * @default 1
+             */
+            wilson_hi: number;
+            /**
+             * Wilson Lo
+             * @default 0
+             */
+            wilson_lo: number;
         };
         /** CalibrationReport */
         CalibrationReport: {
             ab?: components["schemas"]["CalibrationAB"] | null;
             /** Buckets */
             buckets?: components["schemas"]["CalibrationBucket"][];
+            /** Current Threshold */
+            current_threshold?: number | null;
+            learn_preview?: components["schemas"]["LearnPreview"] | null;
+            /**
+             * N Numeric Excluded
+             * @default 0
+             */
+            n_numeric_excluded: number;
+            /**
+             * N Outcomes
+             * @default 0
+             */
+            n_outcomes: number;
+            /** Pooled */
+            pooled?: components["schemas"]["PooledRow"][];
+            /**
+             * Scope
+             * @default project
+             * @enum {string}
+             */
+            scope: "project" | "global";
+            /** Signals */
+            signals?: components["schemas"]["SignalReliability"][];
             /** Suggested Threshold */
             suggested_threshold?: number | null;
+            /** Suggestion Detail */
+            suggestion_detail?: string | null;
+            /** Suggestion Reason */
+            suggestion_reason?: ("ok" | "insufficient_data" | "target_not_met") | null;
             /** Target Edit Rate */
             target_edit_rate: number;
+            /** Warnings */
+            warnings?: string[];
         };
         /**
          * CleanupConfig
@@ -1148,6 +1297,19 @@ export interface components {
             /** Request Id */
             request_id?: string;
         };
+        /** ConfusionPair */
+        ConfusionPair: {
+            /** Examples */
+            examples?: string[];
+            /** Id */
+            id: string;
+            /** Right */
+            right: string;
+            /** Support */
+            support: number;
+            /** Wrong */
+            wrong: string;
+        };
         /** CoverageReport */
         CoverageReport: {
             /** Doc Id */
@@ -1169,6 +1331,21 @@ export interface components {
             cores_physical: number | null;
             /** Model */
             model: string;
+        };
+        /** CriticalPromotion */
+        CriticalPromotion: {
+            /** Below */
+            below: number;
+            /** Id */
+            id: string;
+            /** Rate Above */
+            rate_above: number;
+            /** Rate Below */
+            rate_below: number;
+            /** Signal */
+            signal: string;
+            /** Support */
+            support: number;
         };
         /** Cursor */
         Cursor: {
@@ -1279,6 +1456,13 @@ export interface components {
          * @enum {string}
          */
         DiffOpKind: "equal" | "insert" | "delete" | "replace" | "reorder";
+        /** DiscordantPairs */
+        DiscordantPairs: {
+            /** B */
+            b: number;
+            /** C */
+            c: number;
+        };
         /**
          * DocFigure
          * @description One figure of a document with every article it is attached to (the Verify re-attach picker).
@@ -1370,14 +1554,88 @@ export interface components {
             /** Detail */
             detail: string;
         };
-        /** ExportStatus */
+        /**
+         * EvidenceRef
+         * @description A span quoted from a named source. `verified`: the span occurs (whitespace collapsed) in
+         *     that source's text; an unverified span is kept and shown struck through.
+         */
+        EvidenceRef: {
+            source: components["schemas"]["EvidenceSource"];
+            /** Span */
+            span: string;
+            /**
+             * Verified
+             * @default false
+             */
+            verified: boolean;
+        };
+        /**
+         * EvidenceSource
+         * @description Where a proposal's evidence span was quoted from (module 10).
+         * @enum {string}
+         */
+        EvidenceSource: "pymupdf" | "docling" | "ocr" | "ocr_alt" | "docx" | "vision" | "note" | "candidate";
+        /** ExportReviewSummary */
+        ExportReviewSummary: {
+            /** Approved */
+            approved: number;
+            /** Auto Approved */
+            auto_approved: number;
+            /** Edited */
+            edited: number;
+            /** Numbers Verified */
+            numbers_verified: number;
+            /** Overrides */
+            overrides: number;
+        };
+        /**
+         * ExportStatus
+         * @description `unlocked` is the raw gate (no open flag, no queued in-scope block); `blockers` are the
+         *     blocks an active override does not cover: an export is possible iff `blockers` is empty.
+         */
         ExportStatus: {
+            /** Blockers */
+            blockers?: string[];
             /** Open Flags */
             open_flags: number;
             /** Overrides */
             overrides?: components["schemas"]["Override"][];
+            /**
+             * Queued
+             * @default 0
+             */
+            queued: number;
+            summary?: components["schemas"]["ExportSummary"] | null;
             /** Unlocked */
             unlocked: boolean;
+            /** Zip Path */
+            zip_path?: string | null;
+        };
+        /**
+         * ExportSummary
+         * @description What the Export screen shows after an export (SPEC 7.4).
+         */
+        ExportSummary: {
+            /** Articles */
+            articles: number;
+            /** Docs */
+            docs: number;
+            /** Figures */
+            figures: number;
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
+            /** Pages Covered */
+            pages_covered: number;
+            review: components["schemas"]["ExportReviewSummary"];
+            /** Warnings */
+            warnings?: string[];
+            /** Zip Bytes */
+            zip_bytes: number;
+            /** Zip Sha256 */
+            zip_sha256: string;
         };
         /**
          * Extraction
@@ -1769,6 +2027,24 @@ export interface components {
              */
             units_total: number;
         };
+        /** LearnPreview */
+        LearnPreview: {
+            /** Confusions */
+            confusions?: components["schemas"]["ConfusionPair"][];
+            /** Lexicon */
+            lexicon?: components["schemas"]["LexiconEntry"][];
+            /** Promotions */
+            promotions?: components["schemas"]["CriticalPromotion"][];
+            /** Rules */
+            rules?: string[];
+        };
+        /** LearnedQueue */
+        LearnedQueue: {
+            /** Added */
+            added: number;
+            /** Edited Among Added */
+            edited_among_added: number;
+        };
         /**
          * LearningConfig
          * @description Self-improvement settings (module 7). `enabled` off means baseline behaviour exactly,
@@ -1841,6 +2117,20 @@ export interface components {
              * @default baseline
              */
             provenance: string;
+        };
+        /** LexiconEntry */
+        LexiconEntry: {
+            /** Id */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "unit" | "part_keyword";
+            /** Support */
+            support: number;
+            /** Value */
+            value: string;
         };
         /** ModelRef */
         ModelRef: {
@@ -1978,19 +2268,44 @@ export interface components {
             /** System */
             system: string;
         };
-        /** PriorAttempt */
+        /** PooledRow */
+        PooledRow: {
+            /** Edited */
+            edited: number;
+            /** Hi */
+            hi: number;
+            /** Lo */
+            lo: number;
+            /** N */
+            n: number;
+            /** Rate */
+            rate?: number | null;
+            /** T */
+            t: number;
+        };
+        /**
+         * PriorAttempt
+         * @description An earlier round of the same flag. `reason` is the reviewer's rejection reason; the
+         *     model's own rationale is shown to the reviewer but never fed back to the model.
+         */
         PriorAttempt: {
             /**
              * Decided At
              * Format: date-time
              */
             decided_at: string;
+            /** Failed Checks */
+            failed_checks?: string[];
+            /** @default text */
+            kind: components["schemas"]["ProposalKind"];
             /** Proposal Id */
             proposal_id: string;
             /** Proposal Text */
             proposal_text: string;
             /** Rationale */
             rationale: string;
+            /** Reason */
+            reason?: string | null;
             status: components["schemas"]["ProposalStatus"];
         };
         /** ProbeOut */
@@ -2030,6 +2345,7 @@ export interface components {
         };
         /** ProjectConfig */
         ProjectConfig: {
+            agent?: components["schemas"]["AgentConfig"];
             /** @default per_topic */
             article_split: components["schemas"]["ArticleSplit"];
             /**
@@ -2038,6 +2354,10 @@ export interface components {
              */
             background_ocr_born_digital: boolean;
             cleanup?: components["schemas"]["CleanupConfig"];
+            /** Doc Thresholds */
+            doc_thresholds?: {
+                [key: string]: number;
+            };
             learning?: components["schemas"]["LearningConfig"];
             models?: components["schemas"]["TaskModels"];
             /** Name */
@@ -2095,12 +2415,19 @@ export interface components {
         /** Proposal */
         Proposal: {
             /**
+             * Basis Sha256
+             * @default 0000000000000000000000000000000000000000000000000000000000000000
+             */
+            basis_sha256: string;
+            /**
              * Created At
              * Format: date-time
              */
             created_at: string;
             /** Evidence */
-            evidence: string[];
+            evidence: components["schemas"]["EvidenceRef"][];
+            /** Final Bbox */
+            final_bbox?: number[] | null;
             /** Final Text */
             final_text?: string | null;
             /** Flag Id */
@@ -2111,12 +2438,18 @@ export interface components {
             id: string;
             /** Input Hash */
             input_hash: string;
+            /** @default text */
+            kind: components["schemas"]["ProposalKind"];
             /** Model */
             model: string;
             /** Proposal Text */
             proposal_text?: string | null;
+            proposed_attach?: components["schemas"]["ProposedAttach"] | null;
             /** Proposed Bbox */
             proposed_bbox?: number[] | null;
+            /** Proposed Cells */
+            proposed_cells?: string[][] | null;
+            proposed_regroup?: components["schemas"]["ProposedRegroup"] | null;
             /** Rationale */
             rationale: string;
             /** Rechecks */
@@ -2130,19 +2463,71 @@ export interface components {
             status: components["schemas"]["ProposalStatus"];
             /** Target Id */
             target_id: string;
+            vision?: components["schemas"]["VisionReading"] | null;
         };
         /** ProposalEditIn */
         ProposalEditIn: {
+            /** Bbox */
+            bbox?: number[] | null;
+            /**
+             * Confirm Content Change
+             * @default false
+             */
+            confirm_content_change: boolean;
             /** Request Id */
             request_id?: string;
             /** Text */
-            text: string;
+            text?: string | null;
+        };
+        /**
+         * ProposalKind
+         * @description What a proposal changes (module 10).
+         * @enum {string}
+         */
+        ProposalKind: "text" | "cells" | "bbox" | "attach" | "regroup";
+        /** ProposalRejectIn */
+        ProposalRejectIn: {
+            /** Reason */
+            reason?: string | null;
+            /** Request Id */
+            request_id?: string;
         };
         /**
          * ProposalStatus
          * @enum {string}
          */
-        ProposalStatus: "pending" | "accepted" | "edited" | "rejected";
+        ProposalStatus: "pending" | "accepted" | "edited" | "rejected" | "superseded";
+        /** ProposedAttach */
+        ProposedAttach: {
+            /** Anchor Block Id */
+            anchor_block_id?: string | null;
+            /** Article Id */
+            article_id: string;
+            /** Figure Id */
+            figure_id: string;
+        };
+        /** ProposedRegroup */
+        ProposedRegroup: {
+            /** Block Id */
+            block_id: string;
+            /** To Topic Slug */
+            to_topic_slug: string;
+        };
+        /** ProvenanceRate */
+        ProvenanceRate: {
+            /** Edit Rate */
+            edit_rate?: number | null;
+            /** Edited */
+            edited: number;
+            /** N */
+            n: number;
+            /** Provenance */
+            provenance: string;
+            /** Wilson Hi */
+            wilson_hi: number;
+            /** Wilson Lo */
+            wilson_lo: number;
+        };
         /** QueueItem */
         QueueItem: {
             /** Block Id */
@@ -2426,6 +2811,48 @@ export interface components {
          * @enum {string}
          */
         SignalName: "ocr_mean" | "ocr_min" | "textlayer_vs_ocr" | "parser_agreement" | "reading_order_risk" | "table_consistency" | "garbage_ratio" | "faithfulness" | "figure_method" | "figure_resolution" | "figure_attach_rule" | "has_numeric_spec" | "llm_verifier";
+        /** SignalReliability */
+        SignalReliability: {
+            /** Cut */
+            cut: number;
+            /** Edited Above */
+            edited_above: number;
+            /** Edited Below */
+            edited_below: number;
+            /** Hi Above */
+            hi_above: number;
+            /** Hi Below */
+            hi_below: number;
+            /**
+             * Klass
+             * @enum {string}
+             */
+            klass: "predictive" | "uninformative" | "insufficient";
+            /** Lo Above */
+            lo_above: number;
+            /** Lo Below */
+            lo_below: number;
+            /** N Above */
+            n_above: number;
+            /** N Below */
+            n_below: number;
+            /**
+             * Promote
+             * @default false
+             */
+            promote: boolean;
+            /** Rate Above */
+            rate_above?: number | null;
+            /** Rate Below */
+            rate_below?: number | null;
+            /** Signal */
+            signal: string;
+            /**
+             * Soft Fraction Below
+             * @default 0
+             */
+            soft_fraction_below: number;
+        };
         /** SnapshotInfo */
         SnapshotInfo: {
             /**
@@ -2641,6 +3068,31 @@ export interface components {
             /** Error Type */
             type: string;
         };
+        /**
+         * VisionReading
+         * @description A vision model's transcript of a block's numbers (module 10). It carries no score and no
+         *     confidence by design: it is an attester for number changes and a pane in the Agent screen,
+         *     never a signal.
+         */
+        VisionReading: {
+            /** Detail */
+            detail?: string | null;
+            /** Image Sha256 */
+            image_sha256?: string | null;
+            /** Input Hash */
+            input_hash?: string | null;
+            /** Lines */
+            lines?: string[];
+            /** Model */
+            model?: string | null;
+            /** Numbers */
+            numbers?: string[];
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "ok" | "invalid" | "error" | "skipped";
+        };
         /** WhyItem */
         WhyItem: {
             /**
@@ -2678,7 +3130,7 @@ export interface operations {
         };
         requestBody?: {
             content: {
-                "application/json": components["schemas"]["RequestIn"] | null;
+                "application/json": components["schemas"]["AcceptAllIn"] | null;
             };
         };
         responses: {
@@ -2691,17 +3143,55 @@ export interface operations {
                     "application/json": components["schemas"]["Proposal"][];
                 };
             };
-            /** @description Validation Error */
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Unprocessable Entity */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
-            /** @description Not Implemented */
-            501: {
+        };
+    };
+    list_items: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentItemView"][];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2713,7 +3203,11 @@ export interface operations {
     };
     list_proposals: {
         parameters: {
-            query?: never;
+            query?: {
+                status?: components["schemas"]["ProposalStatus"] | null;
+                flag_id?: string | null;
+                doc?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -2729,8 +3223,17 @@ export interface operations {
                     "application/json": components["schemas"]["Proposal"][];
                 };
             };
-            /** @description Not Implemented */
-            501: {
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2764,17 +3267,17 @@ export interface operations {
                     "application/json": components["schemas"]["Proposal"];
                 };
             };
-            /** @description Validation Error */
-            422: {
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
-            /** @description Not Implemented */
-            501: {
+            /** @description Unprocessable Entity */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2808,17 +3311,17 @@ export interface operations {
                     "application/json": components["schemas"]["Proposal"];
                 };
             };
-            /** @description Validation Error */
-            422: {
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
-            /** @description Not Implemented */
-            501: {
+            /** @description Unprocessable Entity */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2839,7 +3342,7 @@ export interface operations {
         };
         requestBody?: {
             content: {
-                "application/json": components["schemas"]["RequestIn"] | null;
+                "application/json": components["schemas"]["ProposalRejectIn"] | null;
             };
         };
         responses: {
@@ -2852,17 +3355,17 @@ export interface operations {
                     "application/json": components["schemas"]["Proposal"];
                 };
             };
-            /** @description Validation Error */
-            422: {
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
-            /** @description Not Implemented */
-            501: {
+            /** @description Unprocessable Entity */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2894,17 +3397,17 @@ export interface operations {
                     "application/json": components["schemas"]["JobInfo"];
                 };
             };
-            /** @description Validation Error */
-            422: {
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
-            /** @description Not Implemented */
-            501: {
+            /** @description Unprocessable Entity */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2947,7 +3450,10 @@ export interface operations {
     };
     get_calibration: {
         parameters: {
-            query?: never;
+            query?: {
+                scope?: "project" | "global";
+                snapshot?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -2963,8 +3469,17 @@ export interface operations {
                     "application/json": components["schemas"]["CalibrationReport"];
                 };
             };
-            /** @description Not Implemented */
-            501: {
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2996,17 +3511,17 @@ export interface operations {
                     "application/json": components["schemas"]["CalibrationApplyOut"];
                 };
             };
-            /** @description Validation Error */
-            422: {
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
-            /** @description Not Implemented */
-            501: {
+            /** @description Unprocessable Entity */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3268,6 +3783,15 @@ export interface operations {
                     "application/json": components["schemas"]["JobInfo"];
                 };
             };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -3279,6 +3803,35 @@ export interface operations {
             };
             /** @description Not Implemented */
             501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    download_export: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Not Found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3310,13 +3863,13 @@ export interface operations {
                     "application/json": components["schemas"]["ExportStatus"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Unprocessable Entity */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
             /** @description Not Implemented */
@@ -3330,7 +3883,7 @@ export interface operations {
             };
         };
     };
-    export_status: {
+    get_export_status: {
         parameters: {
             query?: never;
             header?: never;

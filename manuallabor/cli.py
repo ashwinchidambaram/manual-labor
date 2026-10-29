@@ -5,9 +5,14 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated, Any
 
 import typer
+
+if TYPE_CHECKING:
+    from manuallabor.project import ProjectPaths
+    from manuallabor.state.lock import ProjectLock
+    from manuallabor.state.store import Store
 
 app = typer.Typer(
     name="labor",
@@ -17,6 +22,14 @@ app = typer.Typer(
 )
 schemas_app = typer.Typer(help="Schema utilities.", no_args_is_help=True)
 app.add_typer(schemas_app, name="schemas")
+
+
+@app.callback()
+def _main() -> None:
+    """Manual Labor."""
+    from manuallabor.providers.offline import install_from_env
+
+    install_from_env()  # MANUALLABOR_OFFLINE=1: no network but the local model server
 
 
 def _register_serve() -> None:
@@ -96,9 +109,11 @@ def _stage(
     only: str | None,
     force: bool,
     extra: dict[str, object] | None = None,
+    allow_reparse: bool = False,
 ) -> list[str]:
     """Run one node (or several, document-major) through the executor (keeps
-    docs/<slug>/stages.json true); the output lines are the stage's own."""
+    docs/<slug>/stages.json true); the output lines are the stage's own. A parse goes through
+    the re-parse guard (refused on documents with decisions unless `allow_reparse`)."""
     from manuallabor.jobs.executor import run_node, run_nodes
     from manuallabor.jobs.providers import provider_set_factory
     from manuallabor.parse.pipeline import stdout_emit
@@ -128,7 +143,14 @@ def _stage(
                 extra=extra,
             )
         return run_node(
-            paths, node, only=only, force=force, emit=stdout_emit, providers=providers, extra=extra
+            paths,
+            node,
+            only=only,
+            force=force,
+            emit=stdout_emit,
+            providers=providers,
+            extra=extra,
+            allow_reparse=allow_reparse,
         )
     finally:
         lock.release()
@@ -143,9 +165,23 @@ def parse(
         int | None,
         typer.Option("--workers", min=1, help="OCR worker processes (default min(2, cpus))."),
     ] = None,
+    discard_decisions: Annotated[
+        bool,
+        typer.Option(
+            "--discard-decisions",
+            help="Re-parse documents that have review decisions (they become orphaned).",
+        ),
+    ] = False,
 ) -> None:
     """Parse ingested sources into blocks (one JSON progress line per stage)."""
-    failed = _stage(project, "parse", only=doc, force=force, extra={"workers": workers})
+    failed = _stage(
+        project,
+        "parse",
+        only=doc,
+        force=force,
+        extra={"workers": workers},
+        allow_reparse=discard_decisions,
+    )
     if failed:
         raise typer.Exit(1)
 
@@ -254,7 +290,11 @@ def run(
     ] = None,
     allow_reparse: Annotated[
         bool,
-        typer.Option("--allow-reparse", help="Allow a re-parse of documents that have decisions."),
+        typer.Option(
+            "--allow-reparse",
+            "--discard-decisions",
+            help="Allow a re-parse of documents that have decisions (they become orphaned).",
+        ),
     ] = False,
     mock: Annotated[bool, typer.Option("--mock", help="Mock every model call.")] = False,
 ) -> None:
@@ -303,12 +343,156 @@ def run(
         raise typer.Exit(1)
 
 
+def _export_session(
+    project: Path, *, writer_cmd: str
+) -> tuple[ProjectPaths, Store, list[ProjectLock]]:
+    """Both locks and a writer store for the commands that assemble or export."""
+    from manuallabor.project import ProjectPaths
+    from manuallabor.state.errors import LockHeld
+    from manuallabor.state.lock import ProjectLock
+    from manuallabor.state.store import Store
+
+    if not project.is_dir():
+        print(f"project directory not found: {project}", file=sys.stderr)
+        raise typer.Exit(2)
+    paths = ProjectPaths(project)
+    paths.ensure_config()
+    plock = ProjectLock(paths.lock, cmd=writer_cmd)
+    wlock = ProjectLock(paths.worker_lock, cmd=writer_cmd)
+    try:
+        plock.acquire()
+        wlock.acquire()
+    except LockHeld as exc:
+        plock.release()
+        print(f"{exc}", file=sys.stderr)
+        raise typer.Exit(3) from exc
+    return paths, Store.open(paths), [wlock, plock]
+
+
+def _clock(now: str | None) -> Any:
+    from manuallabor.export.pipeline import resolve_clock
+    from manuallabor.export.types import ExportError
+
+    try:
+        return resolve_clock(now)
+    except ExportError as exc:
+        print(str(exc), file=sys.stderr)
+        raise typer.Exit(2) from exc
+
+
+@app.command()
+def assemble(
+    project: Annotated[Path, typer.Argument(help="Project directory.")],
+    force: Annotated[bool, typer.Option("--force", help="Rebuild even if up to date.")] = False,
+    now: Annotated[str | None, typer.Option("--now", help="Injected UTC clock (ISO).")] = None,
+) -> None:
+    """Build the export staging tree (export/assembled/) without zipping it."""
+    from manuallabor.export.pipeline import run_assemble
+    from manuallabor.export.types import ExportError, GateLocked
+    from manuallabor.parse.pipeline import stdout_emit
+
+    clock = _clock(now)
+    paths, store, locks = _export_session(project, writer_cmd=" ".join(sys.argv))
+    try:
+        run_assemble(paths, store, clock=clock, emit=stdout_emit, force=force)
+    except GateLocked as exc:
+        print(str(exc), file=sys.stderr)
+        raise typer.Exit(2) from exc
+    except ExportError as exc:
+        print(str(exc), file=sys.stderr)
+        raise typer.Exit(1) from exc
+    finally:
+        store.close()
+        for lk in locks:
+            lk.release()
+
+
 @app.command()
 def export(
     project: Annotated[Path, typer.Argument(help="Project directory.")],
+    override: Annotated[
+        str | None,
+        typer.Option(
+            "--override",
+            help="Export despite open flags / queued blocks; the reason is recorded.",
+        ),
+    ] = None,
+    target: Annotated[
+        str | None, typer.Option("--target", help="Limit --override to this block or figure id.")
+    ] = None,
+    flag: Annotated[
+        str | None, typer.Option("--flag", help="Limit --override to this flag id.")
+    ] = None,
+    out: Annotated[Path | None, typer.Option("--out", help="Zip path.")] = None,
+    now: Annotated[str | None, typer.Option("--now", help="Injected UTC clock (ISO).")] = None,
+    force: Annotated[bool, typer.Option("--force", help="Rebuild even if up to date.")] = False,
+    as_json: Annotated[bool, typer.Option("--json", help="Machine-readable summary.")] = False,
 ) -> None:
-    """Assemble and export the knowledge base."""
-    _not_implemented("export")
+    """Assemble, zip and validate the knowledge base. Exit 2 when the gate is locked."""
+    from manuallabor.export.pipeline import record_override, run_export
+    from manuallabor.export.types import ExportError, GateLocked
+    from manuallabor.parse.pipeline import stdout_emit
+    from manuallabor.state.errors import InvalidOp
+
+    clock = _clock(now)
+    paths, store, locks = _export_session(project, writer_cmd=" ".join(sys.argv))
+    try:
+        if override is not None:
+            try:
+                record_override(paths, store, override, target_id=target, flag_id=flag)
+            except InvalidOp as exc:
+                print(str(exc), file=sys.stderr)
+                raise typer.Exit(2) from exc
+        rec = run_export(
+            paths,
+            store,
+            clock=clock,
+            emit=(lambda _o: None) if as_json else stdout_emit,
+            force=force,
+            out=out,
+        )
+    except GateLocked as exc:
+        print(str(exc), file=sys.stderr)
+        for b in exc.blockers[:20]:
+            print(f"  blocker: {b}", file=sys.stderr)
+        raise typer.Exit(2) from exc
+    except ExportError as exc:
+        print(str(exc), file=sys.stderr)
+        raise typer.Exit(1) from exc
+    finally:
+        store.close()
+        for lk in locks:
+            lk.release()
+    if as_json:
+        print(json.dumps(rec.summary.model_dump(mode="json") | {"zip_path": rec.zip_path}))
+    else:
+        s = rec.summary
+        print(f"{rec.zip_path}: {s.articles} articles, {s.figures} figures, {s.zip_bytes} bytes")
+        print(f"sha256 {s.zip_sha256}")
+
+
+@app.command("validate-export")
+def validate_export(
+    zip_file: Annotated[Path, typer.Argument(help="Export zip to validate.")],
+) -> None:
+    """Validate an export zip against the manifest schema and the figure-reference rules."""
+    import zipfile
+
+    from manuallabor.contracts.manifest import Manifest
+    from manuallabor.export.validate import validate_zip
+
+    if not zip_file.is_file():
+        print(f"not a file: {zip_file}", file=sys.stderr)
+        raise typer.Exit(2)
+    problems = validate_zip(zip_file)
+    if problems:
+        for p in problems:
+            print(str(p))
+        print(f"INVALID: {len(problems)} problem(s)")
+        raise typer.Exit(1)
+    with zipfile.ZipFile(zip_file) as zf:
+        m = Manifest.model_validate_json(zf.read("manifest.json"))
+    print(f"OK: {len(m.articles)} articles, {len(m.figures)} figures")
 
 
 @app.command()
@@ -410,6 +594,9 @@ def _learning_op(project: Path, op: str, arg: str | None = None) -> None:
 
     from manuallabor.state.errors import InvalidOp, NotFound
 
+    if op == "list" and (project / "project.db").is_file():
+        _learning_list_readonly(project)
+        return
     _paths, store, svc, lock = _locked_services(project)
     rid = f"cli-{uuid.uuid4().hex}"
     try:
@@ -445,6 +632,28 @@ def _learning_op(project: Path, op: str, arg: str | None = None) -> None:
     finally:
         store.close()
         lock.release()
+
+
+def _learning_list_readonly(project: Path) -> None:
+    """`labor learning list` reads only: no lock, a read-only connection (works while
+    `labor serve` holds the project)."""
+    from manuallabor.project import ProjectPaths
+    from manuallabor.state.learning import LearningService
+    from manuallabor.state.store import Store
+
+    paths = ProjectPaths(project)
+    store = Store.open(paths, readonly=True)
+    try:
+        st = LearningService(paths, store).state()
+    finally:
+        store.close()
+    print(
+        f"enabled={st.enabled} use_global={st.use_global} "
+        f"active={st.active} provenance={st.provenance}"
+    )
+    for sn in st.snapshots:
+        mark = "*" if sn.active else " "
+        print(f"{mark} {sn.id}  parent={sn.parent or '-'}  origin={sn.origin}  counts={sn.counts}")
 
 
 @learning_app.command("list")
@@ -528,4 +737,11 @@ def decisions_export(
         out.write_text(text, encoding="utf-8")
 
 
+def _register_agent() -> None:
+    from manuallabor import cli_agent
+
+    cli_agent.register(app)
+
+
 _register_serve()
+_register_agent()

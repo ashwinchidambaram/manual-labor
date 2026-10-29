@@ -41,14 +41,25 @@ export function reasonChips({ why, hasNumeric, max = 3 }: { why: ReasonIn[]; has
   return { status, reasons, overflow };
 }
 
-/** The server lists queue reasons as names only; the leading `critical_reasons` ones were critical (gap G3). */
-const CRITICAL_FALLBACK = new Set(["faithfulness", "figure_method"]);
+/**
+ * The server lists queue reasons as names only; the leading `critical_reasons` ones were critical (gap G3).
+ * Until that field exists the criticality is derived the way the scorer assigns it: faithfulness and figure_method
+ * always; the two agreement signals and the weakest-OCR-word signal only on numeric blocks. Values are unknown on a
+ * card (null), so criticals are put in a fixed priority order instead of by value.
+ */
+const CRITICAL_ALWAYS = ["faithfulness", "figure_method"];
+const CRITICAL_IF_NUMERIC = ["parser_agreement", "textlayer_vs_ocr", "ocr_min"];
+const PRIORITY = [...CRITICAL_ALWAYS, ...CRITICAL_IF_NUMERIC];
 export function reasonsFromQueueItem(reasons: string[], hasNumeric: boolean, criticalReasons?: number): ReasonIn[] {
-  void hasNumeric;
-  return reasons.map((name, i) => ({
+  const isCritical = (name: string, i: number): boolean =>
+    criticalReasons !== undefined ? i < criticalReasons : CRITICAL_ALWAYS.includes(name) || (hasNumeric && CRITICAL_IF_NUMERIC.includes(name));
+  const out = reasons.map((name, i): ReasonIn => ({
     kind: name === STALE_NAME ? "stale" : "signal",
     name,
-    value: 0,
-    critical: criticalReasons !== undefined ? i < criticalReasons : CRITICAL_FALLBACK.has(name),
+    value: null,
+    critical: isCritical(name, i),
   }));
+  if (criticalReasons !== undefined) return out;
+  const rank = (n: string): number => PRIORITY.indexOf(n);
+  return [...out.filter((r) => r.critical).sort((a, b) => rank(a.name) - rank(b.name)), ...out.filter((r) => !r.critical)];
 }

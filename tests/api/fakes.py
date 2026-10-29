@@ -598,12 +598,23 @@ class FakeRunner:
         self.started = False
         self.stopped = False
 
-    def enqueue(self, plan: RunPlanIn, kind: str = "run", files: Sequence[Path] = ()) -> JobInfo:
+    def enqueue(
+        self,
+        plan: RunPlanIn,
+        kind: str = "run",
+        files: Sequence[Path] = (),
+        request_id: str | None = None,
+    ) -> JobInfo:
+        if request_id is not None:
+            for j in self.st.jobs.values():
+                if j.plan.get("request_id") == request_id:
+                    return j
         self.st.job_n += 1
+        extra = {} if request_id is None else {"request_id": request_id}
         job = JobInfo(
             id=f"job-{self.st.job_n:06d}",
             kind=kind,
-            plan=plan.model_dump(mode="json"),
+            plan={**plan.model_dump(mode="json"), **extra},
             status="queued",
             created_at=NOW,
         )

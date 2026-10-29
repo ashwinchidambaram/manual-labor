@@ -1,12 +1,66 @@
 {
   "$defs": {
+    "EvidenceRef": {
+      "additionalProperties": false,
+      "description": "A span quoted from a named source. `verified`: the span occurs (whitespace collapsed) in\nthat source's text; an unverified span is kept and shown struck through.",
+      "properties": {
+        "source": {
+          "$ref": "#/$defs/EvidenceSource"
+        },
+        "span": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Span",
+          "type": "string"
+        },
+        "verified": {
+          "default": false,
+          "title": "Verified",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "source",
+        "span",
+        "verified"
+      ],
+      "title": "EvidenceRef",
+      "type": "object"
+    },
+    "EvidenceSource": {
+      "description": "Where a proposal's evidence span was quoted from (module 10).",
+      "enum": [
+        "pymupdf",
+        "docling",
+        "ocr",
+        "ocr_alt",
+        "docx",
+        "vision",
+        "note",
+        "candidate"
+      ],
+      "title": "EvidenceSource",
+      "type": "string"
+    },
     "PriorAttempt": {
       "additionalProperties": false,
+      "description": "An earlier round of the same flag. `reason` is the reviewer's rejection reason; the\nmodel's own rationale is shown to the reviewer but never fed back to the model.",
       "properties": {
         "decided_at": {
           "format": "date-time",
           "title": "Decided At",
           "type": "string"
+        },
+        "failed_checks": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Failed Checks",
+          "type": "array"
+        },
+        "kind": {
+          "$ref": "#/$defs/ProposalKind",
+          "default": "text"
         },
         "proposal_id": {
           "title": "Proposal Id",
@@ -20,6 +74,19 @@
           "title": "Rationale",
           "type": "string"
         },
+        "reason": {
+          "anyOf": [
+            {
+              "maxLength": 300,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        },
         "status": {
           "$ref": "#/$defs/ProposalStatus"
         }
@@ -29,20 +96,93 @@
         "proposal_text",
         "rationale",
         "status",
-        "decided_at"
+        "decided_at",
+        "kind",
+        "reason",
+        "failed_checks"
       ],
       "title": "PriorAttempt",
       "type": "object"
+    },
+    "ProposalKind": {
+      "description": "What a proposal changes (module 10).",
+      "enum": [
+        "text",
+        "cells",
+        "bbox",
+        "attach",
+        "regroup"
+      ],
+      "title": "ProposalKind",
+      "type": "string"
     },
     "ProposalStatus": {
       "enum": [
         "pending",
         "accepted",
         "edited",
-        "rejected"
+        "rejected",
+        "superseded"
       ],
       "title": "ProposalStatus",
       "type": "string"
+    },
+    "ProposedAttach": {
+      "additionalProperties": false,
+      "properties": {
+        "anchor_block_id": {
+          "anyOf": [
+            {
+              "pattern": "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Anchor Block Id"
+        },
+        "article_id": {
+          "pattern": "^(?:[a-z0-9]+(?:-[a-z0-9]+)*)(?:--(?:[a-z0-9]+(?:-[a-z0-9]+)*))?$",
+          "title": "Article Id",
+          "type": "string"
+        },
+        "figure_id": {
+          "pattern": "^FIG-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$",
+          "title": "Figure Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "figure_id",
+        "article_id",
+        "anchor_block_id"
+      ],
+      "title": "ProposedAttach",
+      "type": "object"
+    },
+    "ProposedRegroup": {
+      "additionalProperties": false,
+      "properties": {
+        "block_id": {
+          "pattern": "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$",
+          "title": "Block Id",
+          "type": "string"
+        },
+        "to_topic_slug": {
+          "maxLength": 48,
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "title": "To Topic Slug",
+          "type": "string"
+        }
+      },
+      "required": [
+        "block_id",
+        "to_topic_slug"
+      ],
+      "title": "ProposedRegroup",
+      "type": "object"
     },
     "RecheckResult": {
       "additionalProperties": false,
@@ -75,6 +215,97 @@
       ],
       "title": "RecheckResult",
       "type": "object"
+    },
+    "VisionReading": {
+      "additionalProperties": false,
+      "description": "A vision model's transcript of a block's numbers (module 10). It carries no score and no\nconfidence by design: it is an attester for number changes and a pane in the Agent screen,\nnever a signal.",
+      "properties": {
+        "detail": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Detail"
+        },
+        "image_sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Image Sha256"
+        },
+        "input_hash": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Input Hash"
+        },
+        "lines": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Lines",
+          "type": "array"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model"
+        },
+        "numbers": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Numbers",
+          "type": "array"
+        },
+        "outcome": {
+          "enum": [
+            "ok",
+            "invalid",
+            "error",
+            "skipped"
+          ],
+          "title": "Outcome",
+          "type": "string"
+        }
+      },
+      "required": [
+        "model",
+        "image_sha256",
+        "lines",
+        "numbers",
+        "outcome",
+        "detail",
+        "input_hash"
+      ],
+      "title": "VisionReading",
+      "type": "object"
     }
   },
   "additionalProperties": false,
@@ -84,6 +315,12 @@
       "title": "All Checks Passed",
       "type": "boolean"
     },
+    "basis_sha256": {
+      "default": "0000000000000000000000000000000000000000000000000000000000000000",
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Basis Sha256",
+      "type": "string"
+    },
     "created_at": {
       "format": "date-time",
       "title": "Created At",
@@ -91,11 +328,28 @@
     },
     "evidence": {
       "items": {
-        "type": "string"
+        "$ref": "#/$defs/EvidenceRef"
       },
       "minItems": 1,
       "title": "Evidence",
       "type": "array"
+    },
+    "final_bbox": {
+      "anyOf": [
+        {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 4,
+          "minItems": 4,
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Final Bbox"
     },
     "final_text": {
       "anyOf": [
@@ -131,6 +385,10 @@
       "title": "Input Hash",
       "type": "string"
     },
+    "kind": {
+      "$ref": "#/$defs/ProposalKind",
+      "default": "text"
+    },
     "model": {
       "title": "Model",
       "type": "string"
@@ -146,6 +404,17 @@
       ],
       "default": null,
       "title": "Proposal Text"
+    },
+    "proposed_attach": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ProposedAttach"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "proposed_bbox": {
       "anyOf": [
@@ -163,6 +432,35 @@
       ],
       "default": null,
       "title": "Proposed Bbox"
+    },
+    "proposed_cells": {
+      "anyOf": [
+        {
+          "items": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Proposed Cells"
+    },
+    "proposed_regroup": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ProposedRegroup"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "rationale": {
       "maxLength": 300,
@@ -191,6 +489,17 @@
       "pattern": "(?:^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$)|(?:^FIG-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$)",
       "title": "Target Id",
       "type": "string"
+    },
+    "vision": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/VisionReading"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     }
   },
   "required": [
@@ -198,14 +507,21 @@
     "flag_id",
     "target_id",
     "round",
+    "kind",
     "proposal_text",
     "proposed_bbox",
+    "proposed_cells",
+    "proposed_attach",
+    "proposed_regroup",
     "evidence",
     "rationale",
     "rechecks",
     "status",
     "final_text",
+    "final_bbox",
     "history",
+    "vision",
+    "basis_sha256",
     "model",
     "input_hash",
     "created_at",

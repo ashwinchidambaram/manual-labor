@@ -11,7 +11,7 @@ from manuallabor.contracts.block import FaithfulnessResult, Signal
 from manuallabor.contracts.enums import AttachRule, Extraction
 from manuallabor.figures.types import DedupeEntry, FigureExtraction, FigureFailure
 
-SCORING_ALGO_VERSION: Final = "4"
+SCORING_ALGO_VERSION: Final = "5"
 
 # -- comparison normalization / agreement (2.0, 2.2, 2.3) ------------------------------------
 DIGIT_WEIGHT: Final = 3
@@ -126,6 +126,8 @@ class BlockScore(ScoreModel):
     has_numeric_spec: bool
     numeric_specs: list[str] = Field(default_factory=list)
     faithfulness: FaithfulnessResult | None = None
+    # why-items of the learned layer that fired for this block (module 10); empty on baseline
+    learned_why: list[str] = Field(default_factory=list)
 
 
 class ScoreFile(ScoreModel):
@@ -133,6 +135,7 @@ class ScoreFile(ScoreModel):
     algo_version: str
     fingerprint: Sha256Hex
     threshold: Unit
+    learning_snapshot: str = "baseline"
     blocks: list[BlockScore]
 
 

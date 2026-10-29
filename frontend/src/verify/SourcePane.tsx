@@ -41,6 +41,12 @@ export default function SourcePane({ page, detail, currentId, zoom, onJump, crop
   });
   const rects = useMemo(() => (blocksQ.data ?? []).filter((b) => b.bbox.length === 4), [blocksQ.data]);
 
+  // paint order: largest first, so a block inside a table or figure is later in the DOM, on top, and receives the click
+  const painted = useMemo(() => {
+    const area = (b: number[]): number => Math.max(0, b[2] - b[0]) * Math.max(0, b[3] - b[1]);
+    return rects.map((r, i) => ({ r, i })).sort((a, b) => area(b.r.bbox) - area(a.r.bbox) || a.i - b.i).map((x) => x.r);
+  }, [rects]);
+
   const own = detail && detail.page.doc_id === page.doc_id && detail.page.page === page.page ? detail.block : null;
   const words = useMemo(() => {
     if (!own) return { boxes: [] as number[][], whole: false };
@@ -115,7 +121,7 @@ export default function SourcePane({ page, detail, currentId, zoom, onJump, crop
       <div ref={wrap} className="relative" style={{ width: zoom ? "200%" : "100%" }}>
         <img src={src} alt={`Page ${page.page} of ${page.doc_id}`} className="block w-full select-none bg-white" draggable={false} />
         {page.width > 0 && !crop
-          ? rects.map((r) => {
+          ? painted.map((r) => {
               const isHF = r.type === "header" || r.type === "footer";
               const cur = r.block_id === currentId;
               return (

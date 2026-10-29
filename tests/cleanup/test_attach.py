@@ -72,6 +72,7 @@ def attachments(af: AttachFile) -> dict[tuple[str, str], Any]:
 # -- 23 gate --------------------------------------------------------------------------------
 
 
+@pytest.mark.acc3
 @pytest.mark.parametrize("slug", GATE_FIXTURES)
 def test_23_gate_caption_refs(cleanedproj: Proj, slug: str) -> None:
     g = gt(slug)
@@ -95,6 +96,7 @@ def test_23_gate_caption_refs(cleanedproj: Proj, slug: str) -> None:
             assert sc.attach_rule == AttachRule.caption_ref
             hits += 1
     print(f"\n{slug}: caption_ref {hits}/{want} GT references")
+    print(f"ATTACH ok {hits}/{want} ({slug})")  # SPEC 11.3 evidence
     assert hits == want
     assert want == {"clean": 3, "twocol": 3, "figures": 12, "scanned": 3, "manual": 2}[slug]
 

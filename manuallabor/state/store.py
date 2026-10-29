@@ -10,7 +10,7 @@ import hashlib
 import json
 import sqlite3
 import threading
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Collection, Iterable, Iterator
 from contextlib import contextmanager
 from datetime import datetime
 from typing import Any
@@ -19,9 +19,10 @@ from manuallabor import faults
 from manuallabor.contracts._base import _fmt_utc, _parse_utc
 from manuallabor.contracts.block import DiffOp, Signal
 from manuallabor.contracts.decision import Decision
-from manuallabor.contracts.enums import DecisionAction, FlagCategory, FlagStatus
+from manuallabor.contracts.enums import DecisionAction, FlagCategory, FlagStatus, ProposalStatus
 from manuallabor.contracts.flag import Flag
 from manuallabor.contracts.io import canonical_json
+from manuallabor.contracts.proposal import Proposal
 from manuallabor.project import ProjectPaths
 from manuallabor.providers.base import Clock, utc_now
 from manuallabor.state import db
@@ -204,11 +205,24 @@ class Store:
         r = self.q1("SELECT seq FROM sqlite_sequence WHERE name='decisions'")
         return 1 if r is None else int(r[0]) + 1
 
-    def action_by_request(self, request_id: str | None) -> ActionRecord | None:
+    def action_by_request(
+        self, request_id: str | None, kinds: Collection[ActionKind] | None = None
+    ) -> ActionRecord | None:
+        """The action recorded under `request_id` (a replay), or None. With `kinds`, an action
+        of another kind raises `RequestIdReused` (one request id = one endpoint's action)."""
         if request_id is None:
             return None
         r = self.q1("SELECT * FROM actions WHERE request_id=?", (request_id,))
-        return None if r is None else _action(r)
+        if r is None:
+            return None
+        act = _action(r)
+        if kinds is not None and act.kind not in kinds:
+            from manuallabor.state.errors import RequestIdReused
+
+            raise RequestIdReused(
+                f"request_id {request_id!r} was already used by a {act.kind.value} action"
+            )
+        return act
 
     def append_action(
         self,
@@ -257,6 +271,15 @@ class Store:
     def iter_actions(self) -> Iterator[ActionRecord]:
         for r in self.q("SELECT * FROM actions ORDER BY id"):
             yield _action(r)
+
+    def actions_of(self, kinds: tuple[ActionKind, ...], after_id: int = 0) -> list[ActionRecord]:
+        """Actions of the given kinds with id > `after_id`, by id (module 11 override reads)."""
+        marks = ",".join("?" for _ in kinds)
+        rows = self.q(
+            f"SELECT * FROM actions WHERE kind IN ({marks}) AND id > ? ORDER BY id",  # noqa: S608
+            (*(k.value for k in kinds), after_id),
+        )
+        return [_action(r) for r in rows]
 
     def get_action(self, action_id: int) -> ActionRecord | None:
         r = self.q1("SELECT * FROM actions WHERE id=?", (action_id,))
@@ -413,6 +436,98 @@ class Store:
         f = self.get_flag(flag_id)
         assert f is not None
         return f
+
+    # -- proposals (module 10) ---------------------------------------------------------------
+
+    def next_proposal_n(self) -> int:
+        r = self.q1("SELECT seq FROM sqlite_sequence WHERE name='proposals'")
+        return 1 if r is None else int(r[0]) + 1
+
+    @staticmethod
+    def _flag_n(flag_id: str) -> int:
+        return int(flag_id.split("-", 1)[1])
+
+    def add_proposal(self, p: Proposal) -> None:
+        """Insert a proposal (inside a `tx`; its id was built from `next_proposal_n`). Raises
+        `sqlite3.IntegrityError` when the flag already has a proposal of that round."""
+        if self._depth == 0:
+            raise RuntimeError("add_proposal outside a transaction")
+        self.x(
+            "INSERT INTO proposals(n, flag_id, target_id, round, body, status, created_at, "
+            "decided_action_id) VALUES (?,?,?,?,?,?,?,NULL)",
+            (
+                int(p.id.split("-", 1)[1]),
+                self._flag_n(p.flag_id),
+                p.target_id,
+                p.round,
+                _j(p.model_dump(mode="json")),
+                p.status.value,
+                fmt_ts(p.created_at),
+            ),
+        )
+
+    def get_proposal(self, proposal_id: str) -> Proposal | None:
+        try:
+            n = int(proposal_id.split("-", 1)[1])
+        except (IndexError, ValueError):
+            return None
+        r = self.q1("SELECT * FROM proposals WHERE n=?", (n,))
+        return None if r is None else _proposal(r)
+
+    def proposal_row_action(self, proposal_id: str) -> int | None:
+        n = int(proposal_id.split("-", 1)[1])
+        r = self.q1("SELECT decided_action_id FROM proposals WHERE n=?", (n,))
+        return None if r is None or r[0] is None else int(r[0])
+
+    def proposal_for(self, flag_id: str, round_: int) -> Proposal | None:
+        r = self.q1(
+            "SELECT * FROM proposals WHERE flag_id=? AND round=?", (self._flag_n(flag_id), round_)
+        )
+        return None if r is None else _proposal(r)
+
+    def proposals(
+        self,
+        status: ProposalStatus | None = None,
+        flag_id: str | None = None,
+        doc: str | None = None,
+        target_ids: Iterable[str] | None = None,
+    ) -> list[Proposal]:
+        """Proposals by id (= creation order), optionally filtered."""
+        sql = "SELECT * FROM proposals"
+        args: list[Any] = []
+        where: list[str] = []
+        if status is not None:
+            where.append("status=?")
+            args.append(status.value)
+        if flag_id is not None:
+            where.append("flag_id=?")
+            args.append(self._flag_n(flag_id))
+        if where:
+            sql += " WHERE " + " AND ".join(where)
+        out = [_proposal(r) for r in self.q(sql + " ORDER BY n", tuple(args))]
+        if target_ids is not None:
+            wanted = set(target_ids)
+            out = [p for p in out if p.target_id in wanted]
+        if doc is not None:
+            from manuallabor import ids
+
+            def slug_of(t: str) -> str:
+                return (
+                    ids.parse_figure_id(t)[0] if t.startswith("FIG-") else ids.parse_block_id(t)[0]
+                )
+
+            out = [p for p in out if slug_of(p.target_id) == doc]
+        return out
+
+    def set_proposal(self, p: Proposal, action_id: int | None) -> None:
+        """Replace a proposal's body and status (inside a `tx`)."""
+        if self._depth == 0:
+            raise RuntimeError("set_proposal outside a transaction")
+        self.x(
+            "UPDATE proposals SET body=?, status=?, decided_action_id=COALESCE(?, "
+            "decided_action_id) WHERE n=?",
+            (_j(p.model_dump(mode="json")), p.status.value, action_id, int(p.id.split("-", 1)[1])),
+        )
 
     # -- selection / overrides / cursor ---------------------------------------------------
 
@@ -632,6 +747,10 @@ def _decision(r: sqlite3.Row) -> DecisionRecord:
         learning_provenance=r["learning_provenance"],
         source=r["source"],
     )
+
+
+def _proposal(r: sqlite3.Row) -> Proposal:
+    return Proposal.model_validate(json.loads(r["body"]))
 
 
 def _flag(r: sqlite3.Row) -> Flag:

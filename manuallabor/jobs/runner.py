@@ -18,7 +18,7 @@ import subprocess
 import sys
 import threading
 import time
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -99,6 +99,7 @@ class JobRunner:
         mode: ProviderMode = "config",
         resume: bool = True,
         python: str | None = None,
+        event_handlers: dict[str, Callable[[str, dict[str, Any]], None]] | None = None,
     ) -> None:
         self.paths = paths
         self.store = store
@@ -111,10 +112,32 @@ class JobRunner:
         self._kill_at: dict[str, float] = {}
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
+        # worker log events other than the job lifecycle (module 10: `proposal`, `agent_outcome`)
+        # are handed to these in log order; a handler must be idempotent (a resumed worker and
+        # an adopted job re-read lines)
+        self.event_handlers: dict[str, Callable[[str, dict[str, Any]], None]] = dict(
+            event_handlers or {}
+        )
 
     # -- public API (JobRunnerP) ------------------------------------------------------------
 
-    def enqueue(self, plan: RunPlanIn, kind: str = "run", files: Sequence[Path] = ()) -> JobInfo:
+    def enqueue(
+        self,
+        plan: RunPlanIn,
+        kind: str = "run",
+        files: Sequence[Path] = (),
+        request_id: str | None = None,
+    ) -> JobInfo:
+        """Queue a job. With `request_id` (the mutation that caused it) the call is idempotent:
+        a replayed request returns the job it enqueued the first time."""
+        if request_id is not None:
+            with self._lock:
+                for row in self.store.job_rows():
+                    if json.loads(row["plan"]).get("request_id") == request_id:
+                        return job_info(row)
+                return self._enqueue(
+                    {**plan.model_dump(mode="json"), "request_id": request_id}, kind, [], None
+                )
         saved: list[str] = []
         for f in files:
             f = Path(f)
@@ -125,6 +148,10 @@ class JobRunner:
                 shutil.copyfile(f, dest)
             saved.append(str(dest))
         return self._enqueue(plan.model_dump(mode="json"), kind, saved, None)
+
+    def enqueue_raw(self, plan: dict[str, Any], kind: str) -> JobInfo:
+        """Enqueue a job whose plan is not a `RunPlanIn` (module 10: kind `agent`)."""
+        return self._enqueue(plan, kind, [], None)
 
     def _enqueue(
         self, plan: dict[str, Any], kind: str, files: list[str], resumed_from: str | None
@@ -317,6 +344,8 @@ class JobRunner:
                 tail.node, tail.doc = o.get("node"), o.get("doc")
             elif ev == "job_end":
                 tail.end = o
+            elif ev in self.event_handlers:
+                self.event_handlers[ev](job_id, o)
             elif ev is None:
                 msg = _summary(o)
                 if msg:
@@ -340,6 +369,7 @@ class JobRunner:
         if tail.end is not None:
             status = str(tail.end.get("status", "failed"))
             error = tail.end.get("error")
+            error = None if error is None else str(error)[:500]
             if status == "failed" and not error and tail.end.get("failed"):
                 error = f"failed: {json.dumps(tail.end['failed'], sort_keys=True)}"
         elif row["cancel_requested"]:

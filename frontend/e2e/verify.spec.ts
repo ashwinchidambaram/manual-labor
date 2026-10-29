@@ -479,3 +479,78 @@ test("VE10 documents still preparing", async ({ page, request }) => {
   await expect(page.getByTestId("block-id")).toHaveText(Q[1].block_id);
   await page.unroute("**/api/verify/queue*");
 });
+
+test("VE11 a confirmed edit contains exactly the text the server flagged (locked textarea)", async ({ page, request }) => {
+  const Q = (await getQueue(request)).items.filter((i) => i.type !== "figure" && i.status === "queued");
+  const target = Q[0].block_id;
+  await putCursor(request, target);
+  await page.goto("/verify");
+  await expect(card(page, target)).toBeFocused();
+  await key(page, "e");
+  const ta = page.getByLabel("Edit block text");
+  await expect(ta).toBeFocused();
+  await key(page, "ControlOrMeta+End");
+  await page.keyboard.type(" 999");
+  await key(page, "ControlOrMeta+Enter");
+  await expect(page.getByTestId("edit-conflict")).toBeVisible();
+  await expect(ta).toHaveAttribute("readonly", "");
+  const locked = await ta.inputValue();
+  expect(locked).toMatch(/ 999$/);
+  // text the reviewer never saw in the diff must not be typeable while the panel is open
+  await ta.click({ force: true });
+  await page.keyboard.type(" EXTRA 12345");
+  expect(await ta.inputValue()).toBe(locked);
+  await page.getByRole("button", { name: "Confirm content change" }).click();
+  await expect(page.getByTestId("edit-conflict")).toHaveCount(0);
+  const d = await getDetail(request, target);
+  expect(d.block.status).toBe("edited");
+  expect(d.block.clean_text).toBe(locked);
+  expect(d.block.clean_text).not.toContain("EXTRA");
+  // the edited block carries the content-change marker when it is shown again
+  await page.getByTestId("queue").focus();
+  await key(page, "k");
+  await expect(page.getByTestId("block-id")).toHaveText(target);
+  await expect(page.getByTestId("content-change-marker")).toBeVisible();
+});
+
+test("VE12 a figure attached, then the screen left while the job runs, shows in the rail on return (no reload)", async ({ page, request }) => {
+  const byArticle = await articleBlocks(request);
+  const figs = await api(request).get<DocFigure[]>("/api/docs/figures/figures");
+  let target: { b: string; block: string; f: DocFigure } | null = null;
+  for (const [b, block] of byArticle)
+    for (const f of figs) {
+      if ((f.attachments ?? []).some((a) => a.article_id === b)) continue;
+      if (!(f.attachments ?? []).length) continue;
+      target = { b, block, f };
+      break;
+    }
+  expect(target, "an article with a queued block and a figure not attached to it").not.toBeNull();
+  const { b, block, f } = target!;
+  await putCursor(request, block);
+  await page.goto("/verify");
+  await expect(page.getByTestId("block-id")).toHaveText(block);
+  await expect(page.getByTestId("rail-attach").first()).toBeVisible();
+  await key(page, "g");
+  await key(page, "Enter");
+  await expect(page.getByTestId("figure-picker")).toBeVisible();
+  await page.keyboard.type(f.figure_id);
+  await key(page, "ArrowDown");
+  await key(page, "Enter");
+  await expect(page.getByTestId(`rail-item-${f.figure_id}`).first()).toBeVisible();
+  // leave Verify at once: the rail unmounts while the attach job is still running
+  await page.getByRole("navigation", { name: "Screens" }).getByRole("link", { name: "Scope" }).click();
+  await expect(page.getByTestId("figure-rail")).toHaveCount(0);
+  await waitJobsIdle(request);
+  await expect
+    .poll(async () => (await api(request).get<FigureRailItem[]>(`/api/articles/${b}/figures`)).find((x) => x.figure_id === f.figure_id)?.attachment?.rule)
+    .toBe("human");
+  await page.getByRole("navigation", { name: "Screens" }).getByRole("link", { name: "Verify" }).click();
+  const item = page.getByTestId("figure-rail").getByTestId(`rail-item-${f.figure_id}`).first();
+  await expect(item).toBeVisible();
+  await expect(item.getByTestId("rail-rule")).toHaveText("human");
+  await expect(item.getByTestId("rail-pending")).toHaveCount(0);
+  // clean up: detach again so later runs start from the seeded attachments
+  await item.focus();
+  await key(page, "x");
+  await waitJobsIdle(request);
+});

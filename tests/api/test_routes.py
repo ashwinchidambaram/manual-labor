@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import subprocess
 import sys
 import time
 from typing import Any
@@ -121,33 +122,37 @@ CASES: dict[tuple[str, str], tuple[str, dict[str, Any], int]] = {
     ("GET", "/api/jobs/{job_id}"): ("/api/jobs/job-000001", {}, 404),
     ("GET", "/api/jobs/{job_id}/log"): ("/api/jobs/job-000001/log", {}, 404),
     ("POST", "/api/jobs/{job_id}/cancel"): ("/api/jobs/job-000001/cancel", {}, 404),
-    ("POST", "/api/agent/run"): ("/api/agent/run", {}, 501),
-    ("GET", "/api/agent/proposals"): ("/api/agent/proposals", {}, 501),
+    # module 10: the fake services carry no agent/calibration (503); the real routes are
+    # exercised in tests/agent/test_api.py
+    ("POST", "/api/agent/run"): ("/api/agent/run", {}, 503),
+    ("GET", "/api/agent/items"): ("/api/agent/items", {}, 503),
+    ("GET", "/api/agent/proposals"): ("/api/agent/proposals", {}, 503),
     ("POST", "/api/agent/proposals/{proposal_id}/accept"): (
         "/api/agent/proposals/prop-000001/accept",
         {},
-        501,
+        503,
     ),
     ("POST", "/api/agent/proposals/{proposal_id}/edit"): (
         "/api/agent/proposals/prop-000001/edit",
         {"json": {"text": "x"}},
-        501,
+        503,
     ),
     ("POST", "/api/agent/proposals/{proposal_id}/reject"): (
         "/api/agent/proposals/prop-000001/reject",
         {},
-        501,
+        503,
     ),
-    ("POST", "/api/agent/accept-all-passing"): ("/api/agent/accept-all-passing", {}, 501),
-    ("GET", "/api/calibration"): ("/api/calibration", {}, 501),
+    ("POST", "/api/agent/accept-all-passing"): ("/api/agent/accept-all-passing", {}, 503),
+    ("GET", "/api/calibration"): ("/api/calibration", {}, 503),
     ("POST", "/api/calibration/apply"): (
         "/api/calibration/apply",
         {"json": {"threshold": 0.8}},
-        501,
+        503,
     ),
     ("GET", "/api/export/status"): ("/api/export/status", {}, 200),
     ("POST", "/api/export"): ("/api/export", {}, 501),
     ("POST", "/api/export/override"): ("/api/export/override", {"json": {"reason": "r"}}, 501),
+    ("GET", "/api/export/download"): ("/api/export/download", {}, 404),
 }
 
 
@@ -265,15 +270,16 @@ async def test_a8_jobs(env: Env, api: httpx.AsyncClient) -> None:
 
 async def test_a10_stubs_and_export_status(env: Env, api: httpx.AsyncClient) -> None:
     for method, url in [
-        ("POST", "/api/agent/run"),
-        ("GET", "/api/agent/proposals"),
-        ("GET", "/api/calibration"),
         ("POST", "/api/export"),
     ]:
         r = await api.request(method, url)
         assert r.status_code == 501 and r.json()["code"] == "not_implemented"
     s = (await api.get("/api/export/status")).json()
-    assert s == {"unlocked": True, "open_flags": 0, "overrides": []}
+    assert {k: s[k] for k in ("unlocked", "open_flags", "overrides")} == {
+        "unlocked": True,
+        "open_flags": 0,
+        "overrides": [],
+    }  # module 11 adds queued/blockers/summary/zip_path (the real routes: tests/export)
     env.st.open_flags = 2
     s = (await api.get("/api/export/status")).json()
     assert s["unlocked"] is False and s["open_flags"] == 2
@@ -307,8 +313,36 @@ async def test_a14_non_blocking(env: Env, api: httpx.AsyncClient) -> None:
         q = await api.get("/api/verify/queue")
         assert q.status_code == 200 and time.perf_counter() - t < 0.2
     assert time.perf_counter() - t0 < 0.9  # the job was still running throughout
-    for heavy in ("litellm", "docling", "torch"):
-        assert heavy not in sys.modules, heavy
+    # the API stack (real services, every router, a few reads) imports no model runtime; checked
+    # in an isolated interpreter, since this test process has imported them for other tests
+    r = subprocess.run(
+        [sys.executable, "-I", "-c", _NO_HEAVY_IMPORTS, str(env.paths.root)],
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert r.stdout.strip() == "heavy: []", r.stdout
+
+
+_NO_HEAVY_IMPORTS = """
+import sys
+from pathlib import Path
+from fastapi.testclient import TestClient
+from manuallabor.api.app import create_app
+from manuallabor.project import ProjectPaths
+from manuallabor.providers.base import utc_now
+from manuallabor.state.services import build_services
+svc = build_services(ProjectPaths(Path(sys.argv[1])), mode="mock", resume=False, clock=utc_now)
+c = TestClient(create_app(svc, dev=True))
+for url in ("/api/project", "/api/status", "/api/sources", "/api/scope/selection",
+            "/api/scope/summary", "/api/verify/queue", "/api/verify/cursor", "/api/flags",
+            "/api/jobs", "/api/learning", "/api/export/status"):
+    c.get(url)
+svc.store.close()
+heavy = ("litellm", "docling", "torch", "transformers", "easyocr", "rapidocr")
+print("heavy:", sorted(m for m in sys.modules if m.split(".")[0] in heavy))
+"""
 
 
 async def test_no_project_is_503() -> None:

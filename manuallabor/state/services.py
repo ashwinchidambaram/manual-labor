@@ -29,6 +29,13 @@ def build_services(
     scope = ScopeService(paths, store, data)
     learning = LearningService(paths, store)
     runner = JobRunner(paths, store, mode=mode, resume=resume)
+    from manuallabor.agent.service import AgentService
+    from manuallabor.calibration.apply import CalibrationService
+
+    agent = AgentService(paths, store, data, review, figures, scope, runner)
+    for ev in ("proposal", "agent_outcome"):
+        runner.event_handlers[ev] = agent.ingest_event
+    calibration = CalibrationService(paths, store, data, runner)
     return AppServices(
         paths=paths,
         store=store,
@@ -38,4 +45,6 @@ def build_services(
         learning=learning,
         runner=runner,
         mock=mode == "mock",
+        agent=agent,
+        calibration=calibration,
     )

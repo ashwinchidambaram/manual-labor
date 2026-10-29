@@ -36,7 +36,7 @@ __all__ = [
 ]
 
 EXAMPLES_MAX = 200
-MATERIALIZED = ("cleanup.json", "grouping.json", "calibration.json")
+MATERIALIZED = ("cleanup.json", "grouping.json", "calibration.json", "agent.json")
 
 
 def global_home() -> Path:
@@ -129,8 +129,30 @@ DERIVERS: dict[str, Callable[[list[ActionRecord], dict[int, int], str], Any]] = 
 }
 
 
+def ensure_derivers() -> None:
+    """Register module 10's derivers (lazily: they import this module)."""
+    from manuallabor.calibration import learn
+
+    DERIVERS["cleanup"] = learn.derive_cleanup_v2
+    DERIVERS["calibration"] = learn.derive_calibration
+    DERIVERS["agent"] = learn.derive_agent
+
+
+def count_items(model: Any) -> int:
+    """Learned items of a snapshot model: every list field of items that carry an `id`."""
+    n = 0
+    for name in type(model).model_fields:
+        v = getattr(model, name)
+        if isinstance(v, list) and (
+            name in ("examples", "rules") or (v and all(hasattr(i, "id") for i in v))
+        ):
+            n += len(v)
+    return n
+
+
 def derive_snapshot_files(store: Store, snap_label: str) -> tuple[dict[str, str], dict[str, int]]:
     """{filename: text}, counts. Same action rows -> byte-identical files."""
+    ensure_derivers()
     actions = list(store.iter_actions())
     seq_of_action = {d.action_id: d.decision.seq for d in store.decisions()}
     files: dict[str, str] = {}
@@ -138,7 +160,7 @@ def derive_snapshot_files(store: Store, snap_label: str) -> tuple[dict[str, str]
     for name, fn in DERIVERS.items():
         model = fn(actions, seq_of_action, snap_label)
         files[f"{name}.json"] = dump_json(model)
-        counts[name] = len(model.examples) + len(getattr(model, "rules", []))
+        counts[name] = count_items(model)
     return files, counts
 
 
@@ -215,8 +237,8 @@ class LearningService:
             snapshots=self.store.snapshots(),
         )
 
-    def _replay(self, request_id: str) -> ActionRecord | None:
-        return self.store.action_by_request(request_id)
+    def _replay(self, request_id: str, *kinds: ActionKind) -> ActionRecord | None:
+        return self.store.action_by_request(request_id, kinds)
 
     def set_flags(
         self,
@@ -225,7 +247,7 @@ class LearningService:
         contribute_global: bool | None,
         request_id: str,
     ) -> LearningState:
-        if self._replay(request_id) is not None:
+        if self._replay(request_id, ActionKind.learning_toggle) is not None:
             return self.state()
         cfg = self.paths.load_config()
         upd = {
@@ -291,7 +313,7 @@ class LearningService:
         return final
 
     def snapshot(self, request_id: str) -> SnapshotInfo:
-        prev = self._replay(request_id)
+        prev = self._replay(request_id, ActionKind.learning_snapshot)
         if prev is not None:
             return self._info(str(prev.payload["snapshot"]))
         sid = self.store.next_snapshot_id()
@@ -315,6 +337,13 @@ class LearningService:
                 request_id=request_id,
                 action_id=aid,
             )
+        if self.paths.load_config().learning.contribute_global:
+            from manuallabor.calibration.global_store import publish_outcomes
+            from manuallabor.calibration.outcomes import outcomes
+
+            publish_outcomes(
+                self.store.meta("project_uuid") or "project", outcomes(self.store.iter_actions())
+            )
         return self._info(sid)
 
     def _info(self, sid: str) -> SnapshotInfo:
@@ -324,7 +353,7 @@ class LearningService:
         return s
 
     def activate(self, snapshot_id: str, request_id: str) -> LearningState:
-        if self._replay(request_id) is not None:
+        if self._replay(request_id, ActionKind.learning_activate) is not None:
             return self.state()
         if self.store.get_snapshot(snapshot_id) is None:
             raise NotFound(f"snapshot {snapshot_id}")
@@ -346,7 +375,7 @@ class LearningService:
 
     def reset(self, request_id: str) -> LearningState:
         """Disable the learned layer; snapshots and every decision are kept."""
-        if self._replay(request_id) is not None:
+        if self._replay(request_id, ActionKind.learning_reset) is not None:
             return self.state()
         before = self.store.active_snapshot()
         with self.store.tx():
@@ -367,7 +396,7 @@ class LearningService:
         project_learning(self.store, self.paths)  # use_global may still materialize global
 
     def disable_item(self, item_id: str, request_id: str) -> SnapshotInfo:
-        prev = self._replay(request_id)
+        prev = self._replay(request_id, ActionKind.learning_disable_item)
         if prev is not None:
             return self._info(str(prev.payload["snapshot"]))
         act = self.store.active_snapshot()
@@ -378,22 +407,25 @@ class LearningService:
         files: dict[str, str] = {}
         found = False
         counts: dict[str, int] = {}
-        for name in ("cleanup.json", "grouping.json", "calibration.json"):
+        for name in ("cleanup.json", "grouping.json", "calibration.json", "agent.json"):
             f = src / name
             if not f.is_file():
                 continue
             data = json.loads(f.read_text(encoding="utf-8"))
             data["snapshot"] = f"snapshot:{sid}"
-            for key in ("rules", "examples"):
-                items = data.get(key)
-                if isinstance(items, list):
-                    kept = [
-                        i for i in items if not (isinstance(i, dict) and i.get("id") == item_id)
-                    ]
+            total = 0
+            for key, items in list(data.items()):
+                if (
+                    isinstance(items, list)
+                    and items
+                    and all(isinstance(i, dict) and "id" in i for i in items)
+                ):
+                    kept = [i for i in items if i.get("id") != item_id]
                     found = found or len(kept) != len(items)
                     data[key] = kept
+                    total += len(kept)
             files[name] = json.dumps(data, sort_keys=True, indent=2, ensure_ascii=False) + "\n"
-            counts[name.split(".")[0]] = len(data.get("rules", [])) + len(data.get("examples", []))
+            counts[name.split(".")[0]] = total
         if not found:
             raise InvalidOp(f"no item {item_id} in snapshot {act.id}")
         with self.store.tx():
@@ -419,7 +451,7 @@ class LearningService:
 
     def publish(self, snapshot_id: str, request_id: str) -> SnapshotInfo:
         cfg = self.paths.load_config()
-        prev = self._replay(request_id)
+        prev = self._replay(request_id, ActionKind.learning_publish)
         if prev is not None:
             return self._info(snapshot_id)
         if not cfg.learning.contribute_global:

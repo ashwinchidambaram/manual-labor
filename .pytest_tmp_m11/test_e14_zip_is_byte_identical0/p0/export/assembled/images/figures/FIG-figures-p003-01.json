@@ -1,0 +1,30 @@
+{
+  "articles": [
+    "figures--drive-illustrations"
+  ],
+  "attach_rule": "proximity",
+  "bbox": [
+    72.0,
+    154.05,
+    272.0,
+    354.05
+  ],
+  "caption_original": null,
+  "confidence": 0.774597,
+  "description_generated": "Generated description (mock) of image 6ff34545.",
+  "extraction": "native",
+  "file": "FIG-figures-p003-01.png",
+  "height": 900,
+  "id": "FIG-figures-p003-01",
+  "page": 3,
+  "phash": "b1bc30364761357d",
+  "product_model": "Acme X200",
+  "review": "approved",
+  "source_doc": "figures",
+  "svg": null,
+  "tags": [
+    "figure",
+    "mock"
+  ],
+  "width": 900
+}

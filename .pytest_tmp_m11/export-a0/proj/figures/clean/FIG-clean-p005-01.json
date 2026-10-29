@@ -1,0 +1,31 @@
+{
+  "articles": [
+    "clean--general-precautions",
+    "clean--idler-replacement"
+  ],
+  "attach_rule": "caption_ref",
+  "bbox": [
+    72.0,
+    286.1,
+    372.0,
+    486.1
+  ],
+  "caption_original": "Figure 3. Cover plate and bracket layout.",
+  "confidence": 1.0,
+  "description_generated": "Generated description (mock) of image d265d929.",
+  "extraction": "native",
+  "file": "FIG-clean-p005-01.png",
+  "height": 600,
+  "id": "FIG-clean-p005-01",
+  "page": 5,
+  "phash": "f832a3486e6d6b64",
+  "product_model": "Acme X200",
+  "review": "auto_approved",
+  "source_doc": "clean",
+  "svg": null,
+  "tags": [
+    "figure",
+    "mock"
+  ],
+  "width": 900
+}

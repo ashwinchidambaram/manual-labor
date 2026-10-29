@@ -24,23 +24,31 @@ export interface StatusStripProps {
   saveState: string;
 }
 
-function Stat({ id, label, value }: { id: string; label: string; value: number }) {
+function Stat({ id, label, value, partial = false }: { id: string; label: string; value: number; partial?: boolean }) {
   return (
     <div className="flex items-baseline gap-1">
       <span className="text-xs text-slate-600">{label}</span>
       <span className="text-lg font-semibold tabular-nums" data-testid={id}>
         {value}
+        {partial ? "+" : ""}
       </span>
+      {partial ? <span className="sr-only"> or more, not all pages are loaded</span> : null}
     </div>
   );
 }
 
 export default function StatusStrip(p: StatusStripProps) {
-  const queued = Math.max(0, p.counts.pending - p.viewAdded);
+  // TODO(G1): the server will send `view_added` (auto-approved blocks the view filter lists). Until then:
+  //  - no view filter: every pending block is queued, so `pending` is exact;
+  //  - view filter and every page loaded: pending minus the loaded auto-approved rows is exact;
+  //  - view filter and more pages exist: only a lower bound is known (pending minus ALL auto-approved), shown as "N+".
+  const filtered = p.appliedView !== null;
+  const queuedPartial = filtered && p.viewAddedPartial;
+  const queued = Math.max(0, p.counts.pending - (!filtered ? 0 : queuedPartial ? p.counts.auto_approved : p.viewAdded));
   const T = p.threshold;
   return (
     <section aria-label="Review status" className="flex flex-wrap items-center gap-x-6 gap-y-1 border-b border-slate-300 bg-white px-4 py-2">
-      <Stat id="cnt-queued" label="Queued" value={queued} />
+      <Stat id="cnt-queued" label="Queued" value={queued} partial={queuedPartial} />
       <Stat id="cnt-auto" label="Auto-approved" value={p.counts.auto_approved} />
       <Stat id="cnt-flagged" label="Flagged" value={p.counts.flagged_open} />
       <Stat id="cnt-done" label="Done" value={p.counts.approved + p.counts.edited} />
@@ -58,6 +66,7 @@ export default function StatusStrip(p: StatusStripProps) {
         />
         <span className="text-sm text-slate-700" data-testid="view-copy">
           {sliderCopy(p.view, T, p.viewAdded, p.viewAddedPartial, p.view !== p.appliedView)}
+          {p.view !== null && p.view === p.appliedView && p.viewAddedPartial ? " (loaded)" : ""}
         </span>
         <button type="button" onClick={() => p.onView(1)} className={`rounded border border-slate-400 px-2 text-xs ${FOCUS}`}>
           Show all

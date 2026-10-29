@@ -86,5 +86,5 @@ def apply_tier(body: ApplyTierIn, ctx: Ctx, hooks: HooksDep) -> ApplyTierOut:
 @router.put("/config/threshold", response_model=ThresholdOut)
 def put_threshold(body: ThresholdIn, ctx: Ctx) -> ThresholdOut:
     value = ctx.scope.set_project_threshold(body.value, body.reason, body.request_id)
-    job = ctx.runner.enqueue(RunPlanIn(to="score2"))
+    job = ctx.runner.enqueue(RunPlanIn(to="score2"), request_id=body.request_id)
     return ThresholdOut(threshold=value, job=job)

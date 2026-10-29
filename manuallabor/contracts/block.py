@@ -13,6 +13,7 @@ from manuallabor.contracts._base import (
     ContractModel,
     DocSlug,
     FigureId,
+    Sha256Hex,
     Unit,
 )
 from manuallabor.contracts.enums import (
@@ -35,6 +36,7 @@ __all__ = [
     "TableCell",
     "TableData",
     "TableShape",
+    "VisionReading",
 ]
 
 
@@ -43,6 +45,20 @@ class Signal(ContractModel):
     value: Unit
     critical: bool
     detail: str | None = None
+
+
+class VisionReading(ContractModel):
+    """A vision model's transcript of a block's numbers (module 10). It carries no score and no
+    confidence by design: it is an attester for number changes and a pane in the Agent screen,
+    never a signal."""
+
+    model: str | None = None
+    image_sha256: Sha256Hex | None = None
+    lines: list[str] = Field(default_factory=list)
+    numbers: list[str] = Field(default_factory=list)
+    outcome: Literal["ok", "invalid", "error", "skipped"]
+    detail: str | None = None
+    input_hash: Sha256Hex | None = None
 
 
 class OcrWord(ContractModel):

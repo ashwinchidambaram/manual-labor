@@ -26,6 +26,7 @@ __all__ = [
     "project_all",
     "project_figure_overrides",
     "project_overrides",
+    "project_proposals",
     "project_selection",
     "reconcile",
     "write_if_differs",
@@ -86,10 +87,21 @@ def project_figure_overrides(store: Store, paths: ProjectPaths) -> int:
     return n
 
 
+def project_proposals(store: Store, paths: ProjectPaths) -> bool:
+    """agent/proposals.json: every proposal by id, canonical bytes (module 10). Not written
+    while there are none, so a project that never ran the agent is unchanged."""
+    rows = store.proposals()
+    if not rows:
+        return False
+    body = dump_json([p.model_dump(mode="json") for p in rows])
+    return write_if_differs(paths.agent_proposals, body)
+
+
 def project_all(store: Store, paths: ProjectPaths) -> None:
     project_selection(store, paths)
     project_overrides(store, paths)
     project_figure_overrides(store, paths)
+    project_proposals(store, paths)
     from manuallabor.state.learning import project_learning
 
     project_learning(store, paths)

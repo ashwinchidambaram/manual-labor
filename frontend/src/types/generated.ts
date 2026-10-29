@@ -71,6 +71,13 @@ export type DecisionAction = 'approve' | 'edit' | 'flag' | 'skip';
  */
 export type DocKind = 'born_digital_pdf' | 'scanned_pdf' | 'docx';
 /**
+ * Where a proposal's evidence span was quoted from (module 10).
+ *
+ * This interface was referenced by `_All`'s JSON-Schema
+ * via the `definition` "EvidenceSource".
+ */
+export type EvidenceSource = 'pymupdf' | 'docling' | 'ocr' | 'ocr_alt' | 'docx' | 'vision' | 'note' | 'candidate';
+/**
  * This interface was referenced by `_All`'s JSON-Schema
  * via the `definition` "Extraction".
  */
@@ -112,10 +119,28 @@ export type OcrEngine = 'auto' | 'rapidocr' | 'tesseract';
  * This interface was referenced by `_All`'s JSON-Schema
  * via the `definition` "ProposalStatus".
  */
-export type ProposalStatus = 'pending' | 'accepted' | 'edited' | 'rejected';
+export type ProposalStatus = 'pending' | 'accepted' | 'edited' | 'rejected' | 'superseded';
+/**
+ * What a proposal changes (module 10).
+ *
+ * This interface was referenced by `_All`'s JSON-Schema
+ * via the `definition` "ProposalKind".
+ */
+export type ProposalKind = 'text' | 'cells' | 'bbox' | 'attach' | 'regroup';
 
 export interface _All {
   [k: string]: unknown | undefined;
+}
+/**
+ * Agent-pass settings (module 10).
+ *
+ * This interface was referenced by `_All`'s JSON-Schema
+ * via the `definition` "AgentConfig".
+ */
+export interface AgentConfig {
+  max_rounds: number;
+  page_image: boolean;
+  vision_reader: boolean;
 }
 /**
  * This interface was referenced by `_All`'s JSON-Schema
@@ -379,6 +404,18 @@ export interface Document {
   title_inferred: boolean;
 }
 /**
+ * A span quoted from a named source. `verified`: the span occurs (whitespace collapsed) in
+ * that source's text; an unverified span is kept and shown struck through.
+ *
+ * This interface was referenced by `_All`'s JSON-Schema
+ * via the `definition` "EvidenceRef".
+ */
+export interface EvidenceRef {
+  source: EvidenceSource;
+  span: string;
+  verified: boolean;
+}
+/**
  * This interface was referenced by `_All`'s JSON-Schema
  * via the `definition` "FigureRecord".
  */
@@ -581,6 +618,7 @@ export interface Manifest {
   articles: ManifestArticle[];
   docs: Document[];
   figures: ManifestFigure[];
+  learning: ManifestLearning;
   models: {
     [k: string]: ModelRef | undefined;
   };
@@ -614,6 +652,29 @@ export interface ManifestFigure {
   id: string;
   sidecar: string;
   source_doc: string;
+}
+/**
+ * Which learning snapshot each document's grouping and cleanup used (module 11).
+ *
+ * This interface was referenced by `_All`'s JSON-Schema
+ * via the `definition` "ManifestLearning".
+ */
+export interface ManifestLearning {
+  docs: {
+    [k: string]: ManifestDocLearning;
+  };
+  enabled: boolean;
+}
+/**
+ * This interface was referenced by `undefined`'s JSON-Schema definition
+ * via the `patternProperty` "^[a-z0-9]+(?:-[a-z0-9]+)*$".
+ *
+ * This interface was referenced by `_All`'s JSON-Schema
+ * via the `definition` "ManifestDocLearning".
+ */
+export interface ManifestDocLearning {
+  clean: string;
+  group: string;
 }
 /**
  * This interface was referenced by `_All`'s JSON-Schema
@@ -688,14 +749,23 @@ export interface PlatformInfo {
   system: string;
 }
 /**
+ * An earlier round of the same flag. `reason` is the reviewer's rejection reason; the
+ * model's own rationale is shown to the reviewer but never fed back to the model.
+ *
  * This interface was referenced by `_All`'s JSON-Schema
  * via the `definition` "PriorAttempt".
  */
 export interface PriorAttempt {
   decided_at: string;
+  failed_checks: string[];
+  /**
+   * What a proposal changes (module 10).
+   */
+  kind: 'text' | 'cells' | 'bbox' | 'attach' | 'regroup';
   proposal_id: string;
   proposal_text: string;
   rationale: string;
+  reason: string | null;
   status: ProposalStatus;
 }
 /**
@@ -721,9 +791,17 @@ export interface ProbeResult {
  * via the `definition` "ProjectConfig".
  */
 export interface ProjectConfig {
+  agent: AgentConfig;
   article_split: 'per_topic' | 'per_document';
   background_ocr_born_digital: boolean;
   cleanup: CleanupConfig;
+  doc_thresholds: {
+    /**
+     * This interface was referenced by `undefined`'s JSON-Schema definition
+     * via the `patternProperty` "^[a-z0-9]+(?:-[a-z0-9]+)*$".
+     */
+    [k: string]: number;
+  };
   learning: LearningConfig;
   models: TaskModels;
   name: string;
@@ -753,24 +831,51 @@ export interface TaskModels {
  */
 export interface Proposal {
   all_checks_passed: boolean;
+  basis_sha256: string;
   created_at: string;
   /**
    * @minItems 1
    */
-  evidence: [string, ...string[]];
+  evidence: [EvidenceRef, ...EvidenceRef[]];
+  final_bbox: [number, number, number, number] | null;
   final_text: string | null;
   flag_id: string;
   history: PriorAttempt[];
   id: string;
   input_hash: string;
+  /**
+   * What a proposal changes (module 10).
+   */
+  kind: 'text' | 'cells' | 'bbox' | 'attach' | 'regroup';
   model: string;
   proposal_text: string | null;
+  proposed_attach: ProposedAttach | null;
   proposed_bbox: [number, number, number, number] | null;
+  proposed_cells: string[][] | null;
+  proposed_regroup: ProposedRegroup | null;
   rationale: string;
   rechecks: RecheckResult[];
   round: number;
-  status: 'pending' | 'accepted' | 'edited' | 'rejected';
+  status: 'pending' | 'accepted' | 'edited' | 'rejected' | 'superseded';
   target_id: string;
+  vision: VisionReading | null;
+}
+/**
+ * This interface was referenced by `_All`'s JSON-Schema
+ * via the `definition` "ProposedAttach".
+ */
+export interface ProposedAttach {
+  anchor_block_id: string | null;
+  article_id: string;
+  figure_id: string;
+}
+/**
+ * This interface was referenced by `_All`'s JSON-Schema
+ * via the `definition` "ProposedRegroup".
+ */
+export interface ProposedRegroup {
+  block_id: string;
+  to_topic_slug: string;
 }
 /**
  * This interface was referenced by `_All`'s JSON-Schema
@@ -780,6 +885,23 @@ export interface RecheckResult {
   check: string;
   detail: string | null;
   passed: boolean;
+}
+/**
+ * A vision model's transcript of a block's numbers (module 10). It carries no score and no
+ * confidence by design: it is an attester for number changes and a pane in the Agent screen,
+ * never a signal.
+ *
+ * This interface was referenced by `_All`'s JSON-Schema
+ * via the `definition` "VisionReading".
+ */
+export interface VisionReading {
+  detail: string | null;
+  image_sha256: string | null;
+  input_hash: string | null;
+  lines: string[];
+  model: string | null;
+  numbers: string[];
+  outcome: 'ok' | 'invalid' | 'error' | 'skipped';
 }
 /**
  * This interface was referenced by `_All`'s JSON-Schema

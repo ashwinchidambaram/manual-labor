@@ -1,5 +1,8 @@
 // VC4 extracted pane, VC5 learning chip, VC6 rail and picker, VC7 flag dialog.
 import { screen, waitFor, within } from "@testing-library/react";
+import axe from "axe-core";
+import { http, HttpResponse, delay } from "msw";
+import { server } from "../test/server";
 import { describe, expect, it } from "vitest";
 import type { DocFigure } from "../api/schema";
 import { makeJob } from "../test/fixtures";
@@ -35,6 +38,21 @@ describe("VC4 ExtractedPane", () => {
     expect(screen.queryByTestId("diff-view")).toBeNull();
   });
 
+  it("M7 diff spans carry text alternatives for screen readers: 'removed: ...' and 'inserted: ...'", async () => {
+    const { r } = await mountVerify(2, (f) => {
+      f.details[vid(1)] = makeBlockDetail(f.items[0], {}, {
+        raw_text: "set 0.25 mm",
+        clean_text: "set 0.99 mm",
+        faithfulness: { passed: false, alignment_ratio: 0.9, violations: [], numeric_variants: [], diff: [op("equal", true, "set ", "set "), op("replace", false, "0.25", "0.99"), op("equal", true, " mm", " mm")] },
+      });
+    });
+    await screen.findByTestId("block-text");
+    await r.user.keyboard("t");
+    const dv = await screen.findByTestId("diff-view");
+    expect(within(dv).getByLabelText("removed: 0.25")).toHaveAttribute("data-seg", "del-bad");
+    expect(within(dv).getByLabelText("inserted: 0.99")).toHaveAttribute("data-seg", "ins-bad");
+  });
+
   it("disables the diff when no cleanup ran, and takes an edited block's diff from its human edit", async () => {
     await mountVerify(2, (f) => {
       f.details[vid(1)] = makeBlockDetail(f.items[0], {}, { clean_text: null, faithfulness: null });
@@ -43,6 +61,18 @@ describe("VC4 ExtractedPane", () => {
       }, { status: "edited" });
     });
     await waitFor(() => expect(screen.getByTestId("view-diff")).toBeDisabled());
+  });
+
+  it("M4 a confirmed content-change edit shows a distinct marker; a faithful edit does not", async () => {
+    const rec = (faith: boolean | null) => ({ decision: { id: "d1" } as never, action_id: 1, doc_id: "doc", raw_sha256: "x", shown_text_sha256: "y", numbers_verified: false, learning_provenance: "baseline", source: "human" as const, faith_passed: faith, human_edit_diff: [op("equal", true, "a ", "a "), op("insert", false, "", "999")] });
+    const { r } = await mountVerify(3, (f) => {
+      f.details[vid(1)] = makeBlockDetail(f.items[0], { history: [rec(false)] }, { status: "edited" });
+      f.details[vid(2)] = makeBlockDetail(f.items[1], { history: [rec(true)] }, { status: "edited" });
+    });
+    expect(await screen.findByTestId("content-change-marker")).toHaveTextContent("human edit \u2014 content changed");
+    await r.user.keyboard("j");
+    await waitFor(() => expect(screen.getByTestId("block-id")).toHaveTextContent(vid(2)));
+    expect(screen.queryByTestId("content-change-marker")).toBeNull();
   });
 
   it("lists why this needs you in server order with detail strings and a numeric rule line", async () => {
@@ -95,6 +125,66 @@ describe("VC4 ExtractedPane", () => {
     expect(f.actions[1]).toMatchObject({ kind: "edit", confirm_content_change: true, text: f.actions[0].text });
     expect(f.actions[1].request_id).not.toBe(f.actions[0].request_id);
     await cardFocused(vid(2));
+  });
+
+  it("M9 the textarea has focus the moment edit mode mounts, even right after another action", async () => {
+    const { r } = await mountVerify(4);
+    await cardFocused(vid(1));
+    await r.user.keyboard("a");
+    await r.user.keyboard("e"); // pressed while the previous action's focus request is still pending
+    const ta = await screen.findByLabelText("Edit block text");
+    expect(ta).toHaveFocus();
+    await new Promise((res) => requestAnimationFrame(() => res(null)));
+    await new Promise((res) => setTimeout(res, 50));
+    expect(screen.getByLabelText("Edit block text")).toHaveFocus();
+  });
+
+  it("M1 while the conflict panel is open the text is locked and Confirm sends exactly the 409 text", async () => {
+    const { f, r } = await mountVerify(3, (fk) => {
+      fk.actionHook = (_a, n) => (n === 0 ? { status: 409, body: conflictBody } : null);
+    });
+    await r.user.keyboard("e");
+    await r.user.keyboard(" 999");
+    await r.user.keyboard(ctrlEnter);
+    await screen.findByTestId("edit-conflict");
+    const ta = screen.getByLabelText("Edit block text") as HTMLTextAreaElement;
+    expect(ta).toHaveAttribute("readonly");
+    await r.user.click(ta);
+    await r.user.keyboard(" EXTRA 12345");
+    expect(ta.value).not.toContain("EXTRA");
+    await r.user.click(screen.getByRole("button", { name: "Confirm content change" }));
+    await waitFor(() => expect(f.actions).toHaveLength(2));
+    expect(f.actions[1].text).toBe(f.actions[0].text);
+    expect(f.actions[1].text).toMatch(/ 999$/);
+    expect(f.actions[1].text).not.toContain("EXTRA");
+  });
+
+  it("M1 Esc inside the locked textarea dismisses the panel and unlocks editing", async () => {
+    const { r } = await mountVerify(3, (fk) => {
+      fk.actionHook = (_a, n) => (n === 0 ? { status: 409, body: conflictBody } : null);
+    });
+    await r.user.keyboard("e");
+    await r.user.keyboard(" 999");
+    await r.user.keyboard(ctrlEnter);
+    await screen.findByTestId("edit-conflict");
+    const ta = screen.getByLabelText("Edit block text") as HTMLTextAreaElement;
+    ta.focus();
+    await r.user.keyboard("{Escape}");
+    expect(screen.queryByTestId("edit-conflict")).toBeNull();
+    expect(screen.getByLabelText("Edit block text")).not.toHaveAttribute("readonly");
+  });
+
+  it("M7 a 422 on edit shows the server message, not 'Not saved'", async () => {
+    const { r } = await mountVerify(3, (fk) => {
+      fk.actionHook = () => ({ status: 422, body: { detail: "edit text must not be empty", code: "invalid" } });
+    });
+    await r.user.keyboard("e");
+    await r.user.keyboard("x");
+    await r.user.keyboard(ctrlEnter);
+    const err = await screen.findByTestId("edit-error");
+    expect(err).toHaveTextContent("edit text must not be empty");
+    expect(err).not.toHaveTextContent("Not saved");
+    expect(screen.getByTestId("save-state")).not.toHaveTextContent("Not saved");
   });
 
   it("Keep editing returns to the textarea with the text intact", async () => {
@@ -234,6 +324,35 @@ describe("VC6 FigureRail and FigurePicker", () => {
     expect(within(screen.getByTestId("rail-item-FIG-doc-p001-02")).getByTestId("rail-rule")).toHaveTextContent("human");
   });
 
+  for (const mode of ["loading", "error"] as const)
+    it(`M10 the picker passes axe while ${mode} (the listbox holds options only)`, async () => {
+      const { r } = await railSetup();
+      server.use(
+        http.get("*/api/docs/:slug/figures", async () => {
+          if (mode === "loading") await delay(1500);
+          return HttpResponse.json({ detail: "boom", code: "internal" }, { status: 500 });
+        }),
+      );
+      await r.user.keyboard("{Enter}");
+      const picker = await screen.findByTestId("figure-picker");
+      if (mode === "error") await within(picker).findByText("Could not load figures", undefined, { timeout: 4000 });
+      else await within(picker).findByText("Loading figures...");
+      for (const child of Array.from(picker.querySelectorAll("#picker-list > *"))) expect(child.getAttribute("role")).toBe("option");
+      const res = await axe.run(picker, { runOnly: ["aria-required-children", "aria-required-parent", "aria-allowed-role"] });
+      expect(res.violations.map((v) => v.id)).toEqual([]);
+    }, 10000);
+
+  it("M10 the picker passes axe with figures and with an empty filter result", async () => {
+    const { r } = await railSetup();
+    await r.user.keyboard("{Enter}");
+    const picker = await screen.findByTestId("figure-picker");
+    await screen.findByTestId("pick-FIG-doc-p001-02");
+    const run = async (): Promise<string[]> => (await axe.run(picker, { runOnly: ["aria-required-children", "aria-required-parent", "aria-allowed-role"] })).violations.map((v) => v.id);
+    expect(await run()).toEqual([]);
+    await r.user.type(screen.getByLabelText("Filter figures"), "no-such-figure");
+    expect(await run()).toEqual([]);
+  });
+
   it("without 'also detach' only the attach is posted", async () => {
     const { f, scope, r } = await railSetup();
     scope.jobById["job-a1"] = makeJob({ id: "job-a1", status: "running" });
@@ -244,6 +363,37 @@ describe("VC6 FigureRail and FigurePicker", () => {
     await waitFor(() => expect(f.attaches).toHaveLength(1));
     expect(f.detaches).toHaveLength(0);
   });
+
+  it("M2 an attach whose job finishes while the rail is unmounted shows up when the user navigates back", async () => {
+    const { f, scope, r } = await mountVerify(3, (fk) => {
+      fk.rail[A] = [makeRailItem("FIG-doc-p001-01", A)];
+      fk.rail[B] = [];
+      fk.docFigures = [docFig(1, [att(A, "caption_ref")]), docFig(2, [att(B)])];
+      fk.details[vid(2)] = makeBlockDetail(fk.items[1], { article_ids: [B] });
+    });
+    await r.user.keyboard("g");
+    scope.jobPolls = [[makeJob({ id: "job-a1", status: "running" })]];
+    scope.jobById["job-a1"] = makeJob({ id: "job-a1", status: "running" });
+    await r.user.keyboard("{Enter}");
+    await screen.findByTestId("pick-FIG-doc-p001-02");
+    await r.user.click(screen.getByLabelText("Also detach from its other articles"));
+    await r.user.keyboard("p001-02{ArrowDown}{Enter}");
+    await waitFor(() => expect(f.attaches).toHaveLength(1));
+    // leave the block: article A's rail unmounts while the job is still running
+    await r.user.keyboard("{Escape}");
+    await cardFocused(vid(1));
+    await r.user.keyboard("j");
+    await screen.findByRole("region", { name: `Figures in ${B}` });
+    expect(screen.queryByRole("region", { name: `Figures in ${A}` })).toBeNull();
+    // the job finishes while A's rail is not mounted
+    f.rail[A] = [makeRailItem("FIG-doc-p001-01", A), makeRailItem("FIG-doc-p001-02", A, "human")];
+    scope.jobById["job-a1"] = makeJob({ id: "job-a1", status: "done" });
+    scope.jobPolls.splice(0, scope.jobPolls.length, []);
+    await r.user.keyboard("k");
+    const item = await screen.findByTestId("rail-item-FIG-doc-p001-02", undefined, { timeout: 6000 });
+    expect(within(item).getByTestId("rail-rule")).toHaveTextContent("human");
+    expect(within(item).queryByTestId("rail-pending")).toBeNull();
+  }, 20000);
 
   it("rolls the optimistic attach back and toasts when the job fails", async () => {
     const { scope, r } = await railSetup();

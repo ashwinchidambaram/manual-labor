@@ -45,3 +45,19 @@ describe("VU1 reasonChips", () => {
     expect(exact.map((x) => x.critical)).toEqual([true, false]);
   });
 });
+
+describe("M8 queue-card chip order without critical_reasons (gap G3)", () => {
+  it("a numeric block shows critical signals first (parsers disagree, weak OCR word), then the numeric rule chip", () => {
+    const why = reasonsFromQueueItem(["has_numeric_spec", "ocr_min", "parser_agreement"], true);
+    const chips = reasonChips({ why, hasNumeric: true });
+    expect(chips.reasons.map((c) => c.text)).toEqual(["parsers disagree", "weak OCR word", "numeric spec"]);
+  });
+  it("critical-first holds for the other agreement signal and for faithfulness", () => {
+    const chips = reasonChips({ why: reasonsFromQueueItem(["ocr_mean", "textlayer_vs_ocr", "faithfulness"], true), hasNumeric: true, max: 4 });
+    expect(chips.reasons.map((c) => c.name)).toEqual(["faithfulness", "textlayer_vs_ocr", "has_numeric_spec", "ocr_mean"]);
+  });
+  it("agreement signals are only critical on numeric blocks", () => {
+    const why = reasonsFromQueueItem(["parser_agreement"], false);
+    expect(why[0].critical).toBe(false);
+  });
+});

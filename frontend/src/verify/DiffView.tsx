@@ -58,10 +58,12 @@ export const segName = (s: Segment): string => (s.kind === "equal" ? "equal" : `
 
 function SegSpan({ s }: { s: Segment }) {
   const name = segName(s);
+  const label = s.kind === "del" ? `removed: ${s.text}` : s.kind === "ins" ? `inserted: ${s.text}` : undefined;
   const props = {
     "data-op-index": s.opIndex,
     "data-seg": name,
     title: TITLE[name],
+    "aria-label": label,
     className: CLS[name],
   };
   const inner = <Marked text={s.display} ranges={s.numeric} breaks={s.kind !== "equal"} />;
@@ -83,7 +85,7 @@ export default function DiffView({ ops }: { ops: DiffOp[] }) {
       <p className="mt-2 text-xs text-slate-600" data-testid="diff-legend">
         Legend: <del className="text-slate-500">removed</del> <ins className="text-slate-500">added</ins>{" "}
         <del className="font-bold text-red-700">removed (changes content)</del> <ins className="font-bold text-red-700">added (changes content)</ins>{" "}
-        <span className="text-blue-700 before:content-['⇅']">moved</span>; spaces show as · and line breaks as ↵
+        <span className="text-blue-700 before:content-['⇅']">moved</span>; spaces show as ␣ and line breaks as ↵
       </p>
     </div>
   );

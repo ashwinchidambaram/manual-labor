@@ -17,7 +17,15 @@ from pathlib import Path
 from typing import Any
 
 from manuallabor.contracts.enums import Task
-from manuallabor.jobs.executor import Cancelled, Heartbeat, Plan, execute, make_plan
+from manuallabor.jobs.executor import (
+    PROJECT_NODES,
+    Cancelled,
+    Heartbeat,
+    Plan,
+    execute,
+    make_plan,
+    make_project_plan,
+)
 from manuallabor.jobs.providers import provider_set_factory
 from manuallabor.project import ProjectPaths
 from manuallabor.providers.sinks import JsonlSink
@@ -78,39 +86,22 @@ def run_job(root: Path, job_id: str) -> int:
     threading.Thread(target=pulse, daemon=True).start()
     hb = Heartbeat(JsonlSink(paths.llm_log), on_beat=beat, cancelled=cancel.is_set)
     providers = provider_set_factory(paths, cfg, mode, hb)
-    status, failed, error = "done", {}, None
+    status, error = "done", None
+    failed: dict[str, Any] = {}
     try:
         rp = spec["plan"]
-        if spec.get("kind") == "ingest_run":
-            from manuallabor.ingest import ingest_files
+        if spec.get("kind") == "agent":
+            from manuallabor.agent.pipeline import run_agent_plan
 
-            provider = providers().get(Task.metadata) if mode == "mock" else None
-            ingest_files(
-                paths,
-                [Path(f) for f in spec.get("files", [])],
-                provider=provider,
-                emit=lambda o: log({**o, "node": "ingest"}),
-            )
-        plan: Plan = make_plan(
-            paths,
-            paths.load_config(),
-            to=rp.get("to", "score2"),
-            docs=rp.get("docs"),
-            force=set(rp.get("force", [])),
-            allow_reparse=bool(rp.get("allow_reparse", False)),
-            provider_mode=mode,
-        )
-        log({"event": "job_start", "units": len(plan.units)})
-        res = execute(
-            paths, plan, emit=log, providers=providers, cancelled=cancel.is_set, heartbeat=hb
-        )
-        failed = {**res.failed, **({"plan": [s for s, _ in res.refused]} if res.refused else {})}
-        if failed:
-            status = "failed"
+            n_err = run_agent_plan(paths, rp, providers, log, cancel.is_set)
+            if n_err:
+                status, error = "failed", f"{n_err} agent item(s) ended in an error"
+        else:
+            status, failed, error = _run_stages(paths, spec, rp, mode, providers, log, hb, cancel)
     except Cancelled:
         status = "cancelled"
     except Exception as exc:
-        status, error = "failed", f"{type(exc).__name__}: {exc}"
+        status, error = "failed", f"{type(exc).__name__}: {exc}"[:500]
     finally:
         stop.set()
         _close_pools()
@@ -120,11 +111,57 @@ def run_job(root: Path, job_id: str) -> int:
     return 0 if status == "done" else (130 if status == "cancelled" else 1)
 
 
+def _run_stages(
+    paths: ProjectPaths,
+    spec: dict[str, Any],
+    rp: dict[str, Any],
+    mode: str,
+    providers: Any,
+    log: JobLog,
+    hb: Heartbeat,
+    cancel: threading.Event,
+) -> tuple[str, dict[str, Any], str | None]:
+    """The stage-graph job body (`run` and `ingest_run`)."""
+    status = "done"
+    failed: dict[str, Any] = {}
+    if spec.get("kind") == "ingest_run":
+        from manuallabor.ingest import ingest_files
+
+        provider = providers().get(Task.metadata) if mode == "mock" else None
+        ingest_files(
+            paths,
+            [Path(f) for f in spec.get("files", [])],
+            provider=provider,
+            emit=lambda o: log({**o, "node": "ingest"}),
+        )
+    cfg = paths.load_config()
+    kwargs: dict[str, Any] = {
+        "docs": rp.get("docs"),
+        "force": set(rp.get("force", [])),
+        "allow_reparse": bool(rp.get("allow_reparse", False)),
+        "provider_mode": mode,
+    }
+    plan: Plan = (
+        make_project_plan(paths, cfg, to=rp["to"], **kwargs)
+        if rp.get("to") in PROJECT_NODES
+        else make_plan(paths, cfg, to=rp.get("to", "score2"), **kwargs)
+    )
+    log({"event": "job_start", "units": len(plan.units)})
+    res = execute(paths, plan, emit=log, providers=providers, cancelled=cancel.is_set, heartbeat=hb)
+    failed = {**res.failed, **({"plan": [s for s, _ in res.refused]} if res.refused else {})}
+    if failed:
+        status = "failed"
+    return status, failed, res.error_message() if failed else None
+
+
 def _close_pools() -> None:
     """The OCR pool is closed by parse's own `finally`; nothing else to release here."""
 
 
 def main(argv: list[str]) -> int:
+    from manuallabor.providers.offline import install_from_env
+
+    install_from_env()  # MANUALLABOR_OFFLINE=1: no network but the local model server
     if len(argv) != 2:
         print("usage: python -m manuallabor.jobs.worker <project root> <job id>", file=sys.stderr)
         return 2

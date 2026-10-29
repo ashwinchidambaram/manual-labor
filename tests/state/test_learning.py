@@ -171,7 +171,9 @@ def test_l4_learning_never_touches_the_config(env: Env) -> None:
     # only PUT /api/learning (set_flags) changes `learning.*`, and nothing else
     svc.set_flags(True, True, None, "f")
     old, new = json.loads(cfg_before), json.loads(env.paths.config.read_text())
-    assert {k for k in new if new[k] != old.get(k)} == {"learning"}
+    # keys a newer config model adds with their defaults (module 10: agent, doc_thresholds) are
+    # not changes learning made
+    assert {k for k in new if k in old and new[k] != old[k]} == {"learning"}
     assert new["learning"] == {"enabled": True, "use_global": True, "contribute_global": False}
 
 

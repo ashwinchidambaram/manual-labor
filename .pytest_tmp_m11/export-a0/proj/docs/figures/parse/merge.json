@@ -1,0 +1,1517 @@
+{
+  "dispositions": [
+    {
+      "block_id": "b-figures-p001-01",
+      "detail": null,
+      "order": 0,
+      "outcome": "matched",
+      "page": 1,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p001-02",
+      "detail": null,
+      "order": 1,
+      "outcome": "matched",
+      "page": 1,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p001-03",
+      "detail": null,
+      "order": 2,
+      "outcome": "matched",
+      "page": 1,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p001-04",
+      "detail": null,
+      "order": 3,
+      "outcome": "matched",
+      "page": 1,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p001-05",
+      "detail": null,
+      "order": 4,
+      "outcome": "matched",
+      "page": 1,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p001-06",
+      "detail": null,
+      "order": 5,
+      "outcome": "matched",
+      "page": 1,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p001-07",
+      "detail": null,
+      "order": 6,
+      "outcome": "matched",
+      "page": 1,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p001-08",
+      "detail": null,
+      "order": 7,
+      "outcome": "matched",
+      "page": 1,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p001-09",
+      "detail": null,
+      "order": 8,
+      "outcome": "matched",
+      "page": 1,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p001-10",
+      "detail": null,
+      "order": 9,
+      "outcome": "matched",
+      "page": 1,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p001-11",
+      "detail": null,
+      "order": 10,
+      "outcome": "matched",
+      "page": 1,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p001-01",
+      "detail": null,
+      "order": 0,
+      "outcome": "primary",
+      "page": 1,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p001-02",
+      "detail": null,
+      "order": 1,
+      "outcome": "primary",
+      "page": 1,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p001-03",
+      "detail": null,
+      "order": 2,
+      "outcome": "primary",
+      "page": 1,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p001-04",
+      "detail": null,
+      "order": 3,
+      "outcome": "primary",
+      "page": 1,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p001-05",
+      "detail": null,
+      "order": 4,
+      "outcome": "primary",
+      "page": 1,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p001-06",
+      "detail": null,
+      "order": 5,
+      "outcome": "primary",
+      "page": 1,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p001-07",
+      "detail": null,
+      "order": 6,
+      "outcome": "primary",
+      "page": 1,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p001-08",
+      "detail": null,
+      "order": 7,
+      "outcome": "primary",
+      "page": 1,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p001-09",
+      "detail": null,
+      "order": 8,
+      "outcome": "primary",
+      "page": 1,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p001-10",
+      "detail": null,
+      "order": 9,
+      "outcome": "primary",
+      "page": 1,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p001-11",
+      "detail": null,
+      "order": 10,
+      "outcome": "primary",
+      "page": 1,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p002-01",
+      "detail": null,
+      "order": 0,
+      "outcome": "matched",
+      "page": 2,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p002-02",
+      "detail": null,
+      "order": 1,
+      "outcome": "matched",
+      "page": 2,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p002-03",
+      "detail": null,
+      "order": 2,
+      "outcome": "matched",
+      "page": 2,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p002-04",
+      "detail": null,
+      "order": 3,
+      "outcome": "matched",
+      "page": 2,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p002-05",
+      "detail": null,
+      "order": 4,
+      "outcome": "matched",
+      "page": 2,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p002-06",
+      "detail": null,
+      "order": 5,
+      "outcome": "matched",
+      "page": 2,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p002-07",
+      "detail": null,
+      "order": 6,
+      "outcome": "matched",
+      "page": 2,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p002-08",
+      "detail": null,
+      "order": 7,
+      "outcome": "matched",
+      "page": 2,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p002-09",
+      "detail": null,
+      "order": 8,
+      "outcome": "matched",
+      "page": 2,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p002-10",
+      "detail": null,
+      "order": 9,
+      "outcome": "matched",
+      "page": 2,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p002-11",
+      "detail": null,
+      "order": 10,
+      "outcome": "matched",
+      "page": 2,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p002-01",
+      "detail": null,
+      "order": 0,
+      "outcome": "primary",
+      "page": 2,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p002-02",
+      "detail": null,
+      "order": 1,
+      "outcome": "primary",
+      "page": 2,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p002-03",
+      "detail": null,
+      "order": 2,
+      "outcome": "primary",
+      "page": 2,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p002-04",
+      "detail": null,
+      "order": 3,
+      "outcome": "primary",
+      "page": 2,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p002-05",
+      "detail": null,
+      "order": 4,
+      "outcome": "primary",
+      "page": 2,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p002-06",
+      "detail": null,
+      "order": 5,
+      "outcome": "primary",
+      "page": 2,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p002-07",
+      "detail": null,
+      "order": 6,
+      "outcome": "primary",
+      "page": 2,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p002-08",
+      "detail": null,
+      "order": 7,
+      "outcome": "primary",
+      "page": 2,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p002-09",
+      "detail": null,
+      "order": 8,
+      "outcome": "primary",
+      "page": 2,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p002-10",
+      "detail": null,
+      "order": 9,
+      "outcome": "primary",
+      "page": 2,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p002-11",
+      "detail": null,
+      "order": 10,
+      "outcome": "primary",
+      "page": 2,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p003-01",
+      "detail": null,
+      "order": 0,
+      "outcome": "matched",
+      "page": 3,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p003-02",
+      "detail": null,
+      "order": 1,
+      "outcome": "matched",
+      "page": 3,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p003-03",
+      "detail": null,
+      "order": 2,
+      "outcome": "matched",
+      "page": 3,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p003-04",
+      "detail": null,
+      "order": 3,
+      "outcome": "absorbed",
+      "page": 3,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p003-06",
+      "detail": null,
+      "order": 4,
+      "outcome": "matched",
+      "page": 3,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p003-07",
+      "detail": null,
+      "order": 5,
+      "outcome": "matched",
+      "page": 3,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p003-08",
+      "detail": null,
+      "order": 6,
+      "outcome": "matched",
+      "page": 3,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p003-09",
+      "detail": null,
+      "order": 7,
+      "outcome": "matched",
+      "page": 3,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p003-10",
+      "detail": null,
+      "order": 8,
+      "outcome": "matched",
+      "page": 3,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p003-11",
+      "detail": null,
+      "order": 9,
+      "outcome": "matched",
+      "page": 3,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p003-01",
+      "detail": null,
+      "order": 0,
+      "outcome": "primary",
+      "page": 3,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p003-02",
+      "detail": null,
+      "order": 1,
+      "outcome": "primary",
+      "page": 3,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p003-03",
+      "detail": null,
+      "order": 2,
+      "outcome": "primary",
+      "page": 3,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p003-04",
+      "detail": null,
+      "order": 3,
+      "outcome": "primary",
+      "page": 3,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p003-05",
+      "detail": null,
+      "order": 4,
+      "outcome": "primary",
+      "page": 3,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p003-06",
+      "detail": null,
+      "order": 5,
+      "outcome": "primary",
+      "page": 3,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p003-07",
+      "detail": null,
+      "order": 6,
+      "outcome": "primary",
+      "page": 3,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p003-08",
+      "detail": null,
+      "order": 7,
+      "outcome": "primary",
+      "page": 3,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p003-09",
+      "detail": null,
+      "order": 8,
+      "outcome": "primary",
+      "page": 3,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p003-10",
+      "detail": null,
+      "order": 9,
+      "outcome": "primary",
+      "page": 3,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p003-11",
+      "detail": null,
+      "order": 10,
+      "outcome": "primary",
+      "page": 3,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p004-01",
+      "detail": null,
+      "order": 0,
+      "outcome": "matched",
+      "page": 4,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p004-02",
+      "detail": null,
+      "order": 1,
+      "outcome": "matched",
+      "page": 4,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p004-03",
+      "detail": null,
+      "order": 2,
+      "outcome": "matched",
+      "page": 4,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p004-04",
+      "detail": null,
+      "order": 3,
+      "outcome": "matched",
+      "page": 4,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p004-05",
+      "detail": null,
+      "order": 4,
+      "outcome": "matched",
+      "page": 4,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p004-06",
+      "detail": null,
+      "order": 5,
+      "outcome": "matched",
+      "page": 4,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p004-07",
+      "detail": null,
+      "order": 6,
+      "outcome": "matched",
+      "page": 4,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p004-08",
+      "detail": null,
+      "order": 7,
+      "outcome": "matched",
+      "page": 4,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p004-09",
+      "detail": null,
+      "order": 8,
+      "outcome": "matched",
+      "page": 4,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p004-10",
+      "detail": null,
+      "order": 9,
+      "outcome": "matched",
+      "page": 4,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p004-11",
+      "detail": null,
+      "order": 10,
+      "outcome": "matched",
+      "page": 4,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p004-12",
+      "detail": null,
+      "order": 11,
+      "outcome": "matched",
+      "page": 4,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p004-13",
+      "detail": null,
+      "order": 12,
+      "outcome": "matched",
+      "page": 4,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p004-14",
+      "detail": null,
+      "order": 13,
+      "outcome": "matched",
+      "page": 4,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p004-01",
+      "detail": null,
+      "order": 0,
+      "outcome": "primary",
+      "page": 4,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p004-02",
+      "detail": null,
+      "order": 1,
+      "outcome": "primary",
+      "page": 4,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p004-03",
+      "detail": null,
+      "order": 2,
+      "outcome": "primary",
+      "page": 4,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p004-04",
+      "detail": null,
+      "order": 3,
+      "outcome": "primary",
+      "page": 4,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p004-05",
+      "detail": null,
+      "order": 4,
+      "outcome": "primary",
+      "page": 4,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p004-06",
+      "detail": null,
+      "order": 5,
+      "outcome": "primary",
+      "page": 4,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p004-07",
+      "detail": null,
+      "order": 6,
+      "outcome": "primary",
+      "page": 4,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p004-08",
+      "detail": null,
+      "order": 7,
+      "outcome": "primary",
+      "page": 4,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p004-09",
+      "detail": null,
+      "order": 8,
+      "outcome": "primary",
+      "page": 4,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p004-10",
+      "detail": null,
+      "order": 9,
+      "outcome": "primary",
+      "page": 4,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p004-11",
+      "detail": null,
+      "order": 10,
+      "outcome": "primary",
+      "page": 4,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p004-12",
+      "detail": null,
+      "order": 11,
+      "outcome": "primary",
+      "page": 4,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p004-13",
+      "detail": null,
+      "order": 12,
+      "outcome": "primary",
+      "page": 4,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p004-14",
+      "detail": null,
+      "order": 13,
+      "outcome": "primary",
+      "page": 4,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p005-01",
+      "detail": null,
+      "order": 0,
+      "outcome": "matched",
+      "page": 5,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p005-02",
+      "detail": null,
+      "order": 1,
+      "outcome": "matched",
+      "page": 5,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p005-03",
+      "detail": null,
+      "order": 2,
+      "outcome": "matched",
+      "page": 5,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p005-04",
+      "detail": null,
+      "order": 3,
+      "outcome": "matched",
+      "page": 5,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p005-05",
+      "detail": null,
+      "order": 4,
+      "outcome": "matched",
+      "page": 5,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p005-06",
+      "detail": null,
+      "order": 5,
+      "outcome": "matched",
+      "page": 5,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p005-07",
+      "detail": null,
+      "order": 6,
+      "outcome": "matched",
+      "page": 5,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p005-08",
+      "detail": null,
+      "order": 7,
+      "outcome": "matched",
+      "page": 5,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p005-09",
+      "detail": null,
+      "order": 8,
+      "outcome": "matched",
+      "page": 5,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p005-10",
+      "detail": null,
+      "order": 9,
+      "outcome": "matched",
+      "page": 5,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p005-11",
+      "detail": null,
+      "order": 10,
+      "outcome": "matched",
+      "page": 5,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p005-12",
+      "detail": null,
+      "order": 11,
+      "outcome": "matched",
+      "page": 5,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p005-01",
+      "detail": null,
+      "order": 0,
+      "outcome": "primary",
+      "page": 5,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p005-02",
+      "detail": null,
+      "order": 1,
+      "outcome": "primary",
+      "page": 5,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p005-03",
+      "detail": null,
+      "order": 2,
+      "outcome": "primary",
+      "page": 5,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p005-04",
+      "detail": null,
+      "order": 3,
+      "outcome": "primary",
+      "page": 5,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p005-05",
+      "detail": null,
+      "order": 4,
+      "outcome": "primary",
+      "page": 5,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p005-06",
+      "detail": null,
+      "order": 5,
+      "outcome": "primary",
+      "page": 5,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p005-07",
+      "detail": null,
+      "order": 6,
+      "outcome": "primary",
+      "page": 5,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p005-08",
+      "detail": null,
+      "order": 7,
+      "outcome": "primary",
+      "page": 5,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p005-09",
+      "detail": null,
+      "order": 8,
+      "outcome": "primary",
+      "page": 5,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p005-10",
+      "detail": null,
+      "order": 9,
+      "outcome": "primary",
+      "page": 5,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p005-11",
+      "detail": null,
+      "order": 10,
+      "outcome": "primary",
+      "page": 5,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p005-12",
+      "detail": null,
+      "order": 11,
+      "outcome": "primary",
+      "page": 5,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p006-01",
+      "detail": null,
+      "order": 0,
+      "outcome": "matched",
+      "page": 6,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p006-02",
+      "detail": null,
+      "order": 1,
+      "outcome": "matched",
+      "page": 6,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p006-03",
+      "detail": null,
+      "order": 2,
+      "outcome": "matched",
+      "page": 6,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p006-04",
+      "detail": null,
+      "order": 3,
+      "outcome": "matched",
+      "page": 6,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p006-05",
+      "detail": null,
+      "order": 4,
+      "outcome": "matched",
+      "page": 6,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p006-06",
+      "detail": null,
+      "order": 5,
+      "outcome": "matched",
+      "page": 6,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p006-07",
+      "detail": null,
+      "order": 6,
+      "outcome": "matched",
+      "page": 6,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p006-08",
+      "detail": null,
+      "order": 7,
+      "outcome": "matched",
+      "page": 6,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p006-09",
+      "detail": null,
+      "order": 8,
+      "outcome": "matched",
+      "page": 6,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p006-10",
+      "detail": null,
+      "order": 9,
+      "outcome": "matched",
+      "page": 6,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p006-11",
+      "detail": null,
+      "order": 10,
+      "outcome": "matched",
+      "page": 6,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p006-12",
+      "detail": null,
+      "order": 11,
+      "outcome": "matched",
+      "page": 6,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p006-13",
+      "detail": null,
+      "order": 12,
+      "outcome": "matched",
+      "page": 6,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p006-01",
+      "detail": null,
+      "order": 0,
+      "outcome": "primary",
+      "page": 6,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p006-02",
+      "detail": null,
+      "order": 1,
+      "outcome": "primary",
+      "page": 6,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p006-03",
+      "detail": null,
+      "order": 2,
+      "outcome": "primary",
+      "page": 6,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p006-04",
+      "detail": null,
+      "order": 3,
+      "outcome": "primary",
+      "page": 6,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p006-05",
+      "detail": null,
+      "order": 4,
+      "outcome": "primary",
+      "page": 6,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p006-06",
+      "detail": null,
+      "order": 5,
+      "outcome": "primary",
+      "page": 6,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p006-07",
+      "detail": null,
+      "order": 6,
+      "outcome": "primary",
+      "page": 6,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p006-08",
+      "detail": null,
+      "order": 7,
+      "outcome": "primary",
+      "page": 6,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p006-09",
+      "detail": null,
+      "order": 8,
+      "outcome": "primary",
+      "page": 6,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p006-10",
+      "detail": null,
+      "order": 9,
+      "outcome": "primary",
+      "page": 6,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p006-11",
+      "detail": null,
+      "order": 10,
+      "outcome": "primary",
+      "page": 6,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p006-12",
+      "detail": null,
+      "order": 11,
+      "outcome": "primary",
+      "page": 6,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p006-13",
+      "detail": null,
+      "order": 12,
+      "outcome": "primary",
+      "page": 6,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p007-01",
+      "detail": null,
+      "order": 0,
+      "outcome": "matched",
+      "page": 7,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p007-02",
+      "detail": null,
+      "order": 1,
+      "outcome": "matched",
+      "page": 7,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p007-03",
+      "detail": null,
+      "order": 2,
+      "outcome": "matched",
+      "page": 7,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p007-04",
+      "detail": null,
+      "order": 3,
+      "outcome": "matched",
+      "page": 7,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p007-05",
+      "detail": null,
+      "order": 4,
+      "outcome": "matched",
+      "page": 7,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p007-06",
+      "detail": null,
+      "order": 5,
+      "outcome": "matched",
+      "page": 7,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p007-07",
+      "detail": null,
+      "order": 6,
+      "outcome": "matched",
+      "page": 7,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p007-08",
+      "detail": null,
+      "order": 7,
+      "outcome": "matched",
+      "page": 7,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p007-09",
+      "detail": null,
+      "order": 8,
+      "outcome": "matched",
+      "page": 7,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p007-10",
+      "detail": null,
+      "order": 9,
+      "outcome": "matched",
+      "page": 7,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p007-11",
+      "detail": null,
+      "order": 10,
+      "outcome": "matched",
+      "page": 7,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p007-01",
+      "detail": null,
+      "order": 0,
+      "outcome": "primary",
+      "page": 7,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p007-02",
+      "detail": null,
+      "order": 1,
+      "outcome": "primary",
+      "page": 7,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p007-03",
+      "detail": null,
+      "order": 2,
+      "outcome": "primary",
+      "page": 7,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p007-04",
+      "detail": null,
+      "order": 3,
+      "outcome": "primary",
+      "page": 7,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p007-05",
+      "detail": null,
+      "order": 4,
+      "outcome": "primary",
+      "page": 7,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p007-06",
+      "detail": null,
+      "order": 5,
+      "outcome": "primary",
+      "page": 7,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p007-07",
+      "detail": null,
+      "order": 6,
+      "outcome": "primary",
+      "page": 7,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p007-08",
+      "detail": null,
+      "order": 7,
+      "outcome": "primary",
+      "page": 7,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p007-09",
+      "detail": null,
+      "order": 8,
+      "outcome": "primary",
+      "page": 7,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p007-10",
+      "detail": null,
+      "order": 9,
+      "outcome": "primary",
+      "page": 7,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p007-11",
+      "detail": null,
+      "order": 10,
+      "outcome": "primary",
+      "page": 7,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p008-01",
+      "detail": null,
+      "order": 0,
+      "outcome": "matched",
+      "page": 8,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p008-02",
+      "detail": null,
+      "order": 1,
+      "outcome": "matched",
+      "page": 8,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p008-03",
+      "detail": null,
+      "order": 2,
+      "outcome": "matched",
+      "page": 8,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p008-04",
+      "detail": null,
+      "order": 3,
+      "outcome": "matched",
+      "page": 8,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p008-05",
+      "detail": null,
+      "order": 4,
+      "outcome": "matched",
+      "page": 8,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p008-06",
+      "detail": null,
+      "order": 5,
+      "outcome": "matched",
+      "page": 8,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p008-07",
+      "detail": null,
+      "order": 6,
+      "outcome": "matched",
+      "page": 8,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p008-08",
+      "detail": null,
+      "order": 7,
+      "outcome": "matched",
+      "page": 8,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p008-09",
+      "detail": null,
+      "order": 8,
+      "outcome": "matched",
+      "page": 8,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p008-10",
+      "detail": null,
+      "order": 9,
+      "outcome": "matched",
+      "page": 8,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p008-11",
+      "detail": null,
+      "order": 10,
+      "outcome": "matched",
+      "page": 8,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p008-12",
+      "detail": null,
+      "order": 11,
+      "outcome": "matched",
+      "page": 8,
+      "parser": "docling"
+    },
+    {
+      "block_id": "b-figures-p008-01",
+      "detail": null,
+      "order": 0,
+      "outcome": "primary",
+      "page": 8,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p008-02",
+      "detail": null,
+      "order": 1,
+      "outcome": "primary",
+      "page": 8,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p008-03",
+      "detail": null,
+      "order": 2,
+      "outcome": "primary",
+      "page": 8,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p008-04",
+      "detail": null,
+      "order": 3,
+      "outcome": "primary",
+      "page": 8,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p008-05",
+      "detail": null,
+      "order": 4,
+      "outcome": "primary",
+      "page": 8,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p008-06",
+      "detail": null,
+      "order": 5,
+      "outcome": "primary",
+      "page": 8,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p008-07",
+      "detail": null,
+      "order": 6,
+      "outcome": "primary",
+      "page": 8,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p008-08",
+      "detail": null,
+      "order": 7,
+      "outcome": "primary",
+      "page": 8,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p008-09",
+      "detail": null,
+      "order": 8,
+      "outcome": "primary",
+      "page": 8,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p008-10",
+      "detail": null,
+      "order": 9,
+      "outcome": "primary",
+      "page": 8,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p008-11",
+      "detail": null,
+      "order": 10,
+      "outcome": "primary",
+      "page": 8,
+      "parser": "pymupdf"
+    },
+    {
+      "block_id": "b-figures-p008-12",
+      "detail": null,
+      "order": 11,
+      "outcome": "primary",
+      "page": 8,
+      "parser": "pymupdf"
+    }
+  ],
+  "doc_id": "figures"
+}

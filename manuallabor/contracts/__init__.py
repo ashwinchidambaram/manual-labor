@@ -25,9 +25,11 @@ from manuallabor.contracts.block import (
     TableCell,
     TableData,
     TableShape,
+    VisionReading,
 )
 from manuallabor.contracts.config import (
     KNOWN_PROVIDERS,
+    AgentConfig,
     CleanupConfig,
     LearningConfig,
     ModelRef,
@@ -45,12 +47,14 @@ from manuallabor.contracts.enums import (
     DecisionAction,
     DiffOpKind,
     DocKind,
+    EvidenceSource,
     Extraction,
     FaithViolationKind,
     FlagCategory,
     FlagStatus,
     GroupView,
     OcrEngine,
+    ProposalKind,
     ProposalStatus,
     SignalName,
     Task,
@@ -91,7 +95,14 @@ from manuallabor.contracts.probe import (
     TaskSuggestion,
     TierOption,
 )
-from manuallabor.contracts.proposal import PriorAttempt, Proposal, RecheckResult
+from manuallabor.contracts.proposal import (
+    EvidenceRef,
+    PriorAttempt,
+    Proposal,
+    ProposedAttach,
+    ProposedRegroup,
+    RecheckResult,
+)
 from manuallabor.contracts.selection import (
     CoverageReport,
     GroupCoverage,
@@ -121,6 +132,13 @@ EXPORTED_MODELS: tuple[type[BaseModel], ...] = (
 )
 
 __all__ = [
+    "AgentConfig",
+    "EvidenceRef",
+    "EvidenceSource",
+    "ProposalKind",
+    "ProposedAttach",
+    "ProposedRegroup",
+    "VisionReading",
     "CpuInfo",
     "GpuInfo",
     "OllamaModel",

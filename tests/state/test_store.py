@@ -55,7 +55,7 @@ def test_s1_old_db_migrates_and_keeps_rows(tmp_path: Path, monkeypatch: pytest.M
     monkeypatch.setattr(db, "MIGRATIONS", fake)
     conn = db.connect(path)
     db.migrate(conn)
-    assert db.user_version(conn) == 2
+    assert db.user_version(conn) == len(MIGRATIONS) + 1
     assert conn.execute("SELECT value FROM meta WHERE key='k'").fetchone()[0] == "v"
     assert conn.execute("SELECT name FROM sqlite_master WHERE name='extra_table'").fetchone()
     conn.close()

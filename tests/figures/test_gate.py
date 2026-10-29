@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import xml.etree.ElementTree as ET
+from collections import Counter
 from pathlib import Path
 
 import numpy as np
@@ -30,6 +31,7 @@ def _png(paths: ProjectPaths, slug: str, fid: str) -> bytes:
     return paths.figure_file(slug, fid, "png").read_bytes()
 
 
+@pytest.mark.acc3
 def test_01_figures_methods_match_gt(figproj: ProjectPaths) -> None:
     gt = load_gt("figures")["figures"]
     assert len(gt) == 14
@@ -41,6 +43,11 @@ def test_01_figures_methods_match_gt(figproj: ProjectPaths) -> None:
         e = entry(figproj, "figures", f["expected_id"])
         assert e.reason == ("single_image" if sc.extraction == Extraction.native else "vector_only")
         assert e.method == sc.extraction
+    by_method = Counter(sidecar(figproj, "figures", f["expected_id"]).extraction.value for f in gt)
+    print(  # SPEC 11.3 evidence
+        f"FIGURES native={by_method['native']} vector={by_method['vector']} "
+        f"crop={by_method['crop']} (native+vector {ok}/{len(gt)})"
+    )
     assert ok / len(gt) >= 0.95
     assert ok == 14
 

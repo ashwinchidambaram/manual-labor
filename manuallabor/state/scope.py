@@ -123,20 +123,22 @@ class ScopeService:
         raise NotFound(f"group {op.group_id}")
 
     def apply(self, op: SelectionOp) -> SelectionOut:
-        prev = self.store.action_by_request(op.request_id)
-        if prev is not None:
-            return SelectionOut.model_validate(prev.payload["_outcome"])
         groups = self.data.all_groups()
-        before = self.data.selection()
-        new = self._apply(op, before, groups)
-        new, dropped = sel_ops.normalize_to(new, sel_ops.selectable_ids(groups))
-        out = SelectionOut(
-            selection=new,
-            dropped=dropped,
-            coverage=self._coverage(new, groups),
-            summary=self._summary(new, groups),
-        )
+        # read-modify-write inside one write transaction (BEGIN IMMEDIATE + the store lock):
+        # concurrent PUTs apply their ops one after the other instead of overwriting each other
         with self.store.tx():
+            prev = self.store.action_by_request(op.request_id, tuple(_KIND.values()))
+            if prev is not None:
+                return SelectionOut.model_validate(prev.payload["_outcome"])
+            before = self.data.selection()
+            new = self._apply(op, before, groups)
+            new, dropped = sel_ops.normalize_to(new, sel_ops.selectable_ids(groups))
+            out = SelectionOut(
+                selection=new,
+                dropped=dropped,
+                coverage=self._coverage(new, groups),
+                summary=self._summary(new, groups),
+            )
             aid = self.store.next_action_id()
             self.store.append_action(
                 _KIND[op.op],
@@ -159,8 +161,12 @@ class ScopeService:
             self.store.after_commit(lambda: projections.project_selection(self.store, self.paths))
         return out
 
-    def regroup(self, r: RegroupIn) -> GroupOverride:
-        prev = self.store.action_by_request(r.request_id)
+    def regroup(
+        self, r: RegroupIn, *, screen: str = "scope", meta: dict[str, Any] | None = None
+    ) -> GroupOverride:
+        prev = self.store.action_by_request(
+            r.request_id, (ActionKind.regroup_move, ActionKind.regroup_rename)
+        )
         if prev is not None:
             return GroupOverride.model_validate(prev.payload["_outcome"])
         if r.doc_id not in self.paths.list_slugs():
@@ -186,6 +192,8 @@ class ScopeService:
             raise InvalidOp(str(exc)) from exc
         topics = {t.slug: t for t in gf.topics}
         example: dict[str, Any] = {"doc_id": r.doc_id, "regroup": None}
+        if meta is not None:
+            example["proposal"] = meta.get("proposal")
         if r.kind == "move" and r.block_id is not None:
             frm = next((t for t in gf.topics if r.block_id in t.block_ids), None)
             to = topics.get(r.to_topic_slug or "")
@@ -216,11 +224,12 @@ class ScopeService:
             )
             self.store.append_action(
                 ActionKind.regroup_move if r.kind == "move" else ActionKind.regroup_rename,
-                "scope",
+                screen,
                 doc_id=r.doc_id,
                 target_id=r.block_id or r.topic_slug,
                 payload={
                     "override": ov.model_dump(mode="json"),
+                    **{k: v for k, v in (meta or {}).items() if k != "proposal"},
                     "_outcome": ov.model_dump(mode="json"),
                 },
                 example=example,
@@ -250,7 +259,7 @@ class ScopeService:
         return {"models": cfg.models, "probe": probe, "suggestions": suggestions}
 
     def set_project_threshold(self, value: float, reason: str, request_id: str) -> float:
-        prev = self.store.action_by_request(request_id)
+        prev = self.store.action_by_request(request_id, (ActionKind.threshold_project,))
         if prev is not None:
             return float(prev.payload["_outcome"])
         if not 0.0 <= value <= 1.0:

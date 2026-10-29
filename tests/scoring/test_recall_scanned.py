@@ -8,6 +8,8 @@ import re
 import unicodedata
 from pathlib import Path
 
+import pytest
+
 from manuallabor.contracts.enums import BlockStatus, BlockType
 from manuallabor.scoring.pipeline import load_scored_blocks
 from tests.scoring.conftest import Scored
@@ -21,6 +23,7 @@ def norm(s: str) -> str:
     return " ".join(N3.sub("", unicodedata.normalize("NFC", s)).split())
 
 
+@pytest.mark.acc2
 def test_scanned_recall(scoredproj: Scored) -> None:
     gt = json.loads(GT.read_text())
     pages: dict[int, list[str]] = {}
@@ -44,6 +47,7 @@ def test_scanned_recall(scoredproj: Scored) -> None:
         f"below {THRESHOLD}); queue recall {len(queued)}/{len(differs)}; "
         f"below threshold {low}/{len(blocks)}; review load (queued) {load}/{len(blocks)}"
     )
+    print(f"RECALL {len(caught)}/{len(differs)} at threshold {THRESHOLD}")  # SPEC 11.2 evidence
     missed = [(b.id, b.confidence, b.raw_text[:60]) for b in differs if b not in caught]
     assert len(differs) >= 10
     assert recall >= 0.95, missed

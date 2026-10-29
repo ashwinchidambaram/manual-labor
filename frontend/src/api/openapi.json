@@ -1,6 +1,116 @@
 {
   "components": {
     "schemas": {
+      "AcceptAllIn": {
+        "additionalProperties": false,
+        "properties": {
+          "docs": {
+            "anyOf": [
+              {
+                "items": {
+                  "maxLength": 48,
+                  "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Docs"
+          },
+          "request_id": {
+            "minLength": 1,
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "title": "AcceptAllIn",
+        "type": "object"
+      },
+      "AgentConfig": {
+        "additionalProperties": false,
+        "description": "Agent-pass settings (module 10).",
+        "properties": {
+          "max_rounds": {
+            "default": 3,
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "Max Rounds",
+            "type": "integer"
+          },
+          "page_image": {
+            "default": false,
+            "title": "Page Image",
+            "type": "boolean"
+          },
+          "vision_reader": {
+            "default": true,
+            "title": "Vision Reader",
+            "type": "boolean"
+          }
+        },
+        "title": "AgentConfig",
+        "type": "object"
+      },
+      "AgentItemView": {
+        "additionalProperties": false,
+        "properties": {
+          "flag": {
+            "$ref": "#/components/schemas/Flag"
+          },
+          "last_detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Detail"
+          },
+          "last_outcome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Outcome"
+          },
+          "pending_proposal_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pending Proposal Id"
+          },
+          "round": {
+            "title": "Round",
+            "type": "integer"
+          },
+          "target_id": {
+            "pattern": "(?:^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$)|(?:^FIG-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$)",
+            "title": "Target Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "flag",
+          "target_id",
+          "round"
+        ],
+        "title": "AgentItemView",
+        "type": "object"
+      },
       "AgentRunIn": {
         "additionalProperties": false,
         "properties": {
@@ -19,6 +129,21 @@
               }
             ],
             "title": "Docs"
+          },
+          "flag_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "pattern": "^flag-\\d{6}$",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flag Ids"
           },
           "request_id": {
             "minLength": 1,
@@ -579,6 +704,16 @@
             "title": "Baseline N",
             "type": "integer"
           },
+          "discordant": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DiscordantPairs"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "learned_edit_rate": {
             "anyOf": [
               {
@@ -596,10 +731,48 @@
             "title": "Learned N",
             "type": "integer"
           },
+          "learned_queue": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LearnedQueue"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "method": {
+            "default": "in_sample",
+            "enum": [
+              "holdout",
+              "in_sample"
+            ],
+            "title": "Method",
+            "type": "string"
+          },
+          "observed": {
+            "items": {
+              "$ref": "#/components/schemas/ProvenanceRate"
+            },
+            "title": "Observed",
+            "type": "array"
+          },
+          "snapshot": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot"
+          },
           "verdict": {
             "enum": [
               "learned_better",
               "learned_worse",
+              "no_difference",
               "insufficient"
             ],
             "title": "Verdict",
@@ -622,6 +795,15 @@
             "title": "Request Id",
             "type": "string"
           },
+          "scope": {
+            "default": "next_docs",
+            "enum": [
+              "next_docs",
+              "project"
+            ],
+            "title": "Scope",
+            "type": "string"
+          },
           "threshold": {
             "maximum": 1.0,
             "minimum": 0.0,
@@ -638,6 +820,34 @@
       "CalibrationApplyOut": {
         "additionalProperties": false,
         "properties": {
+          "job": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JobInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pinned": {
+            "items": {
+              "maxLength": 48,
+              "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+              "type": "string"
+            },
+            "title": "Pinned",
+            "type": "array"
+          },
+          "scope": {
+            "default": "next_docs",
+            "enum": [
+              "next_docs",
+              "project"
+            ],
+            "title": "Scope",
+            "type": "string"
+          },
           "threshold": {
             "maximum": 1.0,
             "minimum": 0.0,
@@ -686,6 +896,25 @@
           "n": {
             "title": "N",
             "type": "integer"
+          },
+          "sparse": {
+            "default": false,
+            "title": "Sparse",
+            "type": "boolean"
+          },
+          "wilson_hi": {
+            "default": 1.0,
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Wilson Hi",
+            "type": "number"
+          },
+          "wilson_lo": {
+            "default": 0.0,
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Wilson Lo",
+            "type": "number"
           }
         },
         "required": [
@@ -717,6 +946,62 @@
             "title": "Buckets",
             "type": "array"
           },
+          "current_threshold": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Threshold"
+          },
+          "learn_preview": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LearnPreview"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "n_numeric_excluded": {
+            "default": 0,
+            "title": "N Numeric Excluded",
+            "type": "integer"
+          },
+          "n_outcomes": {
+            "default": 0,
+            "title": "N Outcomes",
+            "type": "integer"
+          },
+          "pooled": {
+            "items": {
+              "$ref": "#/components/schemas/PooledRow"
+            },
+            "title": "Pooled",
+            "type": "array"
+          },
+          "scope": {
+            "default": "project",
+            "enum": [
+              "project",
+              "global"
+            ],
+            "title": "Scope",
+            "type": "string"
+          },
+          "signals": {
+            "items": {
+              "$ref": "#/components/schemas/SignalReliability"
+            },
+            "title": "Signals",
+            "type": "array"
+          },
           "suggested_threshold": {
             "anyOf": [
               {
@@ -730,11 +1015,45 @@
             ],
             "title": "Suggested Threshold"
           },
+          "suggestion_detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggestion Detail"
+          },
+          "suggestion_reason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "ok",
+                  "insufficient_data",
+                  "target_not_met"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggestion Reason"
+          },
           "target_edit_rate": {
             "maximum": 1.0,
             "minimum": 0.0,
             "title": "Target Edit Rate",
             "type": "number"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
           }
         },
         "required": [
@@ -776,6 +1095,44 @@
           }
         },
         "title": "ConfirmIn",
+        "type": "object"
+      },
+      "ConfusionPair": {
+        "additionalProperties": false,
+        "properties": {
+          "examples": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 3,
+            "title": "Examples",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "right": {
+            "title": "Right",
+            "type": "string"
+          },
+          "support": {
+            "minimum": 1.0,
+            "title": "Support",
+            "type": "integer"
+          },
+          "wrong": {
+            "title": "Wrong",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "wrong",
+          "right",
+          "support"
+        ],
+        "title": "ConfusionPair",
         "type": "object"
       },
       "CoverageReport": {
@@ -860,6 +1217,50 @@
           "cores_logical"
         ],
         "title": "CpuInfo",
+        "type": "object"
+      },
+      "CriticalPromotion": {
+        "additionalProperties": false,
+        "properties": {
+          "below": {
+            "title": "Below",
+            "type": "number"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "rate_above": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Rate Above",
+            "type": "number"
+          },
+          "rate_below": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Rate Below",
+            "type": "number"
+          },
+          "signal": {
+            "title": "Signal",
+            "type": "string"
+          },
+          "support": {
+            "minimum": 0.0,
+            "title": "Support",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "signal",
+          "below",
+          "support",
+          "rate_below",
+          "rate_above"
+        ],
+        "title": "CriticalPromotion",
         "type": "object"
       },
       "Cursor": {
@@ -1209,6 +1610,25 @@
         "title": "DiffOpKind",
         "type": "string"
       },
+      "DiscordantPairs": {
+        "additionalProperties": false,
+        "properties": {
+          "b": {
+            "title": "B",
+            "type": "integer"
+          },
+          "c": {
+            "title": "C",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "b",
+          "c"
+        ],
+        "title": "DiscordantPairs",
+        "type": "object"
+      },
       "DocFigure": {
         "additionalProperties": false,
         "description": "One figure of a document with every article it is attached to (the Verify re-attach picker).",
@@ -1438,9 +1858,98 @@
         "title": "EditConflictBody",
         "type": "object"
       },
-      "ExportStatus": {
+      "EvidenceRef": {
+        "additionalProperties": false,
+        "description": "A span quoted from a named source. `verified`: the span occurs (whitespace collapsed) in\nthat source's text; an unverified span is kept and shown struck through.",
+        "properties": {
+          "source": {
+            "$ref": "#/components/schemas/EvidenceSource"
+          },
+          "span": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Span",
+            "type": "string"
+          },
+          "verified": {
+            "default": false,
+            "title": "Verified",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "source",
+          "span"
+        ],
+        "title": "EvidenceRef",
+        "type": "object"
+      },
+      "EvidenceSource": {
+        "description": "Where a proposal's evidence span was quoted from (module 10).",
+        "enum": [
+          "pymupdf",
+          "docling",
+          "ocr",
+          "ocr_alt",
+          "docx",
+          "vision",
+          "note",
+          "candidate"
+        ],
+        "title": "EvidenceSource",
+        "type": "string"
+      },
+      "ExportReviewSummary": {
         "additionalProperties": false,
         "properties": {
+          "approved": {
+            "minimum": 0.0,
+            "title": "Approved",
+            "type": "integer"
+          },
+          "auto_approved": {
+            "minimum": 0.0,
+            "title": "Auto Approved",
+            "type": "integer"
+          },
+          "edited": {
+            "minimum": 0.0,
+            "title": "Edited",
+            "type": "integer"
+          },
+          "numbers_verified": {
+            "minimum": 0.0,
+            "title": "Numbers Verified",
+            "type": "integer"
+          },
+          "overrides": {
+            "minimum": 0.0,
+            "title": "Overrides",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "auto_approved",
+          "approved",
+          "edited",
+          "overrides",
+          "numbers_verified"
+        ],
+        "title": "ExportReviewSummary",
+        "type": "object"
+      },
+      "ExportStatus": {
+        "additionalProperties": false,
+        "description": "`unlocked` is the raw gate (no open flag, no queued in-scope block); `blockers` are the\nblocks an active override does not cover: an export is possible iff `blockers` is empty.",
+        "properties": {
+          "blockers": {
+            "items": {
+              "pattern": "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$",
+              "type": "string"
+            },
+            "title": "Blockers",
+            "type": "array"
+          },
           "open_flags": {
             "title": "Open Flags",
             "type": "integer"
@@ -1452,9 +1961,35 @@
             "title": "Overrides",
             "type": "array"
           },
+          "queued": {
+            "default": 0,
+            "title": "Queued",
+            "type": "integer"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExportSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "unlocked": {
             "title": "Unlocked",
             "type": "boolean"
+          },
+          "zip_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zip Path"
           }
         },
         "required": [
@@ -1462,6 +1997,68 @@
           "open_flags"
         ],
         "title": "ExportStatus",
+        "type": "object"
+      },
+      "ExportSummary": {
+        "additionalProperties": false,
+        "description": "What the Export screen shows after an export (SPEC 7.4).",
+        "properties": {
+          "articles": {
+            "minimum": 0.0,
+            "title": "Articles",
+            "type": "integer"
+          },
+          "docs": {
+            "minimum": 0.0,
+            "title": "Docs",
+            "type": "integer"
+          },
+          "figures": {
+            "minimum": 0.0,
+            "title": "Figures",
+            "type": "integer"
+          },
+          "generated_at": {
+            "format": "date-time",
+            "title": "Generated At",
+            "type": "string"
+          },
+          "pages_covered": {
+            "minimum": 0.0,
+            "title": "Pages Covered",
+            "type": "integer"
+          },
+          "review": {
+            "$ref": "#/components/schemas/ExportReviewSummary"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          },
+          "zip_bytes": {
+            "minimum": 0.0,
+            "title": "Zip Bytes",
+            "type": "integer"
+          },
+          "zip_sha256": {
+            "title": "Zip Sha256",
+            "type": "string"
+          }
+        },
+        "required": [
+          "articles",
+          "figures",
+          "pages_covered",
+          "docs",
+          "review",
+          "zip_bytes",
+          "zip_sha256",
+          "generated_at"
+        ],
+        "title": "ExportSummary",
         "type": "object"
       },
       "Extraction": {
@@ -2740,6 +3337,60 @@
         "title": "JobInfo",
         "type": "object"
       },
+      "LearnPreview": {
+        "additionalProperties": false,
+        "properties": {
+          "confusions": {
+            "items": {
+              "$ref": "#/components/schemas/ConfusionPair"
+            },
+            "title": "Confusions",
+            "type": "array"
+          },
+          "lexicon": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconEntry"
+            },
+            "title": "Lexicon",
+            "type": "array"
+          },
+          "promotions": {
+            "items": {
+              "$ref": "#/components/schemas/CriticalPromotion"
+            },
+            "title": "Promotions",
+            "type": "array"
+          },
+          "rules": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Rules",
+            "type": "array"
+          }
+        },
+        "title": "LearnPreview",
+        "type": "object"
+      },
+      "LearnedQueue": {
+        "additionalProperties": false,
+        "properties": {
+          "added": {
+            "title": "Added",
+            "type": "integer"
+          },
+          "edited_among_added": {
+            "title": "Edited Among Added",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "added",
+          "edited_among_added"
+        ],
+        "title": "LearnedQueue",
+        "type": "object"
+      },
       "LearningConfig": {
         "additionalProperties": false,
         "description": "Self-improvement settings (module 7). `enabled` off means baseline behaviour exactly,\neven when learned state exists on disk. `use_global` / `contribute_global` opt in to the\ncross-project store ($MANUALLABOR_HOME/learning).",
@@ -2877,6 +3528,40 @@
           }
         },
         "title": "LearningUse",
+        "type": "object"
+      },
+      "LexiconEntry": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "unit",
+              "part_keyword"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "support": {
+            "minimum": 1.0,
+            "title": "Support",
+            "type": "integer"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "value",
+          "support"
+        ],
+        "title": "LexiconEntry",
         "type": "object"
       },
       "ModelRef": {
@@ -3317,13 +4002,78 @@
         "title": "PlatformInfo",
         "type": "object"
       },
+      "PooledRow": {
+        "additionalProperties": false,
+        "properties": {
+          "edited": {
+            "title": "Edited",
+            "type": "integer"
+          },
+          "hi": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Hi",
+            "type": "number"
+          },
+          "lo": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Lo",
+            "type": "number"
+          },
+          "n": {
+            "title": "N",
+            "type": "integer"
+          },
+          "rate": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rate"
+          },
+          "t": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "T",
+            "type": "number"
+          }
+        },
+        "required": [
+          "t",
+          "n",
+          "edited",
+          "lo",
+          "hi"
+        ],
+        "title": "PooledRow",
+        "type": "object"
+      },
       "PriorAttempt": {
         "additionalProperties": false,
+        "description": "An earlier round of the same flag. `reason` is the reviewer's rejection reason; the\nmodel's own rationale is shown to the reviewer but never fed back to the model.",
         "properties": {
           "decided_at": {
             "format": "date-time",
             "title": "Decided At",
             "type": "string"
+          },
+          "failed_checks": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Failed Checks",
+            "type": "array"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ProposalKind",
+            "default": "text"
           },
           "proposal_id": {
             "title": "Proposal Id",
@@ -3336,6 +4086,18 @@
           "rationale": {
             "title": "Rationale",
             "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
           },
           "status": {
             "$ref": "#/components/schemas/ProposalStatus"
@@ -3458,6 +4220,9 @@
       "ProjectConfig": {
         "additionalProperties": false,
         "properties": {
+          "agent": {
+            "$ref": "#/components/schemas/AgentConfig"
+          },
           "article_split": {
             "$ref": "#/components/schemas/ArticleSplit",
             "default": "per_topic"
@@ -3469,6 +4234,20 @@
           },
           "cleanup": {
             "$ref": "#/components/schemas/CleanupConfig"
+          },
+          "doc_thresholds": {
+            "patternProperties": {
+              "^[a-z0-9]+(?:-[a-z0-9]+)*$": {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              }
+            },
+            "propertyNames": {
+              "maxLength": 48
+            },
+            "title": "Doc Thresholds",
+            "type": "object"
           },
           "learning": {
             "$ref": "#/components/schemas/LearningConfig"
@@ -3600,6 +4379,12 @@
       "Proposal": {
         "additionalProperties": false,
         "properties": {
+          "basis_sha256": {
+            "default": "0000000000000000000000000000000000000000000000000000000000000000",
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Basis Sha256",
+            "type": "string"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -3607,11 +4392,27 @@
           },
           "evidence": {
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/EvidenceRef"
             },
             "minItems": 1,
             "title": "Evidence",
             "type": "array"
+          },
+          "final_bbox": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "maxItems": 4,
+                "minItems": 4,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Final Bbox"
           },
           "final_text": {
             "anyOf": [
@@ -3646,6 +4447,10 @@
             "title": "Input Hash",
             "type": "string"
           },
+          "kind": {
+            "$ref": "#/components/schemas/ProposalKind",
+            "default": "text"
+          },
           "model": {
             "title": "Model",
             "type": "string"
@@ -3660,6 +4465,16 @@
               }
             ],
             "title": "Proposal Text"
+          },
+          "proposed_attach": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProposedAttach"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "proposed_bbox": {
             "anyOf": [
@@ -3676,6 +4491,33 @@
               }
             ],
             "title": "Proposed Bbox"
+          },
+          "proposed_cells": {
+            "anyOf": [
+              {
+                "items": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposed Cells"
+          },
+          "proposed_regroup": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProposedRegroup"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "rationale": {
             "maxLength": 300,
@@ -3704,6 +4546,16 @@
             "pattern": "(?:^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$)|(?:^FIG-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$)",
             "title": "Target Id",
             "type": "string"
+          },
+          "vision": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VisionReading"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -3722,21 +4574,82 @@
       "ProposalEditIn": {
         "additionalProperties": false,
         "properties": {
+          "bbox": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "maxItems": 4,
+                "minItems": 4,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bbox"
+          },
+          "confirm_content_change": {
+            "default": false,
+            "title": "Confirm Content Change",
+            "type": "boolean"
+          },
           "request_id": {
             "minLength": 1,
             "title": "Request Id",
             "type": "string"
           },
           "text": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          }
+        },
+        "title": "ProposalEditIn",
+        "type": "object"
+      },
+      "ProposalKind": {
+        "description": "What a proposal changes (module 10).",
+        "enum": [
+          "text",
+          "cells",
+          "bbox",
+          "attach",
+          "regroup"
+        ],
+        "title": "ProposalKind",
+        "type": "string"
+      },
+      "ProposalRejectIn": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "request_id": {
             "minLength": 1,
-            "title": "Text",
+            "title": "Request Id",
             "type": "string"
           }
         },
-        "required": [
-          "text"
-        ],
-        "title": "ProposalEditIn",
+        "title": "ProposalRejectIn",
         "type": "object"
       },
       "ProposalStatus": {
@@ -3744,10 +4657,117 @@
           "pending",
           "accepted",
           "edited",
-          "rejected"
+          "rejected",
+          "superseded"
         ],
         "title": "ProposalStatus",
         "type": "string"
+      },
+      "ProposedAttach": {
+        "additionalProperties": false,
+        "properties": {
+          "anchor_block_id": {
+            "anyOf": [
+              {
+                "pattern": "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anchor Block Id"
+          },
+          "article_id": {
+            "pattern": "^(?:[a-z0-9]+(?:-[a-z0-9]+)*)(?:--(?:[a-z0-9]+(?:-[a-z0-9]+)*))?$",
+            "title": "Article Id",
+            "type": "string"
+          },
+          "figure_id": {
+            "pattern": "^FIG-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$",
+            "title": "Figure Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "figure_id",
+          "article_id"
+        ],
+        "title": "ProposedAttach",
+        "type": "object"
+      },
+      "ProposedRegroup": {
+        "additionalProperties": false,
+        "properties": {
+          "block_id": {
+            "pattern": "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$",
+            "title": "Block Id",
+            "type": "string"
+          },
+          "to_topic_slug": {
+            "maxLength": 48,
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "title": "To Topic Slug",
+            "type": "string"
+          }
+        },
+        "required": [
+          "block_id",
+          "to_topic_slug"
+        ],
+        "title": "ProposedRegroup",
+        "type": "object"
+      },
+      "ProvenanceRate": {
+        "additionalProperties": false,
+        "properties": {
+          "edit_rate": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Edit Rate"
+          },
+          "edited": {
+            "title": "Edited",
+            "type": "integer"
+          },
+          "n": {
+            "title": "N",
+            "type": "integer"
+          },
+          "provenance": {
+            "title": "Provenance",
+            "type": "string"
+          },
+          "wilson_hi": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Wilson Hi",
+            "type": "number"
+          },
+          "wilson_lo": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Wilson Lo",
+            "type": "number"
+          }
+        },
+        "required": [
+          "provenance",
+          "n",
+          "edited",
+          "wilson_lo",
+          "wilson_hi"
+        ],
+        "title": "ProvenanceRate",
+        "type": "object"
       },
       "QueueItem": {
         "additionalProperties": false,
@@ -4605,6 +5625,121 @@
         "title": "SignalName",
         "type": "string"
       },
+      "SignalReliability": {
+        "additionalProperties": false,
+        "properties": {
+          "cut": {
+            "title": "Cut",
+            "type": "number"
+          },
+          "edited_above": {
+            "title": "Edited Above",
+            "type": "integer"
+          },
+          "edited_below": {
+            "title": "Edited Below",
+            "type": "integer"
+          },
+          "hi_above": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Hi Above",
+            "type": "number"
+          },
+          "hi_below": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Hi Below",
+            "type": "number"
+          },
+          "klass": {
+            "enum": [
+              "predictive",
+              "uninformative",
+              "insufficient"
+            ],
+            "title": "Klass",
+            "type": "string"
+          },
+          "lo_above": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Lo Above",
+            "type": "number"
+          },
+          "lo_below": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Lo Below",
+            "type": "number"
+          },
+          "n_above": {
+            "title": "N Above",
+            "type": "integer"
+          },
+          "n_below": {
+            "title": "N Below",
+            "type": "integer"
+          },
+          "promote": {
+            "default": false,
+            "title": "Promote",
+            "type": "boolean"
+          },
+          "rate_above": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rate Above"
+          },
+          "rate_below": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rate Below"
+          },
+          "signal": {
+            "title": "Signal",
+            "type": "string"
+          },
+          "soft_fraction_below": {
+            "default": 0.0,
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Soft Fraction Below",
+            "type": "number"
+          }
+        },
+        "required": [
+          "signal",
+          "cut",
+          "n_below",
+          "edited_below",
+          "lo_below",
+          "hi_below",
+          "n_above",
+          "edited_above",
+          "lo_above",
+          "hi_above",
+          "klass"
+        ],
+        "title": "SignalReliability",
+        "type": "object"
+      },
       "SnapshotInfo": {
         "additionalProperties": false,
         "properties": {
@@ -5225,6 +6360,87 @@
         "title": "ValidationError",
         "type": "object"
       },
+      "VisionReading": {
+        "additionalProperties": false,
+        "description": "A vision model's transcript of a block's numbers (module 10). It carries no score and no\nconfidence by design: it is an attester for number changes and a pane in the Agent screen,\nnever a signal.",
+        "properties": {
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "image_sha256": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Sha256"
+          },
+          "input_hash": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Hash"
+          },
+          "lines": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "numbers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Numbers",
+            "type": "array"
+          },
+          "outcome": {
+            "enum": [
+              "ok",
+              "invalid",
+              "error",
+              "skipped"
+            ],
+            "title": "Outcome",
+            "type": "string"
+          }
+        },
+        "required": [
+          "outcome"
+        ],
+        "title": "VisionReading",
+        "type": "object"
+      },
       "WhyItem": {
         "additionalProperties": false,
         "properties": {
@@ -5294,7 +6510,7 @@
               "schema": {
                 "anyOf": [
                   {
-                    "$ref": "#/components/schemas/RequestIn"
+                    "$ref": "#/components/schemas/AcceptAllIn"
                   },
                   {
                     "type": "null"
@@ -5320,17 +6536,7 @@
             },
             "description": "Successful Response"
           },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          },
-          "501": {
+          "409": {
             "content": {
               "application/json": {
                 "schema": {
@@ -5338,7 +6544,17 @@
                 }
               }
             },
-            "description": "Not Implemented"
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
           }
         },
         "summary": "Accept All Passing",
@@ -5347,9 +6563,105 @@
         ]
       }
     },
+    "/api/agent/items": {
+      "get": {
+        "operationId": "list_items",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AgentItemView"
+                  },
+                  "title": "Response List Items",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "List Items",
+        "tags": [
+          "agent"
+        ]
+      }
+    },
     "/api/agent/proposals": {
       "get": {
         "operationId": "list_proposals",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/ProposalStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "flag_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^flag-\\d{6}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Flag Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "doc",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Doc"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -5365,7 +6677,7 @@
             },
             "description": "Successful Response"
           },
-          "501": {
+          "409": {
             "content": {
               "application/json": {
                 "schema": {
@@ -5373,7 +6685,17 @@
                 }
               }
             },
-            "description": "Not Implemented"
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
           }
         },
         "summary": "List Proposals",
@@ -5424,17 +6746,7 @@
             },
             "description": "Successful Response"
           },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          },
-          "501": {
+          "409": {
             "content": {
               "application/json": {
                 "schema": {
@@ -5442,7 +6754,17 @@
                 }
               }
             },
-            "description": "Not Implemented"
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
           }
         },
         "summary": "Accept Proposal",
@@ -5486,17 +6808,7 @@
             },
             "description": "Successful Response"
           },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          },
-          "501": {
+          "409": {
             "content": {
               "application/json": {
                 "schema": {
@@ -5504,7 +6816,17 @@
                 }
               }
             },
-            "description": "Not Implemented"
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
           }
         },
         "summary": "Edit Proposal",
@@ -5533,7 +6855,7 @@
               "schema": {
                 "anyOf": [
                   {
-                    "$ref": "#/components/schemas/RequestIn"
+                    "$ref": "#/components/schemas/ProposalRejectIn"
                   },
                   {
                     "type": "null"
@@ -5555,17 +6877,7 @@
             },
             "description": "Successful Response"
           },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          },
-          "501": {
+          "409": {
             "content": {
               "application/json": {
                 "schema": {
@@ -5573,7 +6885,17 @@
                 }
               }
             },
-            "description": "Not Implemented"
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
           }
         },
         "summary": "Reject Proposal",
@@ -5613,17 +6935,7 @@
             },
             "description": "Successful Response"
           },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          },
-          "501": {
+          "409": {
             "content": {
               "application/json": {
                 "schema": {
@@ -5631,7 +6943,17 @@
                 }
               }
             },
-            "description": "Not Implemented"
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
           }
         },
         "summary": "Agent Run",
@@ -5689,6 +7011,38 @@
     "/api/calibration": {
       "get": {
         "operationId": "get_calibration",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "scope",
+            "required": false,
+            "schema": {
+              "default": "project",
+              "enum": [
+                "project",
+                "global"
+              ],
+              "title": "Scope",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "snapshot",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Snapshot"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -5700,7 +7054,7 @@
             },
             "description": "Successful Response"
           },
-          "501": {
+          "409": {
             "content": {
               "application/json": {
                 "schema": {
@@ -5708,7 +7062,17 @@
                 }
               }
             },
-            "description": "Not Implemented"
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
           }
         },
         "summary": "Get Calibration",
@@ -5741,17 +7105,7 @@
             },
             "description": "Successful Response"
           },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          },
-          "501": {
+          "409": {
             "content": {
               "application/json": {
                 "schema": {
@@ -5759,7 +7113,17 @@
                 }
               }
             },
-            "description": "Not Implemented"
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
           }
         },
         "summary": "Apply Calibration",
@@ -6118,6 +7482,16 @@
             },
             "description": "Successful Response"
           },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -6140,6 +7514,35 @@
           }
         },
         "summary": "Start Export",
+        "tags": [
+          "export"
+        ]
+      }
+    },
+    "/api/export/download": {
+      "get": {
+        "operationId": "download_export",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          }
+        },
+        "summary": "Download Export",
         "tags": [
           "export"
         ]
@@ -6173,11 +7576,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ApiErrorBody"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Unprocessable Entity"
           },
           "501": {
             "content": {
@@ -6198,7 +7601,7 @@
     },
     "/api/export/status": {
       "get": {
-        "operationId": "export_status",
+        "operationId": "get_export_status",
         "responses": {
           "200": {
             "content": {
@@ -6211,7 +7614,7 @@
             "description": "Successful Response"
           }
         },
-        "summary": "Export Status",
+        "summary": "Get Export Status",
         "tags": [
           "export"
         ]

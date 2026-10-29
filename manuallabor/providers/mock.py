@@ -10,6 +10,7 @@ import unicodedata
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any, Literal
 
+from manuallabor.agent.mock_replies import mock_agent_reply
 from manuallabor.cleanup.mock_replies import mock_describe_reply
 from manuallabor.contracts.config import ModelRef
 from manuallabor.contracts.enums import Task
@@ -48,6 +49,7 @@ DEFAULT_MOCK_RESPONSES: dict[Task, str | Responder] = {
     Task.grouping: mock_grouping_reply,
     Task.verifier: "NONE",
     Task.metadata: '{"title": null, "product_model": null}',
+    Task.agent: mock_agent_reply,
 }
 
 

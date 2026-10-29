@@ -8,12 +8,14 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from manuallabor.agent.errors import AgentConflict
 from manuallabor.state.errors import (
     EditConflictError,
     InvalidOp,
     LockHeld,
     NoPageRender,
     OutOfScope,
+    RequestIdReused,
     StateError,
 )
 
@@ -50,9 +52,17 @@ def install_handlers(app: FastAPI) -> None:
             conflict=jsonable_encoder(exc.conflict.model_dump(mode="json")),
         )
 
+    @app.exception_handler(AgentConflict)
+    async def _agent(_: Request, exc: AgentConflict) -> JSONResponse:
+        return _json(409, exc.code, exc.detail)
+
     @app.exception_handler(LockHeld)
     async def _lock(_: Request, exc: LockHeld) -> JSONResponse:
         return _json(409, "locked", str(exc))
+
+    @app.exception_handler(RequestIdReused)
+    async def _reused(_: Request, exc: RequestIdReused) -> JSONResponse:
+        return _json(409, "request_id_reused", str(exc))
 
     @app.exception_handler(OutOfScope)
     async def _scope(_: Request, exc: OutOfScope) -> JSONResponse:

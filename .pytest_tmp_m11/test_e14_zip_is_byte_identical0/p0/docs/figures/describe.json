@@ -1,0 +1,149 @@
+{
+  "algo_version": "2",
+  "doc_id": "figures",
+  "figures": [
+    {
+      "description": "Generated description (mock) of image c19a101b.",
+      "figure_id": "FIG-figures-p001-01",
+      "image_sha256": "c19a101bcc13072f8ee282aaf6744fc2c27206680392619682d99047674483d5",
+      "outcome": "ok",
+      "tags": [
+        "figure",
+        "mock"
+      ]
+    },
+    {
+      "description": "Generated description (mock) of image 8da293bf.",
+      "figure_id": "FIG-figures-p001-02",
+      "image_sha256": "8da293bff18ac569f5dcc1af78dbf30fb753f541eaf3ef03a10d0860d69a27b8",
+      "outcome": "ok",
+      "tags": [
+        "figure",
+        "mock"
+      ]
+    },
+    {
+      "description": "Generated description (mock) of image f053a9ae.",
+      "figure_id": "FIG-figures-p002-01",
+      "image_sha256": "f053a9aeedafbf28a469266a79903d364011a1b842df5fc936b65047200a566e",
+      "outcome": "ok",
+      "tags": [
+        "figure",
+        "mock"
+      ]
+    },
+    {
+      "description": "Generated description (mock) of image 333f444a.",
+      "figure_id": "FIG-figures-p002-02",
+      "image_sha256": "333f444ae3105b11d14ce823c3baee39c4320c34c449e99f6325d154c583976e",
+      "outcome": "ok",
+      "tags": [
+        "figure",
+        "mock"
+      ]
+    },
+    {
+      "description": "Generated description (mock) of image 6ff34545.",
+      "figure_id": "FIG-figures-p003-01",
+      "image_sha256": "6ff345455f4388c6e4cda8062dbac382c878408f0a33ad393a09bbd9e02c3bab",
+      "outcome": "ok",
+      "tags": [
+        "figure",
+        "mock"
+      ]
+    },
+    {
+      "description": "Generated description (mock) of image f68693e3.",
+      "figure_id": "FIG-figures-p003-02",
+      "image_sha256": "f68693e314e20fd96be1feffcbf47869ef66908b60d86bdc16d8def51153524a",
+      "outcome": "ok",
+      "tags": [
+        "figure",
+        "mock"
+      ]
+    },
+    {
+      "description": "Generated description (mock) of image 1b118b6c.",
+      "figure_id": "FIG-figures-p004-01",
+      "image_sha256": "1b118b6c613f9039c7ffec860fcbbf581e9b38da73bbda2ea792f060a6ea67a4",
+      "outcome": "ok",
+      "tags": [
+        "figure",
+        "mock"
+      ]
+    },
+    {
+      "description": "Generated description (mock) of image 48bacb28.",
+      "figure_id": "FIG-figures-p005-01",
+      "image_sha256": "48bacb28a27bd9ac0c1b2972a77b1dc35a4b88964f272f9d3089cb6511d3d94e",
+      "outcome": "ok",
+      "tags": [
+        "figure",
+        "mock"
+      ]
+    },
+    {
+      "description": "Generated description (mock) of image 4fdb649b.",
+      "figure_id": "FIG-figures-p005-02",
+      "image_sha256": "4fdb649b15ee020226edc96c5c6aedcb1efdec94529c33ba0b22d7f2fbc77768",
+      "outcome": "ok",
+      "tags": [
+        "figure",
+        "mock"
+      ]
+    },
+    {
+      "description": "Generated description (mock) of image f053a9ae.",
+      "figure_id": "FIG-figures-p006-01",
+      "image_sha256": "f053a9aeedafbf28a469266a79903d364011a1b842df5fc936b65047200a566e",
+      "outcome": "ok",
+      "tags": [
+        "figure",
+        "mock"
+      ]
+    },
+    {
+      "description": "Generated description (mock) of image 97ffdfd9.",
+      "figure_id": "FIG-figures-p006-02",
+      "image_sha256": "97ffdfd94992e27c7d056eaf0e5341371d3029e73eb92d1a37bbbeeb5e6a4cdf",
+      "outcome": "ok",
+      "tags": [
+        "figure",
+        "mock"
+      ]
+    },
+    {
+      "description": "Generated description (mock) of image f053a9ae.",
+      "figure_id": "FIG-figures-p007-01",
+      "image_sha256": "f053a9aeedafbf28a469266a79903d364011a1b842df5fc936b65047200a566e",
+      "outcome": "ok",
+      "tags": [
+        "figure",
+        "mock"
+      ]
+    },
+    {
+      "description": "Generated description (mock) of image a9355c00.",
+      "figure_id": "FIG-figures-p007-02",
+      "image_sha256": "a9355c00ec5e307472ec03660bc8e1a9ed52810ac0242225f118c4c8c76a96a3",
+      "outcome": "ok",
+      "tags": [
+        "figure",
+        "mock"
+      ]
+    },
+    {
+      "description": "Generated description (mock) of image 172cdc46.",
+      "figure_id": "FIG-figures-p008-01",
+      "image_sha256": "172cdc465635125db66fb61b2a7bb5e5f44ba64a027c228687c297fda6c2125d",
+      "outcome": "ok",
+      "tags": [
+        "figure",
+        "mock"
+      ]
+    }
+  ],
+  "fingerprint": "7b9d8dbc2b7ec59ecedc0d1c3fd3b1da5b74859485da9ee62012892e41d49772",
+  "prompt_version": "desc-v1",
+  "vision_model": "mock:mock-1"
+}

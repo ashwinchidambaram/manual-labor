@@ -20,8 +20,10 @@ from manuallabor.contracts.enums import (
     DocKind,
     FaithViolationKind,
     FlagStatus,
+    ProposalStatus,
 )
 from manuallabor.contracts.flag import Flag
+from manuallabor.contracts.proposal import Proposal
 from manuallabor.project import ProjectPaths
 from manuallabor.scoring.faithfulness import check_faithfulness_ex
 from manuallabor.scoring.pipeline import faith_kwargs
@@ -68,6 +70,13 @@ __all__ = [
 ]
 
 TRAIL_MAX = 50
+_ACT_KINDS = (
+    ActionKind.approve,
+    ActionKind.edit,
+    ActionKind.flag,
+    ActionKind.skip,
+    ActionKind.back,
+)
 
 
 def display_text(block: Block) -> str:
@@ -82,6 +91,9 @@ class Derived:
     latest: DecisionRecord | None  # the latest current decision of any kind (incl. skip)
     orphaned: int  # decisions made on other raw text
     skipped: bool
+    # the latest current human/agent edit: the text source while the block is `edited` (an
+    # approve after it applies to the edited text and keeps status `edited`)
+    edit: DecisionRecord | None = None
 
 
 def derive(block: Block, decisions: Sequence[DecisionRecord], flags: Mapping[str, Flag]) -> Derived:
@@ -93,16 +105,22 @@ def derive(block: Block, decisions: Sequence[DecisionRecord], flags: Mapping[str
     effective = [d for d in current if d.decision.action != DecisionAction.skip]
     d = effective[-1] if effective else None
     skipped = latest is not None and latest.decision.action == DecisionAction.skip
+    edits = [x for x in effective if x.decision.action == DecisionAction.edit]
+    edit = edits[-1] if edits else None
     machine = block.status
     if d is None:
         return Derived(machine, None, None, latest, orphaned, skipped)
     act = d.decision.action
     if act == DecisionAction.approve:
+        if edit is not None:
+            # approve after an edit approves the edited text; a human edit is never discarded
+            # (an approval recorded against other text leaves the edit unapproved)
+            return Derived(BlockStatus.edited, None, d, latest, orphaned, skipped, edit)
         if d.shown_text_sha256 == sha_text(display_text(block)):
             return Derived(BlockStatus.approved, None, d, latest, orphaned, skipped)
         return Derived(machine, "changed since approval", d, latest, orphaned, skipped)
     if act == DecisionAction.edit:
-        return Derived(BlockStatus.edited, None, d, latest, orphaned, skipped)
+        return Derived(BlockStatus.edited, None, d, latest, orphaned, skipped, d)
     # flag
     fid = d.decision.flag_id
     flag = flags.get(fid) if fid is not None else None
@@ -125,9 +143,15 @@ def overlay_block(block: Block, r: Derived) -> Block:
     fields: dict[str, Any] = {"status": r.status.value}
     if r.status == BlockStatus.approved:
         fields["numbers_verified"] = block.has_numeric_spec
-    elif r.status == BlockStatus.edited and r.decision is not None:
-        fields["clean_text"] = r.decision.decision.edited_text
-        fields["numbers_verified"] = block.has_numeric_spec
+    elif r.status == BlockStatus.edited and r.edit is not None and r.decision is not None:
+        fields["clean_text"] = r.edit.decision.edited_text
+        # verified only by an approval of the edited text (or an accepted proposal), never by
+        # the edit itself
+        if r.decision.decision.action == DecisionAction.approve:
+            verified = r.decision.shown_text_sha256 == sha_text(r.edit.decision.edited_text or "")
+        else:
+            verified = r.decision.numbers_verified
+        fields["numbers_verified"] = block.has_numeric_spec and verified
         fields["faithfulness"] = None
     else:
         fields["numbers_verified"] = False
@@ -404,7 +428,9 @@ class ReviewService:
         return self.store.get_cursor() or Cursor()
 
     def set_cursor(self, c: Cursor, request_id: str) -> Cursor:
-        prev = self.store.action_by_request(request_id)
+        prev = self.store.action_by_request(
+            request_id, (ActionKind.cursor, ActionKind.threshold_view)
+        )
         if prev is not None:
             return Cursor.model_validate(prev.payload["_outcome"])
         old = self.cursor()
@@ -506,7 +532,7 @@ class ReviewService:
     # -- actions ----------------------------------------------------------------------------
 
     def act(self, a: ReviewActionIn) -> ReviewActionOut:
-        prev = self.store.action_by_request(a.request_id)
+        prev = self.store.action_by_request(a.request_id, _ACT_KINDS)
         if prev is not None:
             return ReviewActionOut.model_validate(prev.payload["_outcome"])
         if a.kind == "back":
@@ -524,7 +550,7 @@ class ReviewService:
         cfg = self.paths.load_config()
         return {
             "score": machine.confidence,
-            "threshold": cfg.threshold,
+            "threshold": cfg.threshold_for(slug),
             "signals": list(machine.signals),
             "raw_sha256": sha_text(machine.raw_text),
             "shown_text_sha256": sha_text(display_text(machine)),
@@ -621,6 +647,9 @@ class ReviewService:
             if target not in (machine.id, machine.figure_id):
                 raise InvalidOp("flag target does not belong to the block")
             return self._write(a, slug, machine, action, flag=a.flag, target=target)
+        if action == DecisionAction.approve and r.edit is not None:
+            # K then A: the approval applies to the human edit, which stays the text source
+            return self._write(a, slug, machine, action, shown_text=r.edit.decision.edited_text)
         return self._write(a, slug, machine, action)
 
     def _write(
@@ -636,13 +665,23 @@ class ReviewService:
         flag: Any = None,
         target: str | None = None,
         human_edit: bool = False,
+        kind: ActionKind | None = None,
+        screen: str = "verify",
+        source: str = "human",
+        proposal: dict[str, Any] | None = None,
+        resolution: str | None = None,
+        keep_proposal: str | None = None,
+        payload_extra: dict[str, Any] | None = None,
+        shown_text: str | None = None,
     ) -> ReviewActionOut:
         base = self._decision_fields(machine, slug)
-        numeric_ok = machine.has_numeric_spec and action in (
-            DecisionAction.approve,
-            DecisionAction.edit,
+        if shown_text is not None:  # the text the reviewer approved (an earlier edit)
+            base["shown_text_sha256"] = sha_text(shown_text)
+        # numbers are verified by an approval (or an accepted proposal), never by an edit
+        numeric_ok = machine.has_numeric_spec and (
+            action == DecisionAction.approve or kind == ActionKind.proposal_accept
         )
-        kind = ActionKind(action.value)
+        kind = kind if kind is not None else ActionKind(action.value)
         with self.store.tx():
             aid = self.store.next_action_id()
             seq = self.store.next_decision_seq()
@@ -654,13 +693,16 @@ class ReviewService:
                 machine,
                 slug,
                 action.value,
-                clean_after=edited_text if action == DecisionAction.edit else display_text(machine),
+                clean_after=edited_text
+                if action == DecisionAction.edit
+                else (shown_text if shown_text is not None else display_text(machine)),
                 faith_passed=faith_passed,
                 diff=diff,
                 flag_category=None if flag is None else flag.category.value,
                 flag_note=None if flag is None else flag.note,
                 human_edit=human_edit,
             )
+            example["proposal"] = proposal
             # rows that reference the action id first (the FKs are deferred), the action row
             # last: its payload stores the outcome, which needs the post-write state
             new_flag: Flag | None = None
@@ -674,7 +716,7 @@ class ReviewService:
                 )
                 flag_id = new_flag.id
             for fid in resolved_ids:
-                self.store.resolve_flag(fid, f"superseded by action {aid}", aid)
+                self.store.resolve_flag(fid, resolution or f"superseded by action {aid}", aid)
             self.store.add_decision(
                 seq=seq,
                 action_id=aid,
@@ -692,17 +734,19 @@ class ReviewService:
                 human_edit_diff=diff if action == DecisionAction.edit else None,
                 numbers_verified=numeric_ok,
                 provenance=base["provenance"],
+                source=source,
             )
             out = self._outcome(a, aid, slug, machine, new_flag)
             self.store.append_action(
                 kind,
-                "verify",
+                screen,
                 target_id=machine.id,
                 doc_id=slug,
                 payload={
                     "text": edited_text,
                     "flag_id": flag_id,
                     "resolved_flags": resolved_ids,
+                    **(payload_extra or {}),
                     "_outcome": out.model_dump(mode="json"),
                 },
                 example=example,
@@ -712,8 +756,117 @@ class ReviewService:
                 request_id=a.request_id,
                 action_id=aid,
             )
-            self.store.set_cursor(out.cursor, aid)
+            if action in (DecisionAction.approve, DecisionAction.edit):
+                self._supersede_pending(
+                    {machine.id, machine.figure_id or machine.id}, aid, keep_proposal
+                )
+            if screen == "verify":  # the Agent screen never moves the Verify cursor
+                self.store.set_cursor(out.cursor, aid)
         return out
+
+    def _supersede_pending(self, targets: set[str], action_id: int, keep: str | None) -> None:
+        """A reviewer decision on the target settles its pending proposals (module 10)."""
+        for p in self.store.proposals(status=ProposalStatus.pending, target_ids=targets):
+            if p.id != keep:
+                self.store.set_proposal(
+                    p.model_copy(update={"status": ProposalStatus.superseded}), action_id
+                )
+
+    def apply_agent_edit(
+        self,
+        block_id: str,
+        text: str,
+        proposal: Proposal,
+        request_id: str,
+        *,
+        bulk: bool = False,
+    ) -> ReviewActionOut:
+        """Record an accepted agent proposal as an `edit` decision with source `agent`
+        (design 10 section 3.9). The faithfulness verdict stored is the strict check against raw
+        text; a content change that the independent readers attest is recorded exactly like a
+        confirmed human edit (`faith_passed` False, diff stored)."""
+        prev = self.store.action_by_request(request_id)
+        if prev is not None:
+            return ReviewActionOut.model_validate(prev.payload["_outcome"])
+        slug, machine, _ov, _r = self._find(block_id)
+        if not self._in_scope(slug, block_id):
+            raise OutOfScope(block_id)
+        if machine.type == BlockType.figure:
+            raise InvalidOp("figure blocks cannot be edited")
+        chk = check_human_edit(self.data, machine, text)
+        a = ReviewActionIn(kind="edit", block_id=block_id, text=text, request_id=request_id)
+        return self._write(
+            a,
+            slug,
+            machine,
+            DecisionAction.edit,
+            edited_text=text,
+            faith_passed=chk.passed,
+            diff=chk.result.diff,
+            human_edit=not chk.passed,
+            kind=ActionKind.proposal_accept,
+            screen="agent",
+            source="agent",
+            proposal=proposal.model_dump(mode="json"),
+            resolution=f"proposal {proposal.id} accepted",
+            keep_proposal=proposal.id,
+            payload_extra={"proposal_id": proposal.id, "bulk": bulk},
+        )
+
+    def apply_proposal_edit(
+        self,
+        block_id: str,
+        text: str,
+        proposal: Proposal,
+        confirm_content_change: bool,
+        request_id: str,
+    ) -> ReviewActionOut:
+        """The reviewer's own text in place of an agent proposal: the human edit path (the
+        faithfulness check, `EditConflictError` unless confirmed), recorded as `proposal_edit`
+        on the agent screen with source `human`."""
+        prev = self.store.action_by_request(request_id)
+        if prev is not None:
+            return ReviewActionOut.model_validate(prev.payload["_outcome"])
+        slug, machine, _ov, _r = self._find(block_id)
+        if not self._in_scope(slug, block_id):
+            raise OutOfScope(block_id)
+        if machine.type == BlockType.figure:
+            raise InvalidOp("figure blocks cannot be edited")
+        if text.strip() == "":
+            raise InvalidOp("edit text must not be empty")
+        chk = check_human_edit(self.data, machine, text)
+        if not chk.passed and not confirm_content_change:
+            raise EditConflictError(
+                EditConflict(
+                    violations=chk.result.violations,
+                    numeric_changes=chk.numeric_changes,
+                    diff=chk.result.diff,
+                )
+            )
+        a = ReviewActionIn(
+            kind="edit",
+            block_id=block_id,
+            text=text,
+            confirm_content_change=confirm_content_change,
+            request_id=request_id,
+        )
+        return self._write(
+            a,
+            slug,
+            machine,
+            DecisionAction.edit,
+            edited_text=text,
+            faith_passed=chk.passed,
+            diff=chk.result.diff,
+            human_edit=not chk.passed,
+            kind=ActionKind.proposal_edit,
+            screen="agent",
+            source="human",
+            proposal=proposal.model_dump(mode="json"),
+            resolution=f"proposal {proposal.id} edited",
+            keep_proposal=proposal.id,
+            payload_extra={"proposal_id": proposal.id},
+        )
 
     def _outcome(
         self, a: ReviewActionIn, aid: int, slug: str, machine: Block, new_flag: Flag | None
@@ -793,7 +946,7 @@ class ReviewService:
         return self.store.flags(status)
 
     def resolve_flag(self, flag_id: str, resolution: str, request_id: str) -> Flag:
-        prev = self.store.action_by_request(request_id)
+        prev = self.store.action_by_request(request_id, (ActionKind.resolve_flag,))
         if prev is not None:
             return Flag.model_validate(prev.payload["_outcome"])
         flag = self.store.get_flag(flag_id)

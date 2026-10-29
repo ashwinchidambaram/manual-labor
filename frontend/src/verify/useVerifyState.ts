@@ -5,7 +5,7 @@ import { ApiError, client, unwrap } from "../api/client";
 import { useProject } from "../api/queries";
 import type { BlockDetail, EditConflict, FlagCategory, PageBlock, QueueItem, QueuePage, QueueSort, ReviewActionOut } from "../api/schema";
 import { useToast } from "../shell/Toast";
-import { initialState, queueReducer, type ActKind, type QueueEvent, type QueueState } from "./queueReducer";
+import { cmpItems, initialState, queueReducer, type ActKind, type QueueEvent, type QueueState } from "./queueReducer";
 import { stepView as stepViewBy } from "./sliderCopy";
 import { CancelledError, useVerifyWrites } from "./useVerifyWrites";
 
@@ -255,6 +255,18 @@ export function useVerifyState() {
     }
   }, [applied, dispatch]);
 
+  // Resume: a saved cursor can sit beyond the first page. While the pinned current block is a queueable item that
+  // sorts after the last loaded one, keep fetching the next page until the list contains it (then it is no longer
+  // pinned and onNearEnd paging continues from there). Done/flagged blocks are never in the list: no paging for them.
+  useEffect(() => {
+    const p = state.pinned;
+    const last = state.items[state.items.length - 1];
+    if (!p || !last || state.items.length >= state.total || p.block_id !== state.currentId) return;
+    if (["approved", "edited", "flagged", "rejected"].includes(p.status)) return;
+    if (cmpItems(state.cursor.sort, p, last) <= 0) return;
+    void loadMore();
+  }, [state.pinned, state.items, state.total, state.currentId, state.cursor.sort, loadMore]);
+
   // -- actions ----------------------------------------------------------------------------------------------
 
   const act = useCallback(
@@ -281,7 +293,7 @@ export function useVerifyState() {
             }),
           );
           return out;
-        })
+        }, optimistic ? undefined : { inlineStatuses: [422] })
         .then((out): ActResult => {
           if (!optimistic) dispatch({ type: "act", kind, blockId: id, rid });
           dispatch({ type: "ack", rid, out });

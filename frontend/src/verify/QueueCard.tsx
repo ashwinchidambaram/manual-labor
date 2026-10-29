@@ -1,4 +1,4 @@
-import { memo, useLayoutEffect, useRef } from "react";
+import { memo, useLayoutEffect, useMemo, useRef } from "react";
 import type { QueueItem } from "../api/schema";
 import { FOCUS, STALE_NAME, STATUS_LABEL } from "./labels";
 import { reasonChips, reasonsFromQueueItem } from "./reasons";
@@ -20,13 +20,21 @@ interface Props {
   focusTick: number;
   wantFocus: React.MutableRefObject<boolean>;
   onSelect: (id: string) => void;
-  style?: React.CSSProperties;
+  /** row height in px */
+  height: number;
+  /** translateY in px for an absolutely positioned (virtualised) row; undefined for a static row */
+  offset?: number;
   pinned?: boolean;
   criticalReasons?: number;
 }
 
-function QueueCardImpl({ item, isCurrent, pos, size, focusTick, wantFocus, onSelect, style, pinned, criticalReasons }: Props) {
+function QueueCardImpl({ item, isCurrent, pos, size, focusTick, wantFocus, onSelect, height, offset, pinned, criticalReasons }: Props) {
   const ref = useRef<HTMLDivElement>(null);
+  // primitives in, stable style out: the object identity must not defeat memo()
+  const style = useMemo<React.CSSProperties>(
+    () => (offset === undefined ? { height } : { position: "absolute", top: 0, left: 0, width: "100%", height, transform: `translateY(${offset}px)` }),
+    [height, offset],
+  );
   useLayoutEffect(() => {
     if (isCurrent && wantFocus.current && ref.current) {
       wantFocus.current = false;

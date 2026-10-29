@@ -10,6 +10,14 @@ from typing import Any, Literal
 
 from pydantic import Field
 
+from manuallabor.calibration.types import (
+    DiscordantPairs,
+    LearnedQueue,
+    LearnPreview,
+    PooledRow,
+    ProvenanceRate,
+    SignalReliability,
+)
 from manuallabor.cleanup.types import AttachOverride
 from manuallabor.contracts import (
     Block,
@@ -52,7 +60,9 @@ __all__ = [
     "DocReadiness",
     "DocStatus",
     "EditConflict",
+    "ExportReviewSummary",
     "ExportStatus",
+    "ExportSummary",
     "FigureAttachment",
     "FigureRailItem",
     "FlagIn",
@@ -109,7 +119,9 @@ class ActionKind(StrEnum):
     proposal_edit = "proposal_edit"
     proposal_reject = "proposal_reject"
     export_override = "export_override"
+    export_run = "export_run"
     import_ = "import"
+    agent_run = "agent_run"
 
 
 Screen = Literal["scope", "verify", "agent", "export", "settings", "cli"]
@@ -385,6 +397,9 @@ class CalibrationBucket(ContractModel):
     n: int
     edited: int
     edit_rate: Unit | None = None
+    wilson_lo: Unit = 0.0
+    wilson_hi: Unit = 1.0
+    sparse: bool = False
 
 
 class CalibrationAB(ContractModel):
@@ -392,7 +407,12 @@ class CalibrationAB(ContractModel):
     baseline_edit_rate: Unit | None = None
     learned_n: int
     learned_edit_rate: Unit | None = None
-    verdict: Literal["learned_better", "learned_worse", "insufficient"]
+    verdict: Literal["learned_better", "learned_worse", "no_difference", "insufficient"]
+    method: Literal["holdout", "in_sample"] = "in_sample"
+    snapshot: str | None = None
+    discordant: DiscordantPairs | None = None
+    learned_queue: LearnedQueue | None = None
+    observed: list[ProvenanceRate] = Field(default_factory=list)
 
 
 class CalibrationReport(ContractModel):
@@ -400,12 +420,51 @@ class CalibrationReport(ContractModel):
     target_edit_rate: Unit
     suggested_threshold: Unit | None = None
     ab: CalibrationAB | None = None
+    scope: Literal["project", "global"] = "project"
+    current_threshold: Unit | None = None
+    n_outcomes: int = 0
+    n_numeric_excluded: int = 0
+    pooled: list[PooledRow] = Field(default_factory=list)
+    suggestion_reason: Literal["ok", "insufficient_data", "target_not_met"] | None = None
+    suggestion_detail: str | None = None
+    warnings: list[str] = Field(default_factory=list)
+    signals: list[SignalReliability] = Field(default_factory=list)
+    learn_preview: LearnPreview | None = None
+
+
+class ExportReviewSummary(ContractModel):
+    auto_approved: int = Field(ge=0)
+    approved: int = Field(ge=0)
+    edited: int = Field(ge=0)
+    overrides: int = Field(ge=0)
+    numbers_verified: int = Field(ge=0)
+
+
+class ExportSummary(ContractModel):
+    """What the Export screen shows after an export (SPEC 7.4)."""
+
+    articles: int = Field(ge=0)
+    figures: int = Field(ge=0)
+    pages_covered: int = Field(ge=0)
+    docs: int = Field(ge=0)
+    review: ExportReviewSummary
+    warnings: list[str] = Field(default_factory=list)
+    zip_bytes: int = Field(ge=0)
+    zip_sha256: str
+    generated_at: UTCDateTime
 
 
 class ExportStatus(ContractModel):
+    """`unlocked` is the raw gate (no open flag, no queued in-scope block); `blockers` are the
+    blocks an active override does not cover: an export is possible iff `blockers` is empty."""
+
     unlocked: bool
     open_flags: int
     overrides: list[Override] = Field(default_factory=list)
+    queued: int = 0
+    blockers: list[BlockId] = Field(default_factory=list)
+    summary: ExportSummary | None = None
+    zip_path: str | None = None
 
 
 # Re-exported so API code has one import site for everything crossing the boundary.

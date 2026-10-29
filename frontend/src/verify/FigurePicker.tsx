@@ -93,9 +93,9 @@ export default function FigurePicker({ slug, articleId, onPick, onClose }: Props
           }}
           className={`rounded border border-slate-400 px-2 py-1 ${FOCUS}`}
         />
+        {q.isLoading ? <p role="status" className="p-2 text-sm text-slate-600">Loading figures...</p> : null}
+        {q.isError ? <p role="alert" className="p-2 text-sm text-red-800">Could not load figures</p> : null}
         <ul id="picker-list" role="listbox" aria-label="Figures of this document" className="min-h-0 flex-1 overflow-auto">
-          {q.isLoading ? <li className="p-2 text-sm text-slate-600">Loading figures...</li> : null}
-          {q.isError ? <li role="alert" className="p-2 text-sm text-red-800">Could not load figures</li> : null}
           {list.map((f, i) => (
             <li
               key={f.figure_id}

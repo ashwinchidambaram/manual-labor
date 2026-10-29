@@ -1,0 +1,1862 @@
+{
+  "algo_version": "1",
+  "doc_id": "clean",
+  "embedding_dim": 256,
+  "embedding_model": "mock:mock-1",
+  "fingerprint": "ba51b810a5bb39baba765afd480b59931301971823ccbd800371a999a4c8aaba",
+  "grouping_model": "mock:mock-1",
+  "learning_snapshot": "baseline",
+  "overlap": [
+    {
+      "blocks": 1,
+      "section_id": "g-clean-s016",
+      "topic_id": "g-clean-t000"
+    },
+    {
+      "blocks": 2,
+      "section_id": "g-clean-s001",
+      "topic_id": "g-clean-t001"
+    },
+    {
+      "blocks": 1,
+      "section_id": "g-clean-s002",
+      "topic_id": "g-clean-t001"
+    },
+    {
+      "blocks": 1,
+      "section_id": "g-clean-s003",
+      "topic_id": "g-clean-t001"
+    },
+    {
+      "blocks": 1,
+      "section_id": "g-clean-s004",
+      "topic_id": "g-clean-t001"
+    },
+    {
+      "blocks": 1,
+      "section_id": "g-clean-s012",
+      "topic_id": "g-clean-t001"
+    },
+    {
+      "blocks": 1,
+      "section_id": "g-clean-s013",
+      "topic_id": "g-clean-t001"
+    },
+    {
+      "blocks": 1,
+      "section_id": "g-clean-s015",
+      "topic_id": "g-clean-t001"
+    },
+    {
+      "blocks": 4,
+      "section_id": "g-clean-s003",
+      "topic_id": "g-clean-t002"
+    },
+    {
+      "blocks": 1,
+      "section_id": "g-clean-s008",
+      "topic_id": "g-clean-t002"
+    },
+    {
+      "blocks": 3,
+      "section_id": "g-clean-s003",
+      "topic_id": "g-clean-t003"
+    },
+    {
+      "blocks": 2,
+      "section_id": "g-clean-s004",
+      "topic_id": "g-clean-t003"
+    },
+    {
+      "blocks": 1,
+      "section_id": "g-clean-s003",
+      "topic_id": "g-clean-t004"
+    },
+    {
+      "blocks": 2,
+      "section_id": "g-clean-s004",
+      "topic_id": "g-clean-t004"
+    },
+    {
+      "blocks": 1,
+      "section_id": "g-clean-s010",
+      "topic_id": "g-clean-t004"
+    },
+    {
+      "blocks": 2,
+      "section_id": "g-clean-s014",
+      "topic_id": "g-clean-t004"
+    },
+    {
+      "blocks": 1,
+      "section_id": "g-clean-s018",
+      "topic_id": "g-clean-t004"
+    },
+    {
+      "blocks": 1,
+      "section_id": "g-clean-s003",
+      "topic_id": "g-clean-t005"
+    },
+    {
+      "blocks": 2,
+      "section_id": "g-clean-s004",
+      "topic_id": "g-clean-t005"
+    },
+    {
+      "blocks": 1,
+      "section_id": "g-clean-s006",
+      "topic_id": "g-clean-t005"
+    },
+    {
+      "blocks": 1,
+      "section_id": "g-clean-s011",
+      "topic_id": "g-clean-t005"
+    },
+    {
+      "blocks": 3,
+      "section_id": "g-clean-s013",
+      "topic_id": "g-clean-t005"
+    },
+    {
+      "blocks": 2,
+      "section_id": "g-clean-s014",
+      "topic_id": "g-clean-t005"
+    },
+    {
+      "blocks": 1,
+      "section_id": "g-clean-s003",
+      "topic_id": "g-clean-t006"
+    },
+    {
+      "blocks": 1,
+      "section_id": "g-clean-s013",
+      "topic_id": "g-clean-t006"
+    },
+    {
+      "blocks": 1,
+      "section_id": "g-clean-s014",
+      "topic_id": "g-clean-t006"
+    },
+    {
+      "blocks": 1,
+      "section_id": "g-clean-s018",
+      "topic_id": "g-clean-t006"
+    },
+    {
+      "blocks": 1,
+      "section_id": "g-clean-s003",
+      "topic_id": "g-clean-t007"
+    },
+    {
+      "blocks": 3,
+      "section_id": "g-clean-s004",
+      "topic_id": "g-clean-t007"
+    },
+    {
+      "blocks": 2,
+      "section_id": "g-clean-s006",
+      "topic_id": "g-clean-t007"
+    },
+    {
+      "blocks": 1,
+      "section_id": "g-clean-s008",
+      "topic_id": "g-clean-t007"
+    },
+    {
+      "blocks": 2,
+      "section_id": "g-clean-s010",
+      "topic_id": "g-clean-t007"
+    },
+    {
+      "blocks": 2,
+      "section_id": "g-clean-s011",
+      "topic_id": "g-clean-t007"
+    },
+    {
+      "blocks": 1,
+      "section_id": "g-clean-s014",
+      "topic_id": "g-clean-t007"
+    },
+    {
+      "blocks": 4,
+      "section_id": "g-clean-s018",
+      "topic_id": "g-clean-t007"
+    },
+    {
+      "blocks": 1,
+      "section_id": "g-clean-s004",
+      "topic_id": "g-clean-t008"
+    },
+    {
+      "blocks": 4,
+      "section_id": "g-clean-s006",
+      "topic_id": "g-clean-t008"
+    },
+    {
+      "blocks": 1,
+      "section_id": "g-clean-s010",
+      "topic_id": "g-clean-t008"
+    },
+    {
+      "blocks": 2,
+      "section_id": "g-clean-s011",
+      "topic_id": "g-clean-t008"
+    },
+    {
+      "blocks": 2,
+      "section_id": "g-clean-s017",
+      "topic_id": "g-clean-t008"
+    },
+    {
+      "blocks": 2,
+      "section_id": "g-clean-s018",
+      "topic_id": "g-clean-t008"
+    },
+    {
+      "blocks": 1,
+      "section_id": "g-clean-s004",
+      "topic_id": "g-clean-t009"
+    },
+    {
+      "blocks": 2,
+      "section_id": "g-clean-s011",
+      "topic_id": "g-clean-t009"
+    },
+    {
+      "blocks": 1,
+      "section_id": "g-clean-s014",
+      "topic_id": "g-clean-t009"
+    },
+    {
+      "blocks": 2,
+      "section_id": "g-clean-s018",
+      "topic_id": "g-clean-t009"
+    },
+    {
+      "blocks": 1,
+      "section_id": "g-clean-s004",
+      "topic_id": "g-clean-t010"
+    },
+    {
+      "blocks": 1,
+      "section_id": "g-clean-s006",
+      "topic_id": "g-clean-t010"
+    },
+    {
+      "blocks": 2,
+      "section_id": "g-clean-s007",
+      "topic_id": "g-clean-t010"
+    },
+    {
+      "blocks": 3,
+      "section_id": "g-clean-s010",
+      "topic_id": "g-clean-t010"
+    },
+    {
+      "blocks": 1,
+      "section_id": "g-clean-s011",
+      "topic_id": "g-clean-t010"
+    },
+    {
+      "blocks": 2,
+      "section_id": "g-clean-s018",
+      "topic_id": "g-clean-t010"
+    },
+    {
+      "blocks": 1,
+      "section_id": "g-clean-s005",
+      "topic_id": "g-clean-t011"
+    },
+    {
+      "blocks": 1,
+      "section_id": "g-clean-s006",
+      "topic_id": "g-clean-t011"
+    },
+    {
+      "blocks": 4,
+      "section_id": "g-clean-s007",
+      "topic_id": "g-clean-t011"
+    },
+    {
+      "blocks": 5,
+      "section_id": "g-clean-s008",
+      "topic_id": "g-clean-t011"
+    },
+    {
+      "blocks": 1,
+      "section_id": "g-clean-s009",
+      "topic_id": "g-clean-t011"
+    },
+    {
+      "blocks": 1,
+      "section_id": "g-clean-s010",
+      "topic_id": "g-clean-t011"
+    },
+    {
+      "blocks": 1,
+      "section_id": "g-clean-s011",
+      "topic_id": "g-clean-t011"
+    },
+    {
+      "blocks": 2,
+      "section_id": "g-clean-s006",
+      "topic_id": "g-clean-t012"
+    },
+    {
+      "blocks": 1,
+      "section_id": "g-clean-s007",
+      "topic_id": "g-clean-t012"
+    },
+    {
+      "blocks": 2,
+      "section_id": "g-clean-s013",
+      "topic_id": "g-clean-t012"
+    },
+    {
+      "blocks": 1,
+      "section_id": "g-clean-s014",
+      "topic_id": "g-clean-t012"
+    },
+    {
+      "blocks": 2,
+      "section_id": "g-clean-s015",
+      "topic_id": "g-clean-t012"
+    },
+    {
+      "blocks": 1,
+      "section_id": "g-clean-s008",
+      "topic_id": "g-clean-t013"
+    },
+    {
+      "blocks": 2,
+      "section_id": "g-clean-s010",
+      "topic_id": "g-clean-t013"
+    },
+    {
+      "blocks": 4,
+      "section_id": "g-clean-s011",
+      "topic_id": "g-clean-t013"
+    },
+    {
+      "blocks": 2,
+      "section_id": "g-clean-s013",
+      "topic_id": "g-clean-t013"
+    },
+    {
+      "blocks": 1,
+      "section_id": "g-clean-s014",
+      "topic_id": "g-clean-t013"
+    },
+    {
+      "blocks": 2,
+      "section_id": "g-clean-s018",
+      "topic_id": "g-clean-t013"
+    },
+    {
+      "blocks": 1,
+      "section_id": "g-clean-s010",
+      "topic_id": "g-clean-t014"
+    },
+    {
+      "blocks": 1,
+      "section_id": "g-clean-s011",
+      "topic_id": "g-clean-t014"
+    },
+    {
+      "blocks": 5,
+      "section_id": "g-clean-s013",
+      "topic_id": "g-clean-t014"
+    },
+    {
+      "blocks": 3,
+      "section_id": "g-clean-s014",
+      "topic_id": "g-clean-t014"
+    }
+  ],
+  "overrides_applied": 0,
+  "overrides_stale": [],
+  "params": {
+    "d_cut": 0.8,
+    "embed_batch": 32,
+    "embed_prefix": "",
+    "k_max_divisor": 4,
+    "llm_stragglers": true,
+    "low_cohesion": 0.3,
+    "max_topic_blocks": 60,
+    "min_topic_blocks": 3,
+    "n_candidates": 3,
+    "name_sample": 12,
+    "name_tokens": 40,
+    "page_window": 10,
+    "small_doc": 12,
+    "straggler_batch": 10,
+    "summary_tokens": 64,
+    "t_assign": 0.3,
+    "t_candidate": 0.15,
+    "title_max": 80,
+    "topic_slug_max": 40
+  },
+  "stragglers": [
+    {
+      "block_id": "b-clean-p011-05",
+      "by": "centroid",
+      "similarity": 0.867822,
+      "topic_id": null
+    }
+  ],
+  "structure": [
+    {
+      "block_count": 2,
+      "block_ids": [
+        "b-clean-p001-01",
+        "b-clean-p001-02"
+      ],
+      "cohesion": null,
+      "doc_id": "clean",
+      "figure_count": 0,
+      "id": "g-clean-s001",
+      "is_unassigned": false,
+      "level": 1,
+      "page_ranges": [
+        {
+          "end": 1,
+          "start": 1
+        }
+      ],
+      "parent_id": null,
+      "section_ids": [],
+      "section_number": null,
+      "slug": "acme-x200-service-manual",
+      "title": "Acme X200 Service Manual",
+      "view": "structure"
+    },
+    {
+      "block_count": 1,
+      "block_ids": [
+        "b-clean-p002-02"
+      ],
+      "cohesion": null,
+      "doc_id": "clean",
+      "figure_count": 0,
+      "id": "g-clean-s002",
+      "is_unassigned": false,
+      "level": 1,
+      "page_ranges": [
+        {
+          "end": 2,
+          "start": 2
+        }
+      ],
+      "parent_id": null,
+      "section_ids": [],
+      "section_number": "1",
+      "slug": "1-safety-and-preparation",
+      "title": "1. Safety and Preparation",
+      "view": "structure"
+    },
+    {
+      "block_count": 12,
+      "block_ids": [
+        "b-clean-p002-03",
+        "b-clean-p002-04",
+        "b-clean-p002-05",
+        "b-clean-p002-06",
+        "b-clean-p002-07",
+        "b-clean-p002-08",
+        "b-clean-p002-09",
+        "b-clean-p002-10",
+        "b-clean-p002-11",
+        "b-clean-p002-12",
+        "b-clean-p002-13",
+        "b-clean-p002-14"
+      ],
+      "cohesion": null,
+      "doc_id": "clean",
+      "figure_count": 0,
+      "id": "g-clean-s003",
+      "is_unassigned": false,
+      "level": 2,
+      "page_ranges": [
+        {
+          "end": 2,
+          "start": 2
+        }
+      ],
+      "parent_id": "g-clean-s002",
+      "section_ids": [],
+      "section_number": "1.1",
+      "slug": "1-1-general-precautions",
+      "title": "1.1 General Precautions",
+      "view": "structure"
+    },
+    {
+      "block_count": 13,
+      "block_ids": [
+        "b-clean-p003-02",
+        "b-clean-p003-03",
+        "b-clean-p003-04",
+        "b-clean-p003-05",
+        "b-clean-p003-06",
+        "b-clean-p003-07",
+        "b-clean-p003-08",
+        "b-clean-p003-09",
+        "b-clean-p003-10",
+        "b-clean-p003-11",
+        "b-clean-p003-12",
+        "b-clean-p003-13",
+        "b-clean-p003-14"
+      ],
+      "cohesion": null,
+      "doc_id": "clean",
+      "figure_count": 0,
+      "id": "g-clean-s004",
+      "is_unassigned": false,
+      "level": 2,
+      "page_ranges": [
+        {
+          "end": 3,
+          "start": 3
+        }
+      ],
+      "parent_id": "g-clean-s002",
+      "section_ids": [],
+      "section_number": "1.2",
+      "slug": "1-2-tools-and-materials",
+      "title": "1.2 Tools and Materials",
+      "view": "structure"
+    },
+    {
+      "block_count": 1,
+      "block_ids": [
+        "b-clean-p004-02"
+      ],
+      "cohesion": null,
+      "doc_id": "clean",
+      "figure_count": 0,
+      "id": "g-clean-s005",
+      "is_unassigned": false,
+      "level": 1,
+      "page_ranges": [
+        {
+          "end": 4,
+          "start": 4
+        }
+      ],
+      "parent_id": null,
+      "section_ids": [],
+      "section_number": "2",
+      "slug": "2-drive-assembly",
+      "title": "2. Drive Assembly",
+      "view": "structure"
+    },
+    {
+      "block_count": 11,
+      "block_ids": [
+        "b-clean-p004-03",
+        "b-clean-p004-04",
+        "b-clean-p004-05",
+        "b-clean-p004-06",
+        "b-clean-p004-07",
+        "b-clean-p004-08",
+        "b-clean-p004-09",
+        "b-clean-p004-10",
+        "b-clean-p004-11",
+        "b-clean-p004-12",
+        "b-clean-p004-13"
+      ],
+      "cohesion": null,
+      "doc_id": "clean",
+      "figure_count": 0,
+      "id": "g-clean-s006",
+      "is_unassigned": false,
+      "level": 2,
+      "page_ranges": [
+        {
+          "end": 4,
+          "start": 4
+        }
+      ],
+      "parent_id": "g-clean-s005",
+      "section_ids": [],
+      "section_number": "2.1",
+      "slug": "2-1-belt-inspection",
+      "title": "2.1 Belt Inspection",
+      "view": "structure"
+    },
+    {
+      "block_count": 7,
+      "block_ids": [
+        "b-clean-p005-02",
+        "b-clean-p005-03",
+        "b-clean-p005-04",
+        "b-clean-p005-05",
+        "b-clean-p005-06",
+        "b-clean-p005-07",
+        "b-clean-p005-08"
+      ],
+      "cohesion": null,
+      "doc_id": "clean",
+      "figure_count": 1,
+      "id": "g-clean-s007",
+      "is_unassigned": false,
+      "level": 2,
+      "page_ranges": [
+        {
+          "end": 5,
+          "start": 5
+        }
+      ],
+      "parent_id": "g-clean-s005",
+      "section_ids": [],
+      "section_number": "2.2",
+      "slug": "2-2-tension-adjustment",
+      "title": "2.2 Tension Adjustment",
+      "view": "structure"
+    },
+    {
+      "block_count": 8,
+      "block_ids": [
+        "b-clean-p006-02",
+        "b-clean-p006-03",
+        "b-clean-p006-04",
+        "b-clean-p006-05",
+        "b-clean-p006-06",
+        "b-clean-p006-07",
+        "b-clean-p006-08",
+        "b-clean-p006-09"
+      ],
+      "cohesion": null,
+      "doc_id": "clean",
+      "figure_count": 2,
+      "id": "g-clean-s008",
+      "is_unassigned": false,
+      "level": 2,
+      "page_ranges": [
+        {
+          "end": 6,
+          "start": 6
+        }
+      ],
+      "parent_id": "g-clean-s005",
+      "section_ids": [],
+      "section_number": "2.3",
+      "slug": "2-3-idler-replacement",
+      "title": "2.3 Idler Replacement",
+      "view": "structure"
+    },
+    {
+      "block_count": 1,
+      "block_ids": [
+        "b-clean-p007-02"
+      ],
+      "cohesion": null,
+      "doc_id": "clean",
+      "figure_count": 0,
+      "id": "g-clean-s009",
+      "is_unassigned": false,
+      "level": 1,
+      "page_ranges": [
+        {
+          "end": 7,
+          "start": 7
+        }
+      ],
+      "parent_id": null,
+      "section_ids": [],
+      "section_number": "3",
+      "slug": "3-electrical-system",
+      "title": "3. Electrical System",
+      "view": "structure"
+    },
+    {
+      "block_count": 11,
+      "block_ids": [
+        "b-clean-p007-03",
+        "b-clean-p007-04",
+        "b-clean-p007-05",
+        "b-clean-p007-06",
+        "b-clean-p007-07",
+        "b-clean-p007-08",
+        "b-clean-p007-09",
+        "b-clean-p007-10",
+        "b-clean-p007-11",
+        "b-clean-p007-12",
+        "b-clean-p007-13"
+      ],
+      "cohesion": null,
+      "doc_id": "clean",
+      "figure_count": 0,
+      "id": "g-clean-s010",
+      "is_unassigned": false,
+      "level": 2,
+      "page_ranges": [
+        {
+          "end": 7,
+          "start": 7
+        }
+      ],
+      "parent_id": "g-clean-s009",
+      "section_ids": [],
+      "section_number": "3.1",
+      "slug": "3-1-power-supply",
+      "title": "3.1 Power Supply",
+      "view": "structure"
+    },
+    {
+      "block_count": 14,
+      "block_ids": [
+        "b-clean-p008-02",
+        "b-clean-p008-03",
+        "b-clean-p008-04",
+        "b-clean-p008-05",
+        "b-clean-p008-06",
+        "b-clean-p008-07",
+        "b-clean-p008-08",
+        "b-clean-p008-09",
+        "b-clean-p008-10",
+        "b-clean-p008-11",
+        "b-clean-p008-12",
+        "b-clean-p008-13",
+        "b-clean-p008-14",
+        "b-clean-p008-15"
+      ],
+      "cohesion": null,
+      "doc_id": "clean",
+      "figure_count": 0,
+      "id": "g-clean-s011",
+      "is_unassigned": false,
+      "level": 2,
+      "page_ranges": [
+        {
+          "end": 8,
+          "start": 8
+        }
+      ],
+      "parent_id": "g-clean-s009",
+      "section_ids": [],
+      "section_number": "3.2",
+      "slug": "3-2-fuse-replacement",
+      "title": "3.2 Fuse Replacement",
+      "view": "structure"
+    },
+    {
+      "block_count": 1,
+      "block_ids": [
+        "b-clean-p009-02"
+      ],
+      "cohesion": null,
+      "doc_id": "clean",
+      "figure_count": 0,
+      "id": "g-clean-s012",
+      "is_unassigned": false,
+      "level": 1,
+      "page_ranges": [
+        {
+          "end": 9,
+          "start": 9
+        }
+      ],
+      "parent_id": null,
+      "section_ids": [],
+      "section_number": "4",
+      "slug": "4-cooling-and-lubrication",
+      "title": "4. Cooling and Lubrication",
+      "view": "structure"
+    },
+    {
+      "block_count": 14,
+      "block_ids": [
+        "b-clean-p009-03",
+        "b-clean-p009-04",
+        "b-clean-p009-05",
+        "b-clean-p009-06",
+        "b-clean-p009-07",
+        "b-clean-p009-08",
+        "b-clean-p009-09",
+        "b-clean-p009-10",
+        "b-clean-p009-11",
+        "b-clean-p009-12",
+        "b-clean-p009-13",
+        "b-clean-p009-14",
+        "b-clean-p009-15",
+        "b-clean-p009-16"
+      ],
+      "cohesion": null,
+      "doc_id": "clean",
+      "figure_count": 0,
+      "id": "g-clean-s013",
+      "is_unassigned": false,
+      "level": 2,
+      "page_ranges": [
+        {
+          "end": 9,
+          "start": 9
+        }
+      ],
+      "parent_id": "g-clean-s012",
+      "section_ids": [],
+      "section_number": "4.1",
+      "slug": "4-1-coolant-service",
+      "title": "4.1 Coolant Service",
+      "view": "structure"
+    },
+    {
+      "block_count": 12,
+      "block_ids": [
+        "b-clean-p010-02",
+        "b-clean-p010-03",
+        "b-clean-p010-04",
+        "b-clean-p010-05",
+        "b-clean-p010-06",
+        "b-clean-p010-07",
+        "b-clean-p010-08",
+        "b-clean-p010-09",
+        "b-clean-p010-10",
+        "b-clean-p010-11",
+        "b-clean-p010-12",
+        "b-clean-p010-13"
+      ],
+      "cohesion": null,
+      "doc_id": "clean",
+      "figure_count": 0,
+      "id": "g-clean-s014",
+      "is_unassigned": false,
+      "level": 2,
+      "page_ranges": [
+        {
+          "end": 10,
+          "start": 10
+        }
+      ],
+      "parent_id": "g-clean-s012",
+      "section_ids": [],
+      "section_number": "4.2",
+      "slug": "4-2-lubrication-points",
+      "title": "4.2 Lubrication Points",
+      "view": "structure"
+    },
+    {
+      "block_count": 3,
+      "block_ids": [
+        "b-clean-p011-02",
+        "b-clean-p011-03",
+        "b-clean-p011-04"
+      ],
+      "cohesion": null,
+      "doc_id": "clean",
+      "figure_count": 0,
+      "id": "g-clean-s015",
+      "is_unassigned": false,
+      "level": 2,
+      "page_ranges": [
+        {
+          "end": 11,
+          "start": 11
+        }
+      ],
+      "parent_id": "g-clean-s012",
+      "section_ids": [],
+      "section_number": "4.3",
+      "slug": "4-3-reservoir-refill",
+      "title": "4.3 Reservoir Refill",
+      "view": "structure"
+    },
+    {
+      "block_count": 1,
+      "block_ids": [
+        "b-clean-p011-05"
+      ],
+      "cohesion": null,
+      "doc_id": "clean",
+      "figure_count": 0,
+      "id": "g-clean-s016",
+      "is_unassigned": false,
+      "level": 1,
+      "page_ranges": [
+        {
+          "end": 11,
+          "start": 11
+        }
+      ],
+      "parent_id": null,
+      "section_ids": [],
+      "section_number": "5",
+      "slug": "5-final-assembly-and-testing",
+      "title": "5. Final Assembly and Testing",
+      "view": "structure"
+    },
+    {
+      "block_count": 2,
+      "block_ids": [
+        "b-clean-p011-06",
+        "b-clean-p011-07"
+      ],
+      "cohesion": null,
+      "doc_id": "clean",
+      "figure_count": 0,
+      "id": "g-clean-s017",
+      "is_unassigned": false,
+      "level": 2,
+      "page_ranges": [
+        {
+          "end": 11,
+          "start": 11
+        }
+      ],
+      "parent_id": "g-clean-s016",
+      "section_ids": [],
+      "section_number": "5.1",
+      "slug": "5-1-reassembly",
+      "title": "5.1 Reassembly",
+      "view": "structure"
+    },
+    {
+      "block_count": 14,
+      "block_ids": [
+        "b-clean-p012-02",
+        "b-clean-p012-03",
+        "b-clean-p012-04",
+        "b-clean-p012-05",
+        "b-clean-p012-06",
+        "b-clean-p012-07",
+        "b-clean-p012-08",
+        "b-clean-p012-09",
+        "b-clean-p012-10",
+        "b-clean-p012-11",
+        "b-clean-p012-12",
+        "b-clean-p012-13",
+        "b-clean-p012-14",
+        "b-clean-p012-15"
+      ],
+      "cohesion": null,
+      "doc_id": "clean",
+      "figure_count": 0,
+      "id": "g-clean-s018",
+      "is_unassigned": false,
+      "level": 2,
+      "page_ranges": [
+        {
+          "end": 12,
+          "start": 12
+        }
+      ],
+      "parent_id": "g-clean-s016",
+      "section_ids": [],
+      "section_number": "5.2",
+      "slug": "5-2-functional-test",
+      "title": "5.2 Functional Test",
+      "view": "structure"
+    }
+  ],
+  "title_sources": {
+    "g-clean-s001": "heading",
+    "g-clean-s002": "heading",
+    "g-clean-s003": "heading",
+    "g-clean-s004": "heading",
+    "g-clean-s005": "heading",
+    "g-clean-s006": "heading",
+    "g-clean-s007": "heading",
+    "g-clean-s008": "heading",
+    "g-clean-s009": "heading",
+    "g-clean-s010": "heading",
+    "g-clean-s011": "heading",
+    "g-clean-s012": "heading",
+    "g-clean-s013": "heading",
+    "g-clean-s014": "heading",
+    "g-clean-s015": "heading",
+    "g-clean-s016": "heading",
+    "g-clean-s017": "heading",
+    "g-clean-s018": "heading",
+    "g-clean-t000": "fallback",
+    "g-clean-t001": "llm",
+    "g-clean-t002": "llm",
+    "g-clean-t003": "llm",
+    "g-clean-t004": "llm",
+    "g-clean-t005": "llm",
+    "g-clean-t006": "llm",
+    "g-clean-t007": "llm",
+    "g-clean-t008": "llm",
+    "g-clean-t009": "llm",
+    "g-clean-t010": "llm",
+    "g-clean-t011": "llm",
+    "g-clean-t012": "llm",
+    "g-clean-t013": "llm",
+    "g-clean-t014": "llm"
+  },
+  "topic_error": null,
+  "topic_status": "ok",
+  "topics": [
+    {
+      "block_count": 1,
+      "block_ids": [
+        "b-clean-p011-05"
+      ],
+      "cohesion": null,
+      "doc_id": "clean",
+      "figure_count": 0,
+      "id": "g-clean-t000",
+      "is_unassigned": true,
+      "level": 0,
+      "page_ranges": [
+        {
+          "end": 11,
+          "start": 11
+        }
+      ],
+      "parent_id": null,
+      "section_ids": [
+        "g-clean-s016"
+      ],
+      "section_number": null,
+      "slug": "unassigned",
+      "title": "Unassigned blocks",
+      "view": "topic"
+    },
+    {
+      "block_count": 8,
+      "block_ids": [
+        "b-clean-p001-01",
+        "b-clean-p001-02",
+        "b-clean-p002-02",
+        "b-clean-p002-06",
+        "b-clean-p003-04",
+        "b-clean-p009-02",
+        "b-clean-p009-05",
+        "b-clean-p011-04"
+      ],
+      "cohesion": 0.260691,
+      "doc_id": "clean",
+      "figure_count": 0,
+      "id": "g-clean-t001",
+      "is_unassigned": false,
+      "level": 0,
+      "page_ranges": [
+        {
+          "end": 3,
+          "start": 1
+        },
+        {
+          "end": 9,
+          "start": 9
+        },
+        {
+          "end": 11,
+          "start": 11
+        }
+      ],
+      "parent_id": null,
+      "section_ids": [
+        "g-clean-s001",
+        "g-clean-s002",
+        "g-clean-s003",
+        "g-clean-s004",
+        "g-clean-s012",
+        "g-clean-s013",
+        "g-clean-s015"
+      ],
+      "section_number": null,
+      "slug": "acme-x200-service-manual",
+      "title": "Acme X200 Service Manual",
+      "view": "topic"
+    },
+    {
+      "block_count": 5,
+      "block_ids": [
+        "b-clean-p002-03",
+        "b-clean-p002-04",
+        "b-clean-p002-05",
+        "b-clean-p002-09",
+        "b-clean-p006-03"
+      ],
+      "cohesion": 0.229751,
+      "doc_id": "clean",
+      "figure_count": 0,
+      "id": "g-clean-t002",
+      "is_unassigned": false,
+      "level": 0,
+      "page_ranges": [
+        {
+          "end": 2,
+          "start": 2
+        },
+        {
+          "end": 6,
+          "start": 6
+        }
+      ],
+      "parent_id": null,
+      "section_ids": [
+        "g-clean-s003",
+        "g-clean-s008"
+      ],
+      "section_number": null,
+      "slug": "general-precautions",
+      "title": "General Precautions",
+      "view": "topic"
+    },
+    {
+      "block_count": 5,
+      "block_ids": [
+        "b-clean-p002-07",
+        "b-clean-p002-08",
+        "b-clean-p002-12",
+        "b-clean-p003-09",
+        "b-clean-p003-12"
+      ],
+      "cohesion": 0.407481,
+      "doc_id": "clean",
+      "figure_count": 0,
+      "id": "g-clean-t003",
+      "is_unassigned": false,
+      "level": 0,
+      "page_ranges": [
+        {
+          "end": 3,
+          "start": 2
+        }
+      ],
+      "parent_id": null,
+      "section_ids": [
+        "g-clean-s003",
+        "g-clean-s004"
+      ],
+      "section_number": null,
+      "slug": "general-precautions-2",
+      "title": "General Precautions",
+      "view": "topic"
+    },
+    {
+      "block_count": 7,
+      "block_ids": [
+        "b-clean-p002-10",
+        "b-clean-p003-07",
+        "b-clean-p003-10",
+        "b-clean-p007-12",
+        "b-clean-p010-05",
+        "b-clean-p010-13",
+        "b-clean-p012-11"
+      ],
+      "cohesion": 0.412836,
+      "doc_id": "clean",
+      "figure_count": 0,
+      "id": "g-clean-t004",
+      "is_unassigned": false,
+      "level": 0,
+      "page_ranges": [
+        {
+          "end": 3,
+          "start": 2
+        },
+        {
+          "end": 7,
+          "start": 7
+        },
+        {
+          "end": 10,
+          "start": 10
+        },
+        {
+          "end": 12,
+          "start": 12
+        }
+      ],
+      "parent_id": null,
+      "section_ids": [
+        "g-clean-s003",
+        "g-clean-s004",
+        "g-clean-s010",
+        "g-clean-s014",
+        "g-clean-s018"
+      ],
+      "section_number": null,
+      "slug": "tools-and-materials",
+      "title": "Tools and Materials",
+      "view": "topic"
+    },
+    {
+      "block_count": 10,
+      "block_ids": [
+        "b-clean-p002-11",
+        "b-clean-p003-08",
+        "b-clean-p003-13",
+        "b-clean-p004-11",
+        "b-clean-p008-13",
+        "b-clean-p009-07",
+        "b-clean-p009-11",
+        "b-clean-p009-12",
+        "b-clean-p010-06",
+        "b-clean-p010-10"
+      ],
+      "cohesion": 0.350733,
+      "doc_id": "clean",
+      "figure_count": 0,
+      "id": "g-clean-t005",
+      "is_unassigned": false,
+      "level": 0,
+      "page_ranges": [
+        {
+          "end": 4,
+          "start": 2
+        },
+        {
+          "end": 10,
+          "start": 8
+        }
+      ],
+      "parent_id": null,
+      "section_ids": [
+        "g-clean-s003",
+        "g-clean-s004",
+        "g-clean-s006",
+        "g-clean-s011",
+        "g-clean-s013",
+        "g-clean-s014"
+      ],
+      "section_number": null,
+      "slug": "coolant-service",
+      "title": "Coolant Service",
+      "view": "topic"
+    },
+    {
+      "block_count": 4,
+      "block_ids": [
+        "b-clean-p002-13",
+        "b-clean-p009-04",
+        "b-clean-p010-09",
+        "b-clean-p012-05"
+      ],
+      "cohesion": 0.451225,
+      "doc_id": "clean",
+      "figure_count": 0,
+      "id": "g-clean-t006",
+      "is_unassigned": false,
+      "level": 0,
+      "page_ranges": [
+        {
+          "end": 2,
+          "start": 2
+        },
+        {
+          "end": 10,
+          "start": 9
+        },
+        {
+          "end": 12,
+          "start": 12
+        }
+      ],
+      "parent_id": null,
+      "section_ids": [
+        "g-clean-s003",
+        "g-clean-s013",
+        "g-clean-s014",
+        "g-clean-s018"
+      ],
+      "section_number": null,
+      "slug": "general-precautions-3",
+      "title": "General Precautions",
+      "view": "topic"
+    },
+    {
+      "block_count": 16,
+      "block_ids": [
+        "b-clean-p002-14",
+        "b-clean-p003-02",
+        "b-clean-p003-05",
+        "b-clean-p003-11",
+        "b-clean-p004-08",
+        "b-clean-p004-12",
+        "b-clean-p006-09",
+        "b-clean-p007-10",
+        "b-clean-p007-13",
+        "b-clean-p008-08",
+        "b-clean-p008-10",
+        "b-clean-p010-08",
+        "b-clean-p012-02",
+        "b-clean-p012-03",
+        "b-clean-p012-12",
+        "b-clean-p012-15"
+      ],
+      "cohesion": 0.197107,
+      "doc_id": "clean",
+      "figure_count": 0,
+      "id": "g-clean-t007",
+      "is_unassigned": false,
+      "level": 0,
+      "page_ranges": [
+        {
+          "end": 4,
+          "start": 2
+        },
+        {
+          "end": 8,
+          "start": 6
+        },
+        {
+          "end": 10,
+          "start": 10
+        },
+        {
+          "end": 12,
+          "start": 12
+        }
+      ],
+      "parent_id": null,
+      "section_ids": [
+        "g-clean-s003",
+        "g-clean-s004",
+        "g-clean-s006",
+        "g-clean-s008",
+        "g-clean-s010",
+        "g-clean-s011",
+        "g-clean-s014",
+        "g-clean-s018"
+      ],
+      "section_number": null,
+      "slug": "functional-test",
+      "title": "Functional Test",
+      "view": "topic"
+    },
+    {
+      "block_count": 12,
+      "block_ids": [
+        "b-clean-p003-03",
+        "b-clean-p004-03",
+        "b-clean-p004-04",
+        "b-clean-p004-05",
+        "b-clean-p004-10",
+        "b-clean-p007-04",
+        "b-clean-p008-11",
+        "b-clean-p008-12",
+        "b-clean-p011-06",
+        "b-clean-p011-07",
+        "b-clean-p012-07",
+        "b-clean-p012-09"
+      ],
+      "cohesion": 0.209871,
+      "doc_id": "clean",
+      "figure_count": 0,
+      "id": "g-clean-t008",
+      "is_unassigned": false,
+      "level": 0,
+      "page_ranges": [
+        {
+          "end": 4,
+          "start": 3
+        },
+        {
+          "end": 8,
+          "start": 7
+        },
+        {
+          "end": 12,
+          "start": 11
+        }
+      ],
+      "parent_id": null,
+      "section_ids": [
+        "g-clean-s004",
+        "g-clean-s006",
+        "g-clean-s010",
+        "g-clean-s011",
+        "g-clean-s017",
+        "g-clean-s018"
+      ],
+      "section_number": null,
+      "slug": "belt-inspection",
+      "title": "Belt Inspection",
+      "view": "topic"
+    },
+    {
+      "block_count": 6,
+      "block_ids": [
+        "b-clean-p003-06",
+        "b-clean-p008-03",
+        "b-clean-p008-15",
+        "b-clean-p010-11",
+        "b-clean-p012-06",
+        "b-clean-p012-10"
+      ],
+      "cohesion": 0.371356,
+      "doc_id": "clean",
+      "figure_count": 0,
+      "id": "g-clean-t009",
+      "is_unassigned": false,
+      "level": 0,
+      "page_ranges": [
+        {
+          "end": 3,
+          "start": 3
+        },
+        {
+          "end": 8,
+          "start": 8
+        },
+        {
+          "end": 10,
+          "start": 10
+        },
+        {
+          "end": 12,
+          "start": 12
+        }
+      ],
+      "parent_id": null,
+      "section_ids": [
+        "g-clean-s004",
+        "g-clean-s011",
+        "g-clean-s014",
+        "g-clean-s018"
+      ],
+      "section_number": null,
+      "slug": "fuse-replacement",
+      "title": "Fuse Replacement",
+      "view": "topic"
+    },
+    {
+      "block_count": 10,
+      "block_ids": [
+        "b-clean-p003-14",
+        "b-clean-p004-07",
+        "b-clean-p005-03",
+        "b-clean-p005-06",
+        "b-clean-p007-03",
+        "b-clean-p007-05",
+        "b-clean-p007-09",
+        "b-clean-p008-07",
+        "b-clean-p012-13",
+        "b-clean-p012-14"
+      ],
+      "cohesion": 0.192323,
+      "doc_id": "clean",
+      "figure_count": 0,
+      "id": "g-clean-t010",
+      "is_unassigned": false,
+      "level": 0,
+      "page_ranges": [
+        {
+          "end": 5,
+          "start": 3
+        },
+        {
+          "end": 8,
+          "start": 7
+        },
+        {
+          "end": 12,
+          "start": 12
+        }
+      ],
+      "parent_id": null,
+      "section_ids": [
+        "g-clean-s004",
+        "g-clean-s006",
+        "g-clean-s007",
+        "g-clean-s010",
+        "g-clean-s011",
+        "g-clean-s018"
+      ],
+      "section_number": null,
+      "slug": "tension-adjustment",
+      "title": "Tension Adjustment",
+      "view": "topic"
+    },
+    {
+      "block_count": 14,
+      "block_ids": [
+        "b-clean-p004-02",
+        "b-clean-p004-06",
+        "b-clean-p005-02",
+        "b-clean-p005-05",
+        "b-clean-p005-07",
+        "b-clean-p005-08",
+        "b-clean-p006-02",
+        "b-clean-p006-04",
+        "b-clean-p006-05",
+        "b-clean-p006-06",
+        "b-clean-p006-07",
+        "b-clean-p007-02",
+        "b-clean-p007-06",
+        "b-clean-p008-04"
+      ],
+      "cohesion": 0.394307,
+      "doc_id": "clean",
+      "figure_count": 3,
+      "id": "g-clean-t011",
+      "is_unassigned": false,
+      "level": 0,
+      "page_ranges": [
+        {
+          "end": 8,
+          "start": 4
+        }
+      ],
+      "parent_id": null,
+      "section_ids": [
+        "g-clean-s005",
+        "g-clean-s006",
+        "g-clean-s007",
+        "g-clean-s008",
+        "g-clean-s009",
+        "g-clean-s010",
+        "g-clean-s011"
+      ],
+      "section_number": null,
+      "slug": "idler-replacement",
+      "title": "Idler Replacement",
+      "view": "topic"
+    },
+    {
+      "block_count": 8,
+      "block_ids": [
+        "b-clean-p004-09",
+        "b-clean-p004-13",
+        "b-clean-p005-04",
+        "b-clean-p009-15",
+        "b-clean-p009-16",
+        "b-clean-p010-07",
+        "b-clean-p011-02",
+        "b-clean-p011-03"
+      ],
+      "cohesion": 0.230149,
+      "doc_id": "clean",
+      "figure_count": 0,
+      "id": "g-clean-t012",
+      "is_unassigned": false,
+      "level": 0,
+      "page_ranges": [
+        {
+          "end": 5,
+          "start": 4
+        },
+        {
+          "end": 11,
+          "start": 9
+        }
+      ],
+      "parent_id": null,
+      "section_ids": [
+        "g-clean-s006",
+        "g-clean-s007",
+        "g-clean-s013",
+        "g-clean-s014",
+        "g-clean-s015"
+      ],
+      "section_number": null,
+      "slug": "belt-inspection-2",
+      "title": "Belt Inspection",
+      "view": "topic"
+    },
+    {
+      "block_count": 12,
+      "block_ids": [
+        "b-clean-p006-08",
+        "b-clean-p007-07",
+        "b-clean-p007-11",
+        "b-clean-p008-02",
+        "b-clean-p008-06",
+        "b-clean-p008-09",
+        "b-clean-p008-14",
+        "b-clean-p009-08",
+        "b-clean-p009-13",
+        "b-clean-p010-04",
+        "b-clean-p012-04",
+        "b-clean-p012-08"
+      ],
+      "cohesion": 0.339198,
+      "doc_id": "clean",
+      "figure_count": 0,
+      "id": "g-clean-t013",
+      "is_unassigned": false,
+      "level": 0,
+      "page_ranges": [
+        {
+          "end": 10,
+          "start": 6
+        },
+        {
+          "end": 12,
+          "start": 12
+        }
+      ],
+      "parent_id": null,
+      "section_ids": [
+        "g-clean-s008",
+        "g-clean-s010",
+        "g-clean-s011",
+        "g-clean-s013",
+        "g-clean-s014",
+        "g-clean-s018"
+      ],
+      "section_number": null,
+      "slug": "fuse-replacement-2",
+      "title": "Fuse Replacement",
+      "view": "topic"
+    },
+    {
+      "block_count": 10,
+      "block_ids": [
+        "b-clean-p007-08",
+        "b-clean-p008-05",
+        "b-clean-p009-03",
+        "b-clean-p009-06",
+        "b-clean-p009-09",
+        "b-clean-p009-10",
+        "b-clean-p009-14",
+        "b-clean-p010-02",
+        "b-clean-p010-03",
+        "b-clean-p010-12"
+      ],
+      "cohesion": 0.249879,
+      "doc_id": "clean",
+      "figure_count": 0,
+      "id": "g-clean-t014",
+      "is_unassigned": false,
+      "level": 0,
+      "page_ranges": [
+        {
+          "end": 10,
+          "start": 7
+        }
+      ],
+      "parent_id": null,
+      "section_ids": [
+        "g-clean-s010",
+        "g-clean-s011",
+        "g-clean-s013",
+        "g-clean-s014"
+      ],
+      "section_number": null,
+      "slug": "coolant-service-2",
+      "title": "Coolant Service",
+      "view": "topic"
+    }
+  ],
+  "unassigned": [
+    {
+      "block_id": "b-clean-p002-01",
+      "reason": "header_footer",
+      "view": "structure"
+    },
+    {
+      "block_id": "b-clean-p002-15",
+      "reason": "header_footer",
+      "view": "structure"
+    },
+    {
+      "block_id": "b-clean-p003-01",
+      "reason": "header_footer",
+      "view": "structure"
+    },
+    {
+      "block_id": "b-clean-p003-15",
+      "reason": "header_footer",
+      "view": "structure"
+    },
+    {
+      "block_id": "b-clean-p004-01",
+      "reason": "header_footer",
+      "view": "structure"
+    },
+    {
+      "block_id": "b-clean-p004-14",
+      "reason": "header_footer",
+      "view": "structure"
+    },
+    {
+      "block_id": "b-clean-p005-01",
+      "reason": "header_footer",
+      "view": "structure"
+    },
+    {
+      "block_id": "b-clean-p005-09",
+      "reason": "header_footer",
+      "view": "structure"
+    },
+    {
+      "block_id": "b-clean-p006-01",
+      "reason": "header_footer",
+      "view": "structure"
+    },
+    {
+      "block_id": "b-clean-p006-10",
+      "reason": "header_footer",
+      "view": "structure"
+    },
+    {
+      "block_id": "b-clean-p007-01",
+      "reason": "header_footer",
+      "view": "structure"
+    },
+    {
+      "block_id": "b-clean-p007-14",
+      "reason": "header_footer",
+      "view": "structure"
+    },
+    {
+      "block_id": "b-clean-p008-01",
+      "reason": "header_footer",
+      "view": "structure"
+    },
+    {
+      "block_id": "b-clean-p008-16",
+      "reason": "header_footer",
+      "view": "structure"
+    },
+    {
+      "block_id": "b-clean-p009-01",
+      "reason": "header_footer",
+      "view": "structure"
+    },
+    {
+      "block_id": "b-clean-p009-17",
+      "reason": "header_footer",
+      "view": "structure"
+    },
+    {
+      "block_id": "b-clean-p010-01",
+      "reason": "header_footer",
+      "view": "structure"
+    },
+    {
+      "block_id": "b-clean-p010-14",
+      "reason": "header_footer",
+      "view": "structure"
+    },
+    {
+      "block_id": "b-clean-p011-01",
+      "reason": "header_footer",
+      "view": "structure"
+    },
+    {
+      "block_id": "b-clean-p011-08",
+      "reason": "header_footer",
+      "view": "structure"
+    },
+    {
+      "block_id": "b-clean-p012-01",
+      "reason": "header_footer",
+      "view": "structure"
+    },
+    {
+      "block_id": "b-clean-p012-16",
+      "reason": "header_footer",
+      "view": "structure"
+    },
+    {
+      "block_id": "b-clean-p002-01",
+      "reason": "header_footer",
+      "view": "topic"
+    },
+    {
+      "block_id": "b-clean-p002-15",
+      "reason": "header_footer",
+      "view": "topic"
+    },
+    {
+      "block_id": "b-clean-p003-01",
+      "reason": "header_footer",
+      "view": "topic"
+    },
+    {
+      "block_id": "b-clean-p003-15",
+      "reason": "header_footer",
+      "view": "topic"
+    },
+    {
+      "block_id": "b-clean-p004-01",
+      "reason": "header_footer",
+      "view": "topic"
+    },
+    {
+      "block_id": "b-clean-p004-14",
+      "reason": "header_footer",
+      "view": "topic"
+    },
+    {
+      "block_id": "b-clean-p005-01",
+      "reason": "header_footer",
+      "view": "topic"
+    },
+    {
+      "block_id": "b-clean-p005-09",
+      "reason": "header_footer",
+      "view": "topic"
+    },
+    {
+      "block_id": "b-clean-p006-01",
+      "reason": "header_footer",
+      "view": "topic"
+    },
+    {
+      "block_id": "b-clean-p006-10",
+      "reason": "header_footer",
+      "view": "topic"
+    },
+    {
+      "block_id": "b-clean-p007-01",
+      "reason": "header_footer",
+      "view": "topic"
+    },
+    {
+      "block_id": "b-clean-p007-14",
+      "reason": "header_footer",
+      "view": "topic"
+    },
+    {
+      "block_id": "b-clean-p008-01",
+      "reason": "header_footer",
+      "view": "topic"
+    },
+    {
+      "block_id": "b-clean-p008-16",
+      "reason": "header_footer",
+      "view": "topic"
+    },
+    {
+      "block_id": "b-clean-p009-01",
+      "reason": "header_footer",
+      "view": "topic"
+    },
+    {
+      "block_id": "b-clean-p009-17",
+      "reason": "header_footer",
+      "view": "topic"
+    },
+    {
+      "block_id": "b-clean-p010-01",
+      "reason": "header_footer",
+      "view": "topic"
+    },
+    {
+      "block_id": "b-clean-p010-14",
+      "reason": "header_footer",
+      "view": "topic"
+    },
+    {
+      "block_id": "b-clean-p011-01",
+      "reason": "header_footer",
+      "view": "topic"
+    },
+    {
+      "block_id": "b-clean-p011-05",
+      "reason": "low_similarity",
+      "view": "topic"
+    },
+    {
+      "block_id": "b-clean-p011-08",
+      "reason": "header_footer",
+      "view": "topic"
+    },
+    {
+      "block_id": "b-clean-p012-01",
+      "reason": "header_footer",
+      "view": "topic"
+    },
+    {
+      "block_id": "b-clean-p012-16",
+      "reason": "header_footer",
+      "view": "topic"
+    }
+  ]
+}

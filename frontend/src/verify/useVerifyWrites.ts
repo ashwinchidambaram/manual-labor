@@ -9,9 +9,14 @@ export class CancelledError extends Error {
   }
 }
 
+export interface EnqueueOpts {
+  /** the caller shows this rejection inline (edit 409 conflict, 422 validation); it is not a failed save */
+  inlineStatuses?: readonly number[];
+}
+
 export interface Writes {
   /** Runs after every earlier write has settled. Network errors retry twice (callers reuse their request id). */
-  enqueue: <T>(run: () => Promise<T>) => Promise<T>;
+  enqueue: <T>(run: () => Promise<T>, opts?: EnqueueOpts) => Promise<T>;
   /** number of writes queued or running */
   pending: number;
   /** the last write failed and nothing succeeded since */
@@ -27,7 +32,7 @@ export function useVerifyWrites(): Writes {
   const [pending, setPending] = useState(0);
   const [failed, setFailed] = useState(false);
 
-  const enqueue = useCallback(<T,>(run: () => Promise<T>): Promise<T> => {
+  const enqueue = useCallback(<T,>(run: () => Promise<T>, opts: EnqueueOpts = {}): Promise<T> => {
     const myGen = gen.current;
     count.current += 1;
     setPending(count.current);
@@ -41,7 +46,8 @@ export function useVerifyWrites(): Writes {
           return r;
         } catch (e) {
           if (e instanceof ApiError || attempt >= 2) {
-            if (!(e instanceof ApiError && e.status === 409)) setFailed(true);
+            const inline = e instanceof ApiError && (e.status === 409 || (opts.inlineStatuses ?? []).includes(e.status));
+            if (!inline) setFailed(true);
             throw e;
           }
           attempt += 1;

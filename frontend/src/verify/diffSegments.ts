@@ -14,7 +14,7 @@ export interface Segment {
   opIndex: number;
 }
 
-const WS: Record<string, string> = { " ": "·", "\n": "↵", "\t": "→", " ": "⍽" };
+const WS: Record<string, string> = { " ": "␣", "\n": "↵", "\t": "→", " ": "⍽" };
 
 /** Make whitespace visible, one character for one character (so numeric ranges stay valid). */
 export function visualize(s: string): string {

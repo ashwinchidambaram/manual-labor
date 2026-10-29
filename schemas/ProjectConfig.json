@@ -1,5 +1,35 @@
 {
   "$defs": {
+    "AgentConfig": {
+      "additionalProperties": false,
+      "description": "Agent-pass settings (module 10).",
+      "properties": {
+        "max_rounds": {
+          "default": 3,
+          "maximum": 10,
+          "minimum": 1,
+          "title": "Max Rounds",
+          "type": "integer"
+        },
+        "page_image": {
+          "default": false,
+          "title": "Page Image",
+          "type": "boolean"
+        },
+        "vision_reader": {
+          "default": true,
+          "title": "Vision Reader",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "page_image",
+        "vision_reader",
+        "max_rounds"
+      ],
+      "title": "AgentConfig",
+      "type": "object"
+    },
     "ArticleSplit": {
       "enum": [
         "per_topic",
@@ -182,6 +212,9 @@
   },
   "additionalProperties": false,
   "properties": {
+    "agent": {
+      "$ref": "#/$defs/AgentConfig"
+    },
     "article_split": {
       "$ref": "#/$defs/ArticleSplit",
       "default": "per_topic"
@@ -193,6 +226,20 @@
     },
     "cleanup": {
       "$ref": "#/$defs/CleanupConfig"
+    },
+    "doc_thresholds": {
+      "patternProperties": {
+        "^[a-z0-9]+(?:-[a-z0-9]+)*$": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "type": "number"
+        }
+      },
+      "propertyNames": {
+        "maxLength": 48
+      },
+      "title": "Doc Thresholds",
+      "type": "object"
     },
     "learning": {
       "$ref": "#/$defs/LearningConfig"
@@ -254,7 +301,9 @@
     "background_ocr_born_digital",
     "target_edit_rate",
     "learning",
-    "cleanup"
+    "cleanup",
+    "agent",
+    "doc_thresholds"
   ],
   "title": "ProjectConfig",
   "type": "object"

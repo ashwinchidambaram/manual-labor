@@ -1,0 +1,31 @@
+{
+  "articles": [
+    "figures--board-illustrations",
+    "figures--coolant-illustrations"
+  ],
+  "attach_rule": "caption_ref",
+  "bbox": [
+    72.0,
+    140.05,
+    372.0,
+    340.05
+  ],
+  "caption_original": "Figure 13. Test connection diagram.",
+  "confidence": 0.95,
+  "description_generated": "Generated description (mock) of image 172cdc46.",
+  "extraction": "vector",
+  "file": "FIG-figures-p008-01.png",
+  "height": 850,
+  "id": "FIG-figures-p008-01",
+  "page": 8,
+  "phash": "b291ccec183b27d9",
+  "product_model": "Acme X200",
+  "review": "auto_approved",
+  "source_doc": "figures",
+  "svg": "FIG-figures-p008-01.svg",
+  "tags": [
+    "figure",
+    "mock"
+  ],
+  "width": 1267
+}

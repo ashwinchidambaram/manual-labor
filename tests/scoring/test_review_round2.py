@@ -72,8 +72,19 @@ def test_variant_right_digits_wrong_numeric_index_fails() -> None:
         ("G0", "60", True),
         ("9g", "99", True),
         ("3,5", "3.5", True),
-        ("35", "355", True),  # one added digit
-        ("355", "35", True),  # one dropped digit
+        # adding or dropping a digit is never a look-alike (module 10 fix: it needs two
+        # attesters under the design rule, not one reader plus a "confusable" pass)
+        ("35", "355", False),
+        ("355", "35", False),
+        ("35", "350", False),
+        ("35", "3", False),
+        ("1", "11", False),
+        ("3S", "350", False),
+        ("1O", "10", True),
+        ("B8", "88", True),
+        ("35", "3S", True),
+        ("0.5", "O,5", True),
+        ("35", "45", False),  # 3/4 is not a confusable pair
         ("35", "40", False),
         ("36", "35", False),
         ("35", "35", False),

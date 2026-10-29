@@ -711,27 +711,29 @@ _CONFUSABLE_CLASS: Final = {ch: grp[0] for grp in _CONFUSABLE_GROUPS for ch in g
 _TOKEN_PUNCT: Final = "\"'“”‘’()[]{}<>:;!?,."
 
 
-def _confusable_form(s: str) -> str:
-    return "".join(_CONFUSABLE_CLASS.get(ch, ch) for ch in s)
-
-
 def ocr_confusable(raw: str, chosen: str) -> bool:
-    """``chosen`` is a plausible OCR/text-layer misreading of ``raw``: the same length and
-    differing only inside the confusable pairs ``0O 1lI| 5S 8B 2Z 6G 9g .,``, or one digit
-    dropped/added (on top of those). ``35`` -> ``40`` is not a misreading, it is a new value."""
-    if not raw or not chosen or raw == chosen:
+    """``chosen`` is a plausible OCR/text-layer misreading of ``raw`` (a look-alike): the same
+    length, and every character pair that differs lies inside one confusable group
+    ``0O 1lI| 5S 8B 2Z 6G 9g .,``. ``35`` -> ``40`` is not a misreading, it is a new value.
+    Adding or dropping a character (``35`` -> ``350``, ``35`` -> ``3``, ``1`` -> ``11``) is
+    never a look-alike: such a change needs two independent attesters, not one."""
+    if not raw or not chosen or raw == chosen or len(raw) != len(chosen):
         return False
-    a, b = _confusable_form(raw), _confusable_form(chosen)
-    if len(a) == len(b):
-        return a == b
-    if abs(len(a) - len(b)) != 1:
-        return False
-    long, short = (a, b) if len(a) > len(b) else (b, a)
-    return any(long[k].isdigit() and long[:k] + long[k + 1 :] == short for k in range(len(long)))
+    cls = _CONFUSABLE_CLASS
+    return all(
+        x == y or (x in cls and y in cls and cls[x] == cls[y])
+        for x, y in zip(raw, chosen, strict=True)
+    )
 
 
 def _has_digit(tok: str) -> bool:
     return any(ch.isdigit() for ch in tok)
+
+
+def numeric_tokens(text: str) -> list[str]:
+    """The digit-bearing whitespace tokens of text (``TOKEN_RE``), in order: the tokens the
+    numeric-variant rule and the agent's number attestation compare."""
+    return [t for t in TOKEN_RE.findall(text) if _has_digit(t)]
 
 
 def _numeric_index(spans: Sequence[tuple[int, int, bool]], offset: int) -> tuple[int, int]:

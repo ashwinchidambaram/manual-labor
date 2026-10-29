@@ -1,0 +1,855 @@
+{
+  "algo_version": "1",
+  "doc_id": "figures",
+  "embedding_dim": 256,
+  "embedding_model": "mock:mock-1",
+  "fingerprint": "35f0f3ef25af5e5442399fed71bf44b7859009927b0d1b41bda4272ace3e059d",
+  "grouping_model": "mock:mock-1",
+  "learning_snapshot": "baseline",
+  "overlap": [
+    {
+      "blocks": 5,
+      "section_id": "g-figures-s001",
+      "topic_id": "g-figures-t001"
+    },
+    {
+      "blocks": 2,
+      "section_id": "g-figures-s002",
+      "topic_id": "g-figures-t001"
+    },
+    {
+      "blocks": 3,
+      "section_id": "g-figures-s003",
+      "topic_id": "g-figures-t001"
+    },
+    {
+      "blocks": 2,
+      "section_id": "g-figures-s004",
+      "topic_id": "g-figures-t001"
+    },
+    {
+      "blocks": 4,
+      "section_id": "g-figures-s007",
+      "topic_id": "g-figures-t001"
+    },
+    {
+      "blocks": 3,
+      "section_id": "g-figures-s001",
+      "topic_id": "g-figures-t002"
+    },
+    {
+      "blocks": 5,
+      "section_id": "g-figures-s002",
+      "topic_id": "g-figures-t002"
+    },
+    {
+      "blocks": 6,
+      "section_id": "g-figures-s003",
+      "topic_id": "g-figures-t002"
+    },
+    {
+      "blocks": 8,
+      "section_id": "g-figures-s004",
+      "topic_id": "g-figures-t002"
+    },
+    {
+      "blocks": 6,
+      "section_id": "g-figures-s005",
+      "topic_id": "g-figures-t002"
+    },
+    {
+      "blocks": 5,
+      "section_id": "g-figures-s006",
+      "topic_id": "g-figures-t002"
+    },
+    {
+      "blocks": 5,
+      "section_id": "g-figures-s007",
+      "topic_id": "g-figures-t002"
+    },
+    {
+      "blocks": 3,
+      "section_id": "g-figures-s008",
+      "topic_id": "g-figures-t002"
+    },
+    {
+      "blocks": 1,
+      "section_id": "g-figures-s001",
+      "topic_id": "g-figures-t003"
+    },
+    {
+      "blocks": 2,
+      "section_id": "g-figures-s004",
+      "topic_id": "g-figures-t003"
+    },
+    {
+      "blocks": 2,
+      "section_id": "g-figures-s006",
+      "topic_id": "g-figures-t003"
+    },
+    {
+      "blocks": 5,
+      "section_id": "g-figures-s008",
+      "topic_id": "g-figures-t003"
+    },
+    {
+      "blocks": 2,
+      "section_id": "g-figures-s002",
+      "topic_id": "g-figures-t004"
+    },
+    {
+      "blocks": 4,
+      "section_id": "g-figures-s005",
+      "topic_id": "g-figures-t004"
+    },
+    {
+      "blocks": 2,
+      "section_id": "g-figures-s008",
+      "topic_id": "g-figures-t004"
+    },
+    {
+      "blocks": 4,
+      "section_id": "g-figures-s006",
+      "topic_id": "g-figures-t005"
+    }
+  ],
+  "overrides_applied": 0,
+  "overrides_stale": [],
+  "params": {
+    "d_cut": 0.8,
+    "embed_batch": 32,
+    "embed_prefix": "",
+    "k_max_divisor": 4,
+    "llm_stragglers": true,
+    "low_cohesion": 0.3,
+    "max_topic_blocks": 60,
+    "min_topic_blocks": 3,
+    "n_candidates": 3,
+    "name_sample": 12,
+    "name_tokens": 40,
+    "page_window": 10,
+    "small_doc": 12,
+    "straggler_batch": 10,
+    "summary_tokens": 64,
+    "t_assign": 0.3,
+    "t_candidate": 0.15,
+    "title_max": 80,
+    "topic_slug_max": 40
+  },
+  "stragglers": [
+    {
+      "block_id": "b-figures-p003-07",
+      "by": "llm",
+      "similarity": 0.19887,
+      "topic_id": "g-figures-t002"
+    }
+  ],
+  "structure": [
+    {
+      "block_count": 9,
+      "block_ids": [
+        "b-figures-p001-02",
+        "b-figures-p001-03",
+        "b-figures-p001-04",
+        "b-figures-p001-05",
+        "b-figures-p001-06",
+        "b-figures-p001-07",
+        "b-figures-p001-08",
+        "b-figures-p001-09",
+        "b-figures-p001-10"
+      ],
+      "cohesion": null,
+      "doc_id": "figures",
+      "figure_count": 2,
+      "id": "g-figures-s001",
+      "is_unassigned": false,
+      "level": 1,
+      "page_ranges": [
+        {
+          "end": 1,
+          "start": 1
+        }
+      ],
+      "parent_id": null,
+      "section_ids": [],
+      "section_number": "1",
+      "slug": "1-drive-illustrations",
+      "title": "1. Drive Illustrations",
+      "view": "structure"
+    },
+    {
+      "block_count": 9,
+      "block_ids": [
+        "b-figures-p002-02",
+        "b-figures-p002-03",
+        "b-figures-p002-04",
+        "b-figures-p002-05",
+        "b-figures-p002-06",
+        "b-figures-p002-07",
+        "b-figures-p002-08",
+        "b-figures-p002-09",
+        "b-figures-p002-10"
+      ],
+      "cohesion": null,
+      "doc_id": "figures",
+      "figure_count": 2,
+      "id": "g-figures-s002",
+      "is_unassigned": false,
+      "level": 1,
+      "page_ranges": [
+        {
+          "end": 2,
+          "start": 2
+        }
+      ],
+      "parent_id": null,
+      "section_ids": [],
+      "section_number": "2",
+      "slug": "2-idler-illustrations",
+      "title": "2. Idler Illustrations",
+      "view": "structure"
+    },
+    {
+      "block_count": 9,
+      "block_ids": [
+        "b-figures-p003-02",
+        "b-figures-p003-03",
+        "b-figures-p003-04",
+        "b-figures-p003-05",
+        "b-figures-p003-06",
+        "b-figures-p003-07",
+        "b-figures-p003-08",
+        "b-figures-p003-09",
+        "b-figures-p003-10"
+      ],
+      "cohesion": null,
+      "doc_id": "figures",
+      "figure_count": 2,
+      "id": "g-figures-s003",
+      "is_unassigned": false,
+      "level": 1,
+      "page_ranges": [
+        {
+          "end": 3,
+          "start": 3
+        }
+      ],
+      "parent_id": null,
+      "section_ids": [],
+      "section_number": "3",
+      "slug": "3-cover-illustrations",
+      "title": "3. Cover Illustrations",
+      "view": "structure"
+    },
+    {
+      "block_count": 12,
+      "block_ids": [
+        "b-figures-p004-02",
+        "b-figures-p004-03",
+        "b-figures-p004-04",
+        "b-figures-p004-05",
+        "b-figures-p004-06",
+        "b-figures-p004-07",
+        "b-figures-p004-08",
+        "b-figures-p004-09",
+        "b-figures-p004-10",
+        "b-figures-p004-11",
+        "b-figures-p004-12",
+        "b-figures-p004-13"
+      ],
+      "cohesion": null,
+      "doc_id": "figures",
+      "figure_count": 1,
+      "id": "g-figures-s004",
+      "is_unassigned": false,
+      "level": 1,
+      "page_ranges": [
+        {
+          "end": 4,
+          "start": 4
+        }
+      ],
+      "parent_id": null,
+      "section_ids": [],
+      "section_number": "4",
+      "slug": "4-board-illustrations",
+      "title": "4. Board Illustrations",
+      "view": "structure"
+    },
+    {
+      "block_count": 10,
+      "block_ids": [
+        "b-figures-p005-02",
+        "b-figures-p005-03",
+        "b-figures-p005-04",
+        "b-figures-p005-05",
+        "b-figures-p005-06",
+        "b-figures-p005-07",
+        "b-figures-p005-08",
+        "b-figures-p005-09",
+        "b-figures-p005-10",
+        "b-figures-p005-11"
+      ],
+      "cohesion": null,
+      "doc_id": "figures",
+      "figure_count": 2,
+      "id": "g-figures-s005",
+      "is_unassigned": false,
+      "level": 1,
+      "page_ranges": [
+        {
+          "end": 5,
+          "start": 5
+        }
+      ],
+      "parent_id": null,
+      "section_ids": [],
+      "section_number": "5",
+      "slug": "5-coolant-illustrations",
+      "title": "5. Coolant Illustrations",
+      "view": "structure"
+    },
+    {
+      "block_count": 11,
+      "block_ids": [
+        "b-figures-p006-02",
+        "b-figures-p006-03",
+        "b-figures-p006-04",
+        "b-figures-p006-05",
+        "b-figures-p006-06",
+        "b-figures-p006-07",
+        "b-figures-p006-08",
+        "b-figures-p006-09",
+        "b-figures-p006-10",
+        "b-figures-p006-11",
+        "b-figures-p006-12"
+      ],
+      "cohesion": null,
+      "doc_id": "figures",
+      "figure_count": 2,
+      "id": "g-figures-s006",
+      "is_unassigned": false,
+      "level": 1,
+      "page_ranges": [
+        {
+          "end": 6,
+          "start": 6
+        }
+      ],
+      "parent_id": null,
+      "section_ids": [],
+      "section_number": "6",
+      "slug": "6-valve-illustrations",
+      "title": "6. Valve Illustrations",
+      "view": "structure"
+    },
+    {
+      "block_count": 9,
+      "block_ids": [
+        "b-figures-p007-02",
+        "b-figures-p007-03",
+        "b-figures-p007-04",
+        "b-figures-p007-05",
+        "b-figures-p007-06",
+        "b-figures-p007-07",
+        "b-figures-p007-08",
+        "b-figures-p007-09",
+        "b-figures-p007-10"
+      ],
+      "cohesion": null,
+      "doc_id": "figures",
+      "figure_count": 2,
+      "id": "g-figures-s007",
+      "is_unassigned": false,
+      "level": 1,
+      "page_ranges": [
+        {
+          "end": 7,
+          "start": 7
+        }
+      ],
+      "parent_id": null,
+      "section_ids": [],
+      "section_number": "7",
+      "slug": "7-harness-illustrations",
+      "title": "7. Harness Illustrations",
+      "view": "structure"
+    },
+    {
+      "block_count": 10,
+      "block_ids": [
+        "b-figures-p008-02",
+        "b-figures-p008-03",
+        "b-figures-p008-04",
+        "b-figures-p008-05",
+        "b-figures-p008-06",
+        "b-figures-p008-07",
+        "b-figures-p008-08",
+        "b-figures-p008-09",
+        "b-figures-p008-10",
+        "b-figures-p008-11"
+      ],
+      "cohesion": null,
+      "doc_id": "figures",
+      "figure_count": 1,
+      "id": "g-figures-s008",
+      "is_unassigned": false,
+      "level": 1,
+      "page_ranges": [
+        {
+          "end": 8,
+          "start": 8
+        }
+      ],
+      "parent_id": null,
+      "section_ids": [],
+      "section_number": "8",
+      "slug": "8-fan-illustrations",
+      "title": "8. Fan Illustrations",
+      "view": "structure"
+    }
+  ],
+  "title_sources": {
+    "g-figures-s001": "heading",
+    "g-figures-s002": "heading",
+    "g-figures-s003": "heading",
+    "g-figures-s004": "heading",
+    "g-figures-s005": "heading",
+    "g-figures-s006": "heading",
+    "g-figures-s007": "heading",
+    "g-figures-s008": "heading",
+    "g-figures-t000": "fallback",
+    "g-figures-t001": "llm",
+    "g-figures-t002": "llm",
+    "g-figures-t003": "llm",
+    "g-figures-t004": "llm",
+    "g-figures-t005": "llm"
+  },
+  "topic_error": null,
+  "topic_status": "ok",
+  "topics": [
+    {
+      "block_count": 0,
+      "block_ids": [],
+      "cohesion": null,
+      "doc_id": "figures",
+      "figure_count": 0,
+      "id": "g-figures-t000",
+      "is_unassigned": true,
+      "level": 0,
+      "page_ranges": [],
+      "parent_id": null,
+      "section_ids": [],
+      "section_number": null,
+      "slug": "unassigned",
+      "title": "Unassigned blocks",
+      "view": "topic"
+    },
+    {
+      "block_count": 16,
+      "block_ids": [
+        "b-figures-p001-02",
+        "b-figures-p001-04",
+        "b-figures-p001-05",
+        "b-figures-p001-06",
+        "b-figures-p001-07",
+        "b-figures-p002-04",
+        "b-figures-p002-05",
+        "b-figures-p003-04",
+        "b-figures-p003-05",
+        "b-figures-p003-06",
+        "b-figures-p004-04",
+        "b-figures-p004-05",
+        "b-figures-p007-04",
+        "b-figures-p007-05",
+        "b-figures-p007-06",
+        "b-figures-p007-07"
+      ],
+      "cohesion": 0.301323,
+      "doc_id": "figures",
+      "figure_count": 8,
+      "id": "g-figures-t001",
+      "is_unassigned": false,
+      "level": 0,
+      "page_ranges": [
+        {
+          "end": 4,
+          "start": 1
+        },
+        {
+          "end": 7,
+          "start": 7
+        }
+      ],
+      "parent_id": null,
+      "section_ids": [
+        "g-figures-s001",
+        "g-figures-s002",
+        "g-figures-s003",
+        "g-figures-s004",
+        "g-figures-s007"
+      ],
+      "section_number": null,
+      "slug": "drive-illustrations",
+      "title": "Drive Illustrations",
+      "view": "topic"
+    },
+    {
+      "block_count": 41,
+      "block_ids": [
+        "b-figures-p001-03",
+        "b-figures-p001-08",
+        "b-figures-p001-09",
+        "b-figures-p002-02",
+        "b-figures-p002-03",
+        "b-figures-p002-08",
+        "b-figures-p002-09",
+        "b-figures-p002-10",
+        "b-figures-p003-02",
+        "b-figures-p003-03",
+        "b-figures-p003-07",
+        "b-figures-p003-08",
+        "b-figures-p003-09",
+        "b-figures-p003-10",
+        "b-figures-p004-02",
+        "b-figures-p004-06",
+        "b-figures-p004-07",
+        "b-figures-p004-08",
+        "b-figures-p004-09",
+        "b-figures-p004-10",
+        "b-figures-p004-11",
+        "b-figures-p004-13",
+        "b-figures-p005-02",
+        "b-figures-p005-03",
+        "b-figures-p005-08",
+        "b-figures-p005-09",
+        "b-figures-p005-10",
+        "b-figures-p005-11",
+        "b-figures-p006-02",
+        "b-figures-p006-03",
+        "b-figures-p006-08",
+        "b-figures-p006-10",
+        "b-figures-p006-11",
+        "b-figures-p007-02",
+        "b-figures-p007-03",
+        "b-figures-p007-08",
+        "b-figures-p007-09",
+        "b-figures-p007-10",
+        "b-figures-p008-07",
+        "b-figures-p008-08",
+        "b-figures-p008-11"
+      ],
+      "cohesion": 0.154453,
+      "doc_id": "figures",
+      "figure_count": 0,
+      "id": "g-figures-t002",
+      "is_unassigned": false,
+      "level": 0,
+      "page_ranges": [
+        {
+          "end": 8,
+          "start": 1
+        }
+      ],
+      "parent_id": null,
+      "section_ids": [
+        "g-figures-s001",
+        "g-figures-s002",
+        "g-figures-s003",
+        "g-figures-s004",
+        "g-figures-s005",
+        "g-figures-s006",
+        "g-figures-s007",
+        "g-figures-s008"
+      ],
+      "section_number": null,
+      "slug": "board-illustrations",
+      "title": "Board Illustrations",
+      "view": "topic"
+    },
+    {
+      "block_count": 10,
+      "block_ids": [
+        "b-figures-p001-10",
+        "b-figures-p004-03",
+        "b-figures-p004-12",
+        "b-figures-p006-09",
+        "b-figures-p006-12",
+        "b-figures-p008-02",
+        "b-figures-p008-03",
+        "b-figures-p008-06",
+        "b-figures-p008-09",
+        "b-figures-p008-10"
+      ],
+      "cohesion": 0.230589,
+      "doc_id": "figures",
+      "figure_count": 0,
+      "id": "g-figures-t003",
+      "is_unassigned": false,
+      "level": 0,
+      "page_ranges": [
+        {
+          "end": 1,
+          "start": 1
+        },
+        {
+          "end": 4,
+          "start": 4
+        },
+        {
+          "end": 6,
+          "start": 6
+        },
+        {
+          "end": 8,
+          "start": 8
+        }
+      ],
+      "parent_id": null,
+      "section_ids": [
+        "g-figures-s001",
+        "g-figures-s004",
+        "g-figures-s006",
+        "g-figures-s008"
+      ],
+      "section_number": null,
+      "slug": "fan-illustrations",
+      "title": "Fan Illustrations",
+      "view": "topic"
+    },
+    {
+      "block_count": 8,
+      "block_ids": [
+        "b-figures-p002-06",
+        "b-figures-p002-07",
+        "b-figures-p005-04",
+        "b-figures-p005-05",
+        "b-figures-p005-06",
+        "b-figures-p005-07",
+        "b-figures-p008-04",
+        "b-figures-p008-05"
+      ],
+      "cohesion": 0.386417,
+      "doc_id": "figures",
+      "figure_count": 4,
+      "id": "g-figures-t004",
+      "is_unassigned": false,
+      "level": 0,
+      "page_ranges": [
+        {
+          "end": 2,
+          "start": 2
+        },
+        {
+          "end": 5,
+          "start": 5
+        },
+        {
+          "end": 8,
+          "start": 8
+        }
+      ],
+      "parent_id": null,
+      "section_ids": [
+        "g-figures-s002",
+        "g-figures-s005",
+        "g-figures-s008"
+      ],
+      "section_number": null,
+      "slug": "coolant-illustrations",
+      "title": "Coolant Illustrations",
+      "view": "topic"
+    },
+    {
+      "block_count": 4,
+      "block_ids": [
+        "b-figures-p006-04",
+        "b-figures-p006-05",
+        "b-figures-p006-06",
+        "b-figures-p006-07"
+      ],
+      "cohesion": 0.525915,
+      "doc_id": "figures",
+      "figure_count": 2,
+      "id": "g-figures-t005",
+      "is_unassigned": false,
+      "level": 0,
+      "page_ranges": [
+        {
+          "end": 6,
+          "start": 6
+        }
+      ],
+      "parent_id": null,
+      "section_ids": [
+        "g-figures-s006"
+      ],
+      "section_number": null,
+      "slug": "valve-illustrations",
+      "title": "Valve Illustrations",
+      "view": "topic"
+    }
+  ],
+  "unassigned": [
+    {
+      "block_id": "b-figures-p001-01",
+      "reason": "header_footer",
+      "view": "structure"
+    },
+    {
+      "block_id": "b-figures-p001-11",
+      "reason": "header_footer",
+      "view": "structure"
+    },
+    {
+      "block_id": "b-figures-p002-01",
+      "reason": "header_footer",
+      "view": "structure"
+    },
+    {
+      "block_id": "b-figures-p002-11",
+      "reason": "header_footer",
+      "view": "structure"
+    },
+    {
+      "block_id": "b-figures-p003-01",
+      "reason": "header_footer",
+      "view": "structure"
+    },
+    {
+      "block_id": "b-figures-p003-11",
+      "reason": "header_footer",
+      "view": "structure"
+    },
+    {
+      "block_id": "b-figures-p004-01",
+      "reason": "header_footer",
+      "view": "structure"
+    },
+    {
+      "block_id": "b-figures-p004-14",
+      "reason": "header_footer",
+      "view": "structure"
+    },
+    {
+      "block_id": "b-figures-p005-01",
+      "reason": "header_footer",
+      "view": "structure"
+    },
+    {
+      "block_id": "b-figures-p005-12",
+      "reason": "header_footer",
+      "view": "structure"
+    },
+    {
+      "block_id": "b-figures-p006-01",
+      "reason": "header_footer",
+      "view": "structure"
+    },
+    {
+      "block_id": "b-figures-p006-13",
+      "reason": "header_footer",
+      "view": "structure"
+    },
+    {
+      "block_id": "b-figures-p007-01",
+      "reason": "header_footer",
+      "view": "structure"
+    },
+    {
+      "block_id": "b-figures-p007-11",
+      "reason": "header_footer",
+      "view": "structure"
+    },
+    {
+      "block_id": "b-figures-p008-01",
+      "reason": "header_footer",
+      "view": "structure"
+    },
+    {
+      "block_id": "b-figures-p008-12",
+      "reason": "header_footer",
+      "view": "structure"
+    },
+    {
+      "block_id": "b-figures-p001-01",
+      "reason": "header_footer",
+      "view": "topic"
+    },
+    {
+      "block_id": "b-figures-p001-11",
+      "reason": "header_footer",
+      "view": "topic"
+    },
+    {
+      "block_id": "b-figures-p002-01",
+      "reason": "header_footer",
+      "view": "topic"
+    },
+    {
+      "block_id": "b-figures-p002-11",
+      "reason": "header_footer",
+      "view": "topic"
+    },
+    {
+      "block_id": "b-figures-p003-01",
+      "reason": "header_footer",
+      "view": "topic"
+    },
+    {
+      "block_id": "b-figures-p003-11",
+      "reason": "header_footer",
+      "view": "topic"
+    },
+    {
+      "block_id": "b-figures-p004-01",
+      "reason": "header_footer",
+      "view": "topic"
+    },
+    {
+      "block_id": "b-figures-p004-14",
+      "reason": "header_footer",
+      "view": "topic"
+    },
+    {
+      "block_id": "b-figures-p005-01",
+      "reason": "header_footer",
+      "view": "topic"
+    },
+    {
+      "block_id": "b-figures-p005-12",
+      "reason": "header_footer",
+      "view": "topic"
+    },
+    {
+      "block_id": "b-figures-p006-01",
+      "reason": "header_footer",
+      "view": "topic"
+    },
+    {
+      "block_id": "b-figures-p006-13",
+      "reason": "header_footer",
+      "view": "topic"
+    },
+    {
+      "block_id": "b-figures-p007-01",
+      "reason": "header_footer",
+      "view": "topic"
+    },
+    {
+      "block_id": "b-figures-p007-11",
+      "reason": "header_footer",
+      "view": "topic"
+    },
+    {
+      "block_id": "b-figures-p008-01",
+      "reason": "header_footer",
+      "view": "topic"
+    },
+    {
+      "block_id": "b-figures-p008-12",
+      "reason": "header_footer",
+      "view": "topic"
+    }
+  ]
+}

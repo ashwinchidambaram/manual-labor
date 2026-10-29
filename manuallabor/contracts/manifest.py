@@ -111,6 +111,18 @@ class BlockAccounting(ContractModel):
     unassigned_reasons: dict[BlockId, Literal["not_selected", "header_footer", "rejected", "empty"]]
 
 
+class ManifestDocLearning(ContractModel):
+    group: str
+    clean: str
+
+
+class ManifestLearning(ContractModel):
+    """Which learning snapshot each document's grouping and cleanup used (module 11)."""
+
+    enabled: bool = False
+    docs: dict[DocSlug, ManifestDocLearning] = Field(default_factory=dict)
+
+
 class Manifest(ContractModel):
     schema_version: Literal["1.0"] = "1.0"
     project: ManifestProject
@@ -123,6 +135,7 @@ class Manifest(ContractModel):
     article_split: ArticleSplit
     overrides: list[Override]
     accounting: BlockAccounting
+    learning: ManifestLearning = Field(default_factory=ManifestLearning)
 
     @field_validator("docs", mode="before")
     @classmethod

@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, client, unwrap } from "../api/client";
+import { trackJob } from "../api/queries";
 import type { BlockDetail, DocFigure, FigureRailItem } from "../api/schema";
 import { useJobWatch } from "../hooks/useJobsPolling";
 import { useHotkeys } from "../hooks/useHotkeys";
@@ -8,6 +9,8 @@ import { useToast } from "../shell/Toast";
 import FigurePicker from "./FigurePicker";
 import { FOCUS } from "./labels";
 
+/** finite on purpose: a rail left behind while a job ran must refetch when it is shown again */
+const RAIL_STALE_MS = 30_000;
 export const railKey = (articleId: string) => ["rail", articleId] as const;
 const INVALIDATE: readonly (readonly string[])[] = [["rail"], ["docFigures"], ["verify"], ["pageBlocks"]];
 
@@ -49,7 +52,7 @@ function RailSection({ articleId, detail, enqueue, onCrop, register }: SectionPr
     queryKey: railKey(articleId),
     queryFn: async (): Promise<FigureRailItem[]> =>
       unwrap(await client.GET("/api/articles/{article_id}/figures", { params: { path: { article_id: articleId } } })),
-    staleTime: Infinity,
+    staleTime: RAIL_STALE_MS,
   });
   const [overlay, setOverlay] = useState<Overlay[]>([]);
   const [picking, setPicking] = useState(false);
@@ -78,6 +81,8 @@ function RailSection({ articleId, detail, enqueue, onCrop, register }: SectionPr
           }),
         ),
       );
+      // the app-wide jobs poller reconciles the rail even when this section has unmounted by the time the job ends
+      trackJob(qc, out.job);
       return out.job.id;
     } catch (e) {
       toast.error(`Could not ${op} ${figureId}: ${e instanceof ApiError ? e.detail : "network error"}`);

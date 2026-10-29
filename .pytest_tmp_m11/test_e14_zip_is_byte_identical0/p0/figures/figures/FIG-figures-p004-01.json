@@ -1,0 +1,31 @@
+{
+  "articles": [
+    "figures--board-illustrations",
+    "figures--drive-illustrations"
+  ],
+  "attach_rule": "caption_ref",
+  "bbox": [
+    72.0,
+    126.05,
+    392.0,
+    326.05
+  ],
+  "caption_original": "Figure 6. Wiring harness routing.",
+  "confidence": 1.0,
+  "description_generated": "Generated description (mock) of image 1b118b6c.",
+  "extraction": "native",
+  "file": "FIG-figures-p004-01.png",
+  "height": 1000,
+  "id": "FIG-figures-p004-01",
+  "page": 4,
+  "phash": "e25ac5633b6c46e1",
+  "product_model": "Acme X200",
+  "review": "auto_approved",
+  "source_doc": "figures",
+  "svg": null,
+  "tags": [
+    "figure",
+    "mock"
+  ],
+  "width": 1600
+}

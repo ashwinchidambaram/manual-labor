@@ -161,4 +161,10 @@ CREATE UNIQUE INDEX learning_one_active ON learning_snapshots(active) WHERE acti
     + _append_only("threshold_history")
 )
 
-MIGRATIONS: list[str] = [MIGRATION_1]
+# module 10: at most one proposal per (flag, round); resume-safe ingestion of agent events
+MIGRATION_2 = """
+CREATE UNIQUE INDEX proposals_flag_round ON proposals(flag_id, round);
+CREATE INDEX proposals_status ON proposals(status);
+"""
+
+MIGRATIONS: list[str] = [MIGRATION_1, MIGRATION_2]

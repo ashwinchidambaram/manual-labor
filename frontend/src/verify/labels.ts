@@ -1,3 +1,5 @@
+import type { FlagCategory } from "../api/schema";
+
 // Plain-language names for scoring signals (design 09 section 1).
 export const SIGNAL_LABEL: Record<string, string> = {
   parser_agreement: "parsers disagree",
@@ -27,12 +29,19 @@ export const STATUS_LABEL: Record<string, string> = {
   rejected: "rejected",
 };
 
-export const FLAG_CATEGORIES: { id: "wrong_text" | "missing_figure" | "wrong_grouping" | "bad_crop" | "table_structure"; label: string }[] = [
-  { id: "wrong_text", label: "Wrong text" },
-  { id: "missing_figure", label: "Missing figure" },
-  { id: "wrong_grouping", label: "Wrong grouping" },
-  { id: "bad_crop", label: "Bad crop" },
-  { id: "table_structure", label: "Table structure" },
-];
+// Labels are keyed by the generated FlagCategory, so a category added to the contract fails the typecheck here.
+const FLAG_LABEL: Record<FlagCategory, string> = {
+  wrong_text: "Wrong text",
+  missing_figure: "Missing figure",
+  wrong_grouping: "Wrong grouping",
+  bad_crop: "Bad crop",
+  table_structure: "Table structure",
+};
+/** Display order (digits 1-5 in the flag dialog). */
+const FLAG_ORDER = ["wrong_text", "missing_figure", "wrong_grouping", "bad_crop", "table_structure"] as const satisfies readonly FlagCategory[];
+type Missing = Exclude<FlagCategory, (typeof FLAG_ORDER)[number]>;
+const _allCategoriesOrdered: Missing extends never ? true : never = true;
+void _allCategoriesOrdered;
+export const FLAG_CATEGORIES: { id: FlagCategory; label: string }[] = FLAG_ORDER.map((id) => ({ id, label: FLAG_LABEL[id] }));
 
 export const FOCUS = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600";
