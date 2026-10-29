@@ -21,3 +21,4 @@ frontend/playwright-report/
 .planning/.attestation
 .DS_Store
 frontend/tsconfig.tsbuildinfo
+.pytest_tmp/

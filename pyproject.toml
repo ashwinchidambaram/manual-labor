@@ -83,5 +83,5 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q -m 'not slow'"
+addopts = "-q -m 'not slow' --basetemp=.pytest_tmp"
 markers = ["slow: slow end-to-end tests (deselected by default)"]
