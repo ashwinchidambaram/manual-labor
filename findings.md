@@ -83,3 +83,6 @@ Optimize for: (1) modern born-digital figure-heavy two-column (FAA AMT handbook 
 
 ## Remote (2026-10-29)
 Private GitHub repo https://github.com/ashwinchidambaram/manual-labor (user chose private; name follows their short-lowercase convention and the spec's working name). Push `main` after every gate commit. CI (.github/workflows/ci.yml) now runs on push.
+
+## Overnight authorization (user, 2026-10-29)
+User went to bed; authorized: handle CI failures as needed; use Opus reviewers wherever the orchestrator sees fit (not only on the faithfulness path). Continue through gates autonomously; push after each gate.
