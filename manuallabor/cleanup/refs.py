@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from typing import Final
 
 from manuallabor.cleanup.types import RANGE_MAX
+from manuallabor.scoring.numeric import UNIT
 
 _SEP_CHARS: Final = "-–—‑."
 _RANGE_CHARS: Final = "-–—‑"
@@ -25,6 +26,12 @@ _PARTS_RE: Final = re.compile(
     r"^(?P<p>[A-Z])?(?P<ps>-)?(?P<a>\d+)(?:-(?P<b>\d+))?(?P<s>[a-zA-Z])?$"
 )
 _RANGE_WORDS: Final = frozenset({"–", "—", "-", "to", "through"})
+# what makes the number before it a measurement, not a figure number: a unit of the numeric
+# lexicon (``2 mm``, ``6 V``, ``35 N·m``) or a word that counts something (``3 turns``)
+_MEASURE_AFTER_RE: Final = re.compile(
+    rf"\s*(?:(?:{UNIT})(?![A-Za-z])|(?i:turns?|times|clicks?|notch(?:es)?|threads?|teeth"
+    r"|places|revolutions?|x|×)\b)"
+)
 
 
 def normalize_number(n: str) -> str:
@@ -75,27 +82,34 @@ def _expand(a: int, b: int) -> list[str] | None:
 
 def find_refs(text: str, chaptered: bool) -> list[Ref]:
     """Every figure reference in text order, one Ref per referenced number. ``\\s+`` after the
-    keyword includes a newline (``Figure\\n2``). In a non-chaptered document ``3–5`` and
-    ``3 to 5`` are ranges; in a chaptered one ``2-1`` is one number."""
+    keyword includes a newline (``Figure\\n2``). In a non-chaptered document ``Figures 3–5``
+    and ``Figure(s) 3 to 5`` are ranges; in a chaptered one ``2-1`` is one number, and after a
+    singular keyword ``Figure 3-4`` is always one number. After a singular keyword a further
+    number followed by a unit or a counting word (``Figure 1 to 2 mm``, ``Figure 1 - 6 V``)
+    ends the reference: it is a measurement."""
     out: list[Ref] = []
     pos = 0
     while True:
         m = _REF_HEAD_RE.search(text, pos)
         if m is None:
             return out
+        plural = m["kw"].casefold() not in ("fig", "figure")
         items: list[tuple[str | None, str]] = [(None, m["a"])]
         end = m.end()
         while True:
             t = _REF_TAIL_RE.match(text, end)
             if t is None:
                 break
+            if not plural and _MEASURE_AFTER_RE.match(text, t.end()):
+                break  # ``Figure 1 to 2 mm``: the 2 is a measurement, not a figure
             items.append((t["sep"].casefold(), t["b"]))
             end = t.end()
         whole = text[m.start() : end]
         nums: list[str] = []
         prev: str | None = None
         for sep, raw in items:
-            span = None if chaptered else _plain_range(raw)
+            # ``Figs. 3–5`` is a range; after a singular keyword ``Figure 3-4`` is one number
+            span = None if chaptered or not plural else _plain_range(raw)
             expanded = _expand(*span) if span else None
             if expanded is not None:
                 nums.extend(expanded)

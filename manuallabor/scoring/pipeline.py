@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from manuallabor import ids
-from manuallabor.cleanup.types import CleanFile, fallback_detail
+from manuallabor.cleanup.types import CleanFile, fallback_detail, raw_sha256
 from manuallabor.contracts.block import Block, NumericVariant, Signal
 from manuallabor.contracts.config import ProjectConfig
 from manuallabor.contracts.document import Document
@@ -187,7 +187,7 @@ def score_block(
         signals.append(tvo)
     signals.append(reading_order_risk(ctx.displaced_in, ctx.in_overlap, ctx.n_columns))
     if block.type == BlockType.table and block.table is not None:
-        signals.append(table_consistency(block.table))
+        signals.append(table_consistency(block.table, block.raw_text))
     g = garbage_ratio(block.raw_text, is_table=block.type == BlockType.table)
     if g is not None:
         signals.append(g)
@@ -347,30 +347,41 @@ def _figure_inputs(
 
 
 def load_clean_overlay(
-    dp: DocPaths, block_ids: set[str]
+    dp: DocPaths, raw_by_id: Mapping[str, str]
 ) -> tuple[dict[str, str], dict[str, str], str | None]:
     """clean.json (module 5) as (block id -> clean_text, block id -> fallback reason, sha of the
-    file). No file: empty maps and None. An entry for a block that does not exist is an error:
-    clean.json is stale for this parse."""
+    file). No file: empty maps and None. ``raw_by_id``: each block's current raw_text. An
+    entry for a block that does not exist, or whose recorded raw_text sha256 differs from the
+    block's raw_text now, is an error: clean.json is stale for this parse and must be
+    re-generated (never scored as a faithfulness failure of the stale text)."""
     if not dp.clean.is_file():
         return {}, {}, None
     data = dp.clean.read_bytes()
     try:
         cf = CleanFile.model_validate_json(data)
     except ValueError as exc:
-        raise ScoringError(f"clean.json is invalid: {exc}") from exc
+        raise ScoringError(f"clean.json is invalid (re-run `labor clean`): {exc}") from exc
     texts: dict[str, str] = {}
     fallbacks: dict[str, str] = {}
+    stale: list[str] = []
     for e in cf.blocks:
-        if e.block_id not in block_ids:
+        if e.block_id not in raw_by_id:
             raise ScoringError(
                 f"clean.json names unknown block {e.block_id} (stale for this parse: delete "
                 f"{dp.clean.name} and run `labor clean`)"
             )
+        if raw_sha256(raw_by_id[e.block_id]) != e.raw_sha256:
+            stale.append(e.block_id)
+            continue
         texts[e.block_id] = e.clean_text
         reason = fallback_detail(e)
         if reason is not None:
             fallbacks[e.block_id] = reason
+    if stale:
+        shown = ", ".join(stale[:5]) + (f" (+{len(stale) - 5} more)" if len(stale) > 5 else "")
+        raise ScoringError(
+            f"clean.json is stale: raw_text changed since cleanup for {shown}; re-run `labor clean`"
+        )
     return texts, fallbacks, hashlib.sha256(data).hexdigest()
 
 
@@ -534,7 +545,7 @@ def _score_doc(
         raise ScoringError("document is not parsed (blocks.json missing)")
     doc = paths.load_document(slug)
     blocks = read_json_list(dp.blocks, Block)
-    clean_texts, fallbacks, clean_sha = load_clean_overlay(dp, {b.id for b in blocks})
+    clean_texts, fallbacks, clean_sha = load_clean_overlay(dp, {b.id: b.raw_text for b in blocks})
     if clean_texts:
         blocks = [
             b.model_copy(update={"clean_text": clean_texts[b.id]}) if b.id in clean_texts else b
@@ -657,7 +668,7 @@ def load_scored_blocks(paths: ProjectPaths, slug: str) -> list[Block]:
             f"{slug}: scores.json missing or from another algo version (run `labor score`)"
         )
     by_id = {s.block_id: s for s in sf.blocks}
-    clean_texts, _, _ = load_clean_overlay(dp, {b.id for b in blocks})
+    clean_texts, _, _ = load_clean_overlay(dp, {b.id: b.raw_text for b in blocks})
     out: list[Block] = []
     for b in blocks:
         s = by_id.get(b.id)

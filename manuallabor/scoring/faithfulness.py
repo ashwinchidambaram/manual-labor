@@ -45,6 +45,16 @@ SOFT_HYPHEN: Final = "­"
 BULLETS: Final = "•·◦▪‣●*–-"
 LIST_OCR_BULLETS: Final = "¢+o«"
 CANON_BULLET: Final = "•"
+# glyphs that also read as a sign: before a number (``+ 5 V``, ``- 12 V``, ``– 40 °C``) they
+# are part of the value, never a bullet (AE4)
+SIGN_GLYPHS: Final = "+-–"
+
+
+def sign_before_number(glyph: str, rest: str) -> bool:
+    """``glyph`` + ``rest`` (the text after the glyph on its line) is a signed number."""
+    return glyph in SIGN_GLYPHS and rest.lstrip(" \t")[:1].isdigit()
+
+
 _AE2_RE: Final = re.compile(r"(?<=[^\W\d_])-[ \t]*\n[ \t]*(?=[^\W\d_])")
 _AE2_LINE_END_RE: Final = re.compile(r"[^\W\d_]-[ \t]*$")
 _LOOSE_RE: Final = re.compile(r"(?<=[^\W\d_])-(?=[^\W\d_])")
@@ -284,6 +294,26 @@ def is_hf_line(line: str, tables: HfTables, page: int | None) -> bool:
     return not grp.with_pages or len(frozenset().union(*(grp.pages[m] for m in same))) >= 2
 
 
+def hf_edge_lines(lines: Sequence[str], tables: HfTables, page: int | None) -> frozenset[int]:
+    """AE3 position rule: the indices of the lines that may be removed as a header/footer.
+    Only a leading or trailing remnant qualifies: the run of ``is_hf_line`` lines that starts
+    at the first non-blank line, and the run that ends at the last one (a two-line running
+    footer ``Acme X200 Service Manual`` + ``Page 3``). A recorded string with body text on both
+    sides is body text (``Refer to the\nAcme X200 Service Manual\nbefore you start.``). A block
+    is never emptied: when every non-blank line would go (a paragraph that is only
+    ``Page 3``), nothing is removed. Blank lines inside a run are skipped over."""
+    if not tables.exact:
+        return frozenset()
+    body = [k for k, ln in enumerate(lines) if collapse_ws(ln)]
+    out: set[int] = set()
+    for order in (body, body[::-1]):
+        for k in order:
+            if not is_hf_line(lines[k], tables, page):
+                break
+            out.add(k)
+    return frozenset() if len(out) == len(body) else frozenset(out)
+
+
 def _delete_ranges(mt: MappedText, ranges: list[tuple[int, int]]) -> MappedText:
     if not ranges:
         return mt
@@ -319,18 +349,19 @@ def strip_hf_raw(
     page: int | None = None,
     hf_pages: Mapping[str, Sequence[int]] | None = None,
 ) -> tuple[MappedText, list[HfDeleted]]:
-    """AE3 on raw: delete whole lines that are a known header/footer (see is_hf_line)."""
+    """AE3 on raw: delete the whole lines that are a known header/footer (``is_hf_line``) at
+    the block's edges (``hf_edge_lines``)."""
     tables = hf_tables(hf_strings, hf_pages)
     if not tables.exact:
         return mt, []
     ranges: list[tuple[int, int]] = []
     deleted: list[HfDeleted] = []
     total = max(1, len(mt.text))
-    for a, z in _lines(mt):
-        line = mt.text[a:z]
-        if is_hf_line(line, tables, page):
-            ranges.append(_line_delete_range(mt, a, z))
-            deleted.append(HfDeleted(collapse_ws(line), a / total))
+    spans = _lines(mt)
+    for k in sorted(hf_edge_lines([mt.text[a:z] for a, z in spans], tables, page)):
+        a, z = spans[k]
+        ranges.append(_line_delete_range(mt, a, z))
+        deleted.append(HfDeleted(collapse_ws(mt.text[a:z]), a / total))
     return _delete_ranges(mt, _merge(ranges)), deleted
 
 
@@ -349,22 +380,18 @@ def _inline_pattern(text: str) -> re.Pattern[str]:
 
 
 def strip_hf_clean(mt: MappedText, deleted: Sequence[HfDeleted], raw_rest: str) -> MappedText:
-    """AE3 on clean: remove what raw's deleted header/footer lines became, at most as many
-    times as raw had them (multiset). Whole lines first; then inline surplus occurrences (the
-    cleanup joined the line into its neighbours), nearest to the raw line's relative position."""
+    """AE3 on clean: remove what raw's deleted header/footer lines became. A deleted string is
+    removed only as a surplus occurrence: at most as many times as raw had it deleted, and
+    only as many times as clean has it more often than what raw kept (``raw_rest``), so an
+    interior copy that raw keeps can never be dropped from clean. The occurrences nearest to
+    the raw line's relative position are taken (a whole line, or inline when the cleanup
+    joined it into its neighbours); the whitespace left behind is collapsed by AE1."""
     if not deleted:
         return mt
     remaining = Counter(d.text for d in deleted)
-    ranges: list[tuple[int, int]] = []
-    for a, z in _lines(mt):
-        c = collapse_ws(mt.text[a:z])
-        if c and remaining[c] > 0:
-            remaining[c] -= 1
-            ranges.append(_line_delete_range(mt, a, z))
-    mt = _delete_ranges(mt, _merge(ranges))
     total = max(1, len(mt.text))
-    inline: list[tuple[int, int]] = []
-    for text in sorted(t for t, n in remaining.items() if n > 0):
+    spans: list[tuple[int, int]] = []
+    for text in sorted(remaining):
         rx = _inline_pattern(text)
         occ = [m.span() for m in rx.finditer(mt.text)]
         surplus = len(occ) - len(rx.findall(raw_rest))
@@ -377,14 +404,15 @@ def strip_hf_clean(mt: MappedText, deleted: Sequence[HfDeleted], raw_rest: str) 
                 break
             best = min(cands, key=lambda k: (abs(occ[k][0] / total - rel), k))
             chosen.add(best)
-        inline.extend(occ[k] for k in sorted(chosen))
-    return _delete_ranges(mt, _merge(inline))
+        spans.extend(occ[k] for k in sorted(chosen))
+    return _delete_ranges(mt, _merge(spans))
 
 
 def normalize_bullets(mt: MappedText, block_type: BlockType) -> MappedText:
     """AE4: a line-start bullet glyph followed by whitespace (or the end of the text) becomes the
-    canonical bullet. "Whitespace" is the same notion AE1 collapses, so that canonicalization is
-    idempotent (a glyph alone on its line is a line-start glyph again after the collapse)."""
+    canonical bullet, unless it is the sign of a number (``+ 5 V``, ``- 12 V``). "Whitespace"
+    is the same notion AE1 collapses, so that canonicalization is idempotent (a glyph alone on
+    its line is a line-start glyph again after the collapse)."""
     glyphs = BULLETS + (LIST_OCR_BULLETS if block_type == BlockType.list else "")
     chars = list(mt.text)
     n = len(chars)
@@ -392,7 +420,12 @@ def normalize_bullets(mt: MappedText, block_type: BlockType) -> MappedText:
         k = a
         while k < z and chars[k].isspace():
             k += 1
-        if k < z and chars[k] in glyphs and (k + 1 == n or chars[k + 1].isspace()):
+        if (
+            k < z
+            and chars[k] in glyphs
+            and (k + 1 == n or chars[k + 1].isspace())
+            and not sign_before_number(chars[k], mt.text[k + 1 : z])
+        ):
             chars[k] = CANON_BULLET
     return MappedText("".join(chars), mt.src, mt.optional)
 
@@ -565,6 +598,104 @@ def table_clean_canon(rows: list[list[tuple[str, int]]], clean: str) -> MappedTe
             inner = _cell_canon(text, off)
             b.extend(MappedText(inner.text, tuple(min(s, cap) for s in inner.src)))
     return b.build()
+
+
+def table_token(s: str) -> str:
+    """One token for the table/raw coverage comparison: AE5 glyph identity (``TOKEN_RE`` has
+    already split on whitespace, ``|`` and the canonical bullet)."""
+    return glyph_identity(s).text
+
+
+def raw_table_rows(raw: str) -> int | None:
+    """The number of rows of raw_text when they are detectable: raw is in the row convention
+    (``table_raw_text``: cells joined `` | ``, one row per line), so every non-blank line is
+    one row. None when no line carries a cell separator (plain extracted text, where a wrapped
+    cell can span lines)."""
+    lines = [ln for ln in raw.split("\n") if ln.strip()]
+    return len(lines) if any(" | " in ln for ln in lines) else None
+
+
+@dataclass(frozen=True)
+class TableCoverage:
+    missing: Counter[str]  # raw tokens the cells lack
+    extra: Counter[str]  # cell tokens raw lacks
+    raw_rows: int | None  # None: not detectable
+    cell_rows: int  # rows with at least one non-empty cell
+
+    @property
+    def ok(self) -> bool:
+        rows_ok = self.raw_rows is None or self.raw_rows == self.cell_rows
+        return not self.missing and not self.extra and rows_ok
+
+    def detail(self) -> str:
+        parts = []
+        if self.missing:
+            parts.append(f"{sum(self.missing.values())} raw tokens missing from the cells")
+        if self.extra:
+            parts.append(f"{sum(self.extra.values())} cell tokens not in raw")
+        if self.raw_rows is not None and self.raw_rows != self.cell_rows:
+            parts.append(f"{self.cell_rows} rows vs {self.raw_rows} raw rows")
+        return "; ".join(parts) or "cells cover raw"
+
+
+def table_coverage(raw: str, rows: Sequence[Sequence[str]]) -> TableCoverage:
+    """AE6 coverage (design 4.3): the multiset of non-empty cell tokens must equal the token
+    multiset of raw_text, and the number of non-empty rows must equal the raw row count when
+    it is detectable. The structured table can come from another parser than raw_text and
+    miss a row that raw has; the grid-to-grid comparison alone cannot see that."""
+    rc = Counter(t for m in TOKEN_RE.finditer(raw) if (t := table_token(m.group())))
+    cc = Counter(
+        t
+        for row in rows
+        for cell in row
+        for m in TOKEN_RE.finditer(cell)
+        if (t := table_token(m.group()))
+    )
+    n_rows = sum(1 for row in rows if any(cell.strip() for cell in row))
+    return TableCoverage(rc - cc, cc - rc, raw_table_rows(raw), n_rows)
+
+
+def table_coverage_violations(
+    raw: str, clean: str, rows: Sequence[Sequence[tuple[str, int]]]
+) -> list[FaithfulnessViolation]:
+    """``table_coverage`` as violations: a raw token missing from the cells is a ``deletion``
+    (its surplus raw occurrences), a cell token raw lacks an ``insertion``; a row count that
+    differs from the detectable raw rows is one ``deletion`` (fewer rows: raw rows merged or
+    dropped) or ``insertion`` over the whole text."""
+    cov = table_coverage(raw, [[text for text, _ in row] for row in rows])
+    if cov.ok:
+        return []
+    out: list[FaithfulnessViolation] = []
+    if cov.missing:
+        occ: dict[str, list[tuple[int, int]]] = {}
+        for m in TOKEN_RE.finditer(raw):
+            t = table_token(m.group())
+            if t in cov.missing:
+                occ.setdefault(t, []).append(m.span())
+        for t in sorted(occ):
+            for span in occ[t][len(occ[t]) - cov.missing[t] :]:
+                out.append(_violation(FaithViolationKind.deletion, raw, clean, span, None))
+    if cov.extra:
+        cap = len(clean)
+        cocc: dict[str, list[tuple[int, int]]] = {}
+        for row in rows:
+            for text, off in row:
+                for m in TOKEN_RE.finditer(text):
+                    t = table_token(m.group())
+                    if t in cov.extra:
+                        a, z = min(off + m.start(), cap), min(off + m.end(), cap)
+                        cocc.setdefault(t, []).append((a, z))
+        for t in sorted(cocc):
+            for span in cocc[t][len(cocc[t]) - cov.extra[t] :]:
+                out.append(_violation(FaithViolationKind.insertion, raw, clean, None, span))
+    if cov.raw_rows is not None and cov.raw_rows != cov.cell_rows:
+        kind = (
+            FaithViolationKind.deletion
+            if cov.cell_rows < cov.raw_rows
+            else FaithViolationKind.insertion
+        )
+        out.append(_violation(kind, raw, clean, (0, len(raw)), (0, len(clean))))
+    return out
 
 
 # ---------------------------------------------------------------------------------------------
@@ -1144,6 +1275,8 @@ def check_faithfulness_ex(
     if rc.text != cc.text and len(rc.text) + len(cc.text) <= FAITH_MAX_CHARS:
         sm = SequenceMatcher(None, rc.text, cc.text, autojunk=False)
     violations = level_a(raw, clean, rc, cc, sm)
+    if gfm is not None:
+        violations.extend(table_coverage_violations(raw, clean, gfm))
     ratio = _ratio(rc, cc, sm)
     moved: list[tuple[tuple[int, int], tuple[int, int]]] = []
     reordered = False

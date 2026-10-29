@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from manuallabor.contracts.block import Signal, TableData
 from manuallabor.contracts.enums import SignalName
+from manuallabor.scoring.faithfulness import table_coverage
 from manuallabor.scoring.types import (
     TABLE_NO_HEADER,
     TABLE_NO_STRUCTURE,
     TABLE_RAGGED_WEIGHT,
+    TABLE_RAW_MISMATCH,
     TABLE_SINGLE_PARSER,
     clamp01,
     truncate,
@@ -49,7 +51,20 @@ def ragged_rows(t: TableData) -> tuple[int, int]:
     return ragged, len(body)
 
 
-def table_consistency(t: TableData) -> Signal:
+def cell_rows(t: TableData) -> list[list[str]]:
+    """Cell texts per grid row (origin cells only, column order)."""
+    rows: list[list[str]] = [[] for _ in range(t.n_rows)]
+    for cell in sorted(t.cells, key=lambda c: (c.row, c.col)):
+        if cell.row < t.n_rows:
+            rows[cell.row].append(cell.text)
+    return rows
+
+
+def table_consistency(t: TableData, raw: str | None = None) -> Signal:
+    """Shape agreement x ragged rows x header presence. With ``raw`` (the block's raw_text),
+    cells that do not cover raw_text (a token or a row of raw missing from the structure, or
+    extra; faithfulness ``table_coverage``) make the signal critical at TABLE_RAW_MISMATCH:
+    the structure came from a parser that read the table differently, so it is reviewed."""
     shape, shape_desc = _shape_term(t)
     ragged, body = ragged_rows(t)
     ragged_term = 1 - TABLE_RAGGED_WEIGHT * ragged / max(1, body)
@@ -60,6 +75,13 @@ def table_consistency(t: TableData) -> Signal:
         f"{shape_desc}; {ragged} ragged row{'s' if ragged != 1 else ''}; "
         f"{'header ok' if has_header else 'no header'}"
     )
+    critical = False
+    if raw is not None:
+        cov = table_coverage(raw, cell_rows(t))
+        if not cov.ok:
+            value = min(value, TABLE_RAW_MISMATCH)
+            critical = True
+            detail = f"cells disagree with raw text: {cov.detail()}; {detail}"
     return Signal(
-        name=SignalName.table_consistency, value=value, critical=False, detail=truncate(detail)
+        name=SignalName.table_consistency, value=value, critical=critical, detail=truncate(detail)
     )

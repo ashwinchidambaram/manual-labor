@@ -5,6 +5,7 @@ import cycle."""
 
 from __future__ import annotations
 
+import hashlib
 import re
 from typing import Final, Literal
 
@@ -21,7 +22,7 @@ from manuallabor.contracts._base import (
 from manuallabor.contracts.block import FaithfulnessViolation
 from manuallabor.contracts.enums import ArticleSplit, AttachRule, BlockType
 
-CLEANUP_ALGO_VERSION: Final = "1"
+CLEANUP_ALGO_VERSION: Final = "2"
 PROMPT_VERSION: Final = "clean-v1"
 DESCRIBE_PROMPT_VERSION: Final = "desc-v1"
 BASELINE: Final = "baseline"
@@ -114,6 +115,9 @@ class RejectedCandidate(CModel):
 class CleanEntry(CModel):
     block_id: BlockId
     input_hash: Sha256Hex
+    # sha256 of the block's raw_text (UTF-8) when it was cleaned: scoring refuses a clean.json
+    # whose raw_text has since changed (stale for this parse)
+    raw_sha256: Sha256Hex
     clean_text: str
     stage: Stage
     passes: list[str] = Field(default_factory=list)
@@ -138,6 +142,9 @@ class CleanFile(CModel):
     llm_mode: LlmMode
     prompt_version: str
     learning_snapshot: str
+    # learned rules / few-shot examples of the snapshot that were rejected on load (invalid)
+    rejected_rules: list[str] = Field(default_factory=list)
+    rejected_examples: list[str] = Field(default_factory=list)
     blocks: list[CleanEntry]
 
 
@@ -239,6 +246,10 @@ class LearnedCleanup(CModel):
     snapshot: str = Field(min_length=1)
     rules: list[LearnedRule] = Field(default_factory=list)
     examples: list[FewShotExample] = Field(default_factory=list)
+
+
+def raw_sha256(raw_text: str) -> str:
+    return hashlib.sha256(raw_text.encode("utf-8")).hexdigest()
 
 
 def fallback_detail(entry: CleanEntry) -> str | None:

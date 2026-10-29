@@ -28,8 +28,9 @@ from manuallabor.scoring.faithfulness import (
     LIST_OCR_BULLETS,
     HfTables,
     glyph_identity,
+    hf_edge_lines,
     hf_tables,
-    is_hf_line,
+    sign_before_number,
 )
 
 # letter run - line break - letter run; both runs whole words (a part number such as
@@ -81,41 +82,56 @@ def unicode_pass(text: str, ctx: PassCtx) -> str:
 
 
 def strip_hf(text: str, ctx: PassCtx) -> str:
-    """P2 (AE3): delete each whole line that the checker's own predicate calls a recorded
-    header/footer on this page, together with one adjacent newline. A heading is never
-    emptied (keeping a header line is always allowed: the check removes it on both sides)."""
+    """P2 (AE3): delete a recorded header/footer line on this page (the checker's own
+    predicates ``is_hf_line`` + ``hf_edge_lines``): only the first or last non-blank line (a
+    leading/trailing remnant), never one in the interior, and never every line of the block
+    (a paragraph or heading that is only the running header stays; keeping a header line is
+    always allowed)."""
     if not ctx.hf.exact:
         return text
     lines = text.split("\n")
-    keep = [ln for ln in lines if not is_hf_line(ln, ctx.hf, ctx.page)]
-    if ctx.block_type == BlockType.heading and not any(ln.strip() for ln in keep):
-        return text  # a heading that reads like the running header (a title) is never emptied
-    return text if len(keep) == len(lines) else "\n".join(keep)
+    drop = hf_edge_lines(lines, ctx.hf, ctx.page)
+    if not drop:
+        return text
+    return "\n".join(ln for k, ln in enumerate(lines) if k not in drop)
 
 
-def _bullet_glyphs(block_type: BlockType) -> str:
+def bullet_glyphs(block_type: BlockType) -> str:
+    """The glyphs P3 turns into ``•`` (and the only ones the LLM may turn into ``•``, V2)."""
     return BULLETS + LIST_OCR_BULLETS if block_type == BlockType.list else UNAMBIGUOUS_BULLETS
+
+
+def line_bullet(line: str, glyphs: str) -> re.Match[str] | None:
+    """A line-start glyph (after indentation) followed by spaces/tabs or the line end, that is
+    not the sign of a number (``+ 5 V``, ``- 12 V``: AE4 ``sign_before_number``)."""
+    if not glyphs:
+        return None
+    m = re.match(r"([ \t]*)([" + re.escape(glyphs) + r"])([ \t]+|$)", line)
+    if m is None or sign_before_number(m.group(2), line[m.end(2) :]):
+        return None
+    return m
 
 
 def normalize_glyphs(text: str, glyphs: str) -> str:
     """A line-start glyph (after indentation) followed by spaces/tabs becomes ``• ``; a glyph
-    alone at a line end becomes ``•``. Anything else is left as it is."""
+    alone at a line end becomes ``•``; a sign before a number stays. Anything else is left as
+    it is."""
     if not glyphs:
         return text
-    rx = re.compile(r"^([ \t]*)[" + re.escape(glyphs) + r"]([ \t]+|$)")
     out = []
     for ln in text.split("\n"):
-        m = rx.match(ln)
+        m = line_bullet(ln, glyphs)
         if m is not None:
-            ln = m.group(1) + CANON_BULLET + (" " if m.group(2) else "") + ln[m.end() :]
+            ln = m.group(1) + CANON_BULLET + (" " if m.group(3) else "") + ln[m.end() :]
         out.append(ln)
     return "\n".join(out)
 
 
 def bullets(text: str, ctx: PassCtx) -> str:
     """P3 (AE4): in list blocks every AE4 glyph incl. the OCR readings ``¢ + o «``; elsewhere
-    only the unambiguous ``•◦▪‣●`` (``– 40 °C`` and ``* note`` in prose stay)."""
-    return normalize_glyphs(text, _bullet_glyphs(ctx.block_type))
+    only the unambiguous ``•◦▪‣●`` (``– 40 °C`` and ``* note`` in prose stay). A sign before a
+    number is never a bullet (``+ 5 V`` in a list stays)."""
+    return normalize_glyphs(text, bullet_glyphs(ctx.block_type))
 
 
 def dh_decide(left: str, right: str, lexicon: Lexicon) -> tuple[bool, str]:
@@ -171,7 +187,11 @@ def _checker_bullet(line: str, block_type: BlockType) -> bool:
     the previous one would move the glyph off the line start and change its canonical form,
     so the line break before it is kept."""
     glyphs = BULLETS + (LIST_OCR_BULLETS if block_type == BlockType.list else "")
-    return line[:1] in glyphs and (len(line) == 1 or line[1].isspace())
+    return (
+        line[:1] in glyphs
+        and (len(line) == 1 or line[1].isspace())
+        and not sign_before_number(line[0], line[1:])
+    )
 
 
 def _glue(prev: str, nxt: str) -> bool:

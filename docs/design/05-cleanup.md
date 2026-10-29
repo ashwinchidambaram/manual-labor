@@ -49,12 +49,12 @@ Every pass is a pure function `str -> str` with a fixed name. The passes run in 
 |---|---|---|---|---|---|---|---|---|
 | P0 | `crlf`: `\r\n`, `\r` → `\n` | ✓ | ✓ | ✓ | ✓ | ✓ | – | ✓ |
 | P1 | `unicode`: NFC; `LIGATURES` → letters; delete U+00AD; `SPACE_LIKE` and U+202F → `" "`. **Never NFKC**: it would turn `mm²` into `mm2` and `½` into `1/2` | ✓ | ✓ | ✓ | – | ✓ | – | ✓ |
-| P2 | `strip_hf`: delete each whole line where `is_hf_line(line, hf_tables(ctx.hf_strings, ctx.hf_pages), block.page)`, together with one adjacent `\n` | ✓ | ✓ | ✓ | – | ✓ | – | – |
-| P3 | `bullets`: a line-start glyph followed by whitespace becomes `"• "`. In `list` blocks the glyph set is `BULLETS + LIST_OCR_BULLETS` (`•·◦▪‣●*–-¢+o«`). Elsewhere it is only the unambiguous `•◦▪‣●`, so `– 40 °C` and `* note` in prose stay as they are | ✓ | ✓ | – | – | – | – | – |
+| P2 | `strip_hf`: delete the lines `hf_edge_lines(lines, hf_tables(ctx.hf_strings, ctx.hf_pages), block.page)` returns: the run of `is_hf_line` lines at the block's start and the run at its end (leading/trailing remnants) — **never an interior line** (body text on both sides), and nothing at all if that would empty the block (a paragraph that is only `Page 3`) | ✓ | ✓ | ✓ | – | ✓ | – | – |
+| P3 | `bullets`: a line-start glyph followed by whitespace becomes `"• "`. In `list` blocks the glyph set is `BULLETS + LIST_OCR_BULLETS` (`•·◦▪‣●*–-¢+o«`). Elsewhere it is only the unambiguous `•◦▪‣●`, so `– 40 °C` and `* note` in prose stay as they are. A sign before a number (`+ 5 V`, `- 12 V`, `– 40 °C`) is never a bullet, in any block (AE4 `sign_before_number`) | ✓ | ✓ | – | – | – | – | – |
 | P4 | `dehyphenate` (DH, below) | ✓ | ✓ | – | – | – | – | – |
 | P5 | `join_lines` (below) | ✓ | items | `\n`→`" "` | `\n`→`" "` | – | – | – |
 | P6 | `whitespace`: runs of `[ \t]` become `" "`; each line is stripped; blank lines are dropped; `\n` runs become one `\n`; the ends are stripped | ✓ | ✓ | ✓ | ✓ | ✓ | – | ✓ |
-| P7 | `table`: `clean_text = table_markdown_from_data(block.table)`. This is the same GFM `parse.tables.table_markdown` produces, built from `TableData` cells: covered span slots are `""`, `\|` is escaped, and cell text is only `norm_cell`ed | – | – | – | – | – | ✓ | – |
+| P7 | `table`: `clean_text = table_markdown_from_data(block.table)`. This is the same GFM `parse.tables.table_markdown` produces, built from `TableData` cells: covered span slots are `""`, `\|` is escaped, and cell text is only `norm_cell`ed. Accepted only if the cells cover `raw_text` (AE6 coverage, scoring §4.3): the multiset of non-empty cell tokens (`TOKEN_RE`, AE5) equals that of `raw_text`, and the non-empty row count equals the raw row count when raw is in the `` | `` row convention. `TableData` may come from the other parser and miss a row; on a mismatch the check fails, the bisect drops `table` (`passes_rejected`), `clean_text = raw_text`, and `table_consistency` is critical (0.3) so the block is queued | – | – | – | – | – | ✓ | – |
 
 figure, header and footer blocks are never cleaned (`clean_text` stays None). A block whose `raw_text` is empty after `collapse_ws` gets no entry.
 
@@ -84,12 +84,12 @@ figure, header and footer blocks are never cleaned (`clean_text` stays None). A 
 |---|---|---|---|---|
 | crlf | `\r` deleted or turned into `\n` | AE1 | whitespace → non-empty whitespace | – |
 | unicode | NFC; ligature → letters; soft hyphen deleted; space-likes → `" "` | AE5 | the same tables that `glyph_identity` imports; NFC runs on both sides of the check | – |
-| strip_hf | whole lines plus one `\n` | AE3 | the **same predicate** (`is_hf_line`) with the same inputs (`hf_strings`, `hf_pages`, `page`) that the raw side of `canonicalize` uses | – |
+| strip_hf | whole edge lines (leading/trailing runs) plus one `\n` | AE3 | the **same predicates** (`is_hf_line` + `hf_edge_lines`) with the same inputs (`hf_strings`, `hf_pages`, `page`) that the raw side of `canonicalize` uses; the clean side removes a deleted string only as a surplus occurrence over what raw kept, so dropping an interior copy is a `deletion` | – |
 | bullets | glyph → `•` at line start before whitespace | AE4 | the glyph set is a subset of AE4's; the OCR glyphs are used only when `block_type == list`, which is exactly AE4's condition | – |
 | dehyphenate | the `-\n` of an `_AE2_RE` match is dropped (`LR`) or kept (`L-R`) | AE2 | only `_AE2_RE` matches are touched; AE2 accepts both outputs | **Semantic:** dropping a real compound's hyphen (`selfcontained`) passes the check. Mitigated by D2–D5 and the residual flag. The checker can never police this (open issue 3) |
 | join_lines | `\n` → `" "` or `""` | AE1 | `""` only next to a non-word `-`; never between two `\w` chars | – |
 | whitespace | runs collapsed or stripped | AE1 | no run between two `\w` chars ever becomes empty: a run is stripped only at a line end, where the newline remains | – |
-| table | GFM grid from `TableData` | AE6 | the GFM cells are `norm_cell(cell.text)`, and `table_raw_canon` applies the same AE5+AE1 per cell | **Edge:** a cell text containing a backslash before `\|` may not round-trip through `_split_gfm_row`. It is verified at run time like everything else |
+| table | GFM grid from `TableData` | AE6 | the GFM cells are `norm_cell(cell.text)`, and `table_raw_canon` applies the same AE5+AE1 per cell; **not** by construction: the cells must also cover `raw_text` (token multiset, row count), checked at run time | **Edge:** a cell text containing a backslash before `\|` may not round-trip through `_split_gfm_row`. It is verified at run time like everything else |
 | learned rules | `hyphen_*`, `bullet_glyph` | AE2, AE4 | admission check (§7) | – |
 | LLM | anything | – | nothing is trusted; §3 validation, then the full check | everything (hence §3) |
 
@@ -133,9 +133,10 @@ OCR word splits and merges (`replace ment`, `witha`) are **not** triggers: fixin
 | # | Check | Reject reason |
 |---|---|---|
 | V1 | `out = O.strip("\n ")` is non-empty and contains neither `<raw>` nor `</raw>` | `empty` / `tags` |
-| V2 | **Char multiset** over non-whitespace chars: `add = C(out) − C(X)`, `rem = C(X) − C(out)`. Allowed: `add ⊆ {•}` with `add[•] ≤ Σ rem[g]` over the AE4 glyphs, and `rem ⊆ {-} ∪ AE4 glyphs` with `rem[-] ≤` (line-end hyphens in `X` + hyphen bullets). This implies the length-ratio bound `1 − k/n ≤ nonws(out)/nonws(X) ≤ 1`. **No new letter, digit or punctuation, so no new word and no new sentence terminator** | `chars` (detail: up to 3 offending chars) |
+| V2 | **Char multiset** over non-whitespace chars: `add = C(out) − C(X)`, `rem = C(X) − C(out)`. Allowed: `add ⊆ {•}` with `add[•] ≤ Σ min(rem[g], budget[g])`, where `budget` counts the line-start bullets of `X` that P3 itself would normalize (`bullet_glyphs(type)`: the list set only in lists, `•◦▪‣●` elsewhere; never a sign before a number); `rem[g] ≤ budget[g]`, plus `rem[-] ≤` line-end hyphens in `X`. This implies the length-ratio bound `1 − k/n ≤ nonws(out)/nonws(X) ≤ 1`. **No new letter, digit or punctuation, so no new word and no new sentence terminator** | `chars` (detail: up to 3 offending chars) |
 | V3 | `Counter(FAITH_NUM_RE.findall(out)) == Counter(…X)` (signs included) | `numeric_tokens` |
 | V4 | `check_faithfulness_ex(raw_text, out, …)` passes (full context, reorder evidence) | `faithfulness` (violations stored, ≤ 5) |
+| V5 | the multiset of whitespace-delimited tokens that contain a digit or `/` is unchanged (no `4471-A` → `4471- A`, `3/4` → `3 / 4`; AE1 would allow it). Always on, also with V2/V3 off | `token_whitespace` |
 
 - V2 and V3 are cheap pre-filters. V4 alone must also reject every corruption (test 16 runs with V2/V3 disabled).
 - A `ProviderError` gives the outcome `error`: no candidate, and `fallback` stays False because nothing was rejected.
@@ -144,11 +145,13 @@ OCR word splits and merges (`replace ment`, `witha`) are **not** triggers: fixin
 
 ## 4. `clean.json` (per doc, `write_json`, sorted, no timestamps)
 
-`CleanFile{doc_id, algo_version, fingerprint, scoring_algo, cleanup_model: str|None ("provider:model"), llm_mode, prompt_version, learning_snapshot ("baseline"|id), blocks: list[CleanEntry]}`, sorted by `block_sort_key`. It contains entries **only for selected, cleanable blocks**.
+`CleanFile{doc_id, algo_version (2), fingerprint, scoring_algo, cleanup_model: str|None ("provider:model"), llm_mode, prompt_version, learning_snapshot ("baseline"|id), rejected_rules, rejected_examples (ids rejected on load, §7), blocks: list[CleanEntry]}`, sorted by `block_sort_key`. It contains entries **only for selected, cleanable blocks**.
 
-`CleanEntry{block_id, input_hash, clean_text, stage: "raw"|"deterministic"|"llm", passes: list[str] (applied, in order), dh: list[str] (DH decisions, e.g. `drop_default:lubrication`), passes_rejected: list[str], residual: list[ResidualReason], llm: LlmOutcome|None {outcome: "accepted"|"rejected"|"error", reason: str|None}, rejected: list[RejectedCandidate{stage, reason, text (≤ 2,000 chars), violations: list[FaithfulnessViolation] (≤ 5)}], fallback: bool, faith_passed: bool, alignment_ratio: Unit, learned_rules: list[str], few_shot: list[str]}`.
+`CleanEntry{block_id, input_hash, raw_sha256 (sha256 of `raw_text` when cleaned; scoring fails with "re-run `labor clean`" when the block's `raw_text` no longer matches — never a faithfulness failure of stale text), clean_text, stage: "raw"|"deterministic"|"llm", passes: list[str] (applied, in order), dh: list[str] (DH decisions, e.g. `drop_default:lubrication`), passes_rejected: list[str], residual: list[ResidualReason], llm: LlmOutcome|None {outcome: "accepted"|"rejected"|"error", reason: str|None}, rejected: list[RejectedCandidate{stage, reason, text (≤ 2,000 chars), violations: list[FaithfulnessViolation] (≤ 5)}], fallback: bool, faith_passed: bool, alignment_ratio: Unit, learned_rules: list[str], few_shot: list[str]}`.
 
 `input_hash = sha256(canonical_json({algo, raw_text, type, table, raw_source, raw_text_by_parser, page, hf_strings, hf_pages, layout_risk, variants, llm_mode, cleanup_ref, prompt_version, learned rule ids+bodies applicable, few-shot ids}))`. An entry whose `input_hash` is unchanged is reused without recomputation, so a selection change re-cleans only the new blocks.
+
+Header/footer rule (items 1 of the module 5 review): a recorded header/footer string is removable only as a leading/trailing remnant run and never empties a block; cleanup (P2) and the check (AE3 raw side `hf_edge_lines`, clean side surplus-only removal) use the same rule. Table rule (item 2): see P7 — a GFM rendering whose cells do not cover `raw_text` is never `clean_text`.
 
 ## 5. Figure attachment (`refs.py`, `attach.py`)
 
@@ -166,7 +169,8 @@ OCR word splits and merges (`replace ment`, `witha`) are **not** triggers: fixin
 - No caption, or no match, means `num = None`: F can never be a `caption_ref` target.
 - **Doc is "chaptered"** iff any `num(F)` contains `-`.
 - **References:** `(?i)\b(?P<kw>fig(?:ure)?s?)\.?\s+(?P<a>N)(?:\s*(?P<sep>,|and|&|or|to|through|–|—|-)\s*(?P<b>N))*`, with `N` as above. `\s+` includes newline (`Figure\n2`). Each `N` is normalized.
-- **Range:** when `sep ∈ {–, —, -, to, through}`, the doc is not chaptered, and both ends are plain integers with `b − a ≤ 20`, expand to `a..b`. In a chaptered doc, `2-1` is one id.
+- **Range:** when `sep ∈ {–, —, -, to, through}`, the doc is not chaptered, and both ends are plain integers with `b − a ≤ 20`, expand to `a..b`. In a chaptered doc, `2-1` is one id. A one-token `3–5` is a range only after a plural keyword (`Figures`, `Figs.`); after a singular one `Figure 3-4` is the chapter-style number `3-4`.
+- **Measurements end a reference:** after a singular keyword, a further number (`to`/`–`/`-`/`and`/`,` …) followed by a unit of the numeric lexicon (`scoring.numeric.UNIT`) or a counting word (`turns`, `times`, `x` …) is not part of the reference: `Figure 1 to 2 mm` and `Figure 1 - 6 V check` reference only Figure 1. A plural keyword always takes the list/range.
 - **Scope:** scanned in blocks of type paragraph, list, heading, table, other (never caption, figure, header or footer). `Table 3`, `figure out` and Roman numerals never match (open issue 9).
 
 ### 5.2 Rules (for each figure F of the doc with a sidecar; a `FigureFailure` is unattached with reason `extraction_failed`)
@@ -212,7 +216,7 @@ OCR word splits and merges (`replace ment`, `witha`) are **not** triggers: fixin
 
 | Item | Definition |
 |---|---|
-| Store | `<project>/learning/cleanup.json` = `LearnedCleanup{snapshot: str, rules: list[LearnedRule], examples: list[FewShotExample]}`. Module 7 derives it from captured decisions into its versioned snapshot layer and owns the writer. Module 5 reads only via `load_learned_cleanup(paths, config)`, which returns None when learning is off, no file exists, or the snapshot is unreadable (logged). |
+| Store | `<project>/learning/cleanup.json` = `LearnedCleanup{snapshot: str, rules: list[LearnedRule], examples: list[FewShotExample]}`. Module 7 derives it from captured decisions into its versioned snapshot layer and owns the writer. Module 5 reads only via `load_learned_cleanup(_ex)(paths, config)`, which returns None when learning is off, no file exists, or the file itself is unreadable (not JSON / no snapshot id; logged). Each rule and few-shot example is validated **on its own**: an invalid one is rejected and logged, the rest still apply, and the rejected ids go to `CleanFile.rejected_rules` / `rejected_examples`. A few-shot pair is admitted only if `clean ≠ raw` and `check_faithfulness(raw, clean)` passes. |
 | `LearnedRule` | `{id, kind: "hyphen_keep"\|"hyphen_drop"\|"bullet_glyph", value: str, block_types: list[BlockType], support: int ≥ 3, enabled: bool}`. `hyphen_*`: `value` = `"L-R"` casefold (a DH exception, D1). `bullet_glyph`: `value` ∈ AE4 `BULLETS`, which extends P3 to that glyph in the listed non-list types. |
 | Admission (load time) | A rule is used only if it is enabled, its `value` is valid for its kind (`bullet_glyph` must be in the AE4 set, else ignored and logged), and it is one of these lossless kinds. **Learning can never widen AE3:** a header remnant becomes deletable only when a human adds it to the document's recorded header/footer strings (a module 7 decision), never by a learned rule. At run time, a learned rule is a named pass (`learned:<id>`) and goes through §2.2 like any other. |
 | Few-shot | `FewShotExample{id, block_type, ocr: bool, residual: list[str], raw, clean}`, taken from approved/edited decisions whose final clean passes faithfulness with `clean ≠ raw`. `select_examples(block, residual, k=FEW_SHOT_K=2)` ranks by: same `block_type`, same `ocr` (raw_source ∈ {ocr, ocr_alt}), overlap of residual reasons (desc), `\|len(raw) − len(block.raw_text)\|`, then id. Each example is truncated to 600 chars on a line boundary and inserted as a user `<raw>…</raw>` / assistant `clean` pair before the real input. They are used only when the LLM runs, and the output is still validated by V1–V4. |

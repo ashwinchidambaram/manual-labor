@@ -28,6 +28,7 @@ from manuallabor.cleanup.types import (
     LlmOutcome,
     RejectedCandidate,
     Stage,
+    raw_sha256,
 )
 from manuallabor.contracts.block import (
     Block,
@@ -161,6 +162,7 @@ def clean_block(
     entry = CleanEntry(
         block_id=block.id,
         input_hash=input_hash,
+        raw_sha256=raw_sha256(raw),
         clean_text=final,
         stage=stage,
         passes=list(det.applied),

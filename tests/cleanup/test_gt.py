@@ -104,12 +104,20 @@ def test_19_gt_text_rate(cleanedproj: Proj, slug: str) -> None:
 
 
 def _raw_minus_hf(b: Block, ctx: BlockContext) -> str:
+    """raw_text without its leading/trailing header/footer remnant lines (AE3: never an
+    interior line, never every line of the block)."""
     tables = hf_tables(ctx.hf_strings, ctx.hf_pages)
-    t = glyph_identity(b.raw_text).text
-    keep = [ln for ln in t.split("\n") if not is_hf_line(ln, tables, b.page)]
-    if b.type == BlockType.heading and not any(ln.strip() for ln in keep):
-        return t  # a heading that reads like the running header (a title) is never emptied
-    return "\n".join(keep)
+    lines = glyph_identity(b.raw_text).text.split("\n")
+    nb = [k for k, ln in enumerate(lines) if ln.strip()]
+    drop: set[int] = set()
+    for order in (nb, nb[::-1]):
+        for k in order:
+            if not is_hf_line(lines[k], tables, b.page):
+                break
+            drop.add(k)
+    if len(drop) == len(nb):
+        return "\n".join(lines)
+    return "\n".join(ln for k, ln in enumerate(lines) if k not in drop)
 
 
 @pytest.mark.parametrize("slug", ALL_FIXTURES)

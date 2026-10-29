@@ -54,3 +54,29 @@ def test_22_find_refs() -> None:
 
 def test_22_chaptered() -> None:
     assert is_chaptered(["2-1", None, "3"]) and not is_chaptered(["1", "2", None])
+
+
+@pytest.mark.parametrize(
+    ("text", "want"),
+    [
+        # a measurement after the range end: not a figure range (review case)
+        ("Adjust as shown in Figure 1 to 2 mm clearance.", ["1"]),
+        ("see Figure 1 - 6 V check", ["1"]),
+        ("see Figure 1 – 6 V check", ["1"]),
+        ("Adjust as shown in Figure 2 to 5 mm clearance.", ["2"]),
+        ("See Figure 2 and 35 N·m torque.", ["2"]),
+        ("see Figure 1 through 3 turns", ["1"]),
+        # plural keyword: a range or a list
+        ("Figures 3–5", ["3", "4", "5"]),
+        ("Figures 3 to 5", ["3", "4", "5"]),
+        ("Figs. 3 - 5 show the pump", ["3", "4", "5"]),
+        ("FIGURES 1 & 2", ["1", "2"]),
+        # singular keyword, no unit after the end: still a range
+        ("refer to figure 1 through 4 for the steps", ["1", "2", "3", "4"]),
+        # one hyphenated number after a singular keyword is a chapter-style figure number
+        ("see Figure 3-4 for the detail", ["3-4"]),
+        ("see Figure 3–4.", ["3-4"]),
+    ],
+)
+def test_22_unit_ranges_are_not_figure_ranges(text: str, want: list[str]) -> None:
+    assert _nums(text) == want

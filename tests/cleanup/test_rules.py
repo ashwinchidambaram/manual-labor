@@ -122,6 +122,53 @@ def test_03_strip_hf() -> None:
     assert strip_hf(f"{hdr}\n2 Removal", hc) == "2 Removal"
 
 
+HF_EDGE_PAGES = {"Acme X200 Service Manual": [1, 2, 3], "Page 3": [3]}
+INTERIOR_HF = [
+    # (raw, the header/footer-stripped version that must be rejected)
+    (
+        "Refer to the\nAcme X200 Service Manual\nbefore you start.",
+        "Refer to the\nbefore you start.",
+    ),
+    ("Torque table on\nPage 3\napplies to M8.", "Torque table on\napplies to M8."),
+    ("Page 3", ""),  # a paragraph that is only the footer string: never emptied
+    ("Acme X200 Service Manual\nPage 3", ""),  # two edge lines, nothing else
+]
+
+
+@pytest.mark.parametrize(("raw", "stripped"), INTERIOR_HF)
+def test_03_hf_never_removed_from_the_interior_or_emptying(raw: str, stripped: str) -> None:
+    c = ctx(hf=hf_tables([], HF_EDGE_PAGES), page=3)
+    assert strip_hf(raw, c) == raw
+    for t in (P, L, BlockType.other, BlockType.heading):
+        out = compose(raw, plan_passes(t, False), ctx(t, hf=c.hf, page=3)).text
+        assert " ".join(out.split()) == " ".join(raw.split()), (t, out)
+        assert faithful(raw, out, t, hf_pages=HF_EDGE_PAGES, page=3)
+    r = check_faithfulness(raw, stripped, hf_pages=HF_EDGE_PAGES, page=3)
+    assert not r.passed
+    assert "deletion" in {v.kind.value for v in r.violations}
+
+
+def test_03_hf_leading_and_trailing_remnants_still_removed() -> None:
+    c = ctx(hf=hf_tables([], HF_EDGE_PAGES), page=3)
+    for raw, want in (
+        ("Acme X200 Service Manual\nCheck the belt.", "Check the belt."),
+        ("Check the belt.\nPage 3", "Check the belt."),
+        ("Acme X200 Service Manual\nCheck the belt.\nPage 3", "Check the belt."),
+        ("\nAcme X200 Service Manual\n\nCheck the belt.\n", "\n\nCheck the belt.\n"),
+    ):
+        assert strip_hf(raw, c) == want
+        assert faithful(raw, want.strip(), hf_pages=HF_EDGE_PAGES, page=3)
+        assert faithful(raw, raw, hf_pages=HF_EDGE_PAGES, page=3)  # keeping it is allowed
+    # a two-line remnant run at an edge goes; the same strings with body on both sides stay
+    raw = "Check the belt.\nAcme X200 Service Manual\nPage 3"
+    assert strip_hf(raw, c) == "Check the belt."
+    assert faithful(raw, "Check the belt.", hf_pages=HF_EDGE_PAGES, page=3)
+    raw = "Check the\nAcme X200 Service Manual\nPage 3\nbelt."
+    assert strip_hf(raw, c) == raw
+    assert not faithful(raw, "Check the belt.", hf_pages=HF_EDGE_PAGES, page=3)
+    assert not faithful(raw, "Check the\nPage 3\nbelt.", hf_pages=HF_EDGE_PAGES, page=3)
+
+
 # -- 4 bullets ------------------------------------------------------------------------------
 
 
@@ -309,11 +356,30 @@ def test_10_property(raw: str, type: BlockType) -> None:
     )
     assert det(out, type, hf=hf) == out  # idempotent
     # whitespace between two word chars is never deleted (word sequence unchanged once the
-    # recorded header lines are gone)
+    # leading/trailing header remnants are gone; an interior header line is body text and a
+    # block that is only header lines is never emptied)
     body = raw
     if type != BlockType.caption:  # captions are whitespace-only: the header stays inline
-        body = "\n".join(ln for ln in raw.replace("\r", "\n").split("\n") if ln.strip() != HDR)
+        lines = raw.replace("\r", "\n").split("\n")
+        nb = [k for k, ln in enumerate(lines) if ln.strip()]
+        drop: set[int] = set()
+        for order in (nb, nb[::-1]):
+            for k in order:
+                if lines[k].strip() != HDR:
+                    break
+                drop.add(k)
+        if len(drop) < len(nb):
+            body = "\n".join(ln for k, ln in enumerate(lines) if k not in drop)
     assert _words(out, type) == _words(body, type)
+    # an interior header line is never deleted
+    lines = [ln.strip() for ln in raw.replace("\r", "\n").split("\n")]
+    nb = [k for k, ln in enumerate(lines) if ln]
+    interior = [k for k in nb[1:-1] if lines[k] == HDR]
+    if type != BlockType.caption and any(
+        any(lines[j] != HDR for j in nb if j < k) and any(lines[j] != HDR for j in nb if j > k)
+        for k in interior
+    ):
+        assert HDR in out, (raw, out)
 
 
 # -- 39 performance ------------------------------------------------------------------------

@@ -190,7 +190,16 @@ def deterministic_cleanup(b: Block, hf: set[str]) -> str:
     item per line), collapse whitespace; a table becomes its GFM markdown."""
     if b.type == BlockType.table and b.table is not None and b.table.markdown.strip():
         return b.table.markdown
-    lines = [ln for ln in b.raw_text.split("\n") if " ".join(ln.split()) not in hf]
+    lines = b.raw_text.split("\n")
+    body = [k for k, ln in enumerate(lines) if ln.strip()]
+    drop: set[int] = set()  # AE3: leading/trailing header/footer runs only, never everything
+    for order in (body, body[::-1]):
+        for k in order:
+            if " ".join(lines[k].split()) not in hf:
+                break
+            drop.add(k)
+    if len(drop) < len(body):
+        lines = [ln for k, ln in enumerate(lines) if k not in drop]
     text = _HYPHEN_BREAK_RE.sub("", "\n".join(lines))
     out: list[str] = []
     for ln in text.split("\n"):

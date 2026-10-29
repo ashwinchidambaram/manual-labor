@@ -8,6 +8,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Final
 
+from manuallabor.cleanup.rules import bullet_glyphs, line_bullet
 from manuallabor.cleanup.types import (
     FEW_SHOT_MAX_CHARS,
     PROMPT_VERSION,
@@ -17,7 +18,7 @@ from manuallabor.contracts.block import FaithfulnessViolation
 from manuallabor.contracts.enums import BlockType
 from manuallabor.contracts.llm import Message
 from manuallabor.providers.base import RAW_CLOSE, RAW_OPEN
-from manuallabor.scoring.faithfulness import BULLETS, CANON_BULLET, LIST_OCR_BULLETS, FaithOutcome
+from manuallabor.scoring.faithfulness import CANON_BULLET, FaithOutcome
 from manuallabor.scoring.numeric import FAITH_NUM_RE
 
 SYSTEM_PROMPT: Final = (
@@ -59,28 +60,34 @@ def _line_end_hyphens(s: str) -> int:
     return sum(1 for ln in s.split("\n")[:-1] if ln.rstrip(" \t").endswith("-"))
 
 
-def _hyphen_bullets(s: str) -> int:
-    n = 0
+def _bullet_budget(s: str, glyphs: str) -> Counter[str]:
+    """Per glyph, the line-start bullets of s that P3 itself would normalize (the same glyph
+    set for the block type, the same line-start shape, never the sign of a number)."""
+    out: Counter[str] = Counter()
     for ln in s.split("\n"):
-        t = ln.lstrip(" \t")
-        if t[:1] == "-" and (len(t) == 1 or t[1].isspace()):
-            n += 1
-    return n
+        m = line_bullet(ln, glyphs)
+        if m is not None and m.group(2) != CANON_BULLET:
+            out[m.group(2)] += 1
+    return out
 
 
 def char_check(x: str, out: str, block_type: BlockType) -> str | None:
-    """V2: no new letter, digit or punctuation. Only ``•`` may be added (at most as many as
-    bullet glyphs removed); only ``-`` and AE4 glyphs may be removed (``-`` at most the line-end
-    hyphens plus the hyphen bullets of x). Returns up to 3 offending chars, or None."""
-    glyphs = set(BULLETS + (LIST_OCR_BULLETS if block_type == BlockType.list else ""))
+    """V2: no new letter, digit or punctuation. Bullet normalization is allowed exactly as the
+    deterministic P3 does it (``bullet_glyphs``: the list glyph set in lists, only ``•◦▪‣●``
+    elsewhere; line-start glyphs only; never a sign before a number): ``•`` may be added at
+    most as often as such glyphs are removed, and each removed glyph must be one of them.
+    ``-`` may also go at most once per line-end hyphen of x. Returns up to 3 offending chars,
+    or None."""
+    budget = _bullet_budget(x, bullet_glyphs(block_type))
     cx, co = _nonws(x), _nonws(out)
     add, rem = co - cx, cx - co
     bad: list[str] = [ch for ch in add if ch != CANON_BULLET]
-    if add[CANON_BULLET] > sum(rem[g] for g in glyphs):
+    if add[CANON_BULLET] > sum(min(rem[g], budget[g]) for g in budget):
         bad.append(CANON_BULLET)
-    bad.extend(ch for ch in rem if ch != "-" and ch not in glyphs)
-    if rem["-"] > _line_end_hyphens(x) + _hyphen_bullets(x):
-        bad.append("-")
+    for ch, n in rem.items():
+        allowed = budget[ch] + (_line_end_hyphens(x) if ch == "-" else 0)
+        if n > allowed:
+            bad.append(ch)
     if not bad:
         return None
     return "".join(sorted(dict.fromkeys(bad)))[:3]
@@ -89,6 +96,18 @@ def char_check(x: str, out: str, block_type: BlockType) -> str | None:
 def numeric_check(x: str, out: str) -> bool:
     """V3: the same multiset of numeric tokens (signs included)."""
     return Counter(FAITH_NUM_RE.findall(out)) == Counter(FAITH_NUM_RE.findall(x))
+
+
+def _code_tokens(s: str) -> Counter[str]:
+    return Counter(t for t in s.split() if any(c.isdigit() or c == "/" for c in t))
+
+
+def token_check(x: str, out: str) -> bool:
+    """V5: no whitespace inserted into or removed from a token that holds a digit or ``/``
+    (``4471-A`` -> ``4471- A``, ``3/4`` -> ``3 / 4``): the multiset of such whitespace-delimited
+    tokens is unchanged. AE1 allows whitespace next to a non-word char, so V4 cannot see this;
+    in a part number or a fraction it still changes the value."""
+    return _code_tokens(out) == _code_tokens(x)
 
 
 @dataclass(frozen=True)
@@ -108,8 +127,9 @@ def validate_output(
     *,
     prefilter: bool = True,
 ) -> Validation:
-    """V1-V4 in order; the first failure rejects. ``prefilter=False`` skips V2/V3 (V4 alone
-    must still reject every corruption)."""
+    """V1-V5 in order; the first failure rejects. ``prefilter=False`` skips V2/V3 (V4 alone
+    must still reject every corruption). V5 (``token_check``) is a cleanup policy beyond the
+    faithfulness check and always runs."""
     cand = out.strip("\n ")
     if not cand:
         return Validation(None, "empty")
@@ -124,4 +144,6 @@ def validate_output(
     res = check(cand)
     if not res.result.passed:
         return Validation(cand, "faithfulness", None, tuple(res.result.violations), res)
+    if not token_check(x, cand):
+        return Validation(cand, "token_whitespace", None, (), res)
     return Validation(cand, None, None, (), res)

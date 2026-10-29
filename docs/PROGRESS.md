@@ -139,3 +139,27 @@ $ cd frontend && npm run gen-types && git diff --stat -- src/types/generated.ts;
       Tests  1 passed (1)
 $ gate (tests/grouping + reviewer checks): partition invariant exact on all 6 fixtures in both views; structure tree 0 mismatches vs GT on clean/twocol/tables/figures; coverage mapping exact + symmetric; cohesion computed for every topic in [0,1]; groups.json byte-identical across PYTHONHASHSEED/cwd/cold cache; do-not-merge 0/42 leaks; topic cap enforced after stragglers
 ```
+
+## M5 — Cleanup + figure attachment — PASSED 2026-10-29
+
+Design: docs/design/05-cleanup.md (deterministic passes first; LLM only on residual triggers, 5 output checks then full faithfulness; attach caption_ref > caption_match > proximity > human). Review: fresh Opus agent — gate passes on its own run; 3 majors (header string deletable mid-sentence, table clean text never compared to raw_text, "Figure 1 to 2 mm" read as a range) + 5 minors; all fixed failing-test-first (204 cleanup tests). Test disk footprint reduced (copy_project skips page renders; 2 GB session guard; pytest basetemp in-repo).
+
+Commands: `uv run labor clean <project> [--force] [--llm off|residual|always]`; live Ollama test `MANUALLABOR_LIVE=1 uv run pytest tests/cleanup -k live -s` (currently skips: no chat/vision model installed in Ollama).
+
+```
+$ uv run ruff check manuallabor/ tests/ && uv run mypy manuallabor/
+All checks passed!
+Success: no issues found in 103 source files
+$ MANUALLABOR_REQUIRE_DOCLING=1 uv run pytest tests/cleanup
+204 passed, 1 skipped, 14 warnings in 119.08s (0:01:59)
+$ MANUALLABOR_REQUIRE_DOCLING=1 uv run pytest   # fast suite (-m "not slow" in addopts)
+1042 passed, 4 skipped, 2 deselected, 19 warnings in 301.61s (0:05:01)
+$ du -sh .pytest_tmp
+1.8G
+$ uv run labor schemas export --check && uv run python -m tests.fixtures.gen.make_fixtures --check
+schemas up to date
+ok: 15 files match CHECKSUMS.json
+$ cd frontend && npm run gen-types && git diff --stat -- src/types/generated.ts; npm run typecheck && npm test -- --run
+      Tests  1 passed (1)
+$ gate (tests/cleanup tests 16/21/23 + reviewer run): CorruptingMockProvider rejected 100% on 6 fixtures × 4 modes; 0 faithfulness violations on auto-approved blocks after clean+re-score on all fixtures (scanned: 64 auto-approved, 0 violations; 133/133 corrupt outputs rejected); attach rule recorded on every attachment; caption_ref correct for every GT reference (clean 3/3, twocol 3/3, figures 12/12, scanned 3/3, manual 2/2); clean.json byte-identical across PYTHONHASHSEED
+```

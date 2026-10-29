@@ -3,6 +3,7 @@ learning hooks)."""
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -28,7 +29,7 @@ from manuallabor.project import ProjectPaths
 from manuallabor.providers import ListSink, MockProvider
 from manuallabor.providers.base import RawChat
 from manuallabor.scoring.pipeline import load_scored_blocks, run_score
-from manuallabor.scoring.types import ScoreFile
+from manuallabor.scoring.types import ScoreFile, ScoringError
 from tests.cleanup.conftest import Proj, doc_of, mk, quiet
 from tests.conftest import copy_project
 
@@ -182,6 +183,31 @@ def test_36_scoring_integration(cleanedproj: Proj, tmp_path: Path) -> None:
     assert "unknown block" in lines[0]["detail"]
 
 
+def test_36_stale_clean_json_is_detected(cleanedproj: Proj, tmp_path: Path) -> None:
+    """clean.json records each block's raw_text sha256; a re-parse that changed raw_text under
+    the same block id makes scoring fail with "re-run `labor clean`" instead of reporting the
+    stale clean text as a faithfulness failure."""
+    root = tmp_path / "p"
+    copy_project(cleanedproj.paths.root, root)
+    p = ProjectPaths(root)
+    cf = read_json(p.doc("clean").clean, CleanFile)
+    raw = {b.id: b.raw_text for b in load_scored_blocks(p, "clean")}
+    for e in cf.blocks:
+        assert e.raw_sha256 == hashlib.sha256(raw[e.block_id].encode("utf-8")).hexdigest()
+    target = next(e for e in cf.blocks if e.stage == "deterministic")
+    blocks = json.loads(p.doc("clean").blocks.read_text(encoding="utf-8"))
+    for b in blocks:
+        if b["id"] == target.block_id:
+            b["raw_text"] = b["raw_text"] + " Torque to 40 N·m."
+    p.doc("clean").blocks.write_text(json.dumps(blocks), encoding="utf-8")
+    lines: list[dict[str, Any]] = []
+    assert run_score(p, only="clean", emit=lines.append) == ["clean"]
+    assert "re-run `labor clean`" in lines[0]["detail"], lines[0]
+    assert target.block_id in lines[0]["detail"]
+    with pytest.raises(ScoringError, match="re-run `labor clean`"):
+        load_scored_blocks(p, "clean")
+
+
 # -- 37 / 38 learning -----------------------------------------------------------------------
 
 RULES = [
@@ -258,6 +284,60 @@ def test_38_failing_learned_rule_is_rejected(monkeypatch: pytest.MonkeyPatch) ->
     )
     assert entries[0].passes_rejected == ["learned:r-keep"] and entries[0].fallback
     assert entries[0].clean_text == "Do not reenter the tank." and entries[0].learned_rules == []
+
+
+def test_38_invalid_learned_items_are_rejected_one_by_one(grouped_copy: ProjectPaths) -> None:
+    """One invalid rule no longer drops the snapshot: only it is rejected, the rest applies,
+    and clean.json names what was rejected. Few-shot pairs must pass faithfulness."""
+    from manuallabor.cleanup.learned import load_learned_cleanup_ex
+    from manuallabor.cleanup.pipeline import run_clean
+
+    p = grouped_copy
+    rule = {"block_types": ["paragraph"], "support": 3, "enabled": True}
+    store = {
+        "snapshot": "snap-mixed",
+        "rules": [
+            {**rule, "id": "r-keep", "kind": "hyphen_keep", "value": "assem-bly"},
+            {**rule, "id": "r-kind", "kind": "replace", "value": "35->36"},
+            {**rule, "id": "r-glyph", "kind": "bullet_glyph", "value": "»"},
+            {**rule, "id": "r-digit", "kind": "hyphen_drop", "value": "35-36"},
+            {**rule, "id": "r-support", "kind": "hyphen_keep", "value": "co-owner", "support": 1},
+            {**rule, "id": "r-off", "kind": "hyphen_keep", "value": "re-enter", "enabled": False},
+        ],
+        "examples": [
+            {
+                "id": "ex-ok",
+                "block_type": "paragraph",
+                "raw": "adjust-\nment",
+                "clean": "adjustment",
+            },
+            {"id": "ex-digit", "block_type": "paragraph", "raw": "35 N·m", "clean": "36 N·m"},
+            {
+                "id": "ex-drop",
+                "block_type": "paragraph",
+                "raw": "Check the\nbelt.",
+                "clean": "Check.",
+            },
+            {"id": "ex-shape", "block_type": "paragraph", "raw": "x"},
+        ],
+    }
+    p.learned_cleanup.parent.mkdir(parents=True, exist_ok=True)
+    p.learned_cleanup.write_text(json.dumps(store), encoding="utf-8")
+    _set_learning(p, True)
+    learned, rejected = load_learned_cleanup_ex(p, p.load_config())
+    assert learned is not None and learned.snapshot == "snap-mixed"
+    assert [r.id for r in learned.rules] == ["r-keep"]
+    assert [e.id for e in learned.examples] == ["ex-ok"]
+    assert rejected.rules == ["r-digit", "r-glyph", "r-kind", "r-support"]
+    assert rejected.examples == ["ex-digit", "ex-drop", "ex-shape"]
+    assert run_clean(p, only="clean", emit=quiet, rescore=False) == []
+    cf = read_json(p.doc("clean").clean, CleanFile)
+    assert cf.learning_snapshot == "snap-mixed"
+    assert cf.rejected_rules == ["r-digit", "r-glyph", "r-kind", "r-support"]
+    assert cf.rejected_examples == ["ex-digit", "ex-drop", "ex-shape"]
+    used = [e for e in cf.blocks if e.learned_rules]
+    assert used and all(e.learned_rules == ["r-keep"] and e.faith_passed for e in used)
+    assert any("assem-bly" in e.clean_text for e in used)
 
 
 class Spy(MockProvider):

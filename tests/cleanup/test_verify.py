@@ -146,12 +146,75 @@ def test_12_mode_off_and_residual_call_counts() -> None:
     assert len(sink) == 3
 
 
-def test_12_residual_on_clean_pdf(cleanedproj: Any) -> None:
-    cf = cleanedproj.clean("clean")
-    with_residual = sum(1 for e in cf.blocks if e.residual)
-    calls = sum(1 for e in cf.blocks if e.llm is not None)
-    print(f"\nclean.pdf residual mode: {calls} LLM calls, {with_residual} blocks with residual")
-    assert calls == with_residual
+RESIDUAL_CASES = {
+    # reason: (block, its context, a reply the chain accepts, a reply it rejects + reason)
+    "ambiguous_hyphen": (
+        mk(1, 1, "Do not re-\nenter the tank."),
+        bctx(),
+        "Do not re-enter the tank.",
+        ("Do not re-enter the tanks.", "chars"),
+    ),
+    "mid_sentence_break": (
+        mk(1, 2, "Torque the bolt\nto the limit.", BlockType.other),
+        bctx(),
+        "Torque the bolt to the limit.",
+        ("Torque the bolt to the 35 limit.", "chars"),
+    ),
+    "reading_order": (
+        mk(1, 3, "B comes second.\nA comes first.", texts={
+            "pymupdf": "B comes second.\nA comes first.",
+            "docling": "A comes first.\nB comes second.",
+        }),
+        bctx(n_columns=2),
+        "A comes first. B comes second.",
+        ("A comes first.", "chars"),
+    ),
+}  # fmt: skip
+
+
+def _const(reply: str) -> Any:
+    return lambda _messages: reply
+
+
+@pytest.mark.parametrize("reason", sorted(RESIDUAL_CASES))
+def test_12_each_residual_reason_calls_the_llm_once(reason: str) -> None:
+    """Synthetic blocks for each residual reason (the fixtures have none): residual mode calls
+    the LLM exactly once, and its output goes through V1-V5 + the faithfulness check."""
+    b, c, good, (bad, why) = RESIDUAL_CASES[reason]
+    for reply, accepted in ((good, True), (bad, False)):
+        sink = ListSink()
+        prov = MockProvider(sink=sink, responses={Task.cleanup: _const(reply)})
+        res = run(b, ctx=c, provider=prov, mode="residual")
+        e = res.entry
+        assert e.residual == [reason]
+        assert res.llm_called and len(sink) == 1
+        assert e.llm is not None
+        if accepted:
+            assert e.llm.outcome == "accepted" and e.stage == "llm" and e.clean_text == good
+            assert e.faith_passed and not e.fallback
+        else:
+            assert e.llm.outcome == "rejected" and e.llm.reason == why
+            assert e.stage != "llm" and e.clean_text != bad and e.fallback
+            assert [r.stage for r in e.rejected] == ["llm"]
+        # mode off: never called
+        sink_off = ListSink()
+        off = run(b, ctx=c, provider=MockProvider(sink=sink_off), mode="off")
+        assert not off.llm_called and len(sink_off) == 0 and off.entry.residual == [reason]
+
+
+def test_12_residual_call_count_equals_residual_blocks() -> None:
+    blocks = [case[0] for case in RESIDUAL_CASES.values()] + [mk(1, 4, "Check the\nbelt.")]
+    sink = ListSink()
+    prov = MockProvider(sink=sink)
+    layouts: list[Any] = []
+    doc = doc_of(blocks)
+    entries, _ = clean_document(
+        doc, blocks, layouts, {b.id for b in blocks}, mode="residual", provider=prov
+    )
+    with_residual = [e for e in entries if e.residual]
+    assert len(with_residual) >= 2  # ambiguous_hyphen and mid_sentence_break (no layout here)
+    assert len(sink) == len(with_residual)
+    assert all((e.llm is not None) == bool(e.residual) for e in entries)
 
 
 # -- 13 prompt ------------------------------------------------------------------------------
@@ -307,3 +370,87 @@ def test_det_result_is_frozen() -> None:
     d = DetResult("x", [], [])
     with pytest.raises(AttributeError):
         d.text = "y"  # type: ignore[misc]
+
+
+# -- V2 bullet allowance = the deterministic P3 rule; signs are never bullets ----------------
+
+L = BlockType.list
+
+
+@pytest.mark.parametrize(
+    ("x", "out", "type", "ok"),
+    [
+        # prose: only the unambiguous glyphs •◦▪‣● may become •; – - * + stay
+        ("Range:\n– 40 °C min", "Range:\n• 40 °C min", P, False),
+        ("Note:\n* keep it dry", "Note:\n• keep it dry", P, False),
+        ("Steps:\n- open the cover", "Steps:\n• open the cover", P, False),
+        ("Steps:\n+ open the cover", "Steps:\n• open the cover", P, False),
+        ("Steps:\n◦ open the cover", "Steps:\n• open the cover", P, True),
+        # lists: the list glyph set, but a sign before a digit is not a bullet
+        ("- open the cover\n¢ remove the belt", "• open the cover\n• remove the belt", L, True),
+        ("• supply\n+ 5 V rail", "• supply\n• 5 V rail", L, False),
+        ("• range\n– 40 °C", "• range\n• 40 °C", L, False),
+        ("• range\n- 12 V", "• range\n• 12 V", L, False),
+        # a glyph that is not at a line start is never a bullet
+        ("Use the wrench * twice.", "Use the wrench • twice.", P, False),
+    ],
+)
+def test_v2_bullets_match_the_deterministic_rule(
+    x: str, out: str, type: BlockType, ok: bool
+) -> None:
+    b = mk(1, 1, x, type)
+    v = validate_output(x, out, type, _check_for(b))
+    assert (v.reason is None) == ok, v
+    if not ok:
+        assert v.reason == "chars"
+
+
+def test_v2_bullets_with_v4_alone() -> None:
+    """The sign rule is part of AE4 itself: V4 rejects a sign turned into a bullet."""
+    for x, out, type in (
+        ("• supply\n+ 5 V rail", "• supply\n• 5 V rail", L),
+        ("Range:\n– 40 °C min", "Range:\n• 40 °C min", P),
+        ("• range\n- 12 V", "• range\n• 12 V", L),
+    ):
+        v = validate_output(x, out, type, _check_for(mk(1, 1, x, type)), prefilter=False)
+        assert v.reason == "faithfulness", (x, v)
+
+
+def test_p3_never_turns_a_sign_into_a_bullet() -> None:
+    lst = PassCtx(block_type=L)
+    for keep in ("+ 5 V supply", "- 12 V line", "– 40 °C", "-12 V", "+5 V", "-  3.5 mm"):
+        assert rules.bullets(keep, lst) == keep
+    assert rules.bullets("+ remove it\n- 5 V\n- check", lst) == "• remove it\n- 5 V\n• check"
+    raw = "+ 5 V supply\n- 12 V line"
+    out = compose(raw, plan_passes(L, False), lst).text
+    assert out == raw
+    v = validate_output(raw, out, L, _check_for(mk(1, 1, raw, L)))
+    assert v.reason is None
+
+
+# -- V5 whitespace inside a token with a digit or "/" -----------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("x", "out"),
+    [
+        ("Replace seal P/N 4471-A if worn.", "Replace seal P/N 4471- A if worn."),
+        ("Replace seal P/N 4471-A if worn.", "Replace seal P/N 4471 -A if worn."),
+        ("Use a 3/4 in. wrench.", "Use a 3 / 4 in. wrench."),
+        ("Use a 3/4 in. wrench.", "Use a 3/ 4 in. wrench."),
+        ("Check P/N 4471 -A first.", "Check P/N 4471-A first."),
+        ("Torque M8 bolts and P/ N parts.", "Torque M8 bolts and P/N parts."),
+    ],
+)
+def test_v5_whitespace_inside_numeric_tokens_rejected(x: str, out: str) -> None:
+    b = mk(1, 1, x)
+    for prefilter in (True, False):
+        v = validate_output(x, out, P, _check_for(b), prefilter=prefilter)
+        assert v.reason in ("token_whitespace", "numeric_tokens"), (prefilter, v)
+    assert validate_output(x, out, P, _check_for(b)).reason == "token_whitespace"
+
+
+def test_v5_line_joins_around_numeric_tokens_pass() -> None:
+    x = "Replace seal P/N 4471-A\nif worn; use a 3/4\nin. wrench."
+    out = "Replace seal P/N 4471-A if worn; use a 3/4 in. wrench."
+    assert validate_output(x, out, P, _check_for(mk(1, 1, x))).reason is None

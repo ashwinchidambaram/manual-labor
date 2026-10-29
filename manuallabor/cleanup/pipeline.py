@@ -18,7 +18,11 @@ from pydantic import BaseModel, TypeAdapter
 from manuallabor import ids
 from manuallabor.cleanup.attach import FigureInfo, attach_document, figure_projection
 from manuallabor.cleanup.describe import describe_figure
-from manuallabor.cleanup.learned import load_learned_cleanup, select_examples
+from manuallabor.cleanup.learned import (
+    LearningRejected,
+    load_learned_cleanup_ex,
+    select_examples,
+)
 from manuallabor.cleanup.lexicon import Lexicon, doc_lexicon
 from manuallabor.cleanup.residual import residual_reasons
 from manuallabor.cleanup.rules import DH_RE, PassCtx, compose, plan_passes
@@ -326,6 +330,7 @@ class DocRun:
     get_providers: Callable[[], ProviderSet]
     emit: Emit
     prefilter: bool = True
+    learned_rejected: LearningRejected = field(default_factory=LearningRejected)
 
     @property
     def dp(self) -> DocPaths:
@@ -371,7 +376,15 @@ def _stage_clean(run: DocRun, blocks: Sequence[Block]) -> None:
         stats=stats,
     )
     status = "done"
-    if not run.force and prior_file is not None and prior_file.fingerprint == fp:
+    snapshot = run.learned.snapshot if run.learned is not None else BASELINE
+    provenance = (snapshot, run.learned_rejected.rules, run.learned_rejected.examples)
+    if (
+        not run.force
+        and prior_file is not None
+        and prior_file.fingerprint == fp
+        and (prior_file.learning_snapshot, prior_file.rejected_rules, prior_file.rejected_examples)
+        == provenance
+    ):
         status = "skip"
     else:
         write_json(
@@ -384,7 +397,9 @@ def _stage_clean(run: DocRun, blocks: Sequence[Block]) -> None:
                 cleanup_model=_ref(cref),
                 llm_mode=run.mode,
                 prompt_version=PROMPT_VERSION,
-                learning_snapshot=run.learned.snapshot if run.learned is not None else BASELINE,
+                learning_snapshot=snapshot,
+                rejected_rules=list(run.learned_rejected.rules),
+                rejected_examples=list(run.learned_rejected.examples),
                 blocks=entries,
             ),
         )
@@ -660,7 +675,7 @@ def run_clean(
 
     mode: LlmMode = llm_mode or config.cleanup.llm
     do_describe = config.cleanup.describe if describe is None else describe
-    learned = load_learned_cleanup(paths, config)
+    learned, learned_rejected = load_learned_cleanup_ex(paths, config)
     selection, _ = load_selection(paths)
     failed: list[str] = []
     for slug in slugs:
@@ -676,6 +691,7 @@ def run_clean(
             get_providers=get_providers,
             emit=emit,
             prefilter=prefilter,
+            learned_rejected=learned_rejected,
         )
         stage = "clean"
         t0 = time.perf_counter()

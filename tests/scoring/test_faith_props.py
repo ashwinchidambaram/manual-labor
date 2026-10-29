@@ -87,6 +87,10 @@ def test_allowed_edit_compositions_pass(parts, data: st.DataObject) -> None:  # 
         clean_body = clean_body.replace(" ", data.draw(st.sampled_from([" ", "  ", " \n "])))
         raw_lines.append((f"{b} " if b else "") + raw_body)
         cb = data.draw(st.sampled_from(["•", "-", "*"])) if b else None  # AE4
+        if b and ln[:1].isdigit() and "-" in (b, cb):
+            # a sign before a number is never a bullet (AE4): `- 0 a` is the value -0, so a
+            # `-` there is kept as it is and no bullet becomes `-`
+            cb = b if b == "-" else data.draw(st.sampled_from(["•", "*"]))
         clean_lines.append((f"{cb} " if cb else "") + clean_body)
     raw = "\n".join(raw_lines)
     if data.draw(st.booleans()):

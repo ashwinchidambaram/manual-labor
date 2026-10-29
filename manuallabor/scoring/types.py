@@ -11,7 +11,7 @@ from manuallabor.contracts.block import FaithfulnessResult, Signal
 from manuallabor.contracts.enums import AttachRule, Extraction
 from manuallabor.figures.types import DedupeEntry, FigureExtraction, FigureFailure
 
-SCORING_ALGO_VERSION: Final = "3"
+SCORING_ALGO_VERSION: Final = "4"
 
 # -- comparison normalization / agreement (2.0, 2.2, 2.3) ------------------------------------
 DIGIT_WEIGHT: Final = 3
@@ -33,6 +33,7 @@ TABLE_SINGLE_PARSER: Final = 0.7
 TABLE_NO_STRUCTURE: Final = 0.5
 TABLE_NO_HEADER: Final = 0.8
 TABLE_RAGGED_WEIGHT: Final = 0.5
+TABLE_RAW_MISMATCH: Final = 0.3  # cells do not cover raw_text (critical; design 4.3)
 
 # -- garbage (2.7) ---------------------------------------------------------------------------
 GARBAGE_FRAG_FREE: Final = 0.2
