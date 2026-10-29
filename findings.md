@@ -115,3 +115,12 @@ This is a required part of the M7 state design (snapshots + toggle) and M10 (com
 | old-scan | TM 11-427 Barometers ML-102 (1944), archive.org micro_IA41152616_0619 | 300 DPI image-only scan, faded/off-centre; low priority | 57 | 8 |
 | nist-handbook | NIST Handbook 44 (2026) §2.20 Scales, nist.gov | born-digital, vector table borders; text-layer quirks: "≤"→"<", captions detach, private-use glyphs, rotated watermark line. URL is replaced yearly → sha mismatch after supersession. | 64 | 20 |
 All GT model-transcribed; needs human spot-check. The real set now covers: scan (pile driver), born-digital 2-col figure-heavy, table-heavy scan, poor old scan, born-digital complex tables.
+
+## Module 4 decisions (2026-10-29, docs/design/04-grouping.md)
+| Decision | Rationale |
+|---|---|
+| Cluster on document-mean-centered, re-normalised embeddings; average-linkage agglomerative, cosine, cut 0.80, cap n/4, split >60 blocks, dissolve <3, single topic <12 blocks | Measured: raw nomic similarities 0.91 same-section vs 0.83 cross-section → one cluster at any cut; centered: 0.27 vs 0.06. No seeds; ties by block id. |
+| One structure group per heading incl. parents; parents report subtree coverage | Parent intro text needs a home. |
+| `per_topic` articles come from the topic view only; structure view selects | Avoids two article sets. |
+| Human regroup/rename overrides in `docs/<slug>/group_overrides.json`, applied every run | Learning-hook data shape; applied only with `learning.enabled` for learned moves, always for explicit overrides. |
+| `GroupsFile` wrapper + `LearningConfig{enabled=False}` added to contracts; mock grouping reply registered in `providers/mock.py` (import-order-stable cache keys); grouping fingerprint excludes scores.json | Forced by current code; recorded in design §"changes". |
