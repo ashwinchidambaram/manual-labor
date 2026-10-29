@@ -37,7 +37,9 @@ def download() -> None:
     if SOURCE.exists() and sha256_file(SOURCE) == SOURCE_SHA256:
         return
     tmp = SOURCE.with_suffix(".part")
-    req = urllib.request.Request(URL, headers={"User-Agent": "Mozilla/5.0 manual-labor-fixture-fetch/1"})
+    req = urllib.request.Request(
+        URL, headers={"User-Agent": "Mozilla/5.0 manual-labor-fixture-fetch/1"}
+    )
     with urllib.request.urlopen(req, timeout=300) as r, tmp.open("wb") as f:  # noqa: S310
         while chunk := r.read(1 << 20):
             f.write(chunk)
@@ -53,8 +55,12 @@ def build() -> None:
 
     src = pymupdf.open(str(SOURCE))
     out = pymupdf.open()
-    out.insert_pdf(src, from_page=FIRST_PAGE - 1, to_page=LAST_PAGE - 1)  # select() would keep all shared resources (~90 MB)
-    out.set_metadata({"title": "FAA AMT Handbook General (FAA-H-8083-30B) Chapter 7 (fixture)", "author": "FAA"})
+    out.insert_pdf(
+        src, from_page=FIRST_PAGE - 1, to_page=LAST_PAGE - 1
+    )  # select() would keep all shared resources (~90 MB)
+    out.set_metadata(
+        {"title": "FAA AMT Handbook General (FAA-H-8083-30B) Chapter 7 (fixture)", "author": "FAA"}
+    )
     tmp = OUTPUT.with_suffix(".tmp")
     out.save(str(tmp), garbage=4, deflate=True, no_new_id=True)
     out.close()

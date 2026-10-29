@@ -3,9 +3,12 @@ signal; the legitimate edits (header/footer removal, evidence-backed reorder) st
 
 from __future__ import annotations
 
+import re
+
 import pytest
 
-from manuallabor.contracts.enums import DiffOpKind, FaithViolationKind
+from manuallabor.contracts.block import Block
+from manuallabor.contracts.enums import BlockType, DiffOpKind, FaithViolationKind
 from manuallabor.scoring.types import BlockScore
 from tests.scoring import corrupt as H
 from tests.scoring.conftest import Scored
@@ -174,3 +177,53 @@ def test_legit_dehyphenated_cleanup_stays_above(sp: Scored) -> None:
     _record("hyphen/line join (legit)", s, "faithfulness passes")
     assert s.faithfulness is not None and s.faithfulness.passed
     assert s.confidence is not None and s.confidence >= THRESHOLD
+
+
+_BULLET_RE = re.compile(r"^[ \t]*[•·◦▪‣●*–-][ \t]+")
+_HYPHEN_BREAK_RE = re.compile(r"(?<=[^\W\d_])-[ \t]*\n[ \t]*(?=[^\W\d_])")
+
+
+def deterministic_cleanup(b: Block, hf: set[str]) -> str:
+    """The lossless cleanup passes of SPEC 4.6 without a model: drop recorded header/footer
+    lines, join hyphenated line breaks, normalize bullets, join wrapped lines (a list keeps one
+    item per line), collapse whitespace; a table becomes its GFM markdown."""
+    if b.type == BlockType.table and b.table is not None and b.table.markdown.strip():
+        return b.table.markdown
+    lines = [ln for ln in b.raw_text.split("\n") if " ".join(ln.split()) not in hf]
+    text = _HYPHEN_BREAK_RE.sub("", "\n".join(lines))
+    out: list[str] = []
+    for ln in text.split("\n"):
+        item = _BULLET_RE.match(ln) is not None
+        ln = " ".join(_BULLET_RE.sub("- ", ln).split())
+        if not ln:
+            continue
+        if out and not (item and b.type == BlockType.list):
+            out[-1] = f"{out[-1]} {ln}"
+        else:
+            out.append(ln)
+    return "\n".join(out)
+
+
+def test_fixture_wide_legit_cleanup_stays_above(sp: Scored) -> None:
+    """Every text block of clean.pdf with the deterministic cleanup passes faithfulness and
+    stays >= the threshold unless it is a numeric-spec block (always reviewed anyway)."""
+    doc = sp.doc("clean")
+    hf = {" ".join(h.split()) for h in (*doc.stripped_headers, *doc.stripped_footers)}
+    blocks = sp.blocks("clean")
+    n = changed = 0
+    low: list[tuple[str, float | None]] = []
+    for b in H.in_order(blocks):
+        if b.type in (BlockType.header, BlockType.footer, BlockType.figure) or not b.raw_text:
+            continue
+        clean = deterministic_cleanup(b, hf)
+        s = H.rescore(sp, "clean", b.model_copy(update={"clean_text": clean}))
+        n += 1
+        changed += clean != b.raw_text
+        assert s.faithfulness is not None and s.faithfulness.passed, (
+            b.id,
+            [(v.kind.value, v.raw, v.clean) for v in s.faithfulness.violations],
+        )
+        if not s.has_numeric_spec and (s.confidence is None or s.confidence < THRESHOLD):
+            low.append((b.id, s.confidence))
+    print(f"\nclean.pdf legit cleanup: {n} blocks ({changed} changed), all faithful; low {low}")
+    assert changed >= 10 and low == []

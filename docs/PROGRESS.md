@@ -83,3 +83,30 @@ $ cd frontend && npm run gen-types && git diff --stat -- src/types/generated.ts;
       Tests  1 passed (1)
 $ gate numbers (tests/figures/test_gate.py): figures.pdf 14/14 methods match GT (8 native, 6 vector = 100% native/vector); p6 exact dup + p7 near dup -> FIG-figures-p002-01; figures.pdf ingested twice -> all 14 copy sidecars point at ../figures/; byte-identical across PYTHONHASHSEED 1/2
 ```
+
+## M3 — Scoring + faithfulness check — PASSED 2026-10-29
+
+Design: docs/design/03-scoring.md. First review (fresh Opus) REJECTED the gate: line reorder accepted on layout evidence alone (reordered steps auto-approved), digit-masked header removal deleted numeric body lines, real-manual test loosened. All fixed failing-test-first: reorder needs an independent reader's evidence; header/footer removal only on exact match or page-templated match; real metric restored (paragraph swallowed into a figure crop fixed at the source in parse/merge.py); unit lexicon (real-manual precision 0.47 → 0.93); verifier can never raise a score. Re-review of the fix dispatched after this record; findings, if any, are folded into the next commit.
+
+Commands: `uv run labor score <project> [--force]`; live real-manual test `MANUALLABOR_LIVE=1 uv run pytest tests/scoring -k real -s`.
+
+```
+$ uv run ruff check manuallabor/ tests/ && uv run mypy manuallabor/
+All checks passed!
+Success: no issues found in 76 source files
+$ MANUALLABOR_REQUIRE_DOCLING=1 uv run pytest tests/scoring
+337 passed, 1 skipped, 14 warnings in 102.23s (0:01:42)
+$ MANUALLABOR_REQUIRE_DOCLING=1 uv run pytest -m "not slow"
+665 passed, 1 skipped, 2 deselected, 19 warnings in 248.97s (0:04:08)
+$ MANUALLABOR_REQUIRE_DOCLING=1 MANUALLABOR_LIVE=1 uv run pytest tests/scoring -k real -s | grep -i recall
+real manual (7 GT pages, 20 GT blocks): 16 differ from GT, 16 caught below 0.85 -> recall 1.000
+tests/scoring/test_real_scanned.py::test_real_manual_recall
+tests/scoring/test_real_scanned.py::test_real_manual_recall
+tests/scoring/test_real_scanned.py::test_real_manual_recall
+$ uv run labor schemas export --check && uv run python -m tests.fixtures.gen.make_fixtures --check
+schemas up to date
+ok: 15 files match CHECKSUMS.json
+$ cd frontend && npm run gen-types && git diff --stat -- src/types/generated.ts; npm run typecheck && npm test -- --run
+      Tests  1 passed (1)
+$ gate numbers (tests/scoring/test_harness.py, test_corrupting_mock.py, test_recall.py): H1-H9 corruptions all < 0.85 (H1 0.0, H2 0.5, H3 0.5, H4 0.47/0.0, H5 0.0/0.48/0.0, H6 0.0, H8a 0.0, H9 0.25); legit edits >= 0.854; CorruptingMockProvider rejected 436/436 across 4 fixtures x 4 modes; numeric-spec blocks always queued; scanned.pdf SPEC 11.2 recall 1.000; real manual (TM 5-3895-332-12) recall 16/16; 1,000 blocks 1.18 s
+```

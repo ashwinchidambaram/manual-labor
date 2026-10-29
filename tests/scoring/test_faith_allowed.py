@@ -45,10 +45,29 @@ def test_ae2_dehyphenation_drop_and_keep() -> None:
 
 def test_ae3_header_footer_exact_and_key() -> None:
     raw = "Acme X200 Service Manual\nCheck the drive belt.\nPage 7"
-    ok(raw, "Check the drive belt.")  # exact header + hf_key footer (Page 7 ~ Page 3)
-    ok(raw, raw)  # clean may keep them
-    ok(raw, "Acme X200 Service Manual Check the drive belt. Page 7")  # kept, joined inline
-    ok(raw, "Check the drive belt. Page 7")
+    # exact header + footer template `Page {n}` with n == this block's page (Page 7 ~ Page 3)
+    ok(raw, "Check the drive belt.", page=7)
+    ok(raw, raw, page=7)  # clean may keep them
+    ok(raw, "Acme X200 Service Manual Check the drive belt. Page 7", page=7)  # kept, inline
+    ok(raw, "Check the drive belt. Page 7", page=7)
+
+
+def test_ae3_page_footer_on_the_right_page() -> None:
+    ok("Set the gap.\nPage 35", "Set the gap.", page=35)
+    ok("Set the gap.\nPage 3", "Set the gap.", page=99)  # exact recorded string
+
+
+def test_ae3_fused_header_line_passes() -> None:
+    ok("Acme X200 Service Manual\nCheck the drive belt.", "Check the drive belt.")
+    ok("Check the drive belt.\nACME X200  Service Manual", "Check the drive belt.")
+
+
+def test_ae3_template_keeps_recorded_digits_and_page() -> None:
+    hf = ["Acme X200 Service Manual Page 3"]
+    raw = "Check the drive belt.\nAcme X200 Service Manual Page 12"
+    ok(raw, "Check the drive belt.", hf_strings=hf, page=12)
+    r = check_faithfulness(raw, "Check the drive belt.", hf_strings=hf, page=11)
+    assert not r.passed  # 12 is neither the recorded number nor this page
 
 
 def test_ae4_bullets() -> None:
@@ -107,9 +126,17 @@ def test_combined() -> None:
         "• Tighten to 35 N·m.\nPage 9"
     )
     clean = "- Remove the cover and adjust the efficient belt tension\n- Tighten to 35 N·m."
-    ok(raw, clean)
+    ok(raw, clean, page=9)
 
 
 @pytest.mark.parametrize("raw", ["", " ", "\n\n", "x"])
 def test_trivial(raw: str) -> None:
     ok(raw, raw)
+
+
+@pytest.mark.parametrize("nl", ["\r\n", "\r"])
+def test_crlf_normalized_before_dehyphenation_and_alignment(nl: str) -> None:
+    ok(f"Check the belt.{nl}Then tension it{nl}fully.", "Check the belt.\nThen tension it fully.")
+    ok(f"adjust-{nl}ment done", "adjustment done")
+    ok("Use the adjust-\nment screw.", f"Use the adjust-{nl}ment screw.")
+    ok(f"Acme X200 Service Manual{nl}Check the drive belt.", "Check the drive belt.")

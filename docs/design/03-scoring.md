@@ -146,8 +146,8 @@ Missing report entry for a figure block → `ScoringError` (doc fails; run `labo
 - **Skip (omit)** unless all hold: `clean_text` set and `≠ raw_text`; faithfulness passed; `config.model_for(Task.verifier)` is not None; the verifier ModelRef ≠ the cleanup ModelRef (same provider+model+api_base would mean a model reading its own output). Skips are counted in the progress `detail`.
 - Call: `providers.get(Task.verifier).chat(Task.verifier, [system VERIFIER_SYSTEM, user f"{RAW_OPEN}{raw}{RAW_CLOSE}\n<clean>{clean}</clean>\nDoes the cleaned text change any fact, number, or step? Answer with the differing span or NONE"])`. No `json_schema`, because 1B local models break JSON. Temperature 0 and the cache by input hash come from `BaseProvider`.
 - **Strict validation:** `out` = stripped text with one pair of surrounding quotes or backticks removed.
-  - `re.fullmatch(r"(?i)none\.?", out)` → 1.0.
-  - Else if `1 ≤ len(out) ≤ 300`, there is no blank line, and `collapse_ws(out)` is a substring of `collapse_ws(clean)` or `collapse_ws(raw)` → `VERIFIER_FLAG_VALUE = 0.2`, detail `verifier: '<span>'`.
+  - `re.fullmatch(r"(?i)none\.?", out)` → **omitted** (outcome `ok`, no signal). Revised after the module 3 review: a 1.0 soft signal on NONE raised the soft geometric mean and lifted a 0.8486 block to 0.8842 (auto-approved). A "no difference" answer is not evidence; the verifier can only lower a score.
+  - Else if `len(out) ≤ 300`, there is no blank line, the span is not weak (≥ `VERIFIER_MIN_SPAN` = 3 chars, contains a letter or digit, not only function words such as `the`, `of the`), and `collapse_ws(out)` is a substring of `collapse_ws(clean)` or `collapse_ws(raw)` → `VERIFIER_FLAG_VALUE = 0.2`, detail `verifier: '<span>'`.
   - Anything else → omitted, counted `verifier_invalid`. `ProviderError` → omitted, counted `verifier_errors`.
 - Soft. Never asked to rate anything; it is a second reader.
 
@@ -165,6 +165,7 @@ Missing report entry for a figure block → `ScoringError` (doc fails; run `labo
 | dimension | `r"\d+(?:[.,]\d+)?\s?[x×]\s?\d+(?:[.,]\d+)?"` |
 | spec_word | `r"(?i)\b(?:torque|voltage|current|pressure|tolerance|clearance|capacity|rating|gap|preload)\b[^.\n]{0,40}?\d"` |
 
+- **Revised after the module 3 review** (`numeric.py` is the source of truth): the unit lexicon covers abbreviations and plurals (volts/V/VDC/VAC, amps, watts, ohms, Hz, inches/inch/in./`"`, feet/ft/`'`, pounds/lb/lbs, ft.lb./ft-lb/lb-ft/N·m, P.S.I./psi/kPa/bar, tons, gallons/gals., quarts/qts, liters, °F/°C/degrees, rpm, blows per min./bpm, hours/hrs, cu. in./cc, %), part-number keywords add FSN, NSN, Model, Serial (value must contain a digit; keyword must not run into a letter, so `REFERENCES` is not `REF`). False positives removed: `in` is a unit only before `.`/punctuation/end and after a decimal or a dimension word; glued `s`/`h` never (`1970s`, `5s`); glued single-letter units need ≥ 2 digits (`1V`); codes like `50S`/`0G`, appendix refs `A-1`, and codes after Section/Chapter/Appendix are ignored.
 - `find_numeric_specs(text, product_model) -> list[str]`: matches in text order, de-duplicated, stripped.
 - `has_numeric_spec(block, doc)`:
   - header/footer/figure → False.
@@ -191,7 +192,7 @@ def check_faithfulness(raw: str, clean: str, *, block_type: BlockType, table: Ta
 |---|---|---|
 | AE1 | Whitespace: change any whitespace run to any other non-empty run (newline↔space, collapse, strip at the text ends). Delete or insert whitespace **only** where at least one neighbour is not `\w`. | both |
 | AE2 | Dehyphenation: in raw, a `-` that is the last non-space char of a line, preceded by a letter, with the next line starting with a letter, may be dropped or kept (`adjust-\nment` → `adjustment` or `adjust-ment`) | raw line breaks |
-| AE3 | Header/footer removal: delete a whole raw line whose `collapse_ws` equals an `hf_strings` entry, or whose `hf_key` equals the `hf_key` of one (catches `Page 7` fused into a body block even when page 7's footer was not detected). Clean may keep it. | raw lines |
+| AE3 | Header/footer removal (revised after the module 3 review): delete a whole raw line only if (a) its `collapse_ws` equals an `hf_strings` entry, or (b/c) it has the `hf_key` digit template of a recorded entry and every digit run that differs from that entry equals the block's page number (`Page {n}` with n == `block.page`). Any other line carrying a numeric token is body text (a header `TM 5-3895-332-12` no longer deletes the body line `TM 9-2320-280-20`). Clean may keep it. | raw lines |
 | AE4 | Bullet normalization: at line start, `[•·◦▪‣●*–-]` + whitespace ↔ `[-*•]` + whitespace. The OCR misreads `¢ + o «` count as bullets only when `block_type == list`. | line starts |
 | AE5 | Glyph identity: NFC on both sides; ligatures `ﬀ ﬁ ﬂ ﬃ ﬄ ﬅ ﬆ` → letters; delete U+00AD; U+00A0, U+2000–U+200A, U+202F count as whitespace | both |
 | AE6 | Table reconstruction (table blocks): §4.3 | tables |
@@ -240,10 +241,7 @@ Runs only if level (a) failed with only `insertion`/`deletion` violations (any `
    - Matching uses the loose form: both sides with every `-` between two letters deleted.
    - The step budget is `REORDER_MAX_STEPS` (10,000); exceeding it means no permutation (fail closed).
 3. With a permutation π, build `raw_π` = the unit MappedTexts in π order joined by `" "` (src preserved), and rerun **level (a)** on `raw_π` vs `clean`. It must pass with all the normal allowances. This proves the only extra edit is order.
-4. **Evidence gate:**
-   - Line-unit permutations are accepted iff `evidence.layout_risk` or **attested**.
-   - Sentence-unit permutations are accepted iff **attested**. Reordering steps of a procedure changes a fact, so it needs a reader who saw that order.
-   - Attested = some alt text, canonicalized and in loose form, contains every unit in π order at strictly increasing `find` positions.
+4. **Evidence gate (revised after the module 3 review):** a permutation (line units or sentence units alike) is accepted **only if attested**: another independent reader of the same block (the other parser's text or the OCR text, i.e. `evidence.alt_texts`) read the clean order. Attested = some alt text, canonicalized and in loose form, contains every unit in π order at strictly increasing `find` positions. Layout risk (a multi-column page, a displaced block, an overlap) is never sufficient on its own: the review showed a procedure with step 3 moved first passing at 0.9 on an `n_columns=2` page, and step order is a fact. `evidence.layout_risk` is still recorded but no longer accepts anything; an accepted reorder keeps the faithfulness value 0.9.
 5. **Accepted:** `passed=True`, no violations. The `diff` ops that overlap moved units (units not in the LIS of π) get `op = reorder, allowed = True` (the contract addition). `alignment_ratio` stays the level-(a) value. The signal value is 0.9.
 6. **Not accepted** (permutation found, no evidence): `passed=False`, one `reorder` violation per moved unit, with the unit's raw span and its clean span.
 7. No permutation: the level-(a) result stands.
@@ -358,16 +356,16 @@ Fixtures: reuse the session `parsed` and `figproj` fixtures from `tests/conftest
 | 11 | test_faith_allowed | each of AE1–AE6 passes alone and combined; dehyphenation drop and keep; hf exact and `hf_key` (`Page 7`) removal and keep; `¢` bullet in a list; ligatures; NBSP; NFD input; GFM table vs raw; raw→raw |
 | 12 | test_faith_violations | inserted word (insertion, clean span); deleted word (deletion); digit swap (deletion + numeric_mismatch); `a cross`→`across` (deletion); `notable`→`not able` (insertion); `Page 4` in clean not in raw; `¢` replaced in a paragraph; `±`→`+`; dropped table row; moved table cell; for every violation `raw[raw_start:raw_end] == v.raw` and the same for clean; `diff` ops overlapping violations have `allowed=False` |
 | 13 | test_faith_numeric | duplicated number fails; reordered numbers under accepted reorder pass; attested NumericVariant exempts (`3S`→`35`, source ocr); unattested variant ignored → fails and `numeric_variant is None` |
-| 14 | test_faith_reorder | de-interleaved lines + layout_risk pass with `reorder` DiffOps; same without evidence → `reorder` violations with spans; attested sentence swap passes; unattested fails; reorder + inserted word fails; step cap and > 200 units fail closed |
+| 14 | test_faith_reorder | de-interleaved lines attested by the other parser pass with `reorder` DiffOps; layout_risk alone fails; same without evidence → `reorder` violations with spans; attested sentence swap passes; unattested fails; reorder + inserted word fails; step cap and > 200 units fail closed |
 | 15 | test_faith_props (hypothesis) | raw→raw passes for arbitrary text (incl. U+00AD, NBSP, `|`, bullets, hyphens at line ends); random compositions of AE1–AE5 pass; one inserted non-space char outside allowed contexts fails; `canonicalize` idempotent; all spans in bounds |
 | 16 | test_corrupting_mock | H10 on 4 fixtures × 4 modes |
-| 17 | test_verifier | skip reasons (no verifier, same model as cleanup, failed faithfulness, clean == raw); NONE → 1.0; valid span → 0.2 soft; invalid outputs (absent span, > 300 chars, blank line) omitted + counted; ProviderError omitted; second call `cached=True`; spy temperature 0 |
+| 17 | test_verifier | skip reasons (no verifier, same model as cleanup, failed faithfulness, clean == raw); NONE → no signal (score unchanged); weak spans (`e`, `.`, `the`) ignored; valid span → 0.2 soft; invalid outputs (absent span, > 300 chars, blank line) omitted + counted; ProviderError omitted; second call `cached=True`; spy temperature 0 |
 | 18 | test_corruption_harness (**gate**) | H1–H9 with their asserts and the named catching signal |
 | 19 | test_queue | numeric at confidence 1.0 still queued; confidence == threshold → auto; None → queued and sorted first; worst-first with `block_sort_key` ties (p010 after p009); shuffled input → same order; header/footer excluded; sidecar `review` not overwritten when `approved` |
 | 20 | test_pipeline_cli | `labor score` via CliRunner: JSON progress lines; every block has a BlockScore; `load_scored_blocks` validates as Block; `blocks.json` byte-unchanged; 2nd run `skip` with unchanged bytes; `--force` identical bytes; subprocess `PYTHONHASHSEED=123` on a fresh copy → byte-identical `scores.json`, history, sidecars; `labor figures --force` then score → `sidecars` status restores confidence; `parse --force` → re-scored; missing `figures_report.json` → `status:error`, exit 1, other docs scored; history appends only on change |
 | 21 | test_recall_scanned (SPEC §11.2) | blocks = scanned non-figure, non-header/footer, non-empty. `G_p` = page GT `raw_lines` joined `"\n"` per block, NFC, N3 bullets stripped, whitespace collapsed, blocks joined `" "`. differs(b) = normalized raw_text not a substring of `G_p`. Asserts differs ≥ 10 (non-vacuous), **recall = caught(conf < threshold)/differs ≥ 0.95**, and queue recall (status queued) == 1.0; prints recall, counts and review load (measured 24/24, load 49/176) |
 | 22 | test_performance | 1,000 blocks (clean blocks replicated with ids re-minted on synthetic pages, clean_text = dehyphenated + line-joined raw) scored with no verifier < 10 s |
-| 23 | test_real_scanned (live-only) | skips unless `tests/fixtures/real/*.pdf` and a matching `*.gt.json` exist; same metric as #21; prints recall; asserts ≥ 0.95 only with `MANUALLABOR_LIVE=1` |
+| 23 | test_real_scanned (live-only) | skips unless `tests/fixtures/real/real-manual.pdf` and `ground_truth_sample.json` exist and `MANUALLABOR_LIVE=1`; the #21 metric per GT block: region = non-figure blocks with bbox coverage ≥ 0.5 (figures never catch text; an uncovered GT block is a miss); differs = GT comparison tokens (OCR glyph folds) not a contiguous run of the region's tokens; caught = every region block carrying a differing token has confidence < threshold; asserts ≥ 10 differing and recall ≥ 0.95, prints recall |
 | 24 | test_fixture_baseline | on `scoredproj`: no raw→raw faithfulness failure anywhere; every non-numeric body block on clean/twocol auto-approved; every numeric block queued; tables' table blocks queued |
 
 Gate commands (into PROGRESS.md): `MANUALLABOR_REQUIRE_DOCLING=1 uv run pytest -q tests/scoring` (18, 16 and 21 are the gate numbers); `uv run pytest -q`; `uv run ruff check manuallabor tests && uv run mypy manuallabor`; `uv run labor schemas export --check`; `cd frontend && npm run gen-types && npm run typecheck && npm test -- --run`.
@@ -383,7 +381,7 @@ Gate commands (into PROGRESS.md): `MANUALLABOR_REQUIRE_DOCLING=1 uv run pytest -
    - A `Lexicon` hook (per-language pinned wordlist) can be added later behind a `parse_algo`-style version bump.
 2. **Reorder allowance (00 §10.14):** a two-level check.
    - Level (b) proves a unit permutation and then re-checks with level (a).
-   - It is accepted only with evidence: layout risk for line units; another reader having that order for line or sentence units.
+   - It is accepted only with evidence: another reader having that order, for line or sentence units (layout risk alone is not evidence; see §4.5 step 4).
    - An unevidenced transposition is a `reorder` violation, because step order is a fact.
    - Contract addition: `DiffOpKind.reorder`.
 3. **Critical set:** faithfulness and figure_method always; parser_agreement and textlayer_vs_ocr when numeric **or** < 0.8; ocr_min when numeric. All others soft. `has_numeric_spec` is excluded.

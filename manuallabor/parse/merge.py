@@ -24,6 +24,13 @@ CONTAIN_PARTIAL = 0.7
 ALT_LINE_PAD = 3.0
 SPLIT_COVER = 0.6
 REGION_COVER = 0.6
+# Running text printed inside a scanned figure (01-parse follow-up from the module 3 review).
+FIG_TEXT_MIN_WORDS = 8
+FIG_TEXT_MIN_LINES = 2
+FIG_RUN_GAP = 2.0  # max x gap between two words of one run, in word heights
+FIG_LINE_GAP = 1.0  # max vertical gap between two runs of one paragraph, in run heights
+FIG_X_OVERLAP = 0.5  # min x overlap of consecutive runs, as a share of the narrower run
+FIG_WORDY_SHARE = 0.5  # min share of words with >= 2 letters
 
 Region = Literal["text", "table", "figure"]
 DispFn = Callable[..., None]
@@ -139,6 +146,168 @@ def _add_text_from(mb: MergedBlock, c: _Cand, text: str) -> None:
     mb.members.append((c.key, c.order))
     if c.rb.size is not None and mb.size is None:
         mb.size = c.rb.size
+
+
+# ---------------------------------------------------------------------------------------------
+# running text inside scanned figures
+
+
+def _runs(ln: Line) -> list[Line]:
+    """Split one OCR line into horizontal runs of words (an axis tick and a paragraph that share
+    a text line are separate runs). A line without word boxes is one run."""
+    words = [w for w in ln.words if w.bbox is not None]
+    if not words or len(words) != len(ln.words):
+        return [ln]
+    words.sort(key=lambda w: (w.bbox[0], w.bbox[1]))  # type: ignore[index]
+    groups: list[list[OcrWord]] = [[words[0]]]
+    for w in words[1:]:
+        prev = groups[-1][-1]
+        assert prev.bbox is not None and w.bbox is not None
+        h = max(prev.bbox[3] - prev.bbox[1], w.bbox[3] - w.bbox[1], 1.0)
+        if w.bbox[0] - prev.bbox[2] <= FIG_RUN_GAP * h:
+            groups[-1].append(w)
+        else:
+            groups.append([w])
+    if len(groups) == 1:
+        return [ln]
+    out: list[Line] = []
+    for k, grp in enumerate(groups):
+        out.append(
+            Line(
+                text=" ".join(w.text for w in grp),
+                bbox=g.union([list(w.bbox) for w in grp if w.bbox is not None]),
+                size=ln.size,
+                bold=ln.bold,
+                words=grp,
+                native_id=f"{ln.native_id}.r{k}",
+            )
+        )
+    return out
+
+
+def _wordy(t: str) -> bool:
+    return sum(c.isalpha() for c in t) >= 2
+
+
+def split_figure_text(
+    lines: Sequence[Line],
+) -> tuple[list[list[tuple[int, Line]]], list[tuple[int, Line]]]:
+    """OCR lines that fell inside a figure region: (running-text paragraphs, remaining lines),
+    each item tagged with the index of the input line it came from.
+
+    A paragraph is a vertical stack of word runs (consecutive runs overlap in x and are at most
+    one run height apart) with >= FIG_TEXT_MIN_WORDS words on >= FIG_TEXT_MIN_LINES lines, most
+    of them words rather than numbers or symbols. Axis ticks, callout numbers, single labels and
+    a single caption-like line stay figure content. Pure and deterministic."""
+    runs: list[tuple[int, Line]] = []
+    for li, ln in enumerate(lines):
+        runs.extend((li, r) for r in _runs(ln))
+    order = sorted(range(len(runs)), key=lambda k: (runs[k][1].bbox[1], runs[k][1].bbox[0], k))
+    groups: list[list[int]] = []
+    for k in order:
+        r = runs[k][1]
+        if not any(_wordy(w) for w in r.text.split()):
+            continue
+        h = max(r.bbox[3] - r.bbox[1], 1.0)
+        best: int | None = None
+        for gi, grp in enumerate(groups):
+            last = runs[grp[-1]][1]
+            gap = r.bbox[1] - last.bbox[3]
+            ov = min(r.bbox[2], last.bbox[2]) - max(r.bbox[0], last.bbox[0])
+            narrow = min(r.bbox[2] - r.bbox[0], last.bbox[2] - last.bbox[0])
+            if -h / 2 < gap <= FIG_LINE_GAP * h and narrow > 0 and ov >= FIG_X_OVERLAP * narrow:
+                best = gi
+                break
+        if best is None:
+            groups.append([k])
+        else:
+            groups[best].append(k)
+    paragraphs: list[list[tuple[int, Line]]] = []
+    taken: set[int] = set()
+    for grp in groups:
+        words = [w for k in grp for w in runs[k][1].text.split()]
+        n_lines = len({runs[k][0] for k in grp})
+        if (
+            len(words) >= FIG_TEXT_MIN_WORDS
+            and n_lines >= FIG_TEXT_MIN_LINES
+            and sum(_wordy(w) for w in words) >= FIG_WORDY_SHARE * len(words)
+        ):
+            paragraphs.append([runs[k] for k in grp])
+            taken.update(grp)
+    if not paragraphs:
+        return [], list(enumerate(lines))
+    rest: list[tuple[int, Line]] = []
+    for li, ln in enumerate(lines):
+        mine = [k for k, (lj, _) in enumerate(runs) if lj == li]
+        kept = [runs[k][1] for k in mine if k not in taken]
+        if not kept:
+            continue
+        if len(kept) == len(mine):
+            rest.append((li, ln))
+        else:
+            rest.append(
+                (
+                    li,
+                    Line(
+                        text=" ".join(r.text for r in kept),
+                        bbox=g.union([r.bbox for r in kept]),
+                        size=ln.size,
+                        bold=ln.bold,
+                        words=[w for r in kept for w in r.words],
+                        native_id=ln.native_id,
+                    ),
+                )
+            )
+    paragraphs.sort(key=lambda ps: (ps[0][1].bbox[1], ps[0][1].bbox[0]))
+    return paragraphs, rest
+
+
+def _release_figure_text(
+    cands: Sequence[_Cand], page: int
+) -> tuple[list[MergedBlock], dict[int, list[Line]], dict[tuple[str, int], str]]:
+    """Scanned page, OCR candidates absorbed into one figure region: the running-text
+    paragraphs as their own text blocks (raw_source = the OCR key), the lines that stay figure
+    content per candidate index, and the merge outcome of every candidate that contributed."""
+    flat: list[tuple[int, Line]] = [(ci, ln) for ci, c in enumerate(cands) for ln in c.rb.lines]
+    paras, rest = split_figure_text([ln for _, ln in flat])
+    if not paras:
+        return [], {ci: list(c.rb.lines) for ci, c in enumerate(cands)}, {}
+    remaining: dict[int, list[Line]] = {}
+    for li, ln in rest:
+        remaining.setdefault(flat[li][0], []).append(ln)
+    blocks: list[MergedBlock] = []
+    used_by: dict[int, set[int]] = {}
+    for pi, para in enumerate(paras):
+        lines = [ln for _, ln in para]
+        contrib = sorted({flat[li][0] for li, _ in para}, key=lambda ci: cands[ci].order)
+        for ci in contrib:
+            used_by.setdefault(ci, set()).add(pi)
+        key = cands[contrib[0]].key
+        text = "\n".join(ln.text for ln in lines)
+        mb = MergedBlock(
+            page=page,
+            region="text",
+            bbox=g.union([ln.bbox for ln in lines]),
+            raw_source=key,
+            raw_text=text,
+            text_by_parser={key: text},
+            order_by_parser={key: cands[contrib[0]].order},
+            lines=lines,
+            kinds={key: BlockType.paragraph},
+            ocr_words=_words_of(lines),
+            members=[(cands[ci].key, cands[ci].order) for ci in contrib],
+        )
+        mb.size, mb.bold = _size_bold(lines)
+        blocks.append(mb)
+    outcome: dict[tuple[str, int], str] = {}
+    for ci, ps in used_by.items():
+        c = cands[ci]
+        if ci in remaining or len(ps) > 1:
+            outcome[(c.key, c.order)] = "split"
+        else:
+            first = blocks[next(iter(ps))].members[0]
+            outcome[(c.key, c.order)] = "primary" if first == (c.key, c.order) else "matched"
+    return blocks, remaining, outcome
 
 
 # ---------------------------------------------------------------------------------------------
@@ -341,6 +510,7 @@ def merge_page(
     alt_name = names[1] if scanned else None
     free_texts: list[_Cand] = []
     alt_cands: list[_Cand] = []
+    fig_cands: dict[int, list[_Cand]] = {}  # scanned: OCR candidates inside figure regions
     for c in texts:
         if alt_name is not None and c.key == alt_name:
             alt_cands.append(c)
@@ -349,10 +519,33 @@ def merge_page(
         if r is None:
             free_texts.append(c)
             continue
+        if scanned and region_blocks[r].region == "figure" and c.rb.lines:
+            fig_cands.setdefault(r, []).append(c)
+            continue
         absorbed_by[r].setdefault(c.key, []).append((c.order, c.rb.text))
         region_absorbed_members[r].append((c.key, c.order))
         if scanned:
             region_words[r].extend(_words_of(c.rb.lines))
+    # Running text printed inside a scanned figure is its own text block, never silently
+    # swallowed by the figure crop; labels, ticks and callouts stay figure content.
+    released: list[MergedBlock] = []
+    released_outcome: dict[tuple[str, int], str] = {}
+    for r in sorted(fig_cands):
+        cs = sorted(fig_cands[r], key=lambda c: (c.key, c.order))
+        blocks_r, remaining, outcome_r = _release_figure_text(cs, page)
+        released.extend(blocks_r)
+        released_outcome.update(outcome_r)
+        for ci, c in enumerate(cs):
+            lines_left = remaining.get(ci)
+            if not lines_left:
+                continue
+            text = c.rb.text if lines_left == c.rb.lines else "\n".join(x.text for x in lines_left)
+            absorbed_by[r].setdefault(c.key, []).append((c.order, text))
+            if (c.key, c.order) not in outcome_r:
+                region_absorbed_members[r].append((c.key, c.order))
+            else:
+                region_blocks[r].members.append((c.key, c.order))
+            region_words[r].extend(_words_of(lines_left))
 
     dispositions: dict[tuple[str, int], Disposition] = {}
 
@@ -374,6 +567,7 @@ def merge_page(
             absorbed_by,
             page,
             disp,
+            released,
         )
     else:
         text_blocks = _merge_text(free_texts, rank, page, disp, names[0])
@@ -385,6 +579,8 @@ def merge_page(
         for k, o in region_absorbed_members[i]:
             disp(k, o, "absorbed")
         mb.members.extend(region_absorbed_members[i])
+    for (k, o), outcome in sorted(released_outcome.items()):
+        disp(k, o, outcome)
 
     # candidates without geometry are kept alone
     for c in nobox:
@@ -599,13 +795,18 @@ def _merge_alt_lines(
     absorbed_by: list[dict[str, list[tuple[int, str]]]],
     page: int,
     disp: DispFn,
+    released: Sequence[MergedBlock] = (),
 ) -> list[MergedBlock]:
-    """Scanned pages: merge the alternate OCR reading into the primary at line level."""
+    """Scanned pages: merge the alternate OCR reading into the primary at line level.
+    ``released`` are running-text blocks found inside figure regions: an alternate line whose
+    center lies in one of them belongs to it, not to the figure."""
     p_cands = sorted(p_cands, key=lambda c: c.order)
     blocks: list[MergedBlock] = []
     for p in p_cands:
         blocks.append(_from_text_cand(p, page))
         disp(p.key, p.order, "primary")
+    n_free = len(blocks)
+    blocks.extend(released)
     assigned: dict[int, list[tuple[Line, int]]] = {i: [] for i in range(len(blocks))}
     region_lines: dict[int, list[tuple[Line, int]]] = {}
     free: list[tuple[Line, int]] = []
@@ -621,6 +822,17 @@ def _merge_alt_lines(
         ]
         for ln in lines:
             cx, cy = g.center(ln.bbox)
+            inside: tuple[float, int] | None = None
+            for bi in range(n_free, len(blocks)):
+                bb = blocks[bi].bbox
+                if bb is not None and g.contains_point(g.expand(bb, ALT_LINE_PAD), cx, cy):
+                    a = g.area(bb)
+                    if inside is None or (a, bi) < inside:
+                        inside = (a, bi)
+            if inside is not None:
+                assigned[inside[1]].append((ln, c.order))
+                owner_of[c.order].add(f"b{inside[1]}")
+                continue
             reg = None
             for i, rbk in enumerate(region_blocks):
                 if rbk.bbox is not None and g.contains_point(rbk.bbox, cx, cy):

@@ -6,6 +6,8 @@ from manuallabor.contracts.block import FaithfulnessResult, TableCell, TableData
 from manuallabor.contracts.enums import BlockType
 from manuallabor.contracts.enums import FaithViolationKind as K
 from manuallabor.scoring.faithfulness import check_faithfulness
+from manuallabor.scoring.pipeline import score_block
+from tests.scoring.conftest import ctx, make_block
 
 HF = ["Acme X200 Service Manual", "Page 3"]
 
@@ -133,3 +135,77 @@ def test_sorted_violations() -> None:
         for v in r.violations
     ]
     assert keys == sorted(keys)
+
+
+# -- AE3 header/footer removal may never delete a numeric body line (module 3 review) --------
+
+
+def test_hf_template_does_not_delete_other_document_number() -> None:
+    """Header TM 5-3895-332-12 recorded; the body line TM 9-2320-280-20 is a reference to
+    another manual. Same digit template, different numbers: deleting it is a violation."""
+    raw = "Refer to:\nTM 9-2320-280-20\nfor details."
+    for page in (None, 8, 9):
+        r = bad(raw, "Refer to: for details.", hf_strings=["TM 5-3895-332-12"], page=page)
+        assert K.deletion in kinds(r)
+        assert any("9-2320-280-20" in v.raw for v in r.violations)
+
+
+def test_hf_template_page_number_must_be_this_page() -> None:
+    raw = "Set gap to\nPage 35\nmm"
+    for page in (None, 3, 36):
+        r = bad(raw, "Set gap to mm", page=page)
+        assert K.deletion in kinds(r) and any("35" in v.raw for v in r.violations)
+
+
+def test_hf_numeric_line_deletion_queues_block() -> None:
+    raw = "Refer to:\nTM 9-2320-280-20\nfor details."
+    b = make_block(raw, page=8, clean_text="Refer to: for details.")
+    s = score_block(b, ctx(hf_strings=["TM 5-3895-332-12"]), threshold=0.85)
+    assert s.faithfulness is not None and not s.faithfulness.passed
+    assert s.confidence == 0.0 and s.status == "queued"
+
+
+# -- uncovered branches named by the review -------------------------------------------------
+
+
+def test_size_guard_reports_one_whole_text_deletion() -> None:
+    from manuallabor.scoring.types import FAITH_MAX_CHARS
+
+    raw = "Check the drive belt for wear.\n" * (FAITH_MAX_CHARS // 50)
+    clean = raw.replace("wear", "tear", 1)
+    assert len(raw) + len(clean) > FAITH_MAX_CHARS
+    r = check_faithfulness(raw, clean)
+    assert not r.passed and len(r.violations) == 1
+    v = r.violations[0]
+    assert v.kind == K.deletion and (v.raw_start, v.raw_end) == (0, len(raw))
+    assert (v.clean_start, v.clean_end) == (0, len(clean))
+    assert len(r.diff) == 1 and not r.diff[0].allowed
+    # identical oversized text passes without alignment
+    same = check_faithfulness(raw, raw)
+    assert same.passed and [op.op.value for op in same.diff] == ["equal"]
+    # an oversized whitespace-only cleanup still passes (canonical forms are equal)
+    assert check_faithfulness(raw, " ".join(raw.split())).passed
+
+
+def _pipe_table() -> TableData:
+    texts = [["Signal", "Pins"], ["A|B select", "3"], ["Ground", "4"]]
+    cells = [
+        TableCell(row=r, col=c, text=t, is_header=r == 0)
+        for r, row in enumerate(texts)
+        for c, t in enumerate(row)
+    ]
+    return TableData(n_rows=3, n_cols=2, cells=cells, markdown="")
+
+
+PIPE_RAW = "Signal | Pins\nA|B select | 3\nGround | 4"
+
+
+def test_escaped_pipe_in_gfm_cell_passes() -> None:
+    gfm = "| Signal | Pins |\n|---|---|\n| A\\|B select | 3 |\n| Ground | 4 |"
+    r = check_faithfulness(PIPE_RAW, gfm, block_type=BlockType.table, table=_pipe_table())
+    assert r.passed, r.violations
+
+
+def test_unescaped_pipe_in_gfm_cell_fails() -> None:
+    gfm = "| Signal | Pins |\n|---|---|\n| A|B select | 3 |\n| Ground | 4 |"
+    bad(PIPE_RAW, gfm, block_type=BlockType.table, table=_pipe_table())

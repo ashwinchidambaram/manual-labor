@@ -163,6 +163,7 @@ def score_block(
         "hf_strings": ctx.hf_strings,
         "variant_sources": texts,
         "raw_source": block.raw_source,
+        "page": block.page,
     }
     faith_result = None
     if block.clean_text is None:

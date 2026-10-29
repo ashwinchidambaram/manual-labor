@@ -20,7 +20,7 @@ from manuallabor.contracts.block import (
     TableData,
 )
 from manuallabor.contracts.enums import BlockType, DiffOpKind, FaithViolationKind
-from manuallabor.parse.text import collapse_ws, hf_key
+from manuallabor.parse.text import TOKEN_RE, collapse_ws, hf_key
 from manuallabor.scoring.layout import lis_keep
 from manuallabor.scoring.numeric import FAITH_NUM_RE
 from manuallabor.scoring.types import (
@@ -124,7 +124,7 @@ def concat(
 
 def glyph_identity(s: str) -> MappedText:
     """AE5: NFC per combining sequence, ligatures to letters, soft hyphen deleted,
-    NBSP-like spaces to ' '."""
+    NBSP-like spaces to ' '; CRLF and lone CR become LF (before dehyphenation and alignment)."""
     b = _Builder()
     i, n = 0, len(s)
     while i < n:
@@ -134,7 +134,10 @@ def glyph_identity(s: str) -> MappedText:
         seg = s[i:j]
         if j == i + 1:
             ch = seg
-            if ch == SOFT_HYPHEN:
+            if ch == "\r":
+                if i + 1 >= n or s[i + 1] != "\n":
+                    b.add("\n", i)  # lone CR is a line break; CR of CRLF is dropped
+            elif ch == SOFT_HYPHEN:
                 pass
             elif ch in SPACE_LIKE:
                 b.add(" ", i)
@@ -167,18 +170,53 @@ def _lines(mt: MappedText) -> list[tuple[int, int]]:
     return out
 
 
-def _hf_tables(hf_strings: Iterable[str]) -> tuple[frozenset[str], frozenset[str]]:
-    """Exact and hf_key forms of the header/footer strings that contain a letter (a bare number
-    is never treated as a header/footer: deleting it could delete a value)."""
-    usable = [h for h in hf_strings if any(c.isalpha() for c in h)]
-    return frozenset(collapse_ws(h) for h in usable), frozenset(hf_key(h) for h in usable)
+_DIGIT_RUN_RE: Final = re.compile(r"\d+")
 
 
-def is_hf_line(line: str, exact: frozenset[str], keys: frozenset[str]) -> bool:
+@dataclass(frozen=True)
+class HfTables:
+    """Recorded header/footer strings that contain a letter (a bare number is never treated as
+    a header/footer: deleting it could delete a value). ``templates`` maps the digit-normalized
+    form (``hf_key``) to the recorded strings that have it."""
+
+    exact: frozenset[str]
+    templates: Mapping[str, tuple[str, ...]]
+
+
+def hf_tables(hf_strings: Iterable[str]) -> HfTables:
+    usable = sorted({collapse_ws(h) for h in hf_strings if any(c.isalpha() for c in h)})
+    templates: dict[str, list[str]] = {}
+    for h in usable:
+        templates.setdefault(hf_key(h), []).append(h)
+    return HfTables(frozenset(usable), {k: tuple(v) for k, v in templates.items()})
+
+
+def is_hf_line(line: str, tables: HfTables, page: int | None) -> bool:
+    """AE3: a raw line may be removed as a header/footer only if
+    (a) it equals a recorded header/footer string (whitespace-collapsed), or
+    (b)/(c) it has the digit template of a recorded string and every digit run that differs
+        from that recorded string equals this block's page number (``Page {n}`` with
+        n == page; ``Manual X200 Page {n}`` keeps X200 and changes only the page).
+    Any other line, in particular one carrying another numeric token, is body text: deleting it
+    is a ``deletion`` violation."""
     c = collapse_ws(line)
     if not c or not any(ch.isalpha() for ch in c):
         return False
-    return c in exact or hf_key(c) in keys
+    if c in tables.exact:
+        return True
+    recorded = tables.templates.get(hf_key(c), ())
+    if not recorded:
+        return False
+    nums = _DIGIT_RUN_RE.findall(c)
+    pg = str(page) if page is not None else None
+    for rec in recorded:
+        rec_nums = _DIGIT_RUN_RE.findall(rec)
+        if len(rec_nums) == len(nums) and all(
+            n == r or (pg is not None and n.lstrip("0") == pg)
+            for n, r in zip(nums, rec_nums, strict=True)
+        ):
+            return True
+    return False
 
 
 def _delete_ranges(mt: MappedText, ranges: list[tuple[int, int]]) -> MappedText:
@@ -210,17 +248,19 @@ class HfDeleted:
     rel_pos: float  # its start / len(raw), to place inline clean occurrences
 
 
-def strip_hf_raw(mt: MappedText, hf_strings: Sequence[str]) -> tuple[MappedText, list[HfDeleted]]:
-    """AE3 on raw: delete whole lines that are a known header/footer (exact or hf_key)."""
-    exact, keys = _hf_tables(hf_strings)
-    if not exact:
+def strip_hf_raw(
+    mt: MappedText, hf_strings: Sequence[str], page: int | None = None
+) -> tuple[MappedText, list[HfDeleted]]:
+    """AE3 on raw: delete whole lines that are a known header/footer (see is_hf_line)."""
+    tables = hf_tables(hf_strings)
+    if not tables.exact:
         return mt, []
     ranges: list[tuple[int, int]] = []
     deleted: list[HfDeleted] = []
     total = max(1, len(mt.text))
     for a, z in _lines(mt):
         line = mt.text[a:z]
-        if is_hf_line(line, exact, keys):
+        if is_hf_line(line, tables, page):
             ranges.append(_line_delete_range(mt, a, z))
             deleted.append(HfDeleted(collapse_ws(line), a / total))
     return _delete_ranges(mt, _merge(ranges)), deleted
@@ -341,13 +381,14 @@ def canonicalize(
     block_type: BlockType = BlockType.paragraph,
     raw_deleted: Sequence[HfDeleted] | None = None,
     raw_rest: str = "",
+    page: int | None = None,
 ) -> Canon:
     """Steps 1-5 of design 4.2. With raw_deleted=None this is the raw side (AE3 deletes known
     header/footer lines); otherwise the clean side (AE3 removes what raw deleted)."""
     mt = glyph_identity(s)
     deleted: list[HfDeleted] = []
     if raw_deleted is None:
-        mt, deleted = strip_hf_raw(mt, hf_strings)
+        mt, deleted = strip_hf_raw(mt, hf_strings, page)
     else:
         mt = strip_hf_clean(mt, raw_deleted, raw_rest)
     mt = normalize_bullets(mt, block_type)
@@ -465,26 +506,59 @@ def _token_rx(tok: str) -> re.Pattern[str]:
     return re.compile(r"(?<!\w)" + re.escape(tok) + r"(?!\w)")
 
 
+def _token_index(spans: Sequence[tuple[int, int]], offset: int) -> int:
+    """Index of the token containing ``offset`` (else the number of tokens before it)."""
+    for k, (a, z) in enumerate(spans):
+        if a <= offset < z:
+            return k
+        if a > offset:
+            return k
+    return len(spans)
+
+
+def _confirmed_at(i: int, src_tokens: Sequence[str], chosen_rx: re.Pattern[str]) -> bool:
+    """The source reading has the chosen token at token index i +- 1."""
+    return any(
+        0 <= j < len(src_tokens) and chosen_rx.search(src_tokens[j]) is not None
+        for j in (i - 1, i, i + 1)
+    )
+
+
 def apply_variants(
     mt: MappedText,
     variants: Sequence[NumericVariant],
     sources: Mapping[str, str],
     raw_source: str,
+    raw: str | None = None,
 ) -> tuple[MappedText, list[NumericVariant]]:
-    """Replace every whole-token occurrence of an attested variant's raw by its chosen value."""
+    """Replace each whole-token occurrence of a variant's raw that is *confirmed*: the source
+    reading has the chosen token at the aligned position (same token index +- 1, tokens as
+    ``parse.text.TOKEN_RE``; ``raw`` is the original string ``mt.src`` points into). A chosen
+    token elsewhere in that reading confirms nothing. A variant with no confirmed occurrence is
+    not applied."""
+    original = raw if raw is not None else mt.text
+    raw_spans = [m.span() for m in TOKEN_RE.finditer(original)]
     applied: list[NumericVariant] = []
     for v in variants:
         if not v.raw or not v.chosen:
             continue
         rx = _token_rx(v.raw)
-        if rx.search(mt.text) is None:
+        occ = list(rx.finditer(mt.text))
+        if not occ:
             continue
         src_key = "ocr" if v.source == "ocr" else raw_source
-        if _token_rx(v.chosen).search(sources.get(src_key, "")) is None:
+        src_tokens = TOKEN_RE.findall(sources.get(src_key, ""))
+        chosen_rx = _token_rx(v.chosen)
+        ok = [
+            m
+            for m in occ
+            if _confirmed_at(_token_index(raw_spans, mt.src[m.start()]), src_tokens, chosen_rx)
+        ]
+        if not ok:
             continue
         b = _Builder()
         pos = 0
-        for m in rx.finditer(mt.text):
+        for m in ok:
             for k in range(pos, m.start()):
                 b.add(mt.text[k], mt.src[k], k in mt.optional)
             span = m.end() - m.start()
@@ -873,10 +947,12 @@ def _try_reorder(
     hf_strings: Sequence[str],
     block_type: BlockType,
     evidence: ReorderEvidence,
+    page: int | None,
 ) -> tuple[bool, list[tuple[tuple[int, int], tuple[int, int]]]] | None:
     """None: no permutation explains the failure. Else (accepted, moved unit spans)."""
     lines = [
-        apply_variants(u, applied, sources, raw_source)[0] for u in line_units(raw_canon.pre_ae2)
+        apply_variants(u, applied, sources, raw_source, raw)[0]
+        for u in line_units(raw_canon.pre_ae2)
     ]
     candidates: list[_Reorder] = []
     for kind, units in (("line", lines), ("sentence", sentence_units(rc))):
@@ -886,13 +962,16 @@ def _try_reorder(
     if not candidates:
         return None
     alt_loose = [
-        loose(canonicalize(t, hf_strings=hf_strings, block_type=block_type).mt).text
+        loose(canonicalize(t, hf_strings=hf_strings, block_type=block_type, page=page).mt).text
         for t in evidence.alt_texts
     ]
+    # A reorder is accepted only when another independent reader (the other parser's text or
+    # the OCR text of the same block) read the clean order. Layout risk (multi-column page,
+    # displaced block, overlap) is never sufficient on its own: step order is a fact.
     chosen: _Reorder | None = None
     for r in candidates:
         in_order = [loose(r.units[i]).text for i in r.perm]
-        if _attested(in_order, alt_loose) or (r.kind == "line" and evidence.layout_risk):
+        if _attested(in_order, alt_loose):
             chosen = r
             break
     shown = chosen or candidates[0]
@@ -916,16 +995,19 @@ def check_faithfulness_ex(
     variant_sources: Mapping[str, str] | None = None,
     raw_source: str = "",
     evidence: ReorderEvidence | None = None,
+    page: int | None = None,
 ) -> FaithOutcome:
     evidence = evidence or ReorderEvidence()
     sources = variant_sources or {}
     gfm = parse_gfm(clean) if (block_type == BlockType.table and table is not None) else None
+    if gfm is not None and table is not None and any(len(row) != table.n_cols for row in gfm):
+        gfm = None  # design 4.3: every GFM row has n_cols cells, else it is compared as text
     raw_canon: Canon | None = None
     if gfm is not None and table is not None:
         rc = table_raw_canon(table, raw)
         cc = table_clean_canon(gfm, clean)
     else:
-        raw_canon = canonicalize(raw, hf_strings=hf_strings, block_type=block_type)
+        raw_canon = canonicalize(raw, hf_strings=hf_strings, block_type=block_type, page=page)
         rc = raw_canon.mt
         cc = canonicalize(
             clean,
@@ -933,7 +1015,7 @@ def check_faithfulness_ex(
             raw_deleted=raw_canon.hf_deleted,
             raw_rest=raw_canon.pre_ae2.text,
         ).mt
-    rc, applied = apply_variants(rc, variants, sources, raw_source)
+    rc, applied = apply_variants(rc, variants, sources, raw_source, raw)
     sm: SequenceMatcher[str] | None = None
     if rc.text != cc.text and len(rc.text) + len(cc.text) <= FAITH_MAX_CHARS:
         sm = SequenceMatcher(None, rc.text, cc.text, autojunk=False)
@@ -962,6 +1044,7 @@ def check_faithfulness_ex(
             hf_strings,
             block_type,
             evidence,
+            page,
         )
         if found is not None:
             accepted, spans = found
@@ -993,8 +1076,10 @@ def check_faithfulness(
     variant_sources: Mapping[str, str] | None = None,
     raw_source: str = "",
     evidence: ReorderEvidence | None = None,
+    page: int | None = None,
 ) -> FaithfulnessResult:
-    """Pure and deterministic; passed == no violations (design 4)."""
+    """Pure and deterministic; passed == no violations (design 4). ``page`` is the block's
+    page number (AE3 footer templates such as ``Page {n}`` match only n == page)."""
     return check_faithfulness_ex(
         raw,
         clean,
@@ -1005,4 +1090,5 @@ def check_faithfulness(
         variant_sources=variant_sources,
         raw_source=raw_source,
         evidence=evidence,
+        page=page,
     ).result

@@ -37,7 +37,9 @@ def download() -> None:
     if SOURCE.exists() and sha256_file(SOURCE) == SOURCE_SHA256:
         return
     tmp = SOURCE.with_suffix(".part")
-    req = urllib.request.Request(URL, headers={"User-Agent": "Mozilla/5.0 manual-labor-fixture-fetch/1"})
+    req = urllib.request.Request(
+        URL, headers={"User-Agent": "Mozilla/5.0 manual-labor-fixture-fetch/1"}
+    )
     with urllib.request.urlopen(req, timeout=120) as r, tmp.open("wb") as f:  # noqa: S310
         while chunk := r.read(1 << 20):
             f.write(chunk)

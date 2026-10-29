@@ -11,7 +11,7 @@ from manuallabor.contracts.block import FaithfulnessResult, Signal
 from manuallabor.contracts.enums import AttachRule, Extraction
 from manuallabor.figures.types import DedupeEntry, FigureExtraction, FigureFailure
 
-SCORING_ALGO_VERSION: Final = "1"
+SCORING_ALGO_VERSION: Final = "2"
 
 # -- comparison normalization / agreement (2.0, 2.2, 2.3) ------------------------------------
 DIGIT_WEIGHT: Final = 3
@@ -54,6 +54,7 @@ ATTACH: Final = {
 # -- verifier (2.10) -------------------------------------------------------------------------
 VERIFIER_FLAG_VALUE: Final = 0.2
 VERIFIER_MAX_SPAN: Final = 300
+VERIFIER_MIN_SPAN: Final = 3
 
 # -- faithfulness (4) ------------------------------------------------------------------------
 FAITH_REORDER_VALUE: Final = 0.9
@@ -80,7 +81,9 @@ class ScoreModel(BaseModel):
 
 
 class ReorderEvidence(ScoreModel):
-    """Evidence that a reading-order fix is legitimate (4.5)."""
+    """Evidence that a reading-order fix is legitimate (4.5). Only ``alt_texts`` can accept a
+    reorder (another reader saw the clean order); ``layout_risk`` is recorded context and is
+    never sufficient on its own."""
 
     layout_risk: bool = False
     alt_texts: tuple[str, ...] = ()

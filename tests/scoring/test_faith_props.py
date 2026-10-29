@@ -90,7 +90,7 @@ def test_allowed_edit_compositions_pass(parts, data: st.DataObject) -> None:  # 
         clean_lines.append((f"{cb} " if cb else "") + clean_body)
     raw = "\n".join(raw_lines)
     if data.draw(st.booleans()):
-        raw = raw + "\nPage 7"  # AE3: clean drops the footer line
+        raw = raw + "\nPage 7"  # AE3: clean drops the footer line (block on page 7)
     # join lines: AE2 drop / keep for hyphen breaks; AE1 newline or space otherwise,
     # keeping a newline before every bullet line
     clean = clean_lines[0]
@@ -107,7 +107,7 @@ def test_allowed_edit_compositions_pass(parts, data: st.DataObject) -> None:  # 
             clean = clean + "\n" + clean_lines[i]
         else:
             clean = clean + data.draw(st.sampled_from([" ", "\n", "\n\n"])) + clean_lines[i]
-    r = check_faithfulness(raw, clean, hf_strings=HF)
+    r = check_faithfulness(raw, clean, hf_strings=HF, page=7)
     assert r.passed, (raw, clean, [(v.kind.value, v.raw, v.clean) for v in r.violations])
 
 
@@ -119,7 +119,7 @@ def test_one_inserted_char_fails(parts, data: st.DataObject) -> None:  # type: i
     pos = data.draw(st.integers(min_value=0, max_value=len(raw)))
     ch = data.draw(st.sampled_from(list("abqXZ0179")))
     clean = raw[:pos] + ch + raw[pos:]
-    r = check_faithfulness(raw, clean, hf_strings=HF)
+    r = check_faithfulness(raw, clean, hf_strings=HF, page=7)
     assert not r.passed, (raw, clean)
 
 
@@ -127,7 +127,7 @@ def test_one_inserted_char_fails(parts, data: st.DataObject) -> None:  # type: i
 @SETTINGS
 def test_spans_in_bounds(raw: str, clean: str) -> None:
     assume(raw or clean)
-    r = check_faithfulness(raw, clean, hf_strings=HF)
+    r = check_faithfulness(raw, clean, hf_strings=HF, page=7)
     for v in r.violations:
         if v.raw_start is not None:
             assert v.raw_end is not None and 0 <= v.raw_start <= v.raw_end <= len(raw)

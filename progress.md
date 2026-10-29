@@ -91,3 +91,4 @@
   - Dispatched M3.4 fix (Opus): reorder needs independent-reader evidence; exact/page-templated header removal only; strict real metric + module-1 fix for OCR text inside figure regions; unit lexicon; verifier never raises.
   - 2026-10-29: user proposed 3–4 more real manuals; orchestrator agreed (variety by layout class) and dispatched acquisition (Sonnet) in parallel with the M3.4 fix.
   - 2026-10-29: caffeinate -i -s started (PID 54839) at user request; private GitHub repo manual-labor created and main pushed (16 commits).
+  - 4 more real fixtures acquired (Sonnet) and committed (scripts/GT only). M3.4 fix still running.

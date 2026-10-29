@@ -181,3 +181,97 @@ def test_threshold_change_restatus_without_rescoring(
         sf = read_json(paths.doc(slug).scores, ScoreFile)
         assert sf.threshold == 0.4
         assert all(s.status == "queued" for s in sf.blocks if s.has_numeric_spec)
+
+
+# -- uncovered branches named by the review -------------------------------------------------
+
+
+def test_raw_vs_raw_self_test_failure_raises(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    """A canonicalizer that cannot pass raw vs raw is a bug: the document fails loudly
+    instead of every block silently getting faithfulness 1.0."""
+    import pytest
+
+    from manuallabor.contracts.block import FaithfulnessResult, FaithfulnessViolation
+    from manuallabor.contracts.enums import FaithViolationKind
+    from manuallabor.scoring import pipeline as P
+    from manuallabor.scoring.faithfulness import FaithOutcome
+    from manuallabor.scoring.types import ScoringError
+    from tests.scoring.conftest import ctx, make_block
+
+    def broken(raw: str, clean: str, **_kw: object) -> FaithOutcome:
+        v = FaithfulnessViolation(
+            kind=FaithViolationKind.deletion,
+            raw_start=0,
+            raw_end=0,
+            clean_start=0,
+            clean_end=0,
+            raw="",
+            clean="",
+        )
+        res = FaithfulnessResult(passed=False, alignment_ratio=0.0, violations=[v], diff=[])
+        return FaithOutcome(res, False)
+
+    monkeypatch.setattr(P, "check_faithfulness_ex", broken)
+    with pytest.raises(ScoringError, match="self-test failed"):
+        P.score_block(make_block("Check the drive belt."), ctx(), threshold=0.85)
+
+
+def test_run_score_with_mock_verifier(scored_copy: ProjectPaths) -> None:
+    """End to end: cleaned blocks go through run_score with a separate MockProvider verifier;
+    a found span becomes a 0.2 soft signal on that block only, NONE adds nothing."""
+    from collections.abc import Sequence
+
+    from manuallabor.contracts.config import ModelRef
+    from manuallabor.contracts.enums import SignalName, Task
+    from manuallabor.contracts.llm import Message
+    from manuallabor.providers import ListSink, MockProvider, ProviderSet
+    from manuallabor.providers.cache import LLMCache
+
+    paths = scored_copy
+    cfg = json.loads(paths.config.read_text())
+    cfg["models"]["verifier"]["model"] = "mock-verifier"  # not the cleanup model
+    paths.config.write_text(json.dumps(cfg))
+    dp = paths.doc("clean")
+    blocks = read_json_list(dp.blocks, Block)
+    paras = [b for b in blocks if b.type == BlockType.paragraph and "\n" in b.raw_text.strip()][:3]
+    assert len(paras) == 3
+    cleaned = {b.id: " ".join(b.raw_text.replace("-\n", "").split()) for b in paras}
+    flagged_id = paras[0].id
+    span = cleaned[flagged_id].split()[1] + " " + cleaned[flagged_id].split()[2]
+    write_json(
+        dp.blocks,
+        [b.model_copy(update={"clean_text": cleaned.get(b.id)}) for b in blocks],
+    )
+
+    def responder(messages: Sequence[Message]) -> str:
+        return span if cleaned[flagged_id] in messages[-1].content else "NONE"
+
+    sink = ListSink()
+    prov = MockProvider(
+        ModelRef(provider="mock", model="mock-verifier"),
+        sink=sink,
+        cache=LLMCache(paths.root / ".llm_cache"),
+        responses={Task.verifier: responder},
+    )
+    lines: list[dict[str, object]] = []
+    failed = run_score(
+        paths,
+        only="clean",
+        force=True,
+        providers=ProviderSet(by_task={Task.verifier: prov}),
+        emit=lines.append,
+    )
+    assert failed == []
+    assert len(sink) == 3  # one call per cleaned block, nothing else
+    detail = str(lines[-1]["detail"])
+    assert "verifier_flagged: 1" in detail and "verifier_ok: 2" in detail
+    sf = read_json(dp.scores, ScoreFile)
+    by_id = {s.block_id: s for s in sf.blocks}
+    for b in paras:
+        sig = [s for s in by_id[b.id].signals if s.name == SignalName.llm_verifier]
+        assert by_id[b.id].faithfulness is not None and by_id[b.id].faithfulness.passed
+        if b.id == flagged_id:
+            assert [s.value for s in sig] == [0.2] and span in (sig[0].detail or "")
+            assert by_id[b.id].status == "queued"
+        else:
+            assert sig == []

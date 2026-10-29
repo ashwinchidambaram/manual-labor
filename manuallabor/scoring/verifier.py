@@ -16,7 +16,12 @@ from manuallabor.contracts.enums import SignalName, Task
 from manuallabor.contracts.llm import Message
 from manuallabor.parse.text import collapse_ws
 from manuallabor.providers.base import RAW_CLOSE, RAW_OPEN, ProviderError, ProviderSet
-from manuallabor.scoring.types import VERIFIER_FLAG_VALUE, VERIFIER_MAX_SPAN, truncate
+from manuallabor.scoring.types import (
+    VERIFIER_FLAG_VALUE,
+    VERIFIER_MAX_SPAN,
+    VERIFIER_MIN_SPAN,
+    truncate,
+)
 
 VERIFIER_SYSTEM: Final = (
     "You compare two versions of a passage from a technical manual: the raw extraction and "
@@ -27,6 +32,36 @@ QUESTION: Final = (
     "Does the cleaned text change any fact, number, or step? Answer with the differing span or NONE"
 )
 _NONE_RE: Final = re.compile(r"(?i)none\.?")
+FUNCTION_WORDS: Final = frozenset(
+    [
+        "a",
+        "an",
+        "and",
+        "are",
+        "as",
+        "at",
+        "be",
+        "by",
+        "for",
+        "from",
+        "in",
+        "into",
+        "is",
+        "it",
+        "its",
+        "of",
+        "on",
+        "or",
+        "that",
+        "the",
+        "then",
+        "this",
+        "to",
+        "was",
+        "were",
+        "with",
+    ]
+)
 
 Outcome = Literal[
     "ok",
@@ -63,25 +98,36 @@ def _unwrap(text: str) -> str:
     return out
 
 
+def _weak(span: str) -> bool:
+    """Too little to be a differing span: under VERIFIER_MIN_SPAN chars, no letter or digit,
+    or nothing but common function words (``e``, ``.``, ``the``, ``of the``)."""
+    if len(span) < VERIFIER_MIN_SPAN or not any(c.isalnum() for c in span):
+        return True
+    words = [w.strip(".,;:!?()[]'\"").casefold() for w in span.split()]
+    return all(w in FUNCTION_WORDS or not w for w in words)
+
+
 def validate_answer(text: str, raw: str, clean: str) -> tuple[Outcome, Signal | None]:
-    """Strict: NONE -> 1.0; a short verbatim span of raw or clean -> 0.2; anything else is
-    discarded (the model's free text is never used as evidence)."""
+    """Strict. Only a found differing span is evidence, and it can only lower the score:
+    - NONE -> ("ok", None): no signal at all (a 1.0 soft signal would raise the geometric mean
+      of the soft signals and could lift a block over the threshold);
+    - a verbatim span of raw or clean, 3..300 chars, not a bare function word -> 0.2 soft;
+    - anything else (free text, weak spans such as ``e``/``.``/``the``) -> discarded."""
     out = _unwrap(text)
     if _NONE_RE.fullmatch(out):
-        return "ok", Signal(
-            name=SignalName.llm_verifier, value=1.0, critical=False, detail="verifier: NONE"
-        )
+        return "ok", None
+    span = collapse_ws(out)
     if (
-        1 <= len(out) <= VERIFIER_MAX_SPAN
+        len(out) <= VERIFIER_MAX_SPAN
         and re.search(r"\n[ \t]*\n", out) is None
-        and (collapse_ws(out) in collapse_ws(clean) or collapse_ws(out) in collapse_ws(raw))
-        and collapse_ws(out)
+        and not _weak(span)
+        and (span in collapse_ws(clean) or span in collapse_ws(raw))
     ):
         return "flag", Signal(
             name=SignalName.llm_verifier,
             value=VERIFIER_FLAG_VALUE,
             critical=False,
-            detail=truncate(f"verifier: {collapse_ws(out)!r}"),
+            detail=truncate(f"verifier: {span!r}"),
         )
     return "verifier_invalid", None
 

@@ -16,7 +16,7 @@ def test_duplicated_number_fails() -> None:
 def test_reordered_numbers_under_accepted_reorder_pass() -> None:
     raw = "Tighten bolt A to 35 N·m\nTighten bolt B to 48 N·m"
     clean = "Tighten bolt B to 48 N·m Tighten bolt A to 35 N·m"
-    r = check_faithfulness(raw, clean, evidence=ReorderEvidence(layout_risk=True))
+    r = check_faithfulness(raw, clean, evidence=ReorderEvidence(alt_texts=(clean,)))
     assert r.passed
 
 
@@ -87,3 +87,51 @@ def test_multiple_variants() -> None:
         raw_source="pymupdf",
     )
     assert r.passed and r.numeric_variants == [VAR, v2]
+
+
+def test_variant_confirmed_only_at_the_aligned_position() -> None:
+    """The chosen token must be where the other reader read the raw token (same token index
+    +- 1), not anywhere in that reading."""
+    raw = "Set A to 3S N·m and B to 12 N·m. Note: 35 is the max."
+    clean = raw.replace("3S", "35", 1)
+    # OCR read "3S" too at that position; "35" appears only elsewhere (the note)
+    ocr = "Set A to 3S N-m and B to 12 N-m. Note: 35 is the max."
+    r = check_faithfulness(
+        raw,
+        clean,
+        variants=[VAR],
+        variant_sources={"pymupdf": raw, "ocr": ocr},
+        raw_source="pymupdf",
+    )
+    assert not r.passed and r.numeric_variants == []
+    # OCR read "35" at the aligned position (one merged word earlier still counts: +- 1)
+    ocr_ok = "Set A to 35 N-m and B to 12 N-m. Note: 35 is the max."
+    r = check_faithfulness(
+        raw,
+        clean,
+        variants=[VAR],
+        variant_sources={"pymupdf": raw, "ocr": ocr_ok},
+        raw_source="pymupdf",
+    )
+    assert r.passed and r.numeric_variants == [VAR]
+    ocr_merged = "SetA to 35 N-m and B to 12 N-m. Note: 35 is the max."
+    r = check_faithfulness(
+        raw,
+        clean,
+        variants=[VAR],
+        variant_sources={"pymupdf": raw, "ocr": ocr_merged},
+        raw_source="pymupdf",
+    )
+    assert r.passed
+
+
+def test_variant_far_away_is_not_confirmation() -> None:
+    raw = "Tighten to 3S N·m."
+    r = check_faithfulness(
+        raw,
+        "Tighten to 35 N·m.",
+        variants=[VAR],
+        variant_sources={"pymupdf": raw, "ocr": "35 bolts. Tighten to 3S N-m."},
+        raw_source="pymupdf",
+    )
+    assert not r.passed and r.numeric_variants == []

@@ -86,9 +86,11 @@ def test_skip_reasons(tmp_path: Path) -> None:
 
 
 def test_none_answer(tmp_path: Path) -> None:
+    """NONE is no evidence of correctness: it contributes no signal (a 1.0 soft signal would
+    raise the geometric mean and could lift a block over the threshold)."""
     plan, prov, sink = _plan("NONE.", tmp_path)
     outcome, s = llm_verifier(RAW, CLEAN, faith_passed=True, plan=plan)
-    assert outcome == "ok" and s is not None and s.value == 1.0 and not s.critical
+    assert outcome == "ok" and s is None
     assert prov.temperatures == [0.0]
     # second identical call is served from the cache
     llm_verifier(RAW, CLEAN, faith_passed=True, plan=plan)
@@ -169,3 +171,52 @@ def test_progress_detail_counts() -> None:
         "verifier_errors: 1; verifier_invalid: 3; verifier skipped: 4"
     )
     assert _detail(Counter({"skip_no_clean": 3})) is None
+
+
+@pytest.mark.parametrize("reply", ["e", ".", "the", "The", "a", "in", "`.`", "'e'", "of the", "--"])
+def test_weak_answers_ignored(reply: str) -> None:
+    """Spans under 3 chars, punctuation, or bare function words are not a differing span."""
+    outcome, s = validate_answer(reply, RAW, CLEAN)
+    assert outcome == "verifier_invalid" and s is None
+
+
+def test_span_must_be_in_raw_or_clean() -> None:
+    assert validate_answer("star pattern", RAW, CLEAN) == ("verifier_invalid", None)
+    outcome, s = validate_answer("cover bolts", RAW, CLEAN)
+    assert outcome == "flag" and s is not None and s.value == 0.2
+
+
+def _soft_block():  # type: ignore[no-untyped-def]
+    """A cleaned block whose soft signals put it just under the threshold (0.8486...)."""
+    from manuallabor.contracts.block import OcrWord
+
+    words = [
+        OcrWord(text=w, confidence=c, bbox=[0, 0, 1, 1])
+        for w, c in zip(RAW.split(), [0.62, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8], strict=True)
+    ]
+    texts = {"ocr": RAW, "ocr_alt": RAW}
+    return make_block(RAW, source="ocr", texts=texts, ocr_words=words, clean_text=CLEAN)
+
+
+@pytest.mark.parametrize("reply", ["NONE", "none.", "e", ".", "the"])
+def test_verifier_never_raises_a_block_over_threshold(tmp_path: Path, reply: str) -> None:
+    """Reviewer's case: 0.8486 without the verifier became 0.8842 with a NONE answer (a 1.0
+    soft signal diluting the soft mean) and was auto-approved. NONE and weak answers must
+    leave the score unchanged."""
+    b = _soft_block()
+    base = score_block(b, ctx(n_columns=2), threshold=0.85)
+    assert base.confidence is not None and 0.80 < base.confidence < 0.85, base.signals
+    assert base.status == "queued"
+    plan, _, _ = _plan(reply, tmp_path)
+    s = score_block(b, ctx(n_columns=2), threshold=0.85, plan=plan)
+    assert all(x.name != SignalName.llm_verifier for x in s.signals)
+    assert s.confidence == base.confidence and s.status == "queued"
+
+
+def test_found_span_lowers_score(tmp_path: Path) -> None:
+    b = _soft_block()
+    base = score_block(b, ctx(n_columns=2), threshold=0.85)
+    plan, _, _ = _plan("cross pattern", tmp_path)
+    s = score_block(b, ctx(n_columns=2), threshold=0.85, plan=plan)
+    assert s.confidence is not None and base.confidence is not None
+    assert s.confidence < base.confidence

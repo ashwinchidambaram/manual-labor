@@ -170,3 +170,24 @@ def test_up_to_date_documents_skip_before_models_are_checked(
     failed = pipeline.parse_project(parsed.paths, emit=lines.append)
     assert failed == 0
     assert any(ln.get("status") == "skip" for ln in lines)
+
+
+def test_scanned_fixture_figures_release_no_text(parsed: Parsed) -> None:
+    """scanned.pdf figures are crops of raster line art with no running text inside: the
+    figure-text release (module 3 review follow-up) must not create blocks there."""
+    from manuallabor.contracts.enums import BlockType
+    from manuallabor.parse import geometry as g
+
+    blocks = parsed.blocks("scanned")
+    figs = [b for b in blocks if b.type == BlockType.figure and b.bbox is not None]
+    assert figs
+    inside = [
+        b.id
+        for b in blocks
+        if b.type != BlockType.figure
+        and b.bbox is not None
+        and any(f.page == b.page and g.contain(b.bbox, f.bbox) >= 0.8 for f in figs)  # type: ignore[arg-type]
+    ]
+    report = read_json(parsed.paths.doc("scanned").merge, MergeReport)
+    released = [d for d in report.dispositions if d.parser == "ocr" and d.outcome == "split"]
+    assert inside == [] and released == [], (inside, released)

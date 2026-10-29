@@ -195,3 +195,161 @@ def test_multi_piece_text_is_column_aware() -> None:
     blocks, _ = _merge(p, s)
     assert len(blocks) == 1
     assert blocks[0].text_by_parser["docling"] == "left one\nleft two\nright one"
+
+
+# -- scanned pages: running text inside a figure region is not swallowed by the figure --------
+
+
+def _w(text: str, x0: float, y: float, w: float | None = None, h: float = 8.0):  # type: ignore[no-untyped-def]
+    from manuallabor.contracts.block import OcrWord
+
+    return OcrWord(text=text, confidence=0.95, bbox=[x0, y, x0 + (w or 5.0 * len(text)), y + h])
+
+
+def _ocr_line(words, i: int) -> Line:  # type: ignore[no-untyped-def]
+    return Line(
+        text=" ".join(w.text for w in words),
+        bbox=[
+            min(w.bbox[0] for w in words),
+            min(w.bbox[1] for w in words),
+            max(w.bbox[2] for w in words),
+            max(w.bbox[3] for w in words),
+        ],
+        size=8,
+        words=list(words),
+        native_id=f"ocr.l{i}",
+    )
+
+
+def _scan_page(blocks: list[RawBlock]) -> PageParse:
+    return PageParse(page=1, width=612, height=792, has_text_layer=False, blocks=blocks)
+
+
+FIG_BOX = [180.0, 120.0, 480.0, 455.0]
+PARA = [
+    "Having observed on",
+    "gauge 57 P.S.I.=",
+    "21,000 ft.lb. and",
+    "counted 10 blows per",
+    "inch, bearing will",
+    "be 105 tons.",
+]
+
+
+def _chart_with_paragraph() -> list[Line]:
+    """OCR lines of a scanned chart: axis ticks at x~205 share text lines with a paragraph
+    printed inside the chart at x~360 (the real manual's p16 bearing curve)."""
+    lines = [_ocr_line([_w("40", 208, 200)], 0), _ocr_line([_w("50", 208, 225)], 1)]
+    y = 387.0
+    for i, text in enumerate(PARA):
+        words = []
+        x = 362.0
+        if i in (1, 3):
+            words += [_w("120" if i == 1 else "130", 203, y), _w("4", 222, y)]
+        for t in text.split():
+            words.append(_w(t, x, y))
+            x += 5.0 * len(t) + 5.0
+        lines.append(_ocr_line(words, i + 2))
+        y += 10.0
+    return lines
+
+
+def _figure_rb() -> RawBlock:
+    return RawBlock(parser="docling", page=1, order=0, bbox=FIG_BOX, kind=BlockType.figure, text="")
+
+
+def test_scanned_running_text_inside_figure_becomes_own_block() -> None:
+    lines = _chart_with_paragraph()
+    blob = _rb("ocr", 0, BlockType.paragraph, lines)
+    alt = [
+        _rb(
+            "ocr_alt",
+            0,
+            BlockType.paragraph,
+            [_ocr_line([_w("Having", 367, 387), _w("observed", 400, 387), _w("on", 445, 387)], 0)],
+        ),
+        _rb("ocr_alt", 1, BlockType.paragraph, [_ocr_line([_w("40", 208, 200)], 1)]),
+    ]
+    blocks, disp = merge_page(
+        _scan_page([blob]),
+        _scan_page(alt),
+        _scan_page([_figure_rb()]),
+        1,
+        names=("ocr", "ocr_alt", "docling"),
+        scanned=True,
+    )
+    fig = next(b for b in blocks if b.region == "figure")
+    texts = [b for b in blocks if b.region == "text"]
+    assert len(texts) == 1, [b.raw_text for b in blocks]
+    t = texts[0]
+    assert t.raw_source == "ocr" and t.raw_text == "\n".join(PARA)
+    assert t.ocr_words is not None and [w.text for w in t.ocr_words] == " ".join(PARA).split()
+    assert t.bbox == [362.0, 387.0, max(w.bbox[2] for w in t.ocr_words), 445.0]
+    assert t.text_by_parser["ocr_alt"] == "Having observed on"
+    assert fig.bbox == FIG_BOX and fig.raw_text == ""
+    assert "gauge" not in fig.text_by_parser["ocr"] and "120 4" in fig.text_by_parser["ocr"]
+    assert fig.text_by_parser["ocr_alt"] == "40"
+    assert {(d.parser, d.order): d.outcome for d in disp}[("ocr", 0)] == "split"
+
+
+def test_scanned_figure_labels_stay_absorbed() -> None:
+    """Axis ticks, single labels and one caption-like line (>= 8 words but 1 line) are figure
+    content, not running text."""
+    lines = [
+        _ocr_line(
+            [
+                _w(t, 205 + 30 * k, 180)
+                for k, t in enumerate(["30", "20", "18", "16", "14", "12", "10", "8"])
+            ],
+            0,
+        ),
+        _ocr_line([_w(t, 205, 200 + 25 * k) for k, t in enumerate(["40"])], 1),
+        _ocr_line(
+            [_w("BLOWS", 302, 165, 24), _w("PER", 337, 165, 16), _w("INCH", 364, 165, 20)], 2
+        ),
+        _ocr_line(
+            [
+                _w(t, 200 + 26 * k, 300)
+                for k, t in enumerate(
+                    ["one", "two", "three", "four", "five", "six", "seven", "eight", "nine"]
+                )
+            ],
+            3,
+        ),
+    ]
+    blob = _rb("ocr", 0, BlockType.paragraph, lines)
+    blocks, disp = merge_page(
+        _scan_page([blob]),
+        None,
+        _scan_page([_figure_rb()]),
+        1,
+        names=("ocr", None, "docling"),
+        scanned=True,
+    )
+    assert [b.region for b in blocks] == ["figure"]
+    assert {d.outcome for d in disp if d.parser == "ocr"} == {"absorbed"}
+
+
+def test_scanned_running_text_spread_over_line_candidates() -> None:
+    """The OCR grouper can emit each chart line as its own candidate (real manual p16): the
+    paragraph is assembled across them, label-only candidates stay with the figure."""
+    lines = _chart_with_paragraph()
+    cands = [_rb("ocr", i, BlockType.paragraph, [ln]) for i, ln in enumerate(lines)]
+    blocks, disp = merge_page(
+        _scan_page(cands),
+        None,
+        _scan_page([_figure_rb()]),
+        1,
+        names=("ocr", None, "docling"),
+        scanned=True,
+    )
+    texts = [b for b in blocks if b.region == "text"]
+    assert len(texts) == 1 and texts[0].raw_text == "\n".join(PARA)
+    assert texts[0].order_by_parser == {"ocr": 2}
+    out = {(d.parser, d.order): d.outcome for d in disp}
+    assert out[("ocr", 0)] == out[("ocr", 1)] == "absorbed"  # tick labels 40, 50
+    assert out[("ocr", 2)] == "primary"
+    assert out[("ocr", 3)] == "split" and out[("ocr", 5)] == "split"  # 120 4 / 130 4 + text
+    assert out[("ocr", 4)] == out[("ocr", 6)] == out[("ocr", 7)] == "matched"
+    fig = next(b for b in blocks if b.region == "figure")
+    assert fig.text_by_parser["ocr"] == "40\n50\n120 4\n130 4"

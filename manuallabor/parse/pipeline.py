@@ -46,7 +46,7 @@ from manuallabor.parse.types import (
 )
 from manuallabor.project import DocPaths, ProjectPaths
 
-PARSE_ALGO_VERSION = "2"
+PARSE_ALGO_VERSION = "3"
 MAX_BLOCKS_PER_PAGE = 999
 OVERLAP_IOU = 0.05
 
