@@ -164,16 +164,21 @@ def _source_text(inp: AgentInput, source: str) -> str:
 
 
 def validate_evidence(inp: AgentInput, raw: list[dict[str, Any]]) -> list[EvidenceRef]:
-    """Each item is verified iff its span (whitespace collapsed) occurs in its named source."""
+    """Each item is verified iff its span (whitespace collapsed) occurs in its named source and
+    that source is not the block's own raw text: quoting the text under review proves nothing.
+    Evidence must cite an independent reader (the other parser, OCR), the vision transcript,
+    the reviewer's note or a candidate."""
     out: list[EvidenceRef] = []
     for e in raw[:MAX_EVIDENCE]:
         span = str(e["span"])
-        hay = collapse_ws(_source_text(inp, str(e["source"])))
+        source = str(e["source"])
+        hay = collapse_ws(_source_text(inp, source))
+        own = source == inp.raw_source
         out.append(
             EvidenceRef(
-                source=EvidenceSource(str(e["source"])),
+                source=EvidenceSource(source),
                 span=span,
-                verified=bool(collapse_ws(span)) and collapse_ws(span) in hay,
+                verified=not own and bool(collapse_ws(span)) and collapse_ws(span) in hay,
             )
         )
     return out

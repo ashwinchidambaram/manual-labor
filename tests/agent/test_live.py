@@ -92,3 +92,53 @@ def test_31_live_pass_accepts_nothing_that_failed(aenv: AEnv, capsys: Any) -> No
     for p in aenv.agent.proposals():
         if not p.all_checks_passed:
             assert p.status == ProposalStatus.pending
+
+
+def _live_providers(aenv: AEnv) -> ProviderSet:
+    cache = LLMCache(aenv.paths.root / ".llm_cache")
+
+    def real(model: str) -> Any:
+        return make_factory("ollama")(
+            ModelRef(provider="ollama", model=model), aenv.sink, cache, utc_now
+        )
+
+    mock = aenv.providers()
+    return ProviderSet(
+        by_task={**mock.by_task, Task.agent: real(AGENT_MODEL), Task.vision: real(VISION_MODEL)}
+    )
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="llama3.2:1b cannot follow the schema; use --apply medium",
+)
+def test_31b_live_numeric_block_with_named_value_gets_a_proposal(aenv: AEnv, capsys: Any) -> None:
+    """Not vacuous: a numeric block whose text layer reads `3S N·m` (docling and OCR read
+    `35`) and whose flag note names the right value must produce a proposal. Whatever it
+    proposes, nothing failing a check is accepted."""
+    from manuallabor.agent.pipeline import run_agent_plan
+    from tests.agent.test_accept import inject_text_layer_misread
+
+    bid = inject_text_layer_misread(aenv)
+    f = aenv.flag(bid, "wrong_text", note="the torque value should read 35 N·m, not 3S N·m")
+    ps = _live_providers(aenv)
+    plan, _skips = aenv.agent.plan(None, [f])
+    events: list[dict[str, Any]] = []
+
+    def emit(o: dict[str, Any]) -> None:
+        events.append(o)
+        if o.get("event") in ("proposal", "agent_outcome"):
+            aenv.agent.ingest_event("job-live", o)
+
+    run_agent_plan(aenv.paths, plan.model_dump(mode="json"), lambda: ps, emit, lambda: False)
+    props = aenv.agent.proposals(flag_id=f)
+    outcomes = [e for e in events if e.get("event") == "agent_outcome"]
+    with capsys.disabled():
+        print(f"\nlive numeric: proposals={len(props)}")
+        for o in outcomes:
+            print("  outcome:", o["outcome"], (o.get("detail") or "")[:160])
+        for p in props:
+            print("  proposal:", p.all_checks_passed, [r.check for r in p.rechecks if not r.passed])
+    done = aenv.agent.accept_all_passing(None, "live-num")
+    assert all(p.all_checks_passed for p in done)
+    assert len(props) >= 1, "the live agent produced no proposal for a fixable numeric block"

@@ -8,6 +8,7 @@ never applied."""
 
 from __future__ import annotations
 
+import re
 from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -42,7 +43,7 @@ from manuallabor.contracts.block import (
     VisionReading,
 )
 from manuallabor.contracts.enums import BlockType, ProposalKind
-from manuallabor.contracts.proposal import EvidenceRef, RecheckResult
+from manuallabor.contracts.proposal import REQUIRED_CHECKS, EvidenceRef, RecheckResult
 from manuallabor.grouping.coverage import overlap
 from manuallabor.grouping.pipeline import check_partition
 from manuallabor.parse import geometry as g
@@ -68,40 +69,14 @@ __all__ = [
     "Resolved",
     "attested_faithfulness",
     "build_table_data",
+    "check_table_position",
+    "numbers_changed",
     "numeric_attested",
     "resolve_payload",
     "run_rechecks",
 ]
 
-RECHECKS: Final[dict[ProposalKind, tuple[str, ...]]] = {
-    ProposalKind.text: (
-        "shape",
-        "changed",
-        "evidence",
-        "faithfulness",
-        "numeric_attested",
-        "token_whitespace",
-        "garbage_ratio",
-        "parser_agreement",
-    ),
-    ProposalKind.cells: (
-        "shape",
-        "changed",
-        "evidence",
-        "table_coverage",
-        "numeric_attested",
-        "table_consistency",
-    ),
-    ProposalKind.attach: ("changed", "evidence", "attach_target", "attach_evidence"),
-    ProposalKind.regroup: ("changed", "evidence", "regroup_target", "regroup_similarity"),
-    ProposalKind.bbox: (
-        "changed",
-        "evidence",
-        "bbox_geometry",
-        "bbox_text_overlap",
-        "bbox_content",
-    ),
-}
+RECHECKS: Final[dict[ProposalKind, tuple[str, ...]]] = REQUIRED_CHECKS
 
 
 def _r(check: str, passed: bool, detail: str | None = None) -> RecheckResult:
@@ -221,9 +196,10 @@ def numeric_attested(
     at the same position is enough only when the change is an OCR look-alike (`3S`->`35`);
     otherwise two sources must agree (readers or the vision reader). An inserted or deleted
     number needs two sources that show exactly the new sequence (one when the block has no
-    numeric spec)."""
+    numeric spec). Numbers are compared by position: the same numbers in another order are
+    changed numbers (`10 ... 25` -> `25 ... 10`)."""
     tr, tp = _numtoks(raw), _numtoks(text)
-    if Counter(tp) == Counter(tr):
+    if tp == tr:
         return _r("numeric_attested", True, "numbers unchanged")
     indep = {k: _numtoks(v) for k, v in sorted(readers.items()) if k != raw_source}
     vnum: list[str] | None = None
@@ -255,6 +231,11 @@ def numeric_attested(
             f"[{', '.join(who) or 'no attester'}; need {need}]"
         )
     return _r("numeric_attested", ok_all, "; ".join(notes))
+
+
+def numbers_changed(raw: str, text: str) -> bool:
+    """The digit-bearing tokens differ by position (a permutation is a change)."""
+    return _numtoks(raw) != _numtoks(text)
 
 
 def _code_tokens(text: str) -> Counter[str]:
@@ -362,6 +343,124 @@ def check_table_consistency(block: Block, td: TableData) -> RecheckResult:
     if cur is not None and new.value < cur:
         return _r("table_consistency", False, f"{cur:g} → {new.value:g}")
     return _r("table_consistency", True, f"{cur if cur is not None else '-'} → {new.value:g}")
+
+
+_BULLET_RE: Final = re.compile(r"^[•·◦▪‣●*–-]\s+")
+_SEP_RE: Final = re.compile(r"^:?-{3,}:?$")
+Grid = list[list[str]]
+
+
+def _norm_cell(text: str) -> str:
+    """Whitespace collapsed, a leading bullet glyph followed by a space removed (`-35` keeps
+    its sign: a bullet is a glyph and a space)."""
+    return _BULLET_RE.sub("", collapse_ws(text))
+
+
+def _text_grid(text: str) -> Grid:
+    """Rows of a pipe-delimited table text: one row per non-empty line, cells split on `|`
+    (outer pipes and GFM separator rows dropped), padded with empty cells to the widest row."""
+    rows: Grid = []
+    for line in text.splitlines():
+        ln = line.strip()
+        if not ln:
+            continue
+        if ln.startswith("|"):
+            ln = ln[1:]
+        if ln.endswith("|"):
+            ln = ln[:-1]
+        cells = [_norm_cell(c) for c in ln.split("|")]
+        if cells and all(_SEP_RE.match(c) for c in cells):
+            continue
+        rows.append(cells)
+    width = max((len(r) for r in rows), default=0)
+    return [r + [""] * (width - len(r)) for r in rows]
+
+
+def _table_grid(td: TableData) -> Grid:
+    grid = [[""] * td.n_cols for _ in range(td.n_rows)]
+    for c in td.cells:
+        if 0 <= c.row < td.n_rows and 0 <= c.col < td.n_cols:
+            grid[c.row][c.col] = _norm_cell(c.text)
+    return grid
+
+
+def _shape(g: Grid) -> tuple[int, int]:
+    return len(g), (len(g[0]) if g else 0)
+
+
+def _position_failures(
+    base: Grid,
+    prop: Grid,
+    others: Mapping[str, Grid],
+    raw_source: str,
+    has_numeric_spec: bool,
+) -> tuple[list[str], list[str]]:
+    """(failures, attested changes) of `prop` against `base`, cell by cell."""
+    bad: list[str] = []
+    changed: list[str] = []
+    for r, row in enumerate(prop):
+        for c, new in enumerate(row):
+            old = base[r][c]
+            if new == old:
+                continue
+            at = f"({r},{c}) {_clip(old, 16)!r}→{_clip(new, 16)!r}"
+            who = sorted(k for k, g in others.items() if g[r][c] == new)
+            if not who:
+                bad.append(f"{at} [no reader shows it there]")
+                continue
+            cell_readers = {raw_source: old, **{k: g[r][c] for k, g in others.items()}}
+            n = numeric_attested(old, cell_readers, raw_source, new, None, has_numeric_spec)
+            if not n.passed:
+                bad.append(f"{at} [{n.detail}]")
+                continue
+            changed.append(f"{at} [{', '.join(who)}]")
+    return bad, changed
+
+
+def check_table_position(
+    block: Block,
+    cells: Sequence[Sequence[str]],
+    readers: Mapping[str, str],
+    raw_source: str,
+    has_numeric_spec: bool,
+) -> RecheckResult:
+    """Cells compared by position (row, col) with the raw table: the parsed structure of the
+    raw source, or its raw_text rows. The shape must equal one of them; every cell must equal
+    the raw cell at that position (whitespace and bullets normalized), except cells the
+    proposal changes, each of which an independent reader must show at the SAME position and
+    which must pass the numeric-attestation rule there. Moving values between cells or rows
+    (a permutation the multiset checks cannot see) fails."""
+    prop: Grid = [[_norm_cell(str(c)) for c in row] for row in cells]
+    shape = _shape(prop)
+    bases: list[tuple[str, Grid]] = []
+    if block.table is not None:
+        bases.append(("parsed table", _table_grid(block.table)))
+    tg = _text_grid(block.raw_text)
+    if tg and all(tg != g for _n, g in bases):
+        bases.append(("raw rows", tg))
+    same = [(n, g) for n, g in bases if _shape(g) == shape]
+    if not same:
+        have = ", ".join(f"{n} {a}x{b}" for n, (a, b) in ((n, _shape(g)) for n, g in bases))
+        return _r(
+            "table_position",
+            False,
+            f"{shape[0]}x{shape[1]} cells match no raw shape ({have or 'no raw table'})",
+        )
+    others = {
+        k: g
+        for k, v in sorted(readers.items())
+        if k != raw_source and _shape(g := _text_grid(v)) == shape
+    }
+    best: tuple[str, list[str], list[str]] | None = None
+    for name, grid in same:
+        bad, changed = _position_failures(grid, prop, others, raw_source, has_numeric_spec)
+        if not bad:
+            what = f"; changed: {'; '.join(changed)}" if changed else ""
+            return _r("table_position", True, f"cells match the {name} by position{what}")
+        if best is None or len(bad) < len(best[1]):
+            best = (name, bad, changed)
+    assert best is not None
+    return _r("table_position", False, f"vs the {best[0]}: " + "; ".join(best[1][:4]))
 
 
 # -- figures and groups -------------------------------------------------------------------------
@@ -709,8 +808,14 @@ def run_rechecks(
                 out.append(
                     check_table_coverage(block.raw_text, cells, inp.readers, block.raw_source)
                 )
+                out.append(
+                    check_table_position(
+                        block, cells, inp.readers, block.raw_source, block.has_numeric_spec
+                    )
+                )
             else:
                 out.append(_r("table_coverage", False, "cells are malformed"))
+                out.append(_r("table_position", False, "cells are malformed"))
             out.append(
                 numeric_attested(
                     block.raw_text,

@@ -15,6 +15,7 @@ from manuallabor.agent.data import target_slug
 from manuallabor.agent.errors import AgentConflict
 from manuallabor.agent.inputs import basis_sha256, eligible_items
 from manuallabor.agent.projections import project_outcomes_file
+from manuallabor.agent.recheck import numbers_changed
 from manuallabor.agent.types import AgentPlan, Skip
 from manuallabor.contracts._base import ContractModel, TargetId
 from manuallabor.contracts.enums import (
@@ -26,7 +27,6 @@ from manuallabor.contracts.enums import (
 from manuallabor.contracts.flag import Flag
 from manuallabor.contracts.proposal import Proposal
 from manuallabor.project import ProjectPaths
-from manuallabor.scoring.faithfulness import numeric_tokens
 from manuallabor.state import projections
 from manuallabor.state.data import ProjectData
 from manuallabor.state.errors import InvalidOp, NotFound
@@ -257,10 +257,23 @@ class AgentService:
     def _settle(
         self, p: Proposal, status: ProposalStatus, action_id: int | None, **upd: Any
     ) -> Proposal:
+        """pending -> status as a compare-and-swap inside the caller's transaction: if another
+        decision settled the proposal first, raise `already_decided` and the whole transaction
+        (decision, override, flag resolution) rolls back."""
         new = p.model_copy(update={"status": status, **upd})
-        self.store.set_proposal(new, action_id)
+        if not self.store.set_proposal(new, action_id, expect=ProposalStatus.pending):
+            raise AgentConflict("already_decided", f"{p.id} was decided by another request")
         self.store.after_commit(lambda: projections.project_proposals(self.store, self.paths))
         return new
+
+    def _claim(self, proposal_id: str) -> Proposal:
+        """The first statement of a decision transaction (BEGIN IMMEDIATE holds the write lock
+        from here to COMMIT): re-read the proposal; anything but pending means a concurrent
+        request decided it after this one's pre-checks."""
+        cur = self.proposal(proposal_id)
+        if cur.status != ProposalStatus.pending:
+            raise AgentConflict("already_decided", f"{cur.id} is {cur.status.value}")
+        return cur
 
     def _fresh(self, p: Proposal) -> bool:
         slug = target_slug(p.target_id)
@@ -276,9 +289,15 @@ class AgentService:
             raise AgentConflict("not_pending", f"{p.id} is {p.status.value}")
         if not self._fresh(p):
             with self.store.tx():
-                self._settle(p, ProposalStatus.superseded, None)
+                self._settle(self._claim(p.id), ProposalStatus.superseded, None)
             raise AgentConflict(
                 "stale_proposal", f"{p.id}: the project changed since it was proposed"
+            )
+        missing = p.missing_checks()
+        if missing:
+            raise AgentConflict(
+                "checks_failed",
+                f"{p.id}: the check list is incomplete, missing: " + ", ".join(missing),
             )
         if not p.all_checks_passed:
             failed = ", ".join(r.check for r in p.rechecks if not r.passed)
@@ -304,6 +323,7 @@ class AgentService:
         slug = target_slug(p.target_id)
         follow: list[RunPlanIn] = []
         with self.store.tx():
+            p = self._claim(p.id)
             if p.kind in (ProposalKind.text, ProposalKind.cells):
                 assert p.proposal_text is not None
                 out = self.review.apply_agent_edit(
@@ -384,6 +404,7 @@ class AgentService:
         slug = target_slug(p.target_id)
         follow: list[RunPlanIn] = []
         with self.store.tx():
+            p = self._claim(p.id)
             if p.kind == ProposalKind.bbox:
                 if bbox is None:
                     raise InvalidOp("a bbox proposal is edited with a bbox")
@@ -415,6 +436,7 @@ class AgentService:
             raise AgentConflict("not_pending", f"{p.id} is {p.status.value}")
         slug = target_slug(p.target_id)
         with self.store.tx():
+            p = self._claim(p.id)
             aid = self.store.next_action_id()
             self.store.append_action(
                 ActionKind.proposal_reject,
@@ -453,7 +475,12 @@ class AgentService:
                 continue
             if not p.all_checks_passed or not self._fresh(p) or self._numeric_target(p):
                 continue
-            follow.extend(self._accept(p, f"{request_id}:{p.id}", bulk=True))
+            try:
+                follow.extend(self._accept(p, f"{request_id}:{p.id}", bulk=True))
+            except AgentConflict as exc:
+                if exc.code in ("already_decided", "not_pending", "stale_proposal"):
+                    continue  # decided or superseded meanwhile: not this bulk's to accept
+                raise
             accepted.append(self.proposal(p.id))
         self._follow_up(follow)
         return sorted(accepted, key=lambda x: x.id)
@@ -471,5 +498,6 @@ class AgentService:
         if blk.has_numeric_spec:
             return True
         if p.kind in (ProposalKind.text, ProposalKind.cells) and p.proposal_text is not None:
-            return sorted(numeric_tokens(p.proposal_text)) != sorted(numeric_tokens(blk.raw_text))
+            # by position: a permutation of the same numbers is a numeric change
+            return numbers_changed(blk.raw_text, p.proposal_text)
         return False

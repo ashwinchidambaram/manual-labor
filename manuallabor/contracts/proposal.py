@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Final
 
 from pydantic import Field, computed_field, field_validator, model_validator
 
@@ -21,6 +21,39 @@ from manuallabor.contracts._base import (
 )
 from manuallabor.contracts.block import VisionReading
 from manuallabor.contracts.enums import EvidenceSource, ProposalKind, ProposalStatus
+
+# The rechecks every proposal of a kind must carry (design 10 section 3.6). A stored check
+# list that lacks any of them is incomplete and never counts as passing.
+REQUIRED_CHECKS: Final[dict[ProposalKind, tuple[str, ...]]] = {
+    ProposalKind.text: (
+        "shape",
+        "changed",
+        "evidence",
+        "faithfulness",
+        "numeric_attested",
+        "token_whitespace",
+        "garbage_ratio",
+        "parser_agreement",
+    ),
+    ProposalKind.cells: (
+        "shape",
+        "changed",
+        "evidence",
+        "table_coverage",
+        "table_position",
+        "numeric_attested",
+        "table_consistency",
+    ),
+    ProposalKind.attach: ("changed", "evidence", "attach_target", "attach_evidence"),
+    ProposalKind.regroup: ("changed", "evidence", "regroup_target", "regroup_similarity"),
+    ProposalKind.bbox: (
+        "changed",
+        "evidence",
+        "bbox_geometry",
+        "bbox_text_overlap",
+        "bbox_content",
+    ),
+}
 
 
 class RecheckResult(ContractModel):
@@ -166,7 +199,15 @@ class Proposal(ContractModel):
             raise ValueError("history length must equal round - 1")
         return self
 
+    def missing_checks(self) -> list[str]:
+        """The checks its kind requires that the stored list lacks."""
+        have = {r.check for r in self.rechecks}
+        return [c for c in REQUIRED_CHECKS[self.kind] if c not in have]
+
+    # Every check of the kind's list is present and passed: an incomplete list never passes,
+    # so a proposal stored before a check existed cannot be applied. (A comment, not a
+    # docstring: the docstring would become the schema description.)
     @computed_field  # type: ignore[prop-decorator]
     @property
     def all_checks_passed(self) -> bool:
-        return all(r.passed for r in self.rechecks)
+        return not self.missing_checks() and all(r.passed for r in self.rechecks)

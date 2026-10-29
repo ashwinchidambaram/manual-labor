@@ -6,6 +6,7 @@ from collections.abc import Sequence
 
 from manuallabor.calibration.buckets import bucketize, pooled, wilson_hi, wilson_lo
 from manuallabor.calibration.types import (
+    MIN_BUCKET_N,
     MIN_SUGGEST_N,
     Outcome,
     ThresholdSuggestion,
@@ -36,8 +37,13 @@ def suggest_threshold(
     outs: Sequence[Outcome], target: float, current: float | None = None
 ) -> tuple[ThresholdSuggestion, list[str]]:
     """The lowest t in [0.50, 0.95] such that the reviewed decisions with score >= t number at
-    least MIN_SUGGEST_N, have a Wilson upper bound below the target edit rate, and no
-    non-sparse bucket above t has a lower bound above it. Warnings: `current_too_low`."""
+    least MIN_SUGGEST_N, have a Wilson upper bound below the target edit rate, and no bucket
+    at or above t (sparse or not) has a Wilson lower bound above the target.
+
+    No extrapolation: t is never below the lowest bucket that holds MIN_BUCKET_N decisions
+    (the scores below it were not observed in any number, so nothing says they are safe), and
+    a sparse bucket whose edits are significant (lower bound above the target) blocks every
+    t below it however many clean decisions sit lower down. Warnings: `current_too_low`."""
     rows = pooled(outs)
     buckets = bucketize(outs)
     warnings: list[str] = []
@@ -50,30 +56,47 @@ def suggest_threshold(
                 f"were edited (lower bound {wilson_lo(k, len(sel)):.3f} > target {target:g})"
             )
     suggested: float | None = None
+    populated = [b.lo for b in buckets if not b.sparse]
+    floor = min(populated) if populated else None
     for r in rows:
-        if r.n < MIN_SUGGEST_N:
+        if r.n < MIN_SUGGEST_N or floor is None or r.t < floor - 1e-9:
             continue
-        bad_bucket = any(
-            (not b.sparse) and b.lo >= r.t - 1e-9 and b.wilson_lo > target for b in buckets
-        )
+        bad_bucket = any(b.n > 0 and b.lo >= r.t - 1e-9 and b.wilson_lo > target for b in buckets)
         if r.hi < target and not bad_bucket:
             suggested = r.t
             break
     if suggested is not None:
         return ThresholdSuggestion(suggested=suggested, reason="ok"), warnings
-    enough = [r for r in rows if r.n >= MIN_SUGGEST_N]
-    if not enough:
-        have = max((r.n for r in rows), default=0)
+    if floor is None:
         return (
             ThresholdSuggestion(
                 reason="insufficient_data",
-                detail=f"{have} reviewed decisions at or above 0.50; {MIN_SUGGEST_N} are needed",
+                detail=f"no score bucket holds {MIN_BUCKET_N} reviewed decisions yet",
+            ),
+            warnings,
+        )
+    enough = [r for r in rows if r.n >= MIN_SUGGEST_N and r.t >= floor - 1e-9]
+    if not enough:
+        have = max((r.n for r in rows if r.t >= floor - 1e-9), default=0)
+        return (
+            ThresholdSuggestion(
+                reason="insufficient_data",
+                detail=f"{have} reviewed decisions at or above {max(floor, rows[0].t):g}; "
+                f"{MIN_SUGGEST_N} are needed",
             ),
             warnings,
         )
     best = min(enough, key=lambda r: (r.hi, -r.n, r.t))
     need = _extra_needed(best.edited, best.n, target)
-    if need is None:
+    bad = [b for b in buckets if b.n > 0 and b.wilson_lo > target and b.lo >= best.t - 1e-9]
+    if best.hi < target and bad:
+        b = bad[-1]
+        detail = (
+            f"at {best.t:g}: {best.edited}/{best.n} edited, but the bucket "
+            f"[{b.lo:g}, {b.hi:g}) has {b.edited}/{b.n} edited (lower bound "
+            f"{b.wilson_lo:.3f} > {target:g}); no threshold at or below it is safe"
+        )
+    elif need is None:
         detail = (
             f"at {best.t:g}: {best.edited}/{best.n} edited; more decisions cannot bring the "
             f"upper bound below {target:g}"

@@ -8,6 +8,8 @@
 # --live also runs AC8 (needs Ollama and the small-tier models). Without it AC8 is NOT VERIFIED.
 # Environment:
 #   ACCEPT_SKIP="4 6"                   do not run those AC numbers (they render NOT VERIFIED)
+#   ACCEPT_ONLY="3 5"                   run only those AC numbers
+#   ACCEPT_KEEP=1                       keep earlier results in ACCEPT_OUT (re-run some ACs)
 #   ACCEPT_PYTEST_FLAGS="--basetemp=X"  appended to every pytest call
 #   ACCEPT_OUT=build/acceptance         result directory
 #   ACCEPT_DOC=docs/ACCEPTANCE.md       rendered file
@@ -19,10 +21,11 @@ OUT="${ACCEPT_OUT:-build/acceptance}"
 DOC="${ACCEPT_DOC:-docs/ACCEPTANCE.md}"
 FLAGS="${ACCEPT_PYTEST_FLAGS:-}"
 SKIP=" ${ACCEPT_SKIP:-} "
+ONLY="${ACCEPT_ONLY:-}"
 LIVE=0
 [ "${1:-}" = "--live" ] && LIVE=1
 
-rm -rf "$OUT"
+[ "${ACCEPT_KEEP:-0}" = "1" ] || rm -rf "$OUT"
 mkdir -p "$OUT"
 date -u +%Y-%m-%dT%H:%M:%SZ > "$OUT/date.txt"
 echo "$LIVE" > "$OUT/live.txt"
@@ -35,6 +38,9 @@ step() {
   local id="$1-$2"
   shift 2
   case "$SKIP" in *" ${id%%-*} "*) echo "skip $id (ACCEPT_SKIP)"; return 0 ;; esac
+  if [ -n "$ONLY" ]; then
+    case " $ONLY " in *" ${id%%-*} "*) ;; *) return 0 ;; esac
+  fi
   printf '%s\n' "$*" > "$OUT/$id.cmd"
   local t0
   t0=$(date +%s)
@@ -67,14 +73,14 @@ KEPT="$(sed -n 's/^kept //p' "$OUT/1-1.out" 2>/dev/null | tail -1)"
 step 2 1 "uv run pytest tests/scoring -m acc2 -s -q $FLAGS"
 
 # -- AC3: figure methods and caption-reference attachment ------------------------------------
-step 3 1 "uv run pytest -m acc3 -s -q $FLAGS"
+step 3 1 "uv run pytest tests/figures tests/cleanup -m acc3 -s -q $FLAGS"
 
 # -- AC4 / AC6: keyboard-only verify and scope toggle (Playwright) ---------------------------
 step 4 1 "cd frontend && npm run e2e -- --grep '@AC4'"
 step 6 1 "cd frontend && npm run e2e -- --grep '@AC6'"
 
 # -- AC5: agent proposals carry their re-check results -----------------------------------------
-step 5 1 "uv run pytest -m acc5 -s -q $FLAGS"
+step 5 1 "uv run pytest tests/agent -m acc5 -s -q $FLAGS"
 
 # -- AC7: the export zip validates --------------------------------------------------------------
 step 7 1 "uv run pytest tests/export -q $FLAGS"

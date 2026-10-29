@@ -245,6 +245,7 @@ def basis_sha256(
     payload: dict[str, Any] = {"kind": kind.value, "target": target_id}
     if kind in (ProposalKind.text, ProposalKind.cells):
         blk = next((b for b in data.raw_blocks(slug) if b.id == target_id), None)
+        mb = next((b for b in data.machine_blocks(slug) if b.id == target_id), None)
         sf = data.score_file(slug)
         variants: list[Any] = []
         if sf is not None:
@@ -257,6 +258,9 @@ def basis_sha256(
                 "readers": dict(sorted(blk.raw_text_by_parser.items())) if blk else None,
                 "display": current_text,
                 "variants": variants,
+                # N needs two attesters on a numeric-spec block, one otherwise
+                "has_numeric_spec": mb.has_numeric_spec if mb else None,
+                "table": blk.table.model_dump(mode="json") if blk and blk.table else None,
                 "document": file_sha(dp.document),
                 "vision": vision.model_dump(mode="json") if vision is not None else None,
             }
@@ -277,6 +281,9 @@ def basis_sha256(
         payload.update(
             {
                 "attach": file_sha(dp.attach),
+                # the articles (attach_target, attach_evidence) are built from the topic view
+                "groups": file_sha(dp.groups),
+                "group_overrides": file_sha(dp.group_overrides),
                 "selection": canon([sel.block_ids, sel.article_split.value, sel.active_view.value]),
             }
         )

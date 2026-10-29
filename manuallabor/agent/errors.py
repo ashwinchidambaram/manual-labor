@@ -5,7 +5,8 @@ from __future__ import annotations
 
 class AgentConflict(Exception):
     """A precondition of an agent action failed (HTTP 409). `code` is stable and documented:
-    `no_open_flags`, `not_pending`, `stale_proposal`, `checks_failed`."""
+    `no_open_flags`, `not_pending`, `stale_proposal`, `checks_failed`, `already_decided` (a
+    concurrent request decided the proposal between this request's checks and its commit)."""
 
     def __init__(self, code: str, detail: str) -> None:
         super().__init__(detail)

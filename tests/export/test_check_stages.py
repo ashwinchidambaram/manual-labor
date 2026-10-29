@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.check.test_check import PROJECT_A, temp_dirs, tree_hash
+from tests.check.test_check import PROJECT_A, tree_hash
 
 LABOR = [sys.executable, "-m", "manuallabor"]
 
@@ -20,9 +20,16 @@ LABOR = [sys.executable, "-m", "manuallabor"]
 def test_e23_and_e25_labor_check_runs_the_export_stages_offline(
     requires_docling: None, tmp_path: Path
 ) -> None:
-    before_tree, before_tmp = tree_hash(PROJECT_A), temp_dirs()
+    before_tree = tree_hash(PROJECT_A)
     log = tmp_path / "net.log"
-    env = {**os.environ, "MANUALLABOR_OFFLINE": "1", "MANUALLABOR_OFFLINE_LOG": str(log)}
+    tmp_root = tmp_path / "tmp"
+    tmp_root.mkdir()
+    env = {
+        **os.environ,
+        "MANUALLABOR_OFFLINE": "1",
+        "MANUALLABOR_OFFLINE_LOG": str(log),
+        "TMPDIR": str(tmp_root),  # labor check's temporary copy lands here
+    }
     r = subprocess.run(
         [*LABOR, "check", str(PROJECT_A)], capture_output=True, text=True, timeout=900, env=env
     )
@@ -33,7 +40,8 @@ def test_e23_and_e25_labor_check_runs_the_export_stages_offline(
         assert " PASS " in line, line
     assert "refused" in next(v for key, v in rows.items() if key.startswith("K10"))
     assert "faith_violations(auto)" in r.stdout and "| 0 |" in r.stdout
-    assert tree_hash(PROJECT_A) == before_tree and temp_dirs() == before_tmp
+    assert tree_hash(PROJECT_A) == before_tree
+    assert not list(tmp_root.glob("labor-check-*"))  # the temporary copy was removed
     assert not (PROJECT_A / "export").exists()
     assert not log.exists() or log.read_text() == ""  # E25: no network attempt at all
 

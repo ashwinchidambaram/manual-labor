@@ -519,15 +519,28 @@ class Store:
             out = [p for p in out if slug_of(p.target_id) == doc]
         return out
 
-    def set_proposal(self, p: Proposal, action_id: int | None) -> None:
-        """Replace a proposal's body and status (inside a `tx`)."""
+    def set_proposal(
+        self, p: Proposal, action_id: int | None, *, expect: ProposalStatus | None = None
+    ) -> bool:
+        """Replace a proposal's body and status (inside a `tx`). With `expect`, a
+        compare-and-swap: the row changes only if its stored status is still `expect`; returns
+        whether it changed (False: another decision got there first)."""
         if self._depth == 0:
             raise RuntimeError("set_proposal outside a transaction")
-        self.x(
+        sql = (
             "UPDATE proposals SET body=?, status=?, decided_action_id=COALESCE(?, "
-            "decided_action_id) WHERE n=?",
-            (_j(p.model_dump(mode="json")), p.status.value, action_id, int(p.id.split("-", 1)[1])),
+            "decided_action_id) WHERE n=?"
         )
+        args: list[Any] = [
+            _j(p.model_dump(mode="json")),
+            p.status.value,
+            action_id,
+            int(p.id.split("-", 1)[1]),
+        ]
+        if expect is not None:
+            sql += " AND status=?"
+            args.append(expect.value)
+        return self.x(sql, tuple(args)).rowcount == 1
 
     # -- selection / overrides / cursor ---------------------------------------------------
 

@@ -4,7 +4,7 @@
 Deliver Manual Labor v1 per SPEC.md: every CLAUDE.md module gate (0–11) passed with its proving command pasted in docs/PROGRESS.md, and SPEC §11 acceptance recorded in docs/ACCEPTANCE.md.
 
 ## Current Phase
-Phase 7 (API + project state). Autonomous 2026-10-29.
+Phases 9/10/11 in parallel fix/review. Autonomous 2026-10-29.
 
 ## Phases
 Detailed tasks, model assignments, and gates: docs/plans/2026-10-28-manual-labor-build.md. Decisions and environment: findings.md.
@@ -55,9 +55,9 @@ Detailed tasks, model assignments, and gates: docs/plans/2026-10-28-manual-labor
 - **Status:** complete
 
 ### Phase 7: API + project state
-- [ ] Design (Opus) · Implement (Sonnet ×2) · Review (Opus) · Fix
-- [ ] Gate: `labor check ./tests/fixtures/project-a` passes; SIGKILL-resume test; every action persisted
-- **Status:** in_progress
+- [x] Design (Opus) · Implement (Sonnet ×2) · Review (Opus, rejected) · Fix (Opus)
+- [x] Gate: 178 tests; labor check K1–K16; R1–R6 byte-identical; every action persisted
+- **Status:** complete
 
 ### Phase 8: UI Scope
 - [x] Design (Sonnet) · Implement (Sonnet) · UX check (Sonnet) · Review (Opus) · Fix (Sonnet)

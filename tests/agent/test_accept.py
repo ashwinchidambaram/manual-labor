@@ -6,6 +6,7 @@ from __future__ import annotations
 import hashlib
 import json
 import shutil
+from collections.abc import Sequence
 from pathlib import Path
 
 import pytest
@@ -19,18 +20,21 @@ from manuallabor.contracts.enums import (
     ProposalStatus,
     Task,
 )
-from manuallabor.contracts.proposal import Proposal
+from manuallabor.contracts.proposal import REQUIRED_CHECKS, Proposal
+from manuallabor.jobs.inline import run_inline
 from manuallabor.project import ProjectPaths
 from manuallabor.state.errors import EditConflictError
-from manuallabor.state.models import ActionKind
+from manuallabor.state.models import ActionKind, RunPlanIn
 from manuallabor.state.review import display_text, load_review_blocks
 from tests.agent.conftest import AEnv
 from tests.conftest import labor_copy
 
 
-def forge(aenv: AEnv, flag_id: str, text: str) -> Proposal:
+def forge(aenv: AEnv, flag_id: str, text: str, *, checks: Sequence[str] | None = None) -> Proposal:
     """A pending text proposal whose checks all passed (scaffolding for the accept path; the
-    model path is covered by the rechecks' own tests)."""
+    model path is covered by the rechecks' own tests). `checks` defaults to the complete list
+    of the text kind; a shorter list makes an incomplete (never passing) proposal."""
+    names = REQUIRED_CHECKS[ProposalKind.text] if checks is None else checks
     flag = aenv.store.get_flag(flag_id)
     assert flag is not None
     slug = flag.target_id.split("-")[1]
@@ -49,7 +53,7 @@ def forge(aenv: AEnv, flag_id: str, text: str) -> Proposal:
             "proposal_text": text,
             "evidence": [{"source": "note", "span": "seeded", "verified": True}],
             "rationale": "forged",
-            "rechecks": [{"check": "shape", "passed": True}],
+            "rechecks": [{"check": c, "passed": True} for c in names],
             "basis_sha256": basis_sha256(
                 aenv.paths, aenv.data, flag.target_id, ProposalKind.text, cur, None
             ),
@@ -63,7 +67,97 @@ def forge(aenv: AEnv, flag_id: str, text: str) -> Proposal:
     return p
 
 
-def test_5_accept_records_an_agent_edit(aenv: AEnv) -> None:
+def inject_text_layer_misread(aenv: AEnv) -> str:
+    """The real numeric block b-clean-p002-04 with its text layer (pymupdf, the raw source)
+    reading `3S N·m` where docling and OCR read `35`; cleanup and scoring re-run (mock) so the
+    project is consistent and the document ready."""
+    bid = "b-clean-p002-04"
+    dp = aenv.paths.doc("clean")
+    blocks = json.loads(dp.blocks.read_text(encoding="utf-8"))
+    for b in blocks:
+        if b["id"] == bid:
+            assert "35 N" in b["raw_text"] and b["raw_source"] == "pymupdf"
+            b["raw_text"] = b["raw_text"].replace("35 N", "3S N")
+            b["raw_text_by_parser"]["pymupdf"] = b["raw_text"]
+            assert "35 N" in b["raw_text_by_parser"]["docling"]
+            assert "35 N" in b["raw_text_by_parser"]["ocr"]
+    dp.blocks.write_text(json.dumps(blocks), encoding="utf-8")
+    dp.clean.unlink()
+    dp.scores.unlink()
+    res = run_inline(
+        aenv.paths,
+        RunPlanIn(to="score2", docs=["clean"]),
+        mode="mock",
+        emit=lambda _o: None,
+        store=aenv.store,
+    )
+    assert res.ok
+    rd = aenv.data.readiness("clean")
+    assert rd.state == "ready" and not rd.stale
+    return bid
+
+
+def test_5_attested_look_alike_end_to_end_through_the_api(aenv: AEnv) -> None:
+    """Design test 5 on a real block: pymupdf `3S N·m`, docling + OCR `35 N·m`. The mock agent
+    proposes the docling reading; every check passes; the accept goes through the API."""
+    from fastapi.testclient import TestClient
+
+    from manuallabor.api.app import create_app
+    from manuallabor.api.deps import Hooks
+    from manuallabor.calibration.apply import CalibrationService
+    from manuallabor.state.interfaces import AppServices
+    from manuallabor.state.learning import LearningService
+
+    bid = inject_text_layer_misread(aenv)
+    blk = next(b for b in aenv.data.machine_blocks("clean") if b.id == bid)
+    assert blk.has_numeric_spec and "3S N" in blk.raw_text
+    f = aenv.flag(bid, "wrong_text", note="the torque value is misread")
+    aenv.run_agent()
+    (p,) = aenv.agent.proposals()
+    assert p.kind == ProposalKind.text and p.proposal_text is not None
+    assert "35 N" in p.proposal_text and "3S" not in p.proposal_text
+    assert [r.check for r in p.rechecks if not r.passed] == []
+    assert p.all_checks_passed
+    n_att = next(r for r in p.rechecks if r.check == "numeric_attested")
+    assert "3S→35" in (n_att.detail or "") and "docling" in (n_att.detail or "")
+    # a numeric-spec target is never bulk-accepted
+    assert aenv.agent.accept_all_passing(None, "bulk") == []
+    svc = AppServices(
+        paths=aenv.paths,
+        store=aenv.store,
+        review=aenv.review,
+        scope=aenv.scope,
+        figures=aenv.figures,
+        learning=LearningService(aenv.paths, aenv.store),
+        runner=aenv.runner,
+        mock=True,
+        agent=aenv.agent,
+        calibration=CalibrationService(aenv.paths, aenv.store, aenv.data, aenv.runner),
+    )
+    with TestClient(create_app(svc, hooks=Hooks())) as client:
+        r = client.post(f"/api/agent/proposals/{p.id}/accept", json={"request_id": "r-acc"})
+        assert r.status_code == 200, r.text
+        assert r.json()["status"] == "accepted"
+        (d,) = [d for d in aenv.store.decisions() if d.source == "agent"]
+        assert d.decision.action.value == "edit" and d.decision.block_id == bid
+        assert d.decision.edited_text == p.proposal_text
+        assert d.numbers_verified
+        if d.faith_passed is False:  # a content change against raw: the diff is stored
+            assert d.human_edit_diff
+        act = aenv.store.get_action(d.action_id)
+        assert act is not None and act.kind == ActionKind.proposal_accept
+        assert act.screen == "agent"
+        assert act.example is not None and act.example["proposal"]["id"] == p.id
+        assert aenv.store.get_flag(f).status == FlagStatus.resolved  # type: ignore[union-attr]
+        ov = next(b for b in load_review_blocks(aenv.paths, aenv.store, "clean") if b.id == bid)
+        assert ov.status == BlockStatus.edited and ov.clean_text == p.proposal_text
+        # replaying the request changes nothing
+        n = aenv.store.count_actions()
+        r2 = client.post(f"/api/agent/proposals/{p.id}/accept", json={"request_id": "r-acc"})
+        assert r2.status_code == 200 and aenv.store.count_actions() == n
+
+
+def test_accept_records_a_forged_content_change(aenv: AEnv) -> None:
     (f,) = aenv.seed([0])
     blk = next(b for b in aenv.data.machine_blocks("clean") if b.id == "b-clean-p002-04")
     assert blk.has_numeric_spec

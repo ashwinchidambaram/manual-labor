@@ -409,9 +409,15 @@ def _proposal(**over: Any) -> dict[str, Any]:
 
 
 def test_c10_proposal() -> None:
-    p = c.Proposal.model_validate(_proposal(rechecks=[{"check": "z", "passed": True}]))
+    from manuallabor.contracts.proposal import REQUIRED_CHECKS
+
+    full = [{"check": x, "passed": True} for x in REQUIRED_CHECKS[c.ProposalKind.text]]
+    p = c.Proposal.model_validate(_proposal(rechecks=full))
     dumped = p.model_dump(mode="json")
     assert dumped["all_checks_passed"] is True
+    # an incomplete check list never passes (module 10 review fix)
+    part = c.Proposal.model_validate(_proposal(rechecks=[{"check": "z", "passed": True}]))
+    assert part.model_dump(mode="json")["all_checks_passed"] is False
     assert c.Proposal.model_validate(dumped) == p  # round trip with computed field
     p2 = c.Proposal.model_validate(
         _proposal(rechecks=[{"check": "b", "passed": False}, {"check": "a", "passed": True}])

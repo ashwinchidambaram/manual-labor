@@ -29,7 +29,7 @@ from manuallabor.calibration.types import (
 from manuallabor.cleanup.rules import DH_RE
 from manuallabor.cleanup.types import LearnedCleanup, LearnedRule
 from manuallabor.contracts.enums import BlockType
-from manuallabor.scoring.faithfulness import BULLETS
+from manuallabor.scoring.faithfulness import BULLETS, ocr_confusable
 from manuallabor.scoring.numeric import NUM, find_numeric_specs
 from manuallabor.state.learning import derive_cleanup
 from manuallabor.state.models import ActionKind, ActionRecord
@@ -152,7 +152,9 @@ def derive_cleanup_v2(
 
 def mine_confusions(outs: list[Outcome]) -> list[ConfusionPair]:
     """(wrong, right) character pairs where the only change a reviewer made to a token is an
-    OCR look-alike: same length, a digit on at least one side, the corrected token has a digit."""
+    OCR look-alike (`scoring.faithfulness.ocr_confusable` on the whole token: same length,
+    every differing pair inside one confusable group), with a digit on at least one side of
+    the pair and in the corrected token."""
     blocks: dict[tuple[str, str], set[str]] = defaultdict(set)
     examples: dict[tuple[str, str], list[str]] = defaultdict(list)
     for o in outs:
@@ -168,7 +170,9 @@ def mine_confusions(outs: list[Outcome]) -> list[ConfusionPair]:
                 ok = False
                 break
             for w_tok, r_tok in zip(a[i1:i2], b[j1:j2], strict=True):
-                if len(w_tok) != len(r_tok) or not any(c.isdigit() for c in r_tok):
+                # the whole token change must be a look-alike (same length, every differing
+                # pair inside one confusable group): `35`->`45` is a new value, not a misread
+                if not ocr_confusable(w_tok, r_tok) or not any(c.isdigit() for c in r_tok):
                     ok = False
                     break
                 for w, r in zip(w_tok, r_tok, strict=True):

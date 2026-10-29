@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import hashlib
 from collections.abc import Iterable
+from dataclasses import replace
 
 from manuallabor.calibration.types import Outcome
 from manuallabor.state.models import ActionKind, ActionRecord
@@ -90,10 +91,22 @@ def outcome_of(a: ActionRecord) -> Outcome | None:
 
 def outcomes(actions: Iterable[ActionRecord]) -> list[Outcome]:
     """One outcome per (block, raw text): the latest relevant action by id. A re-parse that
-    changes the raw text keeps the earlier observation (the score was real for that text)."""
+    changes the raw text keeps the earlier observation (the score was real for that text).
+
+    An edit that changed the text stays an edit: a later approval of the same (block, raw
+    text) approves the edited text (Verify's "K then A"), so the machine output still needed a
+    change and the outcome is `edited`."""
     latest: dict[tuple[str, str], Outcome] = {}
+    last_edit: dict[tuple[str, str], Outcome] = {}
     for a in sorted(actions, key=lambda x: x.id):
         o = outcome_of(a)
-        if o is not None:
-            latest[(o.block_id, o.raw_sha)] = o
+        if o is None:
+            continue
+        key = (o.block_id, o.raw_sha)
+        if o.edited and a.kind in _EDIT_KINDS:
+            last_edit[key] = o
+        elif not o.edited and key in last_edit:
+            e = last_edit[key]  # the approval keeps the edited text: the edit is the outcome
+            o = replace(o, edited=True, final_text=e.final_text, final_sha=e.final_sha)
+        latest[key] = o
     return sorted(latest.values(), key=lambda o: o.action_id)

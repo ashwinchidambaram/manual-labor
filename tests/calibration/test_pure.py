@@ -51,8 +51,9 @@ def test_20_wilson() -> None:
 def test_20_suggestion_rules() -> None:
     s, _w = suggest_threshold(many([(0.9, 49, 0)]), 0.02)
     assert s.reason == "insufficient_data" and s.suggested is None
+    # never below the lowest bucket that holds >= 20 decisions (no extrapolation down to 0.50)
     s, _w = suggest_threshold(many([(0.9, 200, 0)]), 0.02)
-    assert (s.reason, s.suggested) == ("ok", 0.5)
+    assert (s.reason, s.suggested) == ("ok", 0.9)
     # not enough zero-edit evidence at the target: the price in decisions is stated
     s, _w = suggest_threshold(many([(0.9, 100, 0)]), 0.02)
     assert s.reason == "target_not_met" and "more decisions" in (s.detail or "")
@@ -182,3 +183,92 @@ def test_22_promotion_never_raises_confidence() -> None:
         assert taken <= base
         worse += p2 > base  # the raw promoted combiner CAN raise; scoring must not take it
     assert worse > 0
+
+
+def test_22_promotion_never_raises_score_block_confidence() -> None:
+    """The real scorer on 1,000 random blocks (so random signal sets: reader agreement,
+    garbage, look-alikes, numbers, clean or not) with random promotions: the learned layer may
+    lower confidence and queue more, never raise confidence or release a queued block."""
+    from manuallabor.calibration.types import CriticalPromotion
+    from manuallabor.scoring.learned import LearnedScoring
+    from manuallabor.scoring.pipeline import score_block
+    from tests.conftest import ctx, make_block
+
+    rng = random.Random(11)
+    words = [
+        "Torque",
+        "the",
+        "bolt",
+        "to",
+        "35",
+        "N·m",
+        "3S",
+        "witha",
+        "clean",
+        "cloth",
+        "§",
+        "~~",
+        "###",
+        "0.5",
+        "mm",
+        "Check",
+        "valve",
+        "l0",
+        "B8",
+        "��",
+        "a",
+        "b",
+    ]
+    names = [
+        "garbage_ratio",
+        "parser_agreement",
+        "reading_order_risk",
+        "ocr_confidence",
+        "textlayer_vs_ocr",
+        "llm_verifier",
+        "faithfulness",
+        "table_consistency",
+    ]
+    lowered = scored = 0
+    signal_sets: set[tuple[str, ...]] = set()
+    for _ in range(1000):
+        raw = " ".join(rng.choice(words) for _ in range(rng.randint(2, 10)))
+        alt = " ".join(w if rng.random() < 0.8 else rng.choice(words) for w in raw.split())
+        texts = {"pymupdf": raw}
+        if rng.random() < 0.8:
+            texts["docling"] = alt
+        if rng.random() < 0.3:
+            ocr = (w if rng.random() < 0.9 else rng.choice(words) for w in alt.split())
+            texts["ocr"] = " ".join(ocr)
+        b = make_block(raw, texts=texts)
+        if rng.random() < 0.5:
+            b = b.model_copy(update={"clean_text": raw})
+        proms = tuple(
+            CriticalPromotion(
+                id=f"p{i}",
+                signal=s,
+                below=rng.choice([0.5, 0.8, 0.9]),
+                support=50,
+                rate_below=0.3,
+                rate_above=0.01,
+            )
+            for i, s in enumerate(names)
+            if rng.random() < 0.4
+        )
+        learned = LearnedScoring(snapshot="snapshot:001", sha="x", promotions=proms)
+        c = ctx(
+            displaced_in=["docling"] if rng.random() < 0.3 else [],
+            in_overlap=rng.random() < 0.2,
+            n_columns=rng.choice([1, 1, 2, 3]),
+        )
+        base = score_block(b, c, threshold=0.85)
+        lrn = score_block(b, c, threshold=0.85, learned=learned)
+        signal_sets.add(tuple(sorted(s.name.value for s in base.signals)))
+        if base.confidence is None:
+            continue
+        scored += 1
+        assert lrn.confidence is not None and lrn.confidence <= base.confidence, raw
+        lowered += lrn.confidence < base.confidence
+        if base.status == "queued":
+            assert lrn.status == "queued", raw
+    assert scored >= 900 and lowered > 0 and len(signal_sets) > 1

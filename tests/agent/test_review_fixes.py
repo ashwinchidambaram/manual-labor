@@ -15,8 +15,8 @@ from manuallabor.agent.recheck import (
     check_table_consistency,
     check_table_coverage,
     check_table_position,
-    numeric_attested,
     numbers_changed,
+    numeric_attested,
 )
 from manuallabor.agent.types import AgentInput, AgentItem
 from manuallabor.contracts.block import VisionReading
@@ -51,9 +51,10 @@ def test_permuted_values_fail_table_position() -> None:
     permuted = [["Part", "Qty"], ["Bolt", "8"], ["Nut", "12"], ["Washer", "4"]]
     # the multiset checks cannot see a permutation ...
     assert check_table_coverage(BNW, permuted, {"pymupdf": BNW}, "pymupdf").passed
-    assert numeric_attested(BNW, {"pymupdf": BNW}, "pymupdf", cells_text(permuted), None, True)
     assert check_table_consistency(b, build_table_data(permuted, 1)).passed
-    # ... the positional one does
+    # ... N, now positional, does (the numbers moved), and so does the cell-by-cell check
+    n = numeric_attested(BNW, {"pymupdf": BNW}, "pymupdf", cells_text(permuted), None, False)
+    assert not n.passed
     r = position(b, permuted)
     assert not r.passed and "(1,1)" in (r.detail or "")
     assert position(b, BNW_CELLS).passed
@@ -140,7 +141,8 @@ def test_digit_insert_or_drop_needs_two_attesters() -> None:
     r2 = {"pymupdf": raw2, "docling": "Gap 15 mm"}
     assert not numeric_attested(raw2, r2, "pymupdf", "Gap 15 mm", None, True).passed
     vision = VisionReading(outcome="ok", numbers=["350"], lines=["350"])
-    assert not numeric_attested(raw, {"pymupdf": raw}, "pymupdf", "Torque 350 N·m", vision, True)
+    r = numeric_attested(raw, {"pymupdf": raw}, "pymupdf", "Torque 350 N·m", vision, True)
+    assert not r.passed
     # the look-alike itself still needs only one reader
     raw3 = "Torque 3S N·m"
     r3 = {"pymupdf": raw3, "docling": "Torque 35 N·m"}

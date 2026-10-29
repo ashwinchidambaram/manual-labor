@@ -112,8 +112,8 @@ class CalibrationService:
         prev = self.store.action_by_request(request_id)
         if prev is not None:
             o = prev.payload["_outcome"]
-            job = self.runner.get(o["job"]) if o.get("job") else None
-            return float(o["threshold"]), list(o["pinned"]), job
+            prev_job = self.runner.get(o["job"]) if o.get("job") else None
+            return float(o["threshold"]), list(o["pinned"]), prev_job
         if not 0.0 <= threshold <= 1.0:
             raise InvalidOp("threshold must be within 0..1")
         cfg = self.paths.load_config()
@@ -127,7 +127,12 @@ class CalibrationService:
         else:
             doc_thr = {}
         new_cfg = cfg.model_copy(update={"threshold": threshold, "doc_thresholds": doc_thr})
+        job: JobInfo | None = None
         with self.store.tx():
+            if scope == "project":
+                # enqueued in the same transaction, so the action records the job id and a
+                # replay of this request returns it
+                job = self.runner.enqueue(RunPlanIn(to="score2"))
             aid = self.store.next_action_id()
             self.store.append_action(
                 ActionKind.threshold_project,
@@ -139,14 +144,15 @@ class CalibrationService:
                     "suggested": suggested,
                     "against_suggestion": suggested is not None and threshold != suggested,
                     "reason": "calibration",
-                    "_outcome": {"threshold": threshold, "pinned": pinned, "job": None},
+                    "_outcome": {
+                        "threshold": threshold,
+                        "pinned": pinned,
+                        "job": None if job is None else job.id,
+                    },
                 },
                 request_id=request_id,
                 action_id=aid,
             )
             self.store.add_threshold_history("project", old, threshold, "calibration", aid)
             self.store.after_commit(lambda: write_json(self.paths.config, new_cfg))
-        job = None
-        if scope == "project":
-            job = self.runner.enqueue(RunPlanIn(to="score2"))
         return threshold, pinned, job
