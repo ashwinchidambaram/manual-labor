@@ -106,8 +106,8 @@ export function queueReducer(s: QueueState, e: QueueEvent): QueueState {
       const seen = remember(s.seen, items);
       const wanted = e.replace ? (e.cursor.current_block_id ?? s.currentId) : s.currentId;
       let next: QueueState = { ...s, items, total: e.total, counts: e.counts, docs: e.docs, cursor: e.cursor, seen };
-      const keep = wanted !== null && (items.some((i) => i.block_id === wanted) || s.pinned?.block_id === wanted || seen[wanted]);
-      next = withCurrent(next, keep ? wanted : (items[0]?.block_id ?? null));
+      // a current block that is not listed (approved earlier, then `back`) is kept: the screen fetches and pins it
+      next = withCurrent(next, wanted ?? items[0]?.block_id ?? null);
       return next;
     }
     case "act": {

@@ -6,9 +6,11 @@ import { useProject } from "../api/queries";
 import type { BlockDetail, EditConflict, FlagCategory, PageBlock, QueueItem, QueuePage, QueueSort, ReviewActionOut } from "../api/schema";
 import { useToast } from "../shell/Toast";
 import { initialState, queueReducer, type ActKind, type QueueEvent, type QueueState } from "./queueReducer";
+import { stepView as stepViewBy } from "./sliderCopy";
 import { CancelledError, useVerifyWrites } from "./useVerifyWrites";
 
 export const PAGE_LIMIT = 500;
+const SORTS: QueueSort[] = ["worst_first", "by_page", "figures_only"];
 
 export interface Controls {
   sort: QueueSort;
@@ -169,6 +171,14 @@ export function useVerifyState() {
   );
   const setSort = useCallback((sort: QueueSort) => applyControls({ ...controlsRef.current, sort }, 0), [applyControls]);
   const setView = useCallback((view: number | null) => applyControls({ ...controlsRef.current, view }, 250), [applyControls]);
+  const stepView = useCallback(
+    (dir: 1 | -1) => applyControls({ ...controlsRef.current, view: stepViewBy(controlsRef.current.view, dir, T) }, 250),
+    [applyControls, T],
+  );
+  const cycleSort = useCallback(
+    () => applyControls({ ...controlsRef.current, sort: SORTS[(SORTS.indexOf(controlsRef.current.sort) + 1) % SORTS.length] }, 0),
+    [applyControls],
+  );
 
   // -- navigation -------------------------------------------------------------------------------------------
 
@@ -316,6 +326,8 @@ export function useVerifyState() {
     controls,
     setSort,
     setView,
+    stepView,
+    cycleSort,
     firstLoad,
     queueQ,
     browse,

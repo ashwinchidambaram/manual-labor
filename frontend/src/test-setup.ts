@@ -23,3 +23,11 @@ if (typeof ResizeObserver === "undefined")
     unobserve() {}
     disconnect() {}
   };
+// jsdom has no layout: give virtualised scroll containers a viewport (the Verify queue is role=listbox).
+for (const [prop, size] of [["offsetHeight", 640], ["offsetWidth", 320]] as const)
+  Object.defineProperty(HTMLElement.prototype, prop, {
+    configurable: true,
+    get(this: HTMLElement) {
+      return this.getAttribute("role") === "listbox" ? size : 0;
+    },
+  });

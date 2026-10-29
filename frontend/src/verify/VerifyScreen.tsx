@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ApiError, client, unwrap } from "../api/client";
 import { trackJob } from "../api/queries";
-import type { FigureRailItem, FlagCategory, PageRef, QueueSort } from "../api/schema";
+import type { FigureRailItem, FlagCategory, PageRef } from "../api/schema";
 import { useHotkeys } from "../hooks/useHotkeys";
 import { useToast } from "../shell/Toast";
 import ActionBar from "./ActionBar";
@@ -13,12 +13,9 @@ import FlagDialog from "./FlagDialog";
 import { validCrop, type BBox } from "./geometry";
 import { FOCUS } from "./labels";
 import Queue from "./Queue";
-import { stepView } from "./sliderCopy";
 import SourcePane from "./SourcePane";
 import StatusStrip from "./StatusStrip";
 import { blockKey, fetchBlock, useVerifyState } from "./useVerifyState";
-
-const SORTS: QueueSort[] = ["worst_first", "by_page", "figures_only"];
 
 interface CropMode {
   item: FigureRailItem;
@@ -192,9 +189,9 @@ export default function VerifyScreen() {
       vToggleDiff: () => detail && setView((x) => (x === "text" ? (diffOps(detail) ? "diff" : "text") : "text")),
       vFocusSource: () => document.querySelector<HTMLElement>("[data-zone='source'] [data-current='true']")?.focus(),
       vFocusRail: () => document.querySelector<HTMLElement>("[data-zone='rail'] [data-rail-focusable]")?.focus(),
-      vSort: () => v.setSort(SORTS[(SORTS.indexOf(v.controls.sort) + 1) % SORTS.length]),
-      vViewDown: () => v.setView(stepView(v.controls.view, -1, v.T)),
-      vViewUp: () => v.setView(stepView(v.controls.view, 1, v.T)),
+      vSort: () => v.cycleSort(),
+      vViewDown: () => v.stepView(-1),
+      vViewUp: () => v.stepView(1),
       vZoom: () => setZoom((z) => !z),
       vEscape: () => {
         if (edit?.conflict) setEdit({ ...edit, conflict: null });

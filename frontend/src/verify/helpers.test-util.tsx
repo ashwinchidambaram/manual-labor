@@ -1,4 +1,5 @@
 import { screen, waitFor } from "@testing-library/react";
+import { expect } from "vitest";
 import { renderApp } from "../test/render";
 import { installFake } from "../test/server";
 import { installVerifyFake, makeBlockDetail, seedQueue, vid, type VerifyFake } from "../test/verifyFake";
