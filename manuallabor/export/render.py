@@ -65,11 +65,14 @@ def alt_text(
     figure_id: str, caption_original: str | None, description_generated: str | None
 ) -> str:
     """`<FIG-ID> — <caption>`: the original caption, else the generated description labelled
-    as such (the label itself is literal), else `(no caption)`. `\\`, `[` and `]` of the caption
-    or description are backslash-escaped; whitespace is collapsed."""
+    as such (the label itself is literal), else `(no caption)`. `\\`, `[`, `]` and `)` of the
+    caption or description are backslash-escaped (CommonMark punctuation escapes, so the rendered
+    alt text is unchanged and no link parser ends the alt or the link early); whitespace is
+    collapsed. Only alt text is escaped: article body text is never touched."""
 
     def esc(x: str) -> str:
-        return x.replace("\\", "\\\\").replace("[", "\\[").replace("]", "\\]")
+        x = x.replace("\\", "\\\\").replace("[", "\\[").replace("]", "\\]")
+        return x.replace(")", "\\)")
 
     cap = _WS_RE.sub(" ", caption_original or "").strip()
     if cap:

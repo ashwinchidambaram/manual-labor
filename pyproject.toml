@@ -29,6 +29,7 @@ dependencies = [
     "jsonschema>=4.22",
     "pyyaml>=6",
     "scipy>=1.11",
+    "markdown-it-py>=3",
 ]
 
 [project.scripts]

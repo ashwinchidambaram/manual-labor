@@ -505,15 +505,16 @@ def node_states(paths: ProjectPaths, store: Store | None = None) -> list[NodeSta
             out.append(NodeState(node="assemble", state="missing"))
         elif st is None:
             out.append(NodeState(node="assemble", state="stale", reason="no project.db"))
-        elif not _assemble_fresh(
-            state.assemble,
-            fingerprint(paths, st),
-            _active_ids(st, cutoff := export_cutoff(st)),
-            cutoff,
-        ):
-            out.append(NodeState(node="assemble", state="stale", reason="inputs changed"))
         else:
-            out.append(NodeState(node="assemble", state="fresh"))
+            cutoff = export_cutoff(st)
+            fresh = _assemble_fresh(
+                state.assemble, fingerprint(paths, st), _active_ids(st, cutoff), cutoff
+            )
+            out.append(
+                NodeState(node="assemble", state="fresh")
+                if fresh
+                else NodeState(node="assemble", state="stale", reason="inputs changed")
+            )
     finally:
         if own and st is not None:
             st.close()

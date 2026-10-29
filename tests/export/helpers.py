@@ -145,7 +145,8 @@ def list_lines(t: str) -> list[str]:
 
 def alt_of(fid: str, caption: str | None, generated: str | None) -> str:
     def esc(x: str) -> str:
-        return x.replace("\\", "\\\\").replace("[", "\\[").replace("]", "\\]")
+        x = x.replace("\\", "\\\\").replace("[", "\\[").replace("]", "\\]")
+        return x.replace(")", "\\)")
 
     cap = " ".join((caption or "").split())
     if cap:
@@ -181,7 +182,7 @@ def expected_body(paths: ProjectPaths, store: Store, article_id: str) -> tuple[s
         blocks[b]
         for b in members
         if blocks[b].status != BlockStatus.rejected
-        and (blocks[b].type == BlockType.figure or " ".join(t_of(blocks[b]).split()))
+        and (blocks[b].type == BlockType.figure or " ".join(blocks[b].raw_text.split()))
     ]
     level_of: dict[str, int] = {}
     for g in gf.structure:

@@ -107,7 +107,9 @@ def _heading_levels(d: DocInput, order: dict[str, int]) -> dict[str, int]:
 
 
 def _is_empty(b: Block) -> bool:
-    return b.type != BlockType.figure and _collapse(block_text(b)) == ""
+    """P4: decided on the source text, so a block with source words is never dropped as
+    `empty` because its cleaned text came out blank."""
+    return b.type != BlockType.figure and _collapse(b.raw_text) == ""
 
 
 def _render_block(b: Block, levels: dict[str, int]) -> str:
@@ -202,7 +204,9 @@ def _check_every_selected_block_placed(
         else:
             missing.append(b)
     if missing:
-        shown = ", ".join(missing[:20]) + (f" (+{len(missing) - 20} more)" if len(missing) > 20 else "")
+        shown = ", ".join(missing[:20]) + (
+            f" (+{len(missing) - 20} more)" if len(missing) > 20 else ""
+        )
         raise ExportError(
             f"{d.doc.slug}: {len(missing)} selected block(s) in no article and not unassigned "
             f"with a recorded reason (groups.json does not place them): {shown}"
@@ -267,9 +271,12 @@ def _build_doc_articles(ctx: _Ctx, d: DocInput) -> list[BuiltArticle]:
             key=_section_key,
         )
         pages = sorted({b.page for b in kept})
-        approved = sum(1 for b in kept if b.status in CONTRIBUTING)
-        edited = sum(1 for b in kept if b.status == BlockStatus.edited)
-        overrides = sum(1 for b in kept if b.id in ctx.gate.covered)
+        # an override-covered block (e.g. approved but with an open flag) counts once, as an
+        # override; `approved`/`edited` are only the blocks no override had to cover
+        covered = ctx.gate.covered
+        approved = sum(1 for b in kept if b.status in CONTRIBUTING and b.id not in covered)
+        edited = sum(1 for b in kept if b.status == BlockStatus.edited and b.id not in covered)
+        overrides = sum(1 for b in kept if b.id in covered)
         fm = ArticleFrontmatter(
             id=art_id,
             title=title,

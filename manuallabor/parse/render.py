@@ -142,13 +142,21 @@ class OcrPool:
         self._pool: ProcessPoolExecutor | None = None
         self._workers = workers
 
-    def submit(self, job: OcrJob) -> Future[OcrJobResult]:
+    def executor(self) -> ProcessPoolExecutor:
+        """The pool, started on first use. Spawned workers do not run the CLI or job-worker
+        entry, so they install the offline guard (MANUALLABOR_OFFLINE=1) themselves."""
         if self._pool is None:
+            from manuallabor.providers.offline import install_from_env
+
             self._pool = ProcessPoolExecutor(
                 max_workers=pool_workers(self._workers),
                 mp_context=multiprocessing.get_context("spawn"),
+                initializer=install_from_env,
             )
-        return self._pool.submit(run_ocr_job, job)
+        return self._pool
+
+    def submit(self, job: OcrJob) -> Future[OcrJobResult]:
+        return self.executor().submit(run_ocr_job, job)
 
     def close(self) -> None:
         if self._pool is not None:

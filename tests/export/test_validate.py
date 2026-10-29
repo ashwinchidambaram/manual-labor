@@ -240,3 +240,77 @@ def test_e17_a_figure_line_that_is_not_the_contracted_shape(
         f[a] = f[a].replace(line.encode(), line.replace(" \u2014 ", " - ").encode())
 
     assert "Z4" in codes(mutate(exported_a, tmp_path, fn))
+
+
+# -- every Markdown image link, not only lines that start with `![FIG-` (review fix) -------------
+
+
+def figure_path(text: str) -> str:
+    line = first_figure_line(text)
+    return line[line.rindex("(") + 1 : -1]
+
+
+def append_paragraph(f: Files, para: str) -> str:
+    a = first_article(f)
+    f[a] = f[a].rstrip(b"\n") + b"\n\n" + para.encode() + b"\n"
+    return a
+
+
+def test_z4_an_inline_image_under_images_that_does_not_resolve(
+    exported_a: Exported, tmp_path: Path
+) -> None:
+    def fn(f: Files) -> None:
+        append_paragraph(f, "See the drawing ![pump](images/figures/nope.png) for details.")
+
+    problems = mutate(exported_a, tmp_path, fn)
+    assert "Z4" in codes(problems)
+    assert any("images/figures/nope.png" in p.detail for p in problems)
+
+
+def test_z4_an_image_under_images_without_the_figure_alt_form(
+    exported_a: Exported, tmp_path: Path
+) -> None:
+    def fn(f: Files) -> None:
+        path = figure_path(f[first_article(f)].decode())  # resolves: only the alt is wrong
+        append_paragraph(f, f"![a photo of the pump]({path})")
+
+    problems = mutate(exported_a, tmp_path, fn)
+    assert "Z4" in codes(problems)
+    assert any("alt" in p.detail for p in problems)
+
+
+def test_z4_an_indented_or_quoted_figure_reference_is_checked_too(
+    exported_a: Exported, tmp_path: Path
+) -> None:
+    def fn(f: Files) -> None:
+        a = first_article(f)
+        line = first_figure_line(f[a].decode())
+        moved = line.replace(figure_path(f[a].decode()), "images/figures/FIG-figures-p098-97.png")
+        append_paragraph(f, "> " + moved)
+
+    assert "Z4" in codes(mutate(exported_a, tmp_path, fn))
+
+
+def test_an_image_link_outside_images_in_source_text_is_left_alone(
+    exported_a: Exported, tmp_path: Path
+) -> None:
+    def fn(f: Files) -> None:
+        append_paragraph(f, "Source text with ![logo](https://example.com/logo.png) in it.")
+
+    assert mutate(exported_a, tmp_path, fn) == []
+
+
+def test_a_caption_with_brackets_and_parens_still_validates(
+    exported_a: Exported, tmp_path: Path
+) -> None:
+    from manuallabor.export.render import alt_text
+
+    def fn(f: Files) -> None:
+        a = first_article(f)
+        text = f[a].decode()
+        line = first_figure_line(text)
+        fid = line[2 : line.index(" — ")]
+        alt = alt_text(fid, "Pump [see](images/figures/x.png) (rev. 2)", None)
+        f[a] = text.replace(line, f"![{alt}]({figure_path(text)})").encode()
+
+    assert mutate(exported_a, tmp_path, fn) == []

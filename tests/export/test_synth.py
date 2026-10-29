@@ -287,6 +287,33 @@ def test_e7_a_flag_override_covers_the_flagged_block() -> None:
     )
     res = run(inp)
     assert [(o.target_id, o.flag_id) for o in res.manifest.overrides] == [(bid(2), "flag-000007")]
+    # an approved block with an open flag is counted once: as an override, not also approved
+    fm = res.articles[0].frontmatter
+    assert fm.review == ReviewCounts(approved=1, edited=0, overrides=1)
+    assert fm.review.approved + fm.review.overrides <= fm.blocks
+    edited = synth_inputs(
+        [blk(1, status=A), blk(2, "human", status=BlockStatus.edited)],
+        flags=[flag(7, bid(2))],
+        overrides=[override(3, "r", flag_id="flag-000007")],
+    )
+    assert run(edited).articles[0].frontmatter.review == ReviewCounts(
+        approved=1, edited=0, overrides=1
+    )
+
+
+def test_p4_empty_is_decided_on_the_raw_text() -> None:
+    """P4: a block is `empty` when its raw (source) text is blank. A block whose source has text
+    is never dropped as empty, even if its cleaned text came out blank."""
+    blocks = [
+        blk(1, "Body."),
+        blk(2, "Source words here.", clean=""),  # cleanup produced nothing: still accounted
+        blk(3, "  \n ", clean="x"),  # blank source: empty, whatever the overlay says
+    ]
+    res = run(synth_inputs(blocks))
+    acc = res.manifest.accounting
+    assert acc.assignments[bid(2)] == "doc--main" and bid(2) not in acc.unassigned_reasons
+    assert acc.unassigned_reasons == {bid(3): "empty"}
+    assert res.articles[0].block_ids == [bid(1), bid(2)]
 
 
 # -- E9 figure placement -----------------------------------------------------------------------
@@ -472,9 +499,7 @@ def test_a_selected_block_in_no_topic_is_an_assembly_error_not_unselected() -> N
     assert bid(3) in str(ei.value) and bid(4) in str(ei.value)
     # the same blocks, unselected, are accounted as `not_selected`
     ok = run(
-        synth_inputs(
-            blocks, topics={"a": ("Topic A", [bid(1), bid(2)])}, selected={bid(1), bid(2)}
-        )
+        synth_inputs(blocks, topics={"a": ("Topic A", [bid(1), bid(2)])}, selected={bid(1), bid(2)})
     )
     reasons = ok.manifest.accounting.unassigned_reasons
     assert reasons == {bid(3): "not_selected", bid(4): "not_selected"}
@@ -522,6 +547,11 @@ def test_alt_text_rules() -> None:
     )
     assert alt_text("FIG-a-p001-01", None, " a \n b ") == "FIG-a-p001-01 — [generated] a b"
     assert alt_text("FIG-a-p001-01", " ", None) == "FIG-a-p001-01 — (no caption)"
+    # `]` and `)` are escaped so no link parser can end the alt text or the link early
+    assert alt_text("FIG-a-p001-01", "see [1](images/x.png) (rev 2)", None) == (
+        "FIG-a-p001-01 — see \\[1\\](images/x.png\\) (rev 2\\)"
+    )
+    assert alt_text("FIG-a-p001-01", None, "a) b") == "FIG-a-p001-01 — [generated] a\\) b"
 
 
 def test_the_body_is_deterministic_and_contains_no_overrides_marker() -> None:

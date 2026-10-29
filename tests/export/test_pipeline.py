@@ -416,9 +416,7 @@ def test_a_selected_block_missing_from_every_topic_is_refused_by_name(work: Proj
     finally:
         store.close()
     topic = next(t for t in gf.topics if not t.is_unassigned and len(t.block_ids) >= 3)
-    victim = next(
-        b for b in topic.block_ids if b in selected and types[b] == BlockType.paragraph
-    )
+    victim = next(b for b in topic.block_ids if b in selected and types[b] == BlockType.paragraph)
     topics = [
         t.model_copy(
             update={

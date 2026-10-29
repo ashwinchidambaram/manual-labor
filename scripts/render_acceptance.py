@@ -1,6 +1,6 @@
 """Render docs/ACCEPTANCE.md from the raw results of scripts/acceptance.sh.
 
-    render_acceptance.py render <dir>          Markdown to stdout
+    render_acceptance.py render <dir>          Markdown to stdout; exit 1 when INCOMPLETE
     render_acceptance.py providers <jsonl>     `ollama=N other=M` over an llm_calls.jsonl
 
 Each SPEC section 11 item is VERIFIED only when every step it needs ran, exited 0 and printed
@@ -151,9 +151,9 @@ def v2(steps: list[Step], _live: bool) -> Result:
             NOT_VERIFIED, "no test printed a RECALL line (marker acc2 missing or test skipped)"
         )
     k, n = int(m.group(1)), int(m.group(2))
-    return Result(
-        VERIFIED, f"recall {k}/{n} at threshold {m.group(3)}" + ("" if k == n else " (below 100%)")
-    )
+    if k != n:  # SPEC 11.2: *every* differing block reaches the queue
+        return Result(FAILED, f"recall {k}/{n} ({k / n:.1%}) at threshold {m.group(3)}, not 100%")
+    return Result(VERIFIED, f"recall {k}/{n} at threshold {m.group(3)}")
 
 
 def v3(steps: list[Step], _live: bool) -> Result:
@@ -225,16 +225,30 @@ def v8(steps: list[Step], live: bool) -> Result:
         return Result(
             NOT_VERIFIED, "scripts/acceptance.sh was not run with --live (Ollama models required)"
         )
-    check = next((s for s in steps if s.id == "8-2"), None)
+    by_id = {s.id: s for s in steps}
+    check = by_id.get("8-2")
     if check is not None and "SKIP live" in check.out:
         return Result(NOT_VERIFIED, "Ollama or its models are missing: " + "; ".join(PULLS))
-    r = need(steps, 4)
-    if r:
-        return r
-    m = re.search(r"ollama=(\d+) other=(\d+)", steps[3].out)
+    bad = [s for s in steps if s.rc != 0]
+    if bad:
+        return Result(FAILED, f"{bad[0].id} exited {bad[0].rc}")
+    missing = [i for i in ("8-1", "8-2", "8-3", "8-4") if i not in by_id]
+    if missing:
+        return Result(NOT_VERIFIED, f"step(s) {missing} did not run")
+    control = by_id.get("8-5")
+    if control is None or "blocked and logged" not in control.out:
+        return Result(
+            NOT_VERIFIED, "the negative control (a blocked, logged 1.1.1.1:443) did not run"
+        )
+    m = re.search(r"ollama=(\d+) other=(\d+)", by_id["8-4"].out)
     if m is None or int(m.group(1)) < 1 or int(m.group(2)) != 0:
-        return Result(FAILED, "llm_calls.jsonl is not ollama-only: " + steps[3].out.strip()[:100])
-    return Result(VERIFIED, f"0 network violations; {m.group(0)}")
+        return Result(
+            FAILED, "llm_calls.jsonl is not ollama-only: " + by_id["8-4"].out.strip()[:100]
+        )
+    return Result(
+        VERIFIED,
+        f"0 network violations; {m.group(0)}; negative control: 1.1.1.1:443 blocked and logged",
+    )
 
 
 VERDICTS: dict[int, Callable[[list[Step], bool], Result]] = {
@@ -259,6 +273,10 @@ def host() -> str:
     except (ValueError, OSError, AttributeError):
         mem = "RAM unknown"
     return f"{platform.system()} {platform.release()} {platform.machine()}, {mem}"
+
+
+def is_complete(text: str) -> bool:
+    return "\nstatus: COMPLETE\n" in text
 
 
 def render(d: Path) -> str:
@@ -331,8 +349,9 @@ def providers(path: Path) -> str:
 
 def main(argv: list[str]) -> int:
     if len(argv) == 2 and argv[0] == "render":
-        sys.stdout.write(render(Path(argv[1])))
-        return 0
+        text = render(Path(argv[1]))
+        sys.stdout.write(text)
+        return 0 if is_complete(text) else 1  # an INCOMPLETE record is not a pass
     if len(argv) == 2 and argv[0] == "providers":
         print(providers(Path(argv[1])))
         return 0

@@ -418,20 +418,41 @@ def k15_determinism(ctx: CheckCtx) -> str | None:
 
 
 def k16_figure_refs(ctx: CheckCtx) -> str | None:
+    """Every image in every article, found by a CommonMark parser (not a line regex, so `](`
+    inside an escaped caption cannot end the link early), resolves to a file and a sidecar.
+    Deliberately independent of export/validate.py."""
+    import posixpath
     import re
     import zipfile
 
-    ref = re.compile(r"!\[(FIG-[a-z0-9-]+-p\d+-\d+) [^\n]*?\]\((images/[^)\s]+)\)")
+    from markdown_it import MarkdownIt
+
+    fig_alt = re.compile(r"^(FIG-[a-z0-9-]+-p\d+-\d+) ")
+    md = MarkdownIt("commonmark")
     n = 0
     with zipfile.ZipFile(ctx.export["zip"]) as zf:
         names = set(zf.namelist())
         for name in sorted(names):
             if not name.startswith("articles/"):
                 continue
-            for fid, path in ref.findall(zf.read(name).decode("utf-8")):
+            images: list[tuple[str, str]] = []
+            stack = list(md.parse(zf.read(name).decode("utf-8")))
+            while stack:
+                tok = stack.pop(0)
+                if tok.type == "image":
+                    images.append((tok.content, str(tok.attrs.get("src") or "")))
+                stack[:0] = tok.children or []
+            for alt, src in images:
+                path = posixpath.normpath(src) if src else ""
+                m = fig_alt.match(alt)
+                if m is None:
+                    if path.startswith("images/"):
+                        raise AssertionError(f"{name}: image {src} is not a FIG reference")
+                    continue
+                fid = m.group(1)
                 slug = fid[4:].rsplit("-p", 1)[0]
                 if path not in names:
-                    raise AssertionError(f"{name}: {fid}: {path} is not in the zip")
+                    raise AssertionError(f"{name}: {fid}: {src} is not in the zip")
                 if f"images/{slug}/{fid}.json" not in names:
                     raise AssertionError(f"{name}: {fid}: no sidecar in the zip")
                 n += 1

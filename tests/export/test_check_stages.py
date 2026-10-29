@@ -130,3 +130,136 @@ def test_e27_live_check_with_local_models_makes_no_network_calls(tmp_path: Path)
         pytest.skip(r.stdout)
     assert r.returncode == 0, r.stdout + r.stderr[-2000:]
     assert not log.exists() or log.read_text() == ""
+
+
+# -- K16 parses Markdown links instead of matching a regex (review fix) -------------------------
+
+
+def _k16_zip(tmp: Path, body: str, files: tuple[str, ...]) -> Path:
+    import zipfile
+
+    zp = tmp / "k16.zip"
+    with zipfile.ZipFile(zp, "w") as zf:
+        zf.writestr("articles/a.md", "---\nid: a\n---\n\n# A\n\n" + body + "\n")
+        for n in files:
+            zf.writestr(n, b"x")
+    return zp
+
+
+def _k16(zp: Path) -> str | None:
+    from types import SimpleNamespace
+
+    from manuallabor.check import k16_figure_refs
+
+    return k16_figure_refs(SimpleNamespace(export={"zip": zp}))  # type: ignore[arg-type]
+
+
+def test_k16_a_caption_with_a_link_inside_resolves_to_the_real_target(tmp_path: Path) -> None:
+    from manuallabor.export.render import alt_text, figure_line
+
+    fid = "FIG-a-p001-01"
+    alt = alt_text(fid, "see [1](images/other.png) and (rev 2)", None)
+    body = figure_line(alt, f"images/a/{fid}.png")
+    zp = _k16_zip(tmp_path, body, (f"images/a/{fid}.png", f"images/a/{fid}.json"))
+    assert _k16(zp) == "1 figure references resolve to a file and a sidecar"
+
+
+def test_k16_catches_a_mid_line_reference_and_a_missing_sidecar(tmp_path: Path) -> None:
+    fid = "FIG-a-p001-02"
+    body = f"Text then ![{fid} — c](images/a/{fid}.png) inline."
+    with pytest.raises(AssertionError, match="not in the zip"):
+        _k16(_k16_zip(tmp_path, body, ()))
+    with pytest.raises(AssertionError, match="no sidecar"):
+        _k16(_k16_zip(tmp_path, body, (f"images/a/{fid}.png",)))
+    assert _k16(_k16_zip(tmp_path, body, (f"images/a/{fid}.png", f"images/a/{fid}.json")))
+
+
+# -- the offline guard covers more entry points and spawned workers (review fix) ----------------
+
+
+def _guarded(code: str, log: Path, **extra: str) -> subprocess.CompletedProcess[str]:
+    env = {
+        **os.environ,
+        "MANUALLABOR_OFFLINE": "1",
+        "MANUALLABOR_OFFLINE_LOG": str(log),
+        "OLLAMA_HOST": "127.0.0.1:9",
+        **extra,
+    }
+    return subprocess.run(
+        [sys.executable, "-c", textwrap.dedent(code)],
+        capture_output=True,
+        text=True,
+        env=env,
+        timeout=120,
+    )
+
+
+def test_the_guard_blocks_udp_sendto_and_the_raw_socket_type(tmp_path: Path) -> None:
+    log = tmp_path / "v.log"
+    r = _guarded(
+        """
+        import socket, _socket, sys
+        from manuallabor.providers.offline import install_from_env
+        assert install_from_env() is True
+        u = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            u.sendto(b"x", ("1.1.1.1", 53))
+        except OSError as exc:
+            print("sendto blocked:", exc)
+        else:
+            sys.exit("sendto to 1.1.1.1:53 went through")
+        raw = _socket.socket(_socket.AF_INET, _socket.SOCK_STREAM)
+        try:
+            raw.connect(("9.9.9.9", 443))
+        except OSError as exc:
+            print("raw connect blocked:", exc)
+        else:
+            sys.exit("_socket.socket.connect went through")
+        """,
+        log,
+    )
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert "sendto blocked: offline guard" in r.stdout
+    assert "raw connect blocked: offline guard" in r.stdout
+    seen = log.read_text().splitlines()
+    assert "1.1.1.1:53" in seen and "9.9.9.9:443" in seen
+
+
+def test_the_guard_is_installed_in_the_spawned_ocr_workers(tmp_path: Path) -> None:
+    log = tmp_path / "v.log"
+    r = _guarded(
+        """
+        from manuallabor.parse.render import OcrPool
+        from manuallabor.providers.offline import guard_installed, install_from_env
+        if __name__ == "__main__":
+            assert install_from_env() is True
+            pool = OcrPool(workers=1)
+            try:
+                print("child guard:", pool.executor().submit(guard_installed).result(timeout=60))
+            finally:
+                pool.close()
+        """,
+        log,
+    )
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert "child guard: True" in r.stdout
+
+
+def test_the_ac8_negative_control_is_blocked_and_logged(tmp_path: Path) -> None:
+    from tests.check.test_check import PROJECT_A
+
+    script = PROJECT_A.parents[2] / "scripts" / "offline_control.py"
+    log = tmp_path / "control.log"
+    env = {**os.environ, "MANUALLABOR_OFFLINE": "1", "MANUALLABOR_OFFLINE_LOG": str(log)}
+    r = subprocess.run(
+        [sys.executable, str(script)], capture_output=True, text=True, env=env, timeout=60
+    )
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert "negative control: 1.1.1.1:443 blocked and logged" in r.stdout
+    assert "1.1.1.1:443" in log.read_text().splitlines()
+    # without the guard the control fails (and never tries the network)
+    env.pop("MANUALLABOR_OFFLINE")
+    r = subprocess.run(
+        [sys.executable, str(script)], capture_output=True, text=True, env=env, timeout=60
+    )
+    assert r.returncode == 1 and "not installed" in r.stdout + r.stderr

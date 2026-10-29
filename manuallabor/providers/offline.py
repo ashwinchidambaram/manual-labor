@@ -3,11 +3,15 @@
 With the guard installed, a process can reach only the local model server (`OLLAMA_HOST`,
 default 127.0.0.1:11434) and AF_UNIX sockets. Any other destination is appended to
 `$MANUALLABOR_OFFLINE_LOG` (default `<tmp>/offline-violations.log`) and raises
-`OSError("offline guard")`; the log catches violations a caller swallowed. This module is the
-only place outside the providers' own clients that may import `socket`."""
+`OSError("offline guard")`; the log catches violations a caller swallowed. Covered: name
+resolution, `connect`/`connect_ex`, `create_connection`, connectionless `sendto`/`sendmsg`, and
+sockets made from the raw `_socket.socket` type after installation. The CLI, the job worker and
+the spawned OCR pool workers install it at start (`install_from_env`). This module is the only
+place outside the providers' own clients that may import `socket`."""
 
 from __future__ import annotations
 
+import _socket
 import os
 import socket
 import tempfile
@@ -15,7 +19,14 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
-__all__ = ["DEFAULT_HOST", "install_from_env", "install_guard", "ollama_endpoint", "violation_log"]
+__all__ = [
+    "DEFAULT_HOST",
+    "guard_installed",
+    "install_from_env",
+    "install_guard",
+    "ollama_endpoint",
+    "violation_log",
+]
 
 DEFAULT_HOST = "127.0.0.1:11434"
 _LOOPBACK = frozenset({"localhost", "127.0.0.1", "::1", "0:0:0:0:0:0:0:1"})
@@ -34,6 +45,11 @@ def violation_log() -> Path:
         os.environ.get("MANUALLABOR_OFFLINE_LOG")
         or Path(tempfile.gettempdir()) / "offline-violations.log"
     )
+
+
+def guard_installed() -> bool:
+    """Whether this process has the guard (a picklable probe for pool workers)."""
+    return bool(_installed)
 
 
 def _norm(host: object) -> str:
@@ -70,7 +86,10 @@ def install_guard(allowed: set[tuple[str, int]] | None = None, log: Path | None 
     real_getaddrinfo = socket.getaddrinfo
     real_connect = socket.socket.connect
     real_connect_ex = socket.socket.connect_ex
+    real_sendto = socket.socket.sendto
+    real_sendmsg = socket.socket.sendmsg
     real_create_connection = socket.create_connection
+    raw_type = _socket.socket
 
     def check_addr(addr: Any) -> None:
         if isinstance(addr, tuple) and len(addr) >= 2 and not permitted(addr[0], addr[1]):
@@ -90,14 +109,49 @@ def install_guard(allowed: set[tuple[str, int]] | None = None, log: Path | None 
         check_addr(addr)
         return real_connect_ex(self, addr)
 
+    def sendto(self: socket.socket, data: Any, *args: Any) -> Any:
+        check_addr(args[-1] if args else None)  # sendto(data[, flags], address)
+        return real_sendto(self, data, *args)
+
+    def sendmsg(self: socket.socket, buffers: Any, *args: Any) -> Any:
+        if len(args) >= 3:  # sendmsg(buffers[, ancdata[, flags[, address]]])
+            check_addr(args[2])
+        return real_sendmsg(self, buffers, *args)
+
     def create_connection(address: Any, *a: Any, **k: Any) -> Any:
         check_addr(address)
         return real_create_connection(address, *a, **k)
 
+    class GuardedRawSocket(raw_type):  # type: ignore[misc,valid-type]
+        """What `_socket.socket(...)` makes once the guard is installed (the C type itself
+        cannot be patched). `socket.socket.__init__` calls `_socket.socket.__init__` by name,
+        which resolves to the same inherited slot, so the high-level class is unaffected."""
+
+        def connect(self, addr: Any) -> Any:
+            check_addr(addr)
+            return raw_type.connect(self, addr)
+
+        def connect_ex(self, addr: Any) -> Any:
+            check_addr(addr)
+            return raw_type.connect_ex(self, addr)
+
+        def sendto(self, data: Any, *args: Any) -> Any:
+            check_addr(args[-1] if args else None)
+            return raw_type.sendto(self, data, *args)
+
+        def sendmsg(self, buffers: Any, *args: Any) -> Any:
+            if len(args) >= 3:
+                check_addr(args[2])
+            return raw_type.sendmsg(self, buffers, *args)
+
     socket.getaddrinfo = getaddrinfo
     socket.socket.connect = connect  # type: ignore[method-assign,assignment]
     socket.socket.connect_ex = connect_ex  # type: ignore[method-assign,assignment]
+    socket.socket.sendto = sendto  # type: ignore[method-assign,assignment]
+    socket.socket.sendmsg = sendmsg  # type: ignore[method-assign,assignment]
     socket.create_connection = create_connection
+    _socket.socket = GuardedRawSocket  # type: ignore[misc]
+    _socket.SocketType = GuardedRawSocket
     _installed.append(True)
 
 

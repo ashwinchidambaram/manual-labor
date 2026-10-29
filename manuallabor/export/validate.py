@@ -20,7 +20,7 @@ from manuallabor.contracts.manifest import Manifest
 from manuallabor.export.render import FIGURE_LINE_RE
 from manuallabor.export.types import Problem
 
-__all__ = ["split_article", "validate_zip"]
+__all__ = ["markdown_images", "split_article", "validate_zip"]
 
 KEYS: Final = [
     "id",
@@ -41,6 +41,25 @@ _IMAGE_NAME: Final = re.compile(
     rf"^images/(?P<slug>{_SLUG})/(?P<fid>FIG-[a-z0-9-]+-p\d{{3,4}}-\d{{2,3}})\.(?P<ext>png|svg|json)$"
 )
 SCHEMA_PATH: Final = Path(__file__).resolve().parents[2] / "schemas" / "Manifest.json"
+_ALT_RE: Final = re.compile(r"^(?P<fid>FIG-[a-z0-9-]+-p\d{3,4}-\d{2,3}) \u2014 .+$", re.S)
+
+
+def markdown_images(body: str) -> list[tuple[str, str]]:
+    """(raw alt text, destination) of every Markdown image in `body`, found by a CommonMark
+    parser (inline, reference-style, in quotes or lists), not by matching line starts."""
+    from markdown_it import MarkdownIt
+
+    out: list[tuple[str, str]] = []
+
+    def walk(tokens: Any) -> None:
+        for t in tokens:
+            if t.type == "image":
+                out.append((t.content, str(t.attrs.get("src") or "")))
+            if t.children:
+                walk(t.children)
+
+    walk(MarkdownIt("commonmark").parse(body))
+    return out
 
 
 class _Loader(yaml.SafeLoader):
@@ -207,6 +226,7 @@ def _check_articles_and_figures(
             bad("Z3", a.path, f"frontmatter does not validate: {exc.errors()[0]['msg']}")
             fm = None
         line_figs: list[str] = []
+        line_refs: set[tuple[str, str]] = set()
         for line in body.split("\n"):
             if not line.startswith("![FIG-"):
                 continue
@@ -216,6 +236,7 @@ def _check_articles_and_figures(
                 continue
             fid, img = m.group("fid"), m.group("path")
             line_figs.append(fid)
+            line_refs.add((fid, img))
             if img not in have:
                 bad("Z4", a.path, f"{fid}: image {img} is not in the zip")
             elif img not in checked_images:
@@ -233,6 +254,25 @@ def _check_articles_and_figures(
                 target = posixpath.normpath(f"images/{sc.source_doc}/{sc.file}")
                 if target != img:
                     bad("Z4", a.path, f"{fid}: sidecar file {target} != Markdown path {img}")
+        # every other Markdown image whose target is under images/ (mid-line, quoted, listed,
+        # reference-style): it must resolve and be a figure reference of the contracted form
+        for alt, src in markdown_images(body):
+            target = posixpath.normpath(src) if src else ""
+            if target != "images" and not target.startswith("images/"):
+                continue  # source text may link elsewhere; the body stays verbatim
+            am = _ALT_RE.match(alt)
+            if am is not None and (am.group("fid"), src) in line_refs:
+                continue  # a figure line, checked above
+            if target not in have:
+                bad("Z4", a.path, f"image link {src} is not in the zip")
+            if am is None:
+                bad(
+                    "Z4",
+                    a.path,
+                    f"image link {src}: alt {alt[:60]!r} is not `FIG-ID \u2014 caption`",
+                )
+            else:
+                bad("Z4", a.path, f"{am.group('fid')}: image link {src} is not a figure line")
         refs[a.id] = line_figs
         # -- Z5 -----------------------------------------------------------------------------
         for m2 in ids.FIGURE_ID_SEARCH_RE.finditer(body):
