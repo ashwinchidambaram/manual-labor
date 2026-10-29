@@ -1,0 +1,354 @@
+{
+  "source": "real-manual.pdf (built by fetch.py from archive.org micro_IA41152616_0581)",
+  "coordinates": "PDF points, origin top-left, page sizes (pt) vary slightly: p5 583.4x739.4, p6 583.4x757.4, p8 578.9x757.4, p9 578.9x757.6, p16 583.2x757.6, p25 583.2x748.8, p30 583.2x748.1; pdf-points = pixel*0.48 at 150 DPI",
+  "transcription": "Hand-transcribed by a model from 150 DPI renders (8: 300 DPI crops); not human verified. Dot leaders omitted; dashes written as ASCII hyphens; table cells joined by single spaces; newline separates rows. Printed typos kept (e.g. '12,000 in. dia.').",
+  "numeric_token_rule": "whitespace-separated tokens containing a digit, leading/trailing . , ; : ( ) stripped",
+  "blocks": [
+    {
+      "id": "gt-01",
+      "page": 5,
+      "type": "title",
+      "text": "HAMMER, PILE DRIVER, SELF-POWERED, DIESEL (KOEHRING MODEL DA35) FSN 3895-443-4696",
+      "bbox": [
+        148.8,
+        148.8,
+        394.6,
+        188.2
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "DA35",
+        "3895-443-4696"
+      ]
+    },
+    {
+      "id": "gt-02",
+      "page": 5,
+      "type": "toc_row",
+      "text": "VIII. Maintenance of trip mechanism 4-18 4-13",
+      "bbox": [
+        84.0,
+        445.0,
+        480.0,
+        454.1
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "4-18",
+        "4-13"
+      ]
+    },
+    {
+      "id": "gt-03",
+      "page": 6,
+      "type": "heading",
+      "text": "LIST OF ILLUSTRATIONS",
+      "bbox": [
+        244.8,
+        36.0,
+        367.2,
+        47.0
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": []
+    },
+    {
+      "id": "gt-04",
+      "page": 6,
+      "type": "table_row",
+      "text": "3-6. Lubricating oil filter and shutoff valve, exploded view 3-10",
+      "bbox": [
+        93.6,
+        214.1,
+        524.2,
+        222.2
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "3-6",
+        "3-10"
+      ]
+    },
+    {
+      "id": "gt-05",
+      "page": 8,
+      "type": "heading",
+      "text": "1-4. Difference in Models",
+      "bbox": [
+        91.2,
+        188.2,
+        214.6,
+        197.3
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "1-4"
+      ]
+    },
+    {
+      "id": "gt-06",
+      "page": 8,
+      "type": "paragraph",
+      "text": "This manual covers only the MKT Model DA35 serial numbers 691201 thru 691209. No known unit differences exist for the model covered by this manual.",
+      "bbox": [
+        91.2,
+        211.2,
+        300.0,
+        245.8
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "DA35",
+        "691201",
+        "691209"
+      ]
+    },
+    {
+      "id": "gt-07",
+      "page": 8,
+      "type": "heading",
+      "text": "1-5. Identification and Tabulated Data",
+      "bbox": [
+        91.2,
+        259.2,
+        274.6,
+        268.3
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "1-5"
+      ]
+    },
+    {
+      "id": "gt-08",
+      "page": 8,
+      "type": "spec_list",
+      "text": "Model DA35\nSerial Numbers 691201 thru 691209\nBore 12,000 in. dia.\nStroke (compression) 13.968 in.",
+      "bbox": [
+        320.6,
+        99.8,
+        523.2,
+        133.4
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "DA35",
+        "691201",
+        "691209",
+        "12,000",
+        "13.968"
+      ]
+    },
+    {
+      "id": "gt-09",
+      "page": 8,
+      "type": "spec_list",
+      "text": "Piston displacement 1580 cu. in.\nCompression ratio 14.25 to 1\nRated striking energy 21,000 ft.lb./blow\nAt 57 p.s.i air gauge pressure at 83 blows per min.",
+      "bbox": [
+        320.6,
+        180.5,
+        530.4,
+        232.3
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "1580",
+        "14.25",
+        "1",
+        "21,000",
+        "57",
+        "83"
+      ]
+    },
+    {
+      "id": "gt-10",
+      "page": 8,
+      "type": "spec_list",
+      "text": "Fuel tank 24 gals.\nLubricating oil tank 11 gals.",
+      "bbox": [
+        320.6,
+        409.0,
+        530.4,
+        425.8
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "24",
+        "11"
+      ]
+    },
+    {
+      "id": "gt-11",
+      "page": 8,
+      "type": "spec_list",
+      "text": "Depth 25.750 inches\nWidth 26.875 inches\nHeight 190.000 inches\nWeight 10,000 pounds",
+      "bbox": [
+        320.6,
+        433.9,
+        530.4,
+        473.8
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "25.750",
+        "26.875",
+        "190.000",
+        "10,000"
+      ]
+    },
+    {
+      "id": "gt-12",
+      "page": 8,
+      "type": "table",
+      "text": "Trip mechanism access cover bolts 100 ft.lb.\nLubricating oil pump mounting nuts 60 ft.lb.\nFuel pump mounting nuts 60 ft.lb.\nFuel pump check valve nut 150 ft.lb.\nFuel pump top nut 40 ft.lb.\nFuel pump lock plate cap screws 40 ft.lb.\nFuel and oil line hex nuts 30 ft.lb.\nGuide bracket bolts 100 ft.lb.",
+      "bbox": [
+        320.6,
+        486.2,
+        530.4,
+        556.8
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "100",
+        "60",
+        "60",
+        "150",
+        "40",
+        "40",
+        "30",
+        "100"
+      ]
+    },
+    {
+      "id": "gt-20",
+      "page": 9,
+      "type": "figure_caption",
+      "text": "Figure 1-1. Diesel pile hammer, right rear, three-quarter view with shipping dimensions.",
+      "bbox": [
+        147.8,
+        592.8,
+        374.4,
+        612.0
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "1-1"
+      ]
+    },
+    {
+      "id": "gt-13",
+      "page": 16,
+      "type": "paragraph",
+      "text": "EXAMPLE: Having observed on gauge 57 P.S.I.= 21,000 ft.lb. and counted 10 blows per inch, bearing will be 105 tons.",
+      "bbox": [
+        355.2,
+        386.4,
+        466.6,
+        444.5
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "57",
+        "21,000",
+        "10",
+        "105"
+      ]
+    },
+    {
+      "id": "gt-14",
+      "page": 16,
+      "type": "figure_caption",
+      "text": "Figure 2-4. Pile static load bearing curve.",
+      "bbox": [
+        238.6,
+        608.6,
+        394.6,
+        617.8
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "2-4"
+      ]
+    },
+    {
+      "id": "gt-15",
+      "page": 25,
+      "type": "heading",
+      "text": "Section III. PREVENTIVE MAINTENANCE CHECKS AND SERVICES",
+      "bbox": [
+        108.0,
+        55.2,
+        415.7,
+        65.3
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": []
+    },
+    {
+      "id": "gt-16",
+      "page": 25,
+      "type": "table_caption",
+      "text": "Table 3-1. Preventive Maintenance Checks and Services",
+      "bbox": [
+        161.8,
+        222.2,
+        361.9,
+        231.8
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "3-1"
+      ]
+    },
+    {
+      "id": "gt-17",
+      "page": 25,
+      "type": "table_row",
+      "text": "3. Fuel Filter. Tighten shutoff valve, if leaking. 3-8",
+      "bbox": [
+        52.8,
+        307.2,
+        481.0,
+        323.0
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "3",
+        "3-8"
+      ]
+    },
+    {
+      "id": "gt-18",
+      "page": 25,
+      "type": "table_row",
+      "text": "4. Fuel Pump. Clean check valve. 3-10",
+      "bbox": [
+        52.8,
+        325.9,
+        481.0,
+        335.5
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "4",
+        "3-10"
+      ]
+    },
+    {
+      "id": "gt-19",
+      "page": 30,
+      "type": "figure_caption",
+      "text": "Figure 3-6. Lubricating oil filter and shutoff valve, exploded view.",
+      "bbox": [
+        189.6,
+        560.2,
+        425.3,
+        569.3
+      ],
+      "bbox_approx": true,
+      "numeric_tokens": [
+        "3-6"
+      ]
+    }
+  ]
+}

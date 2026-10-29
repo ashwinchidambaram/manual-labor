@@ -61,3 +61,9 @@
 
 ## Seventh fixture decision (user delegated 2026-10-28)
 Real public-domain scanned US Army/Air Force technical manual from archive.org (US government work), chosen at module 3 start; live-only (not under CHECKSUMS.json); source URL + license recorded here when chosen. Rejected: a second synthetic manual modeled on a real one — it would reproduce none of the scanner artifacts, mixed typesetting, or hand-drawn figures that the real fixture exists to test.
+
+## Seventh fixture chosen (2026-10-28)
+- **TM 5-3895-332-12** (1970), Operator and Organizational Maintenance Manual: Hammer, Pile Driver, Self-Powered, Diesel (Koehring DA35), Dept. of the Army. archive.org `micro_IA41152616_0581`, https://archive.org/details/micro_IA41152616_0581. GPO microfiche scan, ~400 DPI, 64 pages. Public domain as a US federal government work (17 U.S.C. §105); the item page carries no explicit rights field.
+- Built as `tests/fixtures/real/real-manual.pdf` (image-only, 300 DPI gray JPEG q80, 25.8 MiB) by `tests/fixtures/real/fetch.py`; gitignored; tests skip when absent. 20 model-transcribed GT blocks (48 numeric tokens) in `ground_truth_sample.json` — needs a human spot-check.
+- Orchestrator viewed page 8: real two-column layout, dotted-leader spec lists, "100 ft.lb." torque values, microfiche dark edge + binder holes. Good stress input for OCR, column detection, and numeric recall.
+- Alternates noted by the acquiring agent: `micro_IA41152645_0207` (centrifugal pump TM, 64 p) and `micro_IA41152645_0238` (electric forklift TM, 61 p).
