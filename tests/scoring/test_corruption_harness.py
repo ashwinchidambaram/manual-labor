@@ -131,7 +131,8 @@ def test_h6_inserted_negation(sp: Scored) -> None:
 def test_h7_header_footer_removal_is_allowed(sp: Scored) -> None:
     blocks = sp.blocks("clean")
     t = H.p3_para(sp, blocks)
-    raw = t.raw_text + "\nAcme X200 Service Manual" + "\nPage 7"
+    # this page's footer (another page's `Page n` is body text here: design 4.1 AE3)
+    raw = t.raw_text + "\nAcme X200 Service Manual" + f"\nPage {t.page}"
     s = H.rescore(sp, "clean", t.model_copy(update={"raw_text": raw, "clean_text": t.raw_text}))
     _record("H7 (legit)", s, "faithfulness passes")
     assert s.faithfulness is not None and s.faithfulness.passed

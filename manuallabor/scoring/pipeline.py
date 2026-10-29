@@ -26,6 +26,7 @@ from manuallabor.contracts.io import (
 )
 from manuallabor.figures.types import FigureIndex, FigureReport
 from manuallabor.parse.pipeline import Emit, stdout_emit
+from manuallabor.parse.text import collapse_ws
 from manuallabor.parse.types import PageLayout
 from manuallabor.project import ProjectPaths
 from manuallabor.providers.base import ProviderSet, build_provider_set
@@ -90,6 +91,11 @@ def block_contexts(
         by_page.setdefault(b.page, []).append(b)
     lay = {pl.page: pl for pl in layouts}
     hf = sorted(set(doc.stripped_headers) | set(doc.stripped_footers))
+    hf_pages: dict[str, set[int]] = {}
+    for b in blocks:
+        if b.type in (BlockType.header, BlockType.footer) and b.raw_text.strip():
+            hf_pages.setdefault(collapse_ws(b.raw_text), set()).add(b.page)
+    hf_pages_out = {k: sorted(v) for k, v in sorted(hf_pages.items())}
     out: dict[str, BlockContext] = {}
     for page in sorted(by_page):
         disp = displaced_blocks(by_page[page])
@@ -103,6 +109,7 @@ def block_contexts(
                 parser_versions=dict(doc.parser_versions),
                 product_model=doc.product_model,
                 hf_strings=hf,
+                hf_pages=hf_pages_out,
             )
     return out
 
@@ -161,6 +168,7 @@ def score_block(
         "block_type": block.type,
         "table": block.table,
         "hf_strings": ctx.hf_strings,
+        "hf_pages": ctx.hf_pages,
         "variant_sources": texts,
         "raw_source": block.raw_source,
         "page": block.page,

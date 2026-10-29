@@ -38,9 +38,11 @@ UNIT: Final = (
     rf"|{_LENGTH}|{_OTHER})"
 )
 
-# Single-letter units that read as OCR garbage or plurals when glued to a number (5s, 1V,
-# 1970s): glued, they need a number of >= 2 digits or a decimal; s and h need a space.
-_WEAK_GLUED: Final = frozenset({"V", "A", "W", "L", "m", "g", "K"})
+# Single-letter units that read as step/item suffixes, OCR garbage or plurals when glued to a
+# number (Step 3A, 1970s, 5s): glued, they need a number of >= 2 digits or a decimal; s and h
+# need a space. V and W glued to any number are electrical specs (5V, 3W); `Section 1V.` is
+# a roman numeral misread and is excluded by the section context.
+_WEAK_GLUED: Final = frozenset({"A", "L", "m", "g", "K"})
 _SPACE_ONLY: Final = frozenset({"s", "h"})
 _GLUED_ONLY: Final = frozenset({'"', "″", "'", "′"})
 _DIMENSION_WORD_RE: Final = re.compile(
@@ -52,6 +54,10 @@ _SECTION_CONTEXT_RE: Final = re.compile(
 )
 _CODE_GARBAGE_RE: Final = re.compile(r"\d{1,3}[A-Z]")  # OCR garbage: 50S, 0G, 1V, 2B
 _APPENDIX_REF_RE: Final = re.compile(r"[A-Z]-\d{1,3}")  # appendix page refs: A-1, B-12
+# Document-number footers (`ME -3895-332-12/2-4`, `TM -5-3895`): letters, a space, a dash, a
+# digit. Nothing inside one is a spec.
+_DOC_NUMBER_RE: Final = re.compile(r"\b[A-Z]{2,} -\d[\d/.-]*")
+_THREAD_SERIES: Final = r"UNC|UNF|UNEF|UNS|UN|NPTF|NPT|NPS|BSPP|BSPT|BSP"
 
 QUANTITY_RE: Final = re.compile(
     rf"(?<![\w.]){NUM}(?:\s?(?:-|–|to|\.\.)\s?{NUM})?(?P<sp>\s?)(?P<unit>{UNIT})(?![A-Za-z])"
@@ -62,8 +68,16 @@ PART_NUMBER_RE: Final = re.compile(
     r"\s*[:#]?\s*(?P<value>(?=[A-Z0-9./-]*\d)[A-Z0-9][A-Z0-9./-]{2,})"
 )
 
+THREAD_RE: Final = re.compile(
+    # 1/4-20 UNC, 3/8-16, #10-32, 0.250-28 UNF (diameter-pitch thread specs)
+    rf"(?<![\w#/.,-])(?:#\d{{1,2}}-\d{{2,3}}(?:\s?(?:{_THREAD_SERIES}))?"
+    rf"|\d{{1,2}}/\d{{1,2}}-\d{{1,3}}(?:\s?(?:{_THREAD_SERIES}))?"
+    rf"|\d+(?:\.\d+)?-\d{{1,3}}\s?(?:{_THREAD_SERIES}))(?![\w/-])"
+)
+
 NUMERIC_SPEC_RULES: Final[tuple[tuple[str, re.Pattern[str]], ...]] = (
     ("quantity", QUANTITY_RE),
+    ("thread", THREAD_RE),
     ("tolerance", re.compile(r"±\s?\d|\+\s?/\s?-\s?\d|\d\s?(?:±|\+/-)")),
     ("part_number", PART_NUMBER_RE),
     ("code", MODEL_RE),
@@ -72,7 +86,7 @@ NUMERIC_SPEC_RULES: Final[tuple[tuple[str, re.Pattern[str]], ...]] = (
         "spec_word",
         re.compile(
             r"(?i)\b(?:torque|voltage|current|pressure|tolerance|clearance|capacity|rating|gap"
-            r"|preload)\b[^.\n]{0,40}?\d"
+            rf"|preload)\b[^.\n\d]{{0,40}}?(?P<num>{NUM})"
         ),
     ),
 )
@@ -92,13 +106,16 @@ def _quantity_ok(m: re.Match[str], t: str) -> bool:
     if unit in _GLUED_ONLY:
         before = t[m.start() - 1] if m.start() > 0 else ""
         return not sp and before not in "\"'“”‘’″′"
-    if unit in ("in", "in."):
+    if unit == "in.":
+        return True  # `2 in. from the edge`: the abbreviation dot makes it a unit
+    if unit == "in":
         nxt = t[m.end() : m.end() + 1]
-        if unit == "in" and nxt and nxt not in ",;:)]":
+        if nxt and nxt not in ",;:)]":
             return False  # `3 in the list`, `2 in each hand`
         before = t[max(0, m.start() - 40) : m.start()].split("\n")[-1]
         return decimal or _DIMENSION_WORD_RE.search(before) is not None
-    return True
+    # glued after a section word: `Section 1V.` (roman IV misread), `Chapter 2A`
+    return bool(sp) or not _SECTION_CONTEXT_RE.search(t[max(0, m.start() - 20) : m.start()])
 
 
 def _code_ok(m: re.Match[str], t: str, model_tokens: frozenset[str]) -> bool:
@@ -116,18 +133,27 @@ def find_numeric_specs(text: str, product_model: str | None) -> list[str]:
     """Spec matches in text order (ties by rule order), de-duplicated, stripped."""
     t = unicodedata.normalize("NFKC", text)
     model_tokens = frozenset(product_model.split()) if product_model else frozenset()
+    doc_numbers = [m.span() for m in _DOC_NUMBER_RE.finditer(t)]
+    quantity_end: dict[int, int] = {}  # accepted quantity start -> end
     hits: list[tuple[int, int, str]] = []
     for ri, (name, rx) in enumerate(NUMERIC_SPEC_RULES):
         for m in rx.finditer(t):
             s = m.group(0).strip()
             if not s:
                 continue
-            if name == "quantity" and not _quantity_ok(m, t):
+            if any(a <= m.start() < z for a, z in doc_numbers):
                 continue
+            if name == "quantity":
+                if not _quantity_ok(m, t):
+                    continue
+                quantity_end.setdefault(m.start(), m.end())
             if name == "code" and not _code_ok(m, t, model_tokens):
                 continue
             if name == "part_number" and m.group("value") in model_tokens:
                 continue
+            if name == "spec_word":
+                # the whole spec: `Torque to 100 ft.lb.`, never `Torque to 1`
+                s = t[m.start() : quantity_end.get(m.start("num"), m.end())].strip()
             hits.append((m.start(), ri, s))
     hits.sort()
     return list(dict.fromkeys(s for _, _, s in hits))

@@ -173,50 +173,115 @@ def _lines(mt: MappedText) -> list[tuple[int, int]]:
 _DIGIT_RUN_RE: Final = re.compile(r"\d+")
 
 
+def _num_eq(a: str, b: str) -> bool:
+    return (a.lstrip("0") or "0") == (b.lstrip("0") or "0")
+
+
+@dataclass(frozen=True)
+class HfGroup:
+    """Recorded header/footer strings with one digit template (``hf_key``).
+
+    ``page_slots``: indices of the digit runs that carry the page number (the ``{n}`` slot);
+    ``fixed``: index -> the value every member has (a run that never varies)."""
+
+    members: tuple[str, ...]
+    page_slots: frozenset[int]
+    fixed: Mapping[int, str]
+    pages: Mapping[str, frozenset[int]]  # member -> pages it was recorded on ({} if unknown)
+    with_pages: bool
+
+
 @dataclass(frozen=True)
 class HfTables:
     """Recorded header/footer strings that contain a letter (a bare number is never treated as
-    a header/footer: deleting it could delete a value). ``templates`` maps the digit-normalized
-    form (``hf_key``) to the recorded strings that have it."""
+    a header/footer: deleting it could delete a value), grouped by digit template."""
 
     exact: frozenset[str]
-    templates: Mapping[str, tuple[str, ...]]
+    groups: Mapping[str, HfGroup]
 
 
-def hf_tables(hf_strings: Iterable[str]) -> HfTables:
-    usable = sorted({collapse_ws(h) for h in hf_strings if any(c.isalpha() for c in h)})
-    templates: dict[str, list[str]] = {}
+def _group(members: Sequence[str], pages: Mapping[str, frozenset[int]] | None) -> HfGroup:
+    runs = {m: _DIGIT_RUN_RE.findall(m) for m in members}
+    n = len(runs[members[0]])
+    slots: set[int] = set()
+    if pages is not None:
+        # the {n} slot: the run that equals the recording page on every recorded occurrence
+        pairs = [(m, p) for m in members for p in sorted(pages.get(m, ()))]
+        if pairs:
+            slots = {k for k in range(n) if all(_num_eq(runs[m][k], str(p)) for m, p in pairs)}
+    else:
+        # no page record: the single run that varies across the recorded strings
+        varying = {k for k in range(n) if len({runs[m][k] for m in members}) > 1}
+        if len(varying) == 1:
+            slots = varying
+    fixed = {
+        k: runs[members[0]][k]
+        for k in range(n)
+        if k not in slots and len({runs[m][k] for m in members}) == 1
+    }
+    return HfGroup(
+        tuple(members),
+        frozenset(slots),
+        fixed,
+        dict(pages or {}),
+        pages is not None,
+    )
+
+
+def hf_tables(
+    hf_strings: Iterable[str], hf_pages: Mapping[str, Iterable[int]] | None = None
+) -> HfTables:
+    """``hf_pages`` (recorded string -> the pages it was recorded on) supersedes
+    ``hf_strings`` when given: it identifies the page slot and the doc-wide constants."""
+    pages: dict[str, frozenset[int]] | None = None
+    if hf_pages is not None:
+        pages = {}
+        for h, ps in hf_pages.items():
+            c = collapse_ws(h)
+            pages[c] = pages.get(c, frozenset()) | frozenset(ps)
+        source: Iterable[str] = pages
+    else:
+        source = hf_strings
+    usable = sorted({collapse_ws(h) for h in source if any(c.isalpha() for c in h)})
+    by_key: dict[str, list[str]] = {}
     for h in usable:
-        templates.setdefault(hf_key(h), []).append(h)
-    return HfTables(frozenset(usable), {k: tuple(v) for k, v in templates.items()})
+        by_key.setdefault(hf_key(h), []).append(h)
+    groups = {
+        k: _group(v, None if pages is None else {m: pages[m] for m in v}) for k, v in by_key.items()
+    }
+    return HfTables(frozenset(usable), groups)
 
 
 def is_hf_line(line: str, tables: HfTables, page: int | None) -> bool:
-    """AE3: a raw line may be removed as a header/footer only if
-    (a) it equals a recorded header/footer string (whitespace-collapsed), or
-    (b)/(c) it has the digit template of a recorded string and every digit run that differs
-        from that recorded string equals this block's page number (``Page {n}`` with
-        n == page; ``Manual X200 Page {n}`` keeps X200 and changes only the page).
-    Any other line, in particular one carrying another numeric token, is body text: deleting it
-    is a ``deletion`` violation."""
+    """AE3 (design 4.1): a raw line may be removed as a header/footer only if
+    (a) it is the string recorded on THIS page (page record known), or
+    (b) it has the digit template of a recorded group, every run outside the group's page slot
+        (``{n}``) equals the value all recorded strings share there, and the page slot equals
+        this block's page (``Page {n} of 60``: n == page and 60 stays 60), or
+    (c) the group has no page slot and the line is its one recorded string, a doc-wide
+        constant (recorded on >= 2 pages when the page record is known).
+    Any other line, in particular one carrying another numeric token or another page's
+    footer, is body text: deleting it is a ``deletion`` violation."""
     c = collapse_ws(line)
     if not c or not any(ch.isalpha() for ch in c):
         return False
-    if c in tables.exact:
-        return True
-    recorded = tables.templates.get(hf_key(c), ())
-    if not recorded:
+    grp = tables.groups.get(hf_key(c))
+    if grp is None:
         return False
+    same = [m for m in grp.members if m.casefold() == c.casefold()]
+    if grp.with_pages and page is not None and any(page in grp.pages[m] for m in same):
+        return True  # (a)
     nums = _DIGIT_RUN_RE.findall(c)
-    pg = str(page) if page is not None else None
-    for rec in recorded:
-        rec_nums = _DIGIT_RUN_RE.findall(rec)
-        if len(rec_nums) == len(nums) and all(
-            n == r or (pg is not None and n.lstrip("0") == pg)
-            for n, r in zip(nums, rec_nums, strict=True)
-        ):
-            return True
-    return False
+    if any(k not in grp.page_slots and k not in grp.fixed for k in range(len(nums))):
+        return False  # a run that varies across recorded strings but is not the page
+    if any(nums[k] != v for k, v in grp.fixed.items()):
+        return False
+    if grp.page_slots:  # (b)
+        return page is not None and all(_num_eq(nums[k], str(page)) for k in grp.page_slots)
+    # (c): no page slot and every run fixed: c is the group's recorded string (case aside)
+    if not same:
+        return False
+    return not grp.with_pages or len(frozenset().union(*(grp.pages[m] for m in same))) >= 2
 
 
 def _delete_ranges(mt: MappedText, ranges: list[tuple[int, int]]) -> MappedText:
@@ -249,10 +314,13 @@ class HfDeleted:
 
 
 def strip_hf_raw(
-    mt: MappedText, hf_strings: Sequence[str], page: int | None = None
+    mt: MappedText,
+    hf_strings: Sequence[str],
+    page: int | None = None,
+    hf_pages: Mapping[str, Sequence[int]] | None = None,
 ) -> tuple[MappedText, list[HfDeleted]]:
     """AE3 on raw: delete whole lines that are a known header/footer (see is_hf_line)."""
-    tables = hf_tables(hf_strings)
+    tables = hf_tables(hf_strings, hf_pages)
     if not tables.exact:
         return mt, []
     ranges: list[tuple[int, int]] = []
@@ -382,13 +450,14 @@ def canonicalize(
     raw_deleted: Sequence[HfDeleted] | None = None,
     raw_rest: str = "",
     page: int | None = None,
+    hf_pages: Mapping[str, Sequence[int]] | None = None,
 ) -> Canon:
     """Steps 1-5 of design 4.2. With raw_deleted=None this is the raw side (AE3 deletes known
     header/footer lines); otherwise the clean side (AE3 removes what raw deleted)."""
     mt = glyph_identity(s)
     deleted: list[HfDeleted] = []
     if raw_deleted is None:
-        mt, deleted = strip_hf_raw(mt, hf_strings, page)
+        mt, deleted = strip_hf_raw(mt, hf_strings, page, hf_pages)
     else:
         mt = strip_hf_clean(mt, raw_deleted, raw_rest)
     mt = normalize_bullets(mt, block_type)
@@ -506,22 +575,54 @@ def _token_rx(tok: str) -> re.Pattern[str]:
     return re.compile(r"(?<!\w)" + re.escape(tok) + r"(?!\w)")
 
 
-def _token_index(spans: Sequence[tuple[int, int]], offset: int) -> int:
-    """Index of the token containing ``offset`` (else the number of tokens before it)."""
-    for k, (a, z) in enumerate(spans):
+_CONFUSABLE_GROUPS: Final = ("0O", "1lI|", "5S", "8B", "2Z", "6G", "9g", ".,")
+_CONFUSABLE_CLASS: Final = {ch: grp[0] for grp in _CONFUSABLE_GROUPS for ch in grp}
+_TOKEN_PUNCT: Final = "\"'“”‘’()[]{}<>:;!?,."
+
+
+def _confusable_form(s: str) -> str:
+    return "".join(_CONFUSABLE_CLASS.get(ch, ch) for ch in s)
+
+
+def ocr_confusable(raw: str, chosen: str) -> bool:
+    """``chosen`` is a plausible OCR/text-layer misreading of ``raw``: the same length and
+    differing only inside the confusable pairs ``0O 1lI| 5S 8B 2Z 6G 9g .,``, or one digit
+    dropped/added (on top of those). ``35`` -> ``40`` is not a misreading, it is a new value."""
+    if not raw or not chosen or raw == chosen:
+        return False
+    a, b = _confusable_form(raw), _confusable_form(chosen)
+    if len(a) == len(b):
+        return a == b
+    if abs(len(a) - len(b)) != 1:
+        return False
+    long, short = (a, b) if len(a) > len(b) else (b, a)
+    return any(long[k].isdigit() and long[:k] + long[k + 1 :] == short for k in range(len(long)))
+
+
+def _has_digit(tok: str) -> bool:
+    return any(ch.isdigit() for ch in tok)
+
+
+def _numeric_index(spans: Sequence[tuple[int, int, bool]], offset: int) -> tuple[int, int]:
+    """(how many digit-bearing tokens precede the token containing ``offset``, how many
+    digit-bearing tokens the text has once that token reads as a number)."""
+    total = sum(d for _, _, d in spans)
+    n = 0
+    for a, z, digit in spans:
         if a <= offset < z:
-            return k
+            return n, total + (not digit)
         if a > offset:
-            return k
-    return len(spans)
+            return n, total + 1
+        n += digit
+    return n, total + 1
 
 
-def _confirmed_at(i: int, src_tokens: Sequence[str], chosen_rx: re.Pattern[str]) -> bool:
-    """The source reading has the chosen token at token index i +- 1."""
-    return any(
-        0 <= j < len(src_tokens) and chosen_rx.search(src_tokens[j]) is not None
-        for j in (i - 1, i, i + 1)
-    )
+def _confirmed_at(at: tuple[int, int], src_numeric: Sequence[str], chosen: str) -> bool:
+    """The other reading has as many digit-bearing tokens as raw and ``chosen`` is its i-th
+    (exact index, no slack: a neighbouring number is a different value, and a reading with an
+    extra or a missing number cannot be aligned by counting)."""
+    i, total = at
+    return len(src_numeric) == total and src_numeric[i].strip(_TOKEN_PUNCT) == chosen
 
 
 def apply_variants(
@@ -531,28 +632,28 @@ def apply_variants(
     raw_source: str,
     raw: str | None = None,
 ) -> tuple[MappedText, list[NumericVariant]]:
-    """Replace each whole-token occurrence of a variant's raw that is *confirmed*: the source
-    reading has the chosen token at the aligned position (same token index +- 1, tokens as
-    ``parse.text.TOKEN_RE``; ``raw`` is the original string ``mt.src`` points into). A chosen
-    token elsewhere in that reading confirms nothing. A variant with no confirmed occurrence is
-    not applied."""
+    """Replace each whole-token occurrence of a variant's raw that is *confirmed* (design 4.4
+    step 1): ``chosen`` is an OCR-confusable reading of ``raw`` (``ocr_confusable``) and the
+    source reading has ``chosen`` as a whole token at the SAME numeric-token index and as many
+    numeric tokens as raw (tokens as ``parse.text.TOKEN_RE``; only digit-bearing tokens are
+    counted; ``raw`` is the original string ``mt.src`` points into). A chosen token anywhere
+    else in that reading confirms nothing. A variant with no confirmed occurrence is not applied."""
     original = raw if raw is not None else mt.text
-    raw_spans = [m.span() for m in TOKEN_RE.finditer(original)]
+    raw_spans = [(m.start(), m.end(), _has_digit(m.group())) for m in TOKEN_RE.finditer(original)]
     applied: list[NumericVariant] = []
     for v in variants:
-        if not v.raw or not v.chosen:
+        if not v.raw or not v.chosen or not ocr_confusable(v.raw, v.chosen):
             continue
         rx = _token_rx(v.raw)
         occ = list(rx.finditer(mt.text))
         if not occ:
             continue
         src_key = "ocr" if v.source == "ocr" else raw_source
-        src_tokens = TOKEN_RE.findall(sources.get(src_key, ""))
-        chosen_rx = _token_rx(v.chosen)
+        src_numeric = [t for t in TOKEN_RE.findall(sources.get(src_key, "")) if _has_digit(t)]
         ok = [
             m
             for m in occ
-            if _confirmed_at(_token_index(raw_spans, mt.src[m.start()]), src_tokens, chosen_rx)
+            if _confirmed_at(_numeric_index(raw_spans, mt.src[m.start()]), src_numeric, v.chosen)
         ]
         if not ok:
             continue
@@ -867,12 +968,27 @@ def cover(
         return None
 
 
+def _find_unit(alt: str, unit: str, start: int) -> int:
+    """First position >= start where ``unit`` occurs in ``alt`` as a whole unit: preceded by
+    the start or a space and followed by a space or the end (both canonical, so whitespace is
+    one ' '). ``5 Nm is the limit.`` is not found inside ``15 Nm is the limit.``."""
+    q = alt.find(unit, start)
+    while q >= 0:
+        end = q + len(unit)
+        if (q == 0 or alt[q - 1] == " ") and (end == len(alt) or alt[end] == " "):
+            return q
+        q = alt.find(unit, q + 1)
+    return -1
+
+
 def _attested(units_loose: Sequence[str], alt_loose: Sequence[str]) -> bool:
+    """Some other reading contains every unit, as a whole unit, at strictly increasing
+    positions (design 4.5 step 4)."""
     for alt in alt_loose:
         p = 0
         ok = True
         for u in units_loose:
-            q = alt.find(u, p)
+            q = _find_unit(alt, u, p)
             if q < 0:
                 ok = False
                 break
@@ -948,6 +1064,7 @@ def _try_reorder(
     block_type: BlockType,
     evidence: ReorderEvidence,
     page: int | None,
+    hf_pages: Mapping[str, Sequence[int]] | None = None,
 ) -> tuple[bool, list[tuple[tuple[int, int], tuple[int, int]]]] | None:
     """None: no permutation explains the failure. Else (accepted, moved unit spans)."""
     lines = [
@@ -962,7 +1079,11 @@ def _try_reorder(
     if not candidates:
         return None
     alt_loose = [
-        loose(canonicalize(t, hf_strings=hf_strings, block_type=block_type, page=page).mt).text
+        loose(
+            canonicalize(
+                t, hf_strings=hf_strings, block_type=block_type, page=page, hf_pages=hf_pages
+            ).mt
+        ).text
         for t in evidence.alt_texts
     ]
     # A reorder is accepted only when another independent reader (the other parser's text or
@@ -996,6 +1117,7 @@ def check_faithfulness_ex(
     raw_source: str = "",
     evidence: ReorderEvidence | None = None,
     page: int | None = None,
+    hf_pages: Mapping[str, Sequence[int]] | None = None,
 ) -> FaithOutcome:
     evidence = evidence or ReorderEvidence()
     sources = variant_sources or {}
@@ -1007,7 +1129,9 @@ def check_faithfulness_ex(
         rc = table_raw_canon(table, raw)
         cc = table_clean_canon(gfm, clean)
     else:
-        raw_canon = canonicalize(raw, hf_strings=hf_strings, block_type=block_type, page=page)
+        raw_canon = canonicalize(
+            raw, hf_strings=hf_strings, block_type=block_type, page=page, hf_pages=hf_pages
+        )
         rc = raw_canon.mt
         cc = canonicalize(
             clean,
@@ -1045,6 +1169,7 @@ def check_faithfulness_ex(
             block_type,
             evidence,
             page,
+            hf_pages,
         )
         if found is not None:
             accepted, spans = found
@@ -1077,9 +1202,11 @@ def check_faithfulness(
     raw_source: str = "",
     evidence: ReorderEvidence | None = None,
     page: int | None = None,
+    hf_pages: Mapping[str, Sequence[int]] | None = None,
 ) -> FaithfulnessResult:
     """Pure and deterministic; passed == no violations (design 4). ``page`` is the block's
-    page number (AE3 footer templates such as ``Page {n}`` match only n == page)."""
+    page number (AE3 footer templates such as ``Page {n}`` match only n == page);
+    ``hf_pages`` maps each recorded header/footer string to the pages it was recorded on."""
     return check_faithfulness_ex(
         raw,
         clean,
@@ -1091,4 +1218,5 @@ def check_faithfulness(
         raw_source=raw_source,
         evidence=evidence,
         page=page,
+        hf_pages=hf_pages,
     ).result

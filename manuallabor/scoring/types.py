@@ -106,6 +106,9 @@ class BlockContext(ScoreModel):
     parser_versions: dict[str, str] = Field(default_factory=dict)
     product_model: str | None = None
     hf_strings: list[str] = Field(default_factory=list)
+    # recorded header/footer string -> the pages it was recorded on (AE3: page slot and
+    # doc-wide constants); None = unknown, hf_strings alone decides (design 4.1)
+    hf_pages: dict[str, list[int]] | None = None
 
     @property
     def layout_risk(self) -> bool:

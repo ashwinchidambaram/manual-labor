@@ -31,6 +31,8 @@ FIG_RUN_GAP = 2.0  # max x gap between two words of one run, in word heights
 FIG_LINE_GAP = 1.0  # max vertical gap between two runs of one paragraph, in run heights
 FIG_X_OVERLAP = 0.5  # min x overlap of consecutive runs, as a share of the narrower run
 FIG_WORDY_SHARE = 0.5  # min share of words with >= 2 letters
+FIG_MIN_WORDS_PER_LINE = 3.0  # mean words per line: stacked labels/legends/keys are shorter
+FIG_ALPHA_SHARE = 0.4  # min share of alphabetic tokens (letters only, punctuation aside)
 
 Region = Literal["text", "table", "figure"]
 DispFn = Callable[..., None]
@@ -189,6 +191,28 @@ def _wordy(t: str) -> bool:
     return sum(c.isalpha() for c in t) >= 2
 
 
+def _alphabetic(t: str) -> bool:
+    """A word token: its letters and digits are all letters (``P.S.I.=``, ``inch,``)."""
+    core = [c for c in t if c.isalnum()]
+    return bool(core) and all(c.isalpha() for c in core)
+
+
+def is_running_text(words: Sequence[str], n_lines: int) -> bool:
+    """Released from a figure as running text only with >= FIG_TEXT_MIN_WORDS words on
+    >= FIG_TEXT_MIN_LINES lines, a mean of >= FIG_MIN_WORDS_PER_LINE words per line, >=
+    FIG_ALPHA_SHARE alphabetic tokens and >= FIG_WORDY_SHARE wordy tokens. Stacked axis
+    labels (one word a line), a legend (two words a line) and a callout key (``1 Bolt``) stay
+    figure content."""
+    n = len(words)
+    return (
+        n >= FIG_TEXT_MIN_WORDS
+        and n_lines >= FIG_TEXT_MIN_LINES
+        and n >= FIG_MIN_WORDS_PER_LINE * n_lines
+        and sum(_alphabetic(w) for w in words) >= FIG_ALPHA_SHARE * n
+        and sum(_wordy(w) for w in words) >= FIG_WORDY_SHARE * n
+    )
+
+
 def split_figure_text(
     lines: Sequence[Line],
 ) -> tuple[list[list[tuple[int, Line]]], list[tuple[int, Line]]]:
@@ -196,9 +220,9 @@ def split_figure_text(
     each item tagged with the index of the input line it came from.
 
     A paragraph is a vertical stack of word runs (consecutive runs overlap in x and are at most
-    one run height apart) with >= FIG_TEXT_MIN_WORDS words on >= FIG_TEXT_MIN_LINES lines, most
-    of them words rather than numbers or symbols. Axis ticks, callout numbers, single labels and
-    a single caption-like line stay figure content. Pure and deterministic."""
+    one run height apart) that passes ``is_running_text``. Axis ticks and stacked axis labels,
+    legends, callout keys, single labels and a single caption-like line stay figure content.
+    Pure and deterministic."""
     runs: list[tuple[int, Line]] = []
     for li, ln in enumerate(lines):
         runs.extend((li, r) for r in _runs(ln))
@@ -227,11 +251,7 @@ def split_figure_text(
     for grp in groups:
         words = [w for k in grp for w in runs[k][1].text.split()]
         n_lines = len({runs[k][0] for k in grp})
-        if (
-            len(words) >= FIG_TEXT_MIN_WORDS
-            and n_lines >= FIG_TEXT_MIN_LINES
-            and sum(_wordy(w) for w in words) >= FIG_WORDY_SHARE * len(words)
-        ):
+        if is_running_text(words, n_lines):
             paragraphs.append([runs[k] for k in grp])
             taken.update(grp)
     if not paragraphs:

@@ -8,7 +8,7 @@ from hypothesis import strategies as st
 from manuallabor.contracts.enums import BlockType
 from manuallabor.scoring.faithfulness import canonicalize, check_faithfulness
 
-HF = ["Acme X200 Service Manual", "Page 3"]
+HF = ["Acme X200 Service Manual", "Page 3", "Page 4"]  # footers recorded on pages 3, 4
 SETTINGS = settings(max_examples=300, deadline=None, suppress_health_check=[HealthCheck.too_slow])
 
 WEIRD = "abcXYZ019 \n\t-–·±|•*¢«o.,;:()­  ﬁﬂ́éÅ"

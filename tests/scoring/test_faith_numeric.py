@@ -36,24 +36,34 @@ def test_attested_variant_exempts() -> None:
 
 
 def test_textlayer_variant() -> None:
-    v = NumericVariant(raw="36", chosen="35", source="textlayer", reason="OCR misread")
-    raw = "Tighten to 36 N·m."
+    v = NumericVariant(raw="3B", chosen="38", source="textlayer", reason="OCR misread")
+    raw = "Tighten to 3B N·m."
     r = check_faithfulness(
         raw,
-        "Tighten to 35 N·m.",
+        "Tighten to 38 N·m.",
         variants=[v],
         variant_sources={"ocr": raw, "ocr_alt": raw},
         raw_source="ocr",
     )
-    assert not r.passed and r.numeric_variants == []  # 35 not attested in raw_source text
+    assert not r.passed and r.numeric_variants == []  # 38 not attested in raw_source text
     r = check_faithfulness(
         raw,
-        "Tighten to 35 N·m.",
+        "Tighten to 38 N·m.",
         variants=[v],
-        variant_sources={"ocr": "Tighten to 35 N·m."},
+        variant_sources={"ocr": "Tighten to 38 N·m."},
         raw_source="ocr",
     )
     assert r.passed
+    # 36 -> 35 is not an OCR confusion (6/5 is no confusable pair): never applied
+    v2 = NumericVariant(raw="36", chosen="35", source="textlayer", reason="OCR misread")
+    r = check_faithfulness(
+        "Tighten to 36 N·m.",
+        "Tighten to 35 N·m.",
+        variants=[v2],
+        variant_sources={"ocr": "Tighten to 35 N·m."},
+        raw_source="ocr",
+    )
+    assert not r.passed and r.numeric_variants == []
 
 
 def test_unattested_variant_ignored() -> None:
@@ -90,8 +100,8 @@ def test_multiple_variants() -> None:
 
 
 def test_variant_confirmed_only_at_the_aligned_position() -> None:
-    """The chosen token must be where the other reader read the raw token (same token index
-    +- 1), not anywhere in that reading."""
+    """The chosen token must be where the other reader read the raw token (same numeric-token
+    index), not anywhere in that reading."""
     raw = "Set A to 3S N·m and B to 12 N·m. Note: 35 is the max."
     clean = raw.replace("3S", "35", 1)
     # OCR read "3S" too at that position; "35" appears only elsewhere (the note)
@@ -104,7 +114,7 @@ def test_variant_confirmed_only_at_the_aligned_position() -> None:
         raw_source="pymupdf",
     )
     assert not r.passed and r.numeric_variants == []
-    # OCR read "35" at the aligned position (one merged word earlier still counts: +- 1)
+    # OCR read "35" at the aligned position (a merged word does not shift numeric tokens)
     ocr_ok = "Set A to 35 N-m and B to 12 N-m. Note: 35 is the max."
     r = check_faithfulness(
         raw,

@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import random
 
+import pytest
+
 from manuallabor.contracts.block import TableCell
 from manuallabor.contracts.enums import BlockType
-from manuallabor.parse.merge import merge_page
+from manuallabor.parse.merge import is_running_text, merge_page, split_figure_text
 from manuallabor.parse.types import Line, PageParse, RawBlock, TableCandidate
 
 
@@ -353,3 +355,54 @@ def test_scanned_running_text_spread_over_line_candidates() -> None:
     assert out[("ocr", 4)] == out[("ocr", 6)] == out[("ocr", 7)] == "matched"
     fig = next(b for b in blocks if b.region == "figure")
     assert fig.text_by_parser["ocr"] == "40\n50\n120 4\n130 4"
+
+
+# -- figure-text release rule (module 3 second review) ----------------------------------------
+
+
+def _fig_line(text: str, y: float, i: int, x0: float = 50.0) -> Line:
+    words = []
+    x = x0
+    for t in text.split():
+        words.append(_w(t, x, y, h=10.0))
+        x += 5.0 * len(t) + 4.0
+    return _ocr_line(words, i)
+
+
+def _stack(texts: list[str]) -> list[Line]:
+    return [_fig_line(t, 100.0 + 12.0 * k, k) for k, t in enumerate(texts)]
+
+
+MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct"]
+
+
+@pytest.mark.parametrize(
+    "texts",
+    [
+        MONTHS,  # stacked axis labels, one word a line
+        ["Oil pressure", "Coolant temp", "Fuel level", "Battery voltage"],  # 4x2 legend
+        ["1 Bolt", "2 Nut", "3 Washer", "4 Gasket", "5 Cover", "6 Clamp"],  # callout key
+        ["1. Clamp, loop", "2. Strainer", "3. Ring, retaining", "4. Valve, check"],
+        [str(10 * k) for k in range(10)],  # numeric ticks
+    ],
+)
+def test_figure_labels_legends_keys_stay_in_figure(texts: list[str]) -> None:
+    paras, rest = split_figure_text(_stack(texts))
+    assert paras == [] and [ln.text for _, ln in rest] == texts
+
+
+def test_figure_sentence_paragraph_is_released() -> None:
+    """The real manual's p16 paragraph printed inside the bearing chart (6 lines, ~3 words a
+    line, numbers and units mixed in) is running text."""
+    paras, rest = split_figure_text(_stack(PARA))
+    assert len(paras) == 1 and [ln.text for _, ln in paras[0]] == PARA and rest == []
+
+
+def test_is_running_text_thresholds() -> None:
+    words = ["Having", "observed", "on", "gauge", "57", "P.S.I.=", "21,000", "ft.lb.", "and"]
+    assert is_running_text(words, 3)  # 9 words, 3 lines, mean 3
+    assert not is_running_text(words, 4)  # mean 2.25
+    assert not is_running_text(words[:7], 2)  # < 8 words
+    assert not is_running_text(words, 1)  # one line
+    nums = ["12", "14", "16", "18", "20", "22", "a1", "b2", "Nut"]
+    assert not is_running_text(nums, 3)  # < 40% alphabetic

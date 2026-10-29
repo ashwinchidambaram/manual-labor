@@ -10,7 +10,7 @@ from manuallabor.contracts.block import FaithfulnessResult, TableCell, TableData
 from manuallabor.contracts.enums import BlockType, DiffOpKind
 from manuallabor.scoring.faithfulness import check_faithfulness
 
-HF = ["Acme X200 Service Manual", "Page 3"]
+HF = ["Acme X200 Service Manual", "Page 3", "Page 4"]  # footers recorded on pages 3, 4
 
 
 def ok(raw: str, clean: str, **kw) -> FaithfulnessResult:  # type: ignore[no-untyped-def]
@@ -54,7 +54,9 @@ def test_ae3_header_footer_exact_and_key() -> None:
 
 def test_ae3_page_footer_on_the_right_page() -> None:
     ok("Set the gap.\nPage 35", "Set the gap.", page=35)
-    ok("Set the gap.\nPage 3", "Set the gap.", page=99)  # exact recorded string
+    # another page's footer is body text on this page, even when recorded verbatim
+    r = check_faithfulness("Set the gap.\nPage 3", "Set the gap.", hf_strings=HF, page=99)
+    assert not r.passed
 
 
 def test_ae3_fused_header_line_passes() -> None:
@@ -64,9 +66,10 @@ def test_ae3_fused_header_line_passes() -> None:
 
 def test_ae3_template_keeps_recorded_digits_and_page() -> None:
     hf = ["Acme X200 Service Manual Page 3"]
+    pages = {hf[0]: [3]}  # recorded on page 3: the page slot is the run that reads 3
     raw = "Check the drive belt.\nAcme X200 Service Manual Page 12"
-    ok(raw, "Check the drive belt.", hf_strings=hf, page=12)
-    r = check_faithfulness(raw, "Check the drive belt.", hf_strings=hf, page=11)
+    ok(raw, "Check the drive belt.", hf_strings=hf, hf_pages=pages, page=12)
+    r = check_faithfulness(raw, "Check the drive belt.", hf_pages=pages, page=11)
     assert not r.passed  # 12 is neither the recorded number nor this page
 
 

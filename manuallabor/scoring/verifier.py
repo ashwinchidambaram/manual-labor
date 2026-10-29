@@ -32,6 +32,7 @@ QUESTION: Final = (
     "Does the cleaned text change any fact, number, or step? Answer with the differing span or NONE"
 )
 _NONE_RE: Final = re.compile(r"(?i)none\.?")
+_WHOLE_NUMBER_RE: Final = re.compile(r"(?<![\w.,])\d+(?:[.,]\d+)*(?!\w)")
 FUNCTION_WORDS: Final = frozenset(
     [
         "a",
@@ -107,11 +108,20 @@ def _weak(span: str) -> bool:
     return all(w in FUNCTION_WORDS or not w for w in words)
 
 
+def _short_numeric(span: str, raw: str, clean: str) -> bool:
+    """A 1-2 char span that is a whole numeric token of raw or clean (``35``, ``5``): a
+    number is a fact even when short. ``3`` inside ``35`` is not one."""
+    if len(span) >= VERIFIER_MIN_SPAN or not span.isdigit():
+        return False
+    return span in _WHOLE_NUMBER_RE.findall(raw) or span in _WHOLE_NUMBER_RE.findall(clean)
+
+
 def validate_answer(text: str, raw: str, clean: str) -> tuple[Outcome, Signal | None]:
     """Strict. Only a found differing span is evidence, and it can only lower the score:
     - NONE -> ("ok", None): no signal at all (a 1.0 soft signal would raise the geometric mean
       of the soft signals and could lift a block over the threshold);
     - a verbatim span of raw or clean, 3..300 chars, not a bare function word -> 0.2 soft;
+    - a 1-2 char span that is a whole numeric token of raw or clean (``35``, ``5``) -> 0.2;
     - anything else (free text, weak spans such as ``e``/``.``/``the``) -> discarded."""
     out = _unwrap(text)
     if _NONE_RE.fullmatch(out):
@@ -120,8 +130,10 @@ def validate_answer(text: str, raw: str, clean: str) -> tuple[Outcome, Signal | 
     if (
         len(out) <= VERIFIER_MAX_SPAN
         and re.search(r"\n[ \t]*\n", out) is None
-        and not _weak(span)
-        and (span in collapse_ws(clean) or span in collapse_ws(raw))
+        and (
+            _short_numeric(span, raw, clean)
+            or (not _weak(span) and (span in collapse_ws(clean) or span in collapse_ws(raw)))
+        )
     ):
         return "flag", Signal(
             name=SignalName.llm_verifier,

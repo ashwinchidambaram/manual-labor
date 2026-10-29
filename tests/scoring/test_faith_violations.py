@@ -9,7 +9,7 @@ from manuallabor.scoring.faithfulness import check_faithfulness
 from manuallabor.scoring.pipeline import score_block
 from tests.scoring.conftest import ctx, make_block
 
-HF = ["Acme X200 Service Manual", "Page 3"]
+HF = ["Acme X200 Service Manual", "Page 3", "Page 4"]  # footers recorded on pages 3, 4
 
 
 def bad(raw: str, clean: str, **kw) -> FaithfulnessResult:  # type: ignore[no-untyped-def]
