@@ -137,3 +137,11 @@ Root cause: `/private/var/folders/.../T/com.docker.install` — a Docker Desktop
 | Attachment: caption_ref 1.0 (reference regex incl. line-broken "Figure\n2", ranges, chapter-style numbers) > caption_match 0.9 (figure's own section, ≥2 content words and ≥60%) > proximity 0.6 (own article) > human 1.0 (overrides re-applied) | caption_match over all article text hit 8–11 articles per figure on clean.pdf. |
 | Scoring overlays `clean.json` (fingerprinted), exposes one faithfulness-context helper, adds `human` attach rule, SCORING_ALGO_VERSION→3; `Provider.vision` gains optional json_schema; `cleanup` config section (llm off/residual/always, describe on/off) | Forced by current code; recorded in design. |
 | Known limit: dropping the hyphen of a real compound (`self-contained`→`selfcontained`) passes §5.2 either way; mitigated by word-evidence rules, the ambiguous-prefix trigger, and learned exceptions | Open issue, documented. |
+
+## Module 6 decisions (2026-10-29, docs/design/06-providers.md)
+| Decision | Rationale |
+|---|---|
+| One LiteLLM-backed provider for ollama/anthropic/openai-compatible (vllm/llamacpp aliases); lazy import; `LITELLM_LOCAL_MODEL_COST_MAP=True` + telemetry off for the offline guarantee; Ollama `num_ctx=8192`, truncation guard, model digest in cache key | LiteLLM 1.106.5 supports Ollama chat+images+JSON format, embeddings, Anthropic chat/vision (no embeddings → clear error). Import costs ~1 s / 194 MB. |
+| `TaskModels` defaults flipped to the small tier: chat/verifier/grouping/metadata `llama3.2:1b`, vision `moondream`, embeddings `nomic-embed-text` (was gemma4 e4b, 9.6 GB) | Fits a 16 GB machine; probe suggests bigger tiers; `labor probe --apply <tier>` sets them. |
+| Orchestrator pulls `llama3.2:1b` (1.3 GB) + `moondream` (1.7 GB) for the live gate; user may delete after | Live gates are part of the build; gemma4 was removed overnight (likely to free disk). |
+| JSON-schema retry = one corrective re-ask inside the same logged call; transport retries separate; validation failures never retried at transport level | Reconciles SPEC "validated" with "never retry validation failures". |
