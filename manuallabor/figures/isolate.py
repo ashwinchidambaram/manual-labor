@@ -23,6 +23,20 @@ def outer_rect(page_rect: Sequence[float], bbox: Sequence[float], margin: float)
     )
 
 
+def clamp_bbox(page_rect: Sequence[float], bbox: Sequence[float]) -> list[float] | None:
+    """`bbox` intersected with the page; None when the result is degenerate (a side < 1 pt)."""
+    r = g.qbox(bbox)
+    c = [
+        max(page_rect[0], r[0]),
+        max(page_rect[1], r[1]),
+        min(page_rect[2], r[2]),
+        min(page_rect[3], r[3]),
+    ]
+    if c[2] - c[0] < 1.0 or c[3] - c[1] < 1.0:
+        return None
+    return g.qbox(c)
+
+
 @contextmanager
 def isolated_page(
     src: Any, pno: int, outer: Sequence[float], *, keep_images: bool, keep_graphics: bool = False

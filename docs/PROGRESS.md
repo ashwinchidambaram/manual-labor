@@ -61,3 +61,25 @@ $ cd frontend && npm run gen-types && git diff --stat -- src/types/generated.ts 
       Tests  1 passed (1)
 $ gate numbers (from tests/parse): token F1 1.000 + exact header/footer on clean/twocol/tables/figures; scanned: headings 18/18, bbox-match 0.9375, F1 0.9665; determinism byte-identical across PYTHONHASHSEED (test 2 + reviewer check 1)
 ```
+
+## M2 — Figure extraction — PASSED 2026-10-28
+
+Design: docs/design/02-figures.md (isolated-page SVG export; lossless JPEG→PNG; phash-64 near-dup threshold 8 measured against fixture distances 0/2–6/10/12+; `figures/<slug>/` + `figures/index.json`). Review: fresh Sonnet agent — gate PASS, 1 major (off-page bbox crashed the doc instead of one figure failure) + 5 minors; all fixed failing-test-first (44 figure tests).
+
+Commands: `uv run labor figures <project> [--force] [--doc SLUG]`.
+
+```
+$ uv run ruff check manuallabor/ tests/ && uv run mypy manuallabor/
+All checks passed!
+Success: no issues found in 61 source files
+$ MANUALLABOR_REQUIRE_DOCLING=1 uv run pytest tests/figures
+44 passed, 15 warnings in 192.00s (0:03:12)
+$ MANUALLABOR_REQUIRE_DOCLING=1 uv run pytest -m "not slow"
+324 passed, 2 deselected, 19 warnings in 369.87s (0:06:09)
+$ uv run labor schemas export --check && uv run python -m tests.fixtures.gen.make_fixtures --check
+schemas up to date
+ok: 15 files match CHECKSUMS.json
+$ cd frontend && npm run gen-types && git diff --stat -- src/types/generated.ts; npm run typecheck && npm test -- --run
+      Tests  1 passed (1)
+$ gate numbers (tests/figures/test_gate.py): figures.pdf 14/14 methods match GT (8 native, 6 vector = 100% native/vector); p6 exact dup + p7 near dup -> FIG-figures-p002-01; figures.pdf ingested twice -> all 14 copy sidecars point at ../figures/; byte-identical across PYTHONHASHSEED 1/2
+```

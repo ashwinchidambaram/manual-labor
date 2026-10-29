@@ -75,3 +75,5 @@
   - M2.1 design done (Opus, 323 lines, 22 tests): isolated-page SVG export, lossless JPEG→PNG, phash-64 near-dup threshold 8 (measured 0/2–6/10/12+), figures/<slug>/ layout, canonical = best method then area. Found module-1 fused caption on scanned p6 → added to M1.6 fixer. Commit 772b9c0.
   - M1.6 fix done (Sonnet): 6/6 failing-first; scanned lists 8/8, captions own blocks. Full fast suite 280 passed; commit 87cbd81. Disk now 19 GB free (user cleared).
   - Dispatched M2.2 implement (Sonnet).
+  - M2.2 implement done (Sonnet): 14/14 methods match GT, dedupe exact+near+cross-slug, SVGs 2.5-3.3 KB, byte-identical across processes; 37 tests. Commit 2b99ca0. Dispatched M2.3 review (Sonnet, fresh).
+  - M2.3 review (Sonnet): gate PASS (14/14, dedupe across copies, native sha == GT, byte-identical across hash seeds). 1 major (off-page bbox crashes doc instead of per-figure failure), minors (stale files, near-dup sidecar width/height, --force keeps confidence, zero-area bbox). Dispatched M2.4 fix (Sonnet).

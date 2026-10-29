@@ -321,3 +321,7 @@ The cached `pages/pNNN.png` is **not** used:
 9. **Page renders** (`pages/pNNN.png`) are not reused (§5). The raster `crop_source` gives scanned figures their native pixels with no resampling instead.
 10. **Duplicates keep their own project files.** "One file" holds in the export, not on disk; the cost is about 1 MB per fixture project, and it keeps dedupe a pure pointer that can be recomputed.
 11. **Module 1 follow-up** (not blocking): the scanned p6 caption block fuses a paragraph (`b-scanned-p006-08`). Module 2 trims for `caption_original`, but the block itself is still wrong for grouping/cleanup. Log it in module 1's issues for the module 3 or 4 pass.
+
+## 14. Post-review notes (2026-10-28)
+- The sidecar `confidence` written here is the method-derived base (native 1.0 / vector 0.95 / crop 0.70) and is recomputed on every figures run. Module 3 overwrites it with the combined figure confidence; therefore module 7's stage graph must mark scoring stale whenever `labor figures --force` re-runs (same rule as parse → figures).
+- Duplicate figures keep their own project-internal PNG (design §13.10); export (module 11) emits one file per canonical figure and rewrites references.

@@ -12,7 +12,11 @@ PROVISIONAL_CONFIDENCE = {Extraction.native: 1.0, Extraction.vector: 0.95, Extra
 
 
 def build_record(
-    ext: FigureExtraction, doc: Document, entry: DedupeEntry, existing: FigureRecord | None
+    ext: FigureExtraction,
+    doc: Document,
+    entry: DedupeEntry,
+    existing: FigureRecord | None,
+    canonical: FigureExtraction | None = None,
 ) -> FigureRecord:
     if entry.duplicate_of is None:
         file, svg = f"{ext.figure_id}.png", f"{ext.figure_id}.svg"
@@ -20,6 +24,8 @@ def build_record(
         cslug = ids.parse_figure_id(entry.duplicate_of)[0]
         file = f"../{cslug}/{entry.duplicate_of}.png"
         svg = f"../{cslug}/{entry.duplicate_of}.svg"
+    # `file` points at the canonical's bytes for a duplicate, so the pixel metadata must describe it
+    pix = canonical if (entry.duplicate_of is not None and canonical is not None) else ext
     is_vector = ext.method == Extraction.vector
     fields: dict[str, object] = {
         "id": ext.figure_id,
@@ -30,9 +36,9 @@ def build_record(
         "page": ext.page,
         "bbox": ext.bbox,
         "extraction": ext.method,
-        "width": ext.width,
-        "height": ext.height,
-        "phash": ext.phash,
+        "width": pix.width,
+        "height": pix.height,
+        "phash": pix.phash,
         "caption_original": ext.caption_original,
         "description_generated": None,
         "tags": [],
@@ -47,7 +53,6 @@ def build_record(
             "tags",
             "articles",
             "attach_rule",
-            "confidence",
             "review",
         ):
             fields[k] = getattr(existing, k)

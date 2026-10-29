@@ -112,6 +112,19 @@ def test_05_dedupe_in_figures(figproj: ProjectPaths) -> None:
 
 
 def test_06_twin_cross_slug(twin: ProjectPaths) -> None:
+    """The copy writes its own files on disk (design 13.10); the original's PNGs are untouched.
+
+    Export dedupes to one file: every copy sidecar's `file` points at the canonical's PNG, so
+    only the canonical files are copied into `images/`.
+    """
+    orig = report(twin, "figures")
+    for f in orig.figures:
+        data = twin.figure_file("figures", f.figure_id, "png").read_bytes()
+        assert sha256_bytes(data) == f.png_sha256, f.figure_id
+        own = twin.figure_file(
+            "figures-copy", f.figure_id.replace("figures-", "figures-copy-", 1), "png"
+        )
+        assert own.is_file()
     rep = report(twin, "figures-copy")
     assert len(rep.figures) == 14
     entries = {e.figure_id: e for e in index(twin).entries if e.source_doc == "figures-copy"}

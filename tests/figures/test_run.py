@@ -85,6 +85,10 @@ def test_22_cli(parsed: Parsed, tmp_path: Path) -> None:
     assert lines[0]["doc"] == "figures" and lines[0]["status"] == "done"
     assert lines[0]["by_method"] == {"crop": 0, "native": 8, "vector": 6}
 
+    # an unknown slug is an error: non-zero exit
+    bad = runner.invoke(app, ["figures", str(root), "--doc", "no-such-doc"])
+    assert bad.exit_code != 0, bad.output
+
     # corrupt one document's candidate list: that doc errors, the others still run
     paths = ProjectPaths(root)
     fj = paths.doc("twocol").figures

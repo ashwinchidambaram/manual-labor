@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.metadata as md
+import shutil
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -31,6 +32,7 @@ from manuallabor.figures.encode import (
     sha256_bytes,
     write_if_changed,
 )
+from manuallabor.figures.isolate import clamp_bbox
 from manuallabor.figures.mu import pymupdf
 from manuallabor.figures.native import effective_dpi, extract_native
 from manuallabor.figures.page_content import load_page_content
@@ -90,6 +92,10 @@ def extract_pdf_figure(
     if pc is None:
         pc = load_page_content(doc, page, has_text_layer=has_text_layer)
     cache = cache or DecodeCache()
+    clamped = clamp_bbox(pc.page_rect, bbox)
+    if clamped is None:
+        raise UnsupportedImage("degenerate_bbox")
+    bbox = clamped
     dec: Decision = decide(bbox, pc)
     reason: Reason = dec.reason
     if dec.method == Extraction.native and dec.placement is not None:
@@ -319,6 +325,37 @@ def _extract_docx(imgs: DocxImages, cand: FigureCandidate) -> Extracted:
     )
 
 
+def _clear_outputs(paths: ProjectPaths, slug: str) -> None:
+    """Drop every derived file of a doc except its FIG-*.json sidecars (they carry later-module
+    fields that survive a re-extraction)."""
+    fdir = paths.figure_dir(slug)
+    if not fdir.is_dir():
+        return
+    for p in sorted(fdir.iterdir()):
+        if p.is_dir():
+            shutil.rmtree(p)
+        elif not (p.name.startswith("FIG-") and p.suffix == ".json"):
+            p.unlink()
+
+
+def _purge_doc(paths: ProjectPaths, slug: str) -> None:
+    """A doc whose figure stage failed leaves no outputs behind (nothing orphaned to glob)."""
+    shutil.rmtree(paths.figure_dir(slug), ignore_errors=True)
+    rp = paths.doc(slug).figure_report
+    if rp.is_file():
+        rp.unlink()
+
+
+def _purge_removed_docs(paths: ProjectPaths) -> None:
+    root = paths.figures_root
+    if not root.is_dir():
+        return
+    live = set(paths.list_slugs())
+    for p in sorted(root.iterdir()):
+        if p.is_dir() and p.name not in live:
+            shutil.rmtree(p)
+
+
 def _process_doc(paths: ProjectPaths, slug: str, force: bool, emit: Emit) -> FigureReport | None:
     t0 = time.monotonic()
     doc = paths.load_document(slug)
@@ -346,6 +383,8 @@ def _process_doc(paths: ProjectPaths, slug: str, force: bool, emit: Emit) -> Fig
     # drop the old report first so an interrupted run is never mistaken for a finished one
     if dp.figure_report.is_file():
         dp.figure_report.unlink()
+    if force:
+        _clear_outputs(paths, slug)
     report, stale = _extract_doc(paths, doc, dp, blocks, fp)
     write_if_changed(dp.figure_report, dump_json(report).encode("utf-8"))
     emit(
@@ -366,6 +405,7 @@ def _process_doc(paths: ProjectPaths, slug: str, force: bool, emit: Emit) -> Fig
 def _sidecar_phase(
     paths: ProjectPaths, reports: dict[str, FigureReport], entries: dict[str, DedupeEntry]
 ) -> None:
+    all_ext = {f.figure_id: f for rep in reports.values() for f in rep.figures}
     for slug in sorted(reports):
         rep = reports[slug]
         doc = paths.load_document(slug)
@@ -377,7 +417,9 @@ def _sidecar_phase(
                     existing = read_json(sc, FigureRecord)
                 except ValueError:
                     existing = None
-            rec = build_record(f, doc, entries[f.figure_id], existing)
+            ent = entries[f.figure_id]
+            canon = all_ext.get(ent.duplicate_of) if ent.duplicate_of else None
+            rec = build_record(f, doc, ent, existing, canon)
             write_if_changed(sc, dump_json(rec).encode("utf-8"))
             _check_targets(paths, slug, rec)
 
@@ -405,11 +447,13 @@ def run_figures(
             return [only]
         slugs = [only]
     failed: list[str] = []
+    _purge_removed_docs(paths)
     for slug in slugs:
         try:
             _process_doc(paths, slug, force, emit)
         except Exception as exc:
             failed.append(slug)
+            _purge_doc(paths, slug)
             emit(
                 {
                     "doc": slug,

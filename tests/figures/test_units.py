@@ -433,6 +433,8 @@ def test_21_rewrite_preserves_downstream_fields() -> None:
         }
     )
     again = build_record(ext, doc, entry, edited)
-    for k in ("description_generated", "tags", "articles", "attach_rule", "confidence", "review"):
+    for k in ("description_generated", "tags", "articles", "attach_rule", "review"):
         assert getattr(again, k) == getattr(edited, k), k
+    # method-derived fields are recomputed on every rewrite (fix pass item 4)
+    assert again.confidence == fresh.confidence == 1.0
     assert again.file == f"{fid}.png" and again.svg is None
