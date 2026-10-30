@@ -439,7 +439,10 @@ test("UX7 Export locked: reason text, counts match the queue, override needs a r
   }
   if (st.open_flags > 0) await expect(page.getByTestId("reason-flags")).toContainText(`${st.open_flags} open flag`);
   // the copy says what an override covers before anything is recorded
-  await expect(page.getByTestId("override-form")).toContainText("A block or flag that starts blocking later is not covered");
+  await expect(page.getByTestId("override-form")).toContainText(
+    "a flag raised on it after you record the override blocks the export again",
+  );
+  await expect(page.getByTestId("override-form")).toContainText("a block that starts blocking later is not covered");
   // empty reason is refused, nothing is sent
   const posted: { reason: string; target_id?: string | null; flag_id?: string | null; request_id?: string }[] = [];
   await page.route("**/api/export/override", async (route) => {
