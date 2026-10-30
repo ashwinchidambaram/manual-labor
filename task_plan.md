@@ -4,7 +4,7 @@
 Deliver Manual Labor v1 per SPEC.md: every CLAUDE.md module gate (0–11) passed with its proving command pasted in docs/PROGRESS.md, and SPEC §11 acceptance recorded in docs/ACCEPTANCE.md.
 
 ## Current Phase
-All 12 gates (M0–M11) passed and recorded in docs/PROGRESS.md; docs/ACCEPTANCE.md COMPLETE (AC0–AC8 VERIFIED, live). Build finished 2026-10-29.
+M0–M12 passed and recorded in docs/PROGRESS.md; docs/ACCEPTANCE.md COMPLETE (live). Phase 13 (friendly, guided UI craft per docs/design/13-ui-craft.md) in progress 2026-10-30.
 
 ## Phases
 Detailed tasks, model assignments, and gates: docs/plans/2026-10-28-manual-labor-build.md. Decisions and environment: findings.md.
@@ -102,3 +102,13 @@ See findings.md "Technical Decisions".
 ## Notes
 - Re-read this file and findings.md before each module's design dispatch.
 - Log every gate command + output in docs/PROGRESS.md (CLAUDE.md requirement) and summarize in progress.md.
+
+### Phase 12: Onboarding, tooltips, trust evidence, Agent + Export screens (user request 2026-10-29)
+- [x] Design (Opus) · [x] Backend guide state (Sonnet) · [x] UI implement (Opus, Impeccable craft) · [x] UX check (Sonnet, first-time user) · [x] Review ×2 (Opus) · [x] Fixes (Opus)
+- [x] Gate: 305 vitest, 75 Playwright, 1666 pytest, labor check K1–K16; recorded in docs/PROGRESS.md
+- **Status:** complete
+
+### Phase 13: Friendly, guided UI craft (user direction 2026-10-30; docs/design/13-ui-craft.md)
+- [x] Impeccable audit + shape brief + 2 direction mocks (impeccable-ui-architect) · [x] Owner decisions D1–D8, D1a · [x] Backend card fields (Opus) · [ ] UI craft (impeccable-ui-architect, in flight) · [ ] UX check as first-time user · [ ] Fresh review · [ ] Gate
+- **Status:** in_progress
+
