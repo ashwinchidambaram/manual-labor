@@ -70,7 +70,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y tesseract-ocr
       - name: Cache Docling models
         id: docling-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cache/huggingface
@@ -84,7 +84,7 @@ jobs:
         run: npx playwright install --with-deps chromium
         working-directory: frontend
       - name: Cache the e2e mock project
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: frontend/e2e/.cache
           # Same inputs as the key in scripts/e2e-project.sh: fixtures, the script, every Python source (which holds the
