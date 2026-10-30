@@ -17,10 +17,12 @@ from manuallabor.grouping import selection as sel_ops
 from manuallabor.grouping.coverage import coverage
 from manuallabor.project import ProjectPaths
 from manuallabor.state import projections
+from manuallabor.state import selection_log as sel_log
 from manuallabor.state.data import ProjectData
 from manuallabor.state.errors import InvalidOp, NotFound
 from manuallabor.state.models import (
     ActionKind,
+    ActionRecord,
     RegroupIn,
     SelectionOp,
     SelectionOut,
@@ -70,7 +72,10 @@ class ScopeService:
     def _summary(self, sel: Selection, groups: dict[str, GroupsFile]) -> ScopeSummary:
         blocks: dict[str, list[Block]] = {}
         for slug in groups:
-            if self.paths.doc(slug).scores.is_file():
+            # the pre-cleanup estimate: first-pass scores count (no clean.json needed), the same
+            # rows `/api/scope/blocks` gives the client; no current scores, no rows (the
+            # document still counts in docs, pages and blocks, `scope_summary`)
+            if self.data.has_scores(slug):
                 blocks[slug] = self.data.machine_blocks(slug)
         return sel_ops.scope_summary(
             sel, groups, blocks, threshold=self.paths.load_config().threshold
@@ -129,9 +134,10 @@ class ScopeService:
         with self.store.tx():
             prev = self.store.action_by_request(op.request_id, tuple(_KIND.values()))
             if prev is not None:
-                return SelectionOut.model_validate(prev.payload["_outcome"])
+                return self._replayed(prev, groups)
+            stored = self.data.raw_selection()
             before = self.data.selection()
-            new = self._apply(op, before, groups)
+            new = sel_ops.mark_known(self._apply(op, before, groups), groups)
             new, dropped = sel_ops.normalize_to(new, sel_ops.selectable_ids(groups))
             out = SelectionOut(
                 selection=new,
@@ -145,21 +151,45 @@ class ScopeService:
                 "cli" if op.request_id.startswith("cli-") else "scope",
                 doc_id=op.doc_id,
                 target_id=op.group_id,
+                # review F6: the delta and what a replay cannot recompute, not two snapshots and
+                # the whole outcome (design 07 section 16, `state/selection_log.py`)
                 payload={
                     "op": op.op,
                     "block_ids": op.block_ids,
                     "group_id": op.group_id,
                     "subtree": op.subtree,
-                    "_outcome": out.model_dump(mode="json"),
+                    "view": op.view,
+                    "split": op.split,
+                    "delta": sel_log.selection_delta(stored, new),
+                    "_outcome": {
+                        "dropped": dropped,
+                        "summary": out.summary.model_dump(mode="json"),
+                    },
                 },
-                before=_sel_json(before),
-                after=_sel_json(new),
                 request_id=op.request_id,
                 action_id=aid,
             )
             self.store.set_selection_json(_sel_json(new), aid)
             self.store.after_commit(lambda: projections.project_selection(self.store, self.paths))
         return out
+
+    def _replayed(self, prev: ActionRecord, groups: dict[str, GroupsFile]) -> SelectionOut:
+        """The response a replayed request got the first time: stored whole by rows written
+        before F6; rebuilt for later rows from the stored selection and the deltas written since
+        (coverage is recomputed on the current groups, the same unless a regroup ran since)."""
+        if sel_log.is_legacy_outcome(prev.payload):
+            return SelectionOut.model_validate(prev.payload["_outcome"])
+        later = self.store.actions_of(sel_log.SELECTION_KINDS, prev.id)
+        sel = sel_log.selection_at(self.data.raw_selection(), later)
+        if sel is None:  # cannot happen: the action wrote a selection
+            raise InvalidOp(f"no selection recorded for action {prev.id}")
+        out = prev.payload["_outcome"]
+        return SelectionOut(
+            selection=sel,
+            dropped=out.get("dropped", []),
+            coverage=self._coverage(sel, groups),
+            summary=ScopeSummary.model_validate(out["summary"]),
+        )
 
     def regroup(
         self, r: RegroupIn, *, screen: str = "scope", meta: dict[str, Any] | None = None
@@ -174,7 +204,7 @@ class ScopeService:
         gf = self.data.groups(r.doc_id)
         if gf is None:
             raise NotFound(f"{r.doc_id}: not grouped yet")
-        seq = self.store.next_override_seq("group_overrides")
+        seq = 1  # validation only; the real seq is allocated inside the transaction below
         try:
             if r.kind == "move":
                 if r.block_id is None or r.to_topic_slug is None:
@@ -214,10 +244,13 @@ class ScopeService:
                 "summary": "",
             }
         with self.store.tx():
+            # Read the seq inside the transaction that inserts it: read outside, two concurrent
+            # requests got the same seq and one failed on UNIQUE (design 07 section 14.2).
+            ov = ov.model_copy(update={"seq": self.store.next_override_seq("group_overrides")})
             aid = self.store.next_action_id()
             self.store.add_override(
                 "group_overrides",
-                seq,
+                ov.seq,
                 r.doc_id,
                 json.dumps(ov.model_dump(mode="json"), sort_keys=True),
                 aid,
@@ -250,7 +283,7 @@ class ScopeService:
         cfg = self.paths.load_config()
         probe = None
         suggestions = None
-        pj = self.paths.root / "probe.json"
+        pj = self.paths.probe
         if pj.is_file():
             from manuallabor.providers.probe import suggest
 

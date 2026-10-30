@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -12,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 import manuallabor
 from manuallabor.api.deps import Hooks
 from manuallabor.api.errors import ApiError, install_handlers
+from manuallabor.api.guard import DEFAULT_MAX_BODY_BYTES, RequestGuard
 from manuallabor.api.routers import (
     agent,
     export,
@@ -43,8 +45,13 @@ def create_app(
     static_dir: Path | None = None,
     dev: bool = False,
     hooks: Hooks | None = None,
+    allowed_hosts: Iterable[str] | None = None,
+    max_body_bytes: int = DEFAULT_MAX_BODY_BYTES,
 ) -> FastAPI:
-    """Build the app. `ctx=None` is for OpenAPI export (every route answers 503)."""
+    """Build the app. `ctx=None` is for OpenAPI export (every route answers 503).
+
+    Every request passes `RequestGuard` (design 07 section 15): same-origin writes and the body
+    cap always; the Host allow-list when `allowed_hosts` is given (`labor serve` always does)."""
     app = FastAPI(
         title="Manual Labor API",
         version=manuallabor.__version__,
@@ -53,6 +60,12 @@ def create_app(
     )
     app.state.ctx = ctx
     app.state.hooks = hooks or Hooks()
+    app.state.max_body_bytes = max_body_bytes
+    app.add_middleware(
+        RequestGuard,
+        allowed_hosts=None if allowed_hosts is None else frozenset(allowed_hosts),
+        max_body_bytes=max_body_bytes,
+    )
     install_handlers(app)
     for r in (project, sources, scope, verify, figures, jobs, learning, agent, export, ui):
         app.include_router(r.router)

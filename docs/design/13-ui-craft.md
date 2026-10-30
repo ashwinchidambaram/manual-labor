@@ -416,3 +416,108 @@ Review (Opus, worktree) and UX check (Opus, `frontend/e2e/ux-craft.spec.ts` UC1 
 - Full-suite findings (state carried between specs): the Agent loading placeholder needed `role="status"` for its aria-label; the Export blocker list grouped before its titles had arrived and now waits for one queue read per document (`doc=<slug>`, so the reviewer's document filter never applies); UX7 intercepted the override posts but not the status reread the screen performs, so its stub now serves both.
 
 Deferred (server fields, additive): per-section blocker counts on `/api/export/status`, per-document queued counts in `/api/verify/queue` `docs[]` for quiet milestones.
+
+### 8.2 Jobs bar and step rail from server truth (2026-10-30, first-use report C10, D)
+**2.5.6 Jobs bar.** One row per queued or running job: what it is ("Scoring your selection"), a determinate `<progress>` with the server's `progress`, and the step in words from the job row (`shell/jobStep.stepSentence`): "Step 3 of 4: Finding figures in x200-two-column.pdf, page 4 of 6". The step number is `units_done + 1` of `units_total`; the manual is its file name from the Sources list; the count is the worker's own (design 07 section 17). A step that reports no count adds "working, no estimate" and the bar stands still: nothing moves that the server did not move, and there is no indeterminate animation. A queued upload names its files ("Waiting to start: pump.pdf"); an upload being added says "Adding pump.pdf". The bar is `sticky top-0` in the screen column, so it stays in view while Scope or Export scrolls; on a short window it is one line (section 8.3). This replaces "N of M steps · now on <slug>" (review M13 P2-11), which named the last finished unit and never the step. The manual's chip on Scope names the same step ("Grouping into topics, 2 of 5 topics", "Waiting its turn") instead of "Processing clean"; Verify's document chips say "preparing (cleaning up text)" in words.
+
+**2.5.1 Rail states.** `StepNav.stepStates(path, gate, { scoring })`, `scoring` = a pipeline job is queued or running. Verify: "scoring in progress" while scoring; "N to review"; done only with blocks in scope (`gate.counts.in_scope > 0`), none queued and no blocker. Export: "after scoring" while scoring; "locked: ..." with blockers, never with the checkmark (an earlier export no longer marks a locked step done); "nothing to export yet" with nothing in scope; "exported" (done) after an export with nothing blocking; else "ready" / "ready with an override". Freshness: the shell re-reads the export gate on a route change (as before), whenever an active job's `units_done` or status changes, and Verify invalidates it after every saved decision, so the counts follow the reviewer without a reload.
+
+**Tests.** Vitest `src/shell/jobProgress.test.tsx`, `src/onboarding/stepStates.test.tsx`, `src/scope/sourcesRun.test.tsx`; updated `JobsBar.test.tsx`, `panels.test.tsx` C9. Playwright `e2e/progress.spec.ts` (own server on 8767, every document unscored, `MANUALLABOR_DELAY=step:score=0.3`): the step sentence equals the job row, the count and the bar advance, the empty Verify list, the rail's Export state, and the bar's top stays at 0 after the Scope page scrolls. Updated assertions: `ux-scope.spec.ts` (job row wording), `scope.spec.ts` and `ux-scope.spec.ts` (chip words), `verify.spec.ts` VE10 and `ux-verify.spec.ts` (not scored yet / still being scored).
+
+### 8.3 Short windows: every band has a budget (2026-10-30, frontend review 2 M1)
+
+**What failed.** At 720x450 (200 percent zoom on a 1440x900 laptop) Verify fits the page strip and the block text above the sticky action bar only because every band above the text folds to one line (`short:`, max-height 600px). Three bands had no fold: the job bar wrapped to two lines (a long step sentence and Cancel), the flag notice of a block opened from Agent took two to four lines, and the totals note sat outside the folded status block. With a job running and a flagged block open, the text started under `act-approve`. Z1 only measured the screen at rest with no job.
+
+**The rule.** On a short window each band above the text is one line, and what does not fit is one button away or in a title, never dropped:
+
+- **Job bar.** One line that never wraps (`short:flex-nowrap`): the step sentence is cut to fit (`truncate`, the whole sentence in its `title`); below `wide` the job's name is left to the progress bar's label (`short-narrow:hidden`); Cancel keeps its words. The bar publishes its height as `--jobs-bar` on `<html>` while it is shown (`shell/publishHeight.usePublishedHeight`, measured like `--guide-sheet`).
+- **Flag notice.** One summary line, "Flagged: Wrong text · Agent: tried once", and a Details toggle (`aria-expanded`, `aria-controls`), the pattern of the status block's "Counts and filters". The details hold the reviewer's note, the agent outcome per flag when there are several, and the flag sentence (design 09 section 10). It publishes `--flag-notice`.
+- **Totals note.** Joins the folded summary line ("4 of 12 checked by you · 2 more blocks queued after scoring finished", cut to fit, whole in its title) and shows in full under the details. Its live region is a separate, always-mounted `sr-only` node.
+- **Page strip.** Gives back the height of every optional band above it: `short:max-h` is `max(2.5rem, 5.5rem - var(--jobs-bar) - var(--flag-notice))`, so the two extra bands cost the text at most 1.5rem; at other heights the strip's `min(34vh, 17rem)` gives back `--jobs-bar`. 2.5rem keeps about two lines of the page at reading size. The extracted pane's top padding and header gap tighten under `short:` (`pt-2`, `gap-2`).
+- **Scope.** The sticky summary column (`xl:sticky`) sits below the job bar: `top: calc(var(--jobs-bar) + 1.5rem)`.
+
+Measured at 720x450 with a stubbed running job and a flagged block opened from Agent (Chromium, macOS): job bar 33 px, flag notice 29 px, strip 40 px, text top at 329 px against the action bar at about 355 px. Before: job bar 37, notice 37, text top 360 (covered).
+
+**Tests.** Playwright `e2e/zoom.spec.ts` Z2 (fails on the old layout: "block-text not in viewport"): 720x450, a running job served to the page by a route stub (a real job ends before the layout is read), a flagged block opened through the Agent screen's link; asserts the strip and the text are in the viewport and uncovered, the strip starts below the bar and the text above the action bar, the bar and the notice are one line each, and Details opens the flag sentence. Vitest `src/review2.test.tsx` (the bar publishes and removes `--jobs-bar` and keeps the sentence in `title`; the notice's summary line, toggle and details).
+
+
+## 9. Fluid layout (2026-10-30, owner request: "the UI needs to be able to scale dynamically to fit the screen size")
+
+### 9.1 What failed
+
+The layout was fixed columns plus one breakpoint, and nothing changed with the window's height. `e2e/responsive.spec.ts` measured the build before this section (Chromium, CSS px):
+
+| Size | What broke |
+|---|---|
+| 1100x700 (tester, shot 098) | Verify: text top 550, action bar top 595, so less than one line of text above the bar. Four causes: the action bar wraps to two lines (105 px); the 8.5rem whole-page locator, not the strip, sets the page band's height (band 248, strip 111); the pane header (provenance, title, ids, Text/Diff toggle) takes about 150 px above the text; the 20rem queue leaves the text 41 characters wide. The strip is 320 px wide, so a full-width paragraph is drawn at about half size, which is too small to compare. Scope: one column, so the selection's counts are below the fold. |
+| 1024x768 | Verify: text top 626, action bar top 622: covered. |
+| 720x450, and 200 percent on 1440x900 | Verify: one line of text above the bar at rest (§8.3 met "in view", not "readable"). Scope: the dock carries Confirm but no counts; the counts are below the list. |
+| 1366x768 | Verify: the evidence stacks under the text (beside only from 1400) although there is room for it beside. |
+| 1440x900 | Verify: the text column is 38 characters (fixed 23rem evidence column, 20rem queue). |
+| 1920x1080, 2560x1440 | Scope: Sources take a full row above Topics. Export: capped at 1024 px (`max-w-5xl`), 61 percent of the width beside the rail at 1920. Verify at 2560: the strip spans the work area while the text is capped at 62ch, so the page line is no longer above the text line, and the rest of the row is empty. |
+
+### 9.2 The model: widths
+
+Every column width is a `clamp()` of the viewport width, set once as a CSS custom property in `index.css`, and the arrangement switches at named widths (`tailwind.config.js` screens). The thresholds come from the widths, not from devices: a split happens where both sides still meet their minimums.
+
+| Token | Value | Used by |
+|---|---|---|
+| step rail | 15.5rem (248 px), unchanged (DESIGN.md) | shell, from `wide` |
+| `--queue-w` | `clamp(14rem, 18vw, 24rem)` | Verify queue, from `wide` |
+| `--evidence-w` | `clamp(16rem, 19vw, 28rem)` | Verify evidence column and the band cell above it, from `split` |
+| `--page-col-w` | `clamp(24rem, 22vw, 38rem)` | Verify whole-page column, from `vast` |
+| `--scope-aside-w` | `clamp(18rem, 24vw, 24rem)` | Scope summary column, from `wide` |
+| `--sources-w` | `clamp(17rem, 16vw, 24rem)` | Scope sources column, from `tri` |
+| `--export-side-w` | `clamp(20rem, 30vw, 36rem)` | Export overrides column, from `xl` |
+| `--read-size` | `clamp(1.125rem, 0.5625rem + 0.46875vw, 1.3125rem)` | the block's text: 18 px up to 1920 wide, 21 px at 2560 |
+
+| Name | Min width | What changes |
+|---|---|---|
+| (base) | | One column, the page scrolls, the step rail is a bottom sheet, 16 px side gutters. |
+| `wide` | 1100 | Rail docked on the left. Verify: fixed-height frame, queue column beside the work area. Scope: summary column beside the list (sticky). |
+| `xl` | 1280 | Export: gate and overrides side by side. Action bar: the position line ("Block 3 of 216 · saved after every action") joins it. |
+| `split` | 1340 | Verify: evidence column beside the text, scrolling on its own; the page band is a grid with the same two columns, so the strip sits exactly above the text and the whole-page locator above the evidence. |
+| `tri` | 1800 | Scope: Sources get their own (sticky) column: Sources, Topics, Summary. |
+| `vast` | 2400 | Verify: the whole page leaves the band for its own column right of the evidence. |
+
+Why these numbers. Atkinson Hyperlegible's `ch` (its "0") is 0.648 em, 11.7 px at 18 px, so 45ch is 525 px and the text column needs 525 + 56 px of padding. With the rail at 248 and the queue at `--queue-w`: at 1100 the work area is 628 and the text 49ch (stacked); at `split` (1340) the text beside a 16rem evidence column is 46ch; at 1366, 48ch; at 1440, 52ch; at 1920, 62ch (the cap); at `vast` (2400) with the page column, 56ch at 20 px; at 2560, 63ch at 21 px. Below 1100 the text is the screen width less 32 px, capped at 62ch. The cap stays 62ch (about 75 real characters, since "0" is the widest glyph). The block's text grows from 18 to 21 px between 1920 and 2560, so a 62ch line is still the right length on a 27-inch screen. The size floor is in rem, so browser zoom and the reader's font-size setting still enlarge it.
+
+What fills 2560: the queue (24rem), the evidence (28rem) and a column with the whole page at about 560 px wide (fit to width, the current block outlined, overlay buttons as before). Z still swaps the strip for the zoomed page in the band; while it is zoomed, or cropping, the page column is not shown, so the page is drawn once. Which parent holds `SourcePane` is decided in React by `useMediaQuery("(min-width: 2400px)")` (`shell/useMediaQuery.ts`); everything else is CSS.
+
+### 9.3 The model: heights
+
+Height has three bands. `short` (600 px and less, §8.3) is unchanged. New: `low`, 820 px and less, which covers 700, 720 and 768: the common laptop heights, and 150 percent zoom on 1080p. A taller window uses the layout as it was.
+
+- **Page strip**: `--strip-max` = `max(4.5rem, min(24rem, 50dvh - 12rem) - var(--jobs-bar))`. That is 158 px at 700 tall, 192 at 768, 258 at 900, 348 at 1080 and 384 (the cap) at 1440. On a short window it is §8.3's `max(2.5rem, 5.5rem - var(--jobs-bar) - var(--flag-notice))`, unchanged. `dvh` follows the visible window when browser bars come and go.
+- **Whole-page locator** (in the band, beside the strip): it may never be the band's tallest thing. Its width is `min(var(--locator-max), (strip frame height - 1.25rem) x page aspect)`, with a floor of 6rem (3.5rem on a short window): a smaller page cannot be clicked on, and at that size the current block's 2 px outline already distorts a short block's rectangle by more than 2 percent (`ux-verify.spec.ts` T4 caught it at 1280x720 with a 3.5rem floor). The strip reports its frame's rendered height (`PageStrip onFrameHeight`, from the ResizeObserver it already has), so a two-line block gets a short band; before the first measurement the bound is `--strip-max`. `--locator-max` is 8.5rem, and from `split` it is the evidence width less its padding (the locator gets the whole cell above the evidence). The image sits in one wrapper in every mode, so Z never remounts the page.
+- **Action bar**: one line from `wide` (`flex-nowrap`). The position line shows from `xl`, cut to fit, and the whole line is in its `title`. Below `xl` the queue header already says "Block 3 of 216". One line at any width: 61 to 65 px.
+- **Pane header** (on `low` and `short`): the title is set at 18 px and the ids line follows it. Then comes the block's text, and after the text the Text/Diff toggle and the provenance line ("x200.pdf · page 1 · read by ..."), like a citation under a quote. Above the text: title, ids, text. On a taller window the header is as it was.
+- **Status block**: tighter padding on `low` (py-2, gap 1.5). Every count and the reconcile line stay on screen. Folding them behind "Counts and filters" is kept for `short` only, because 768 is too common a height to hide counts on.
+- **Queue below `wide`**: the list folds to its one-line header (position, title, Up/Down) on `low` too, not only on `short`. At 1024x768 the 100 px list showed about one card and pushed the text under the action bar.
+
+Budget at 1100x700 after the change: status about 125, band about 205 (strip 158), header about 70, so the text starts near 400 with the action bar at 635. At 720x450 the text starts near 280 with the bar at 354, which shows two lines at rest. 1024x768 (flowing page, bottom sheet): text near 520, bar near 640.
+
+### 9.4 Scope and Export
+
+- **Scope**: one column below `wide`. The dock at the bottom (it already held Confirm) adds one line with the selection's numbers: "364 blocks · estimated review 216" (`dock-blocks`, `dock-queued`). They are the same numbers as the summary card, so the counts are on screen at every size. From `wide` there are two columns, Topics and a sticky summary (the summary moved down from `xl`, 1280). From `tri` there are three: Sources (sticky), Topics, Summary. The middle wrapper is `display: contents` at `tri`, so the two panes become grid items without moving in the DOM. It is a plain `div`, so no role is lost.
+- **Export**: the 1024 px cap is gone. From `xl` there are two columns. `export-main` holds the last export and the gate (locked with its blockers, or ready with Export). `export-side` holds the override forms and the active overrides. The side column is not rendered when it would be empty (unlocked, no overrides), and then the gate spans the row. Paragraphs keep their 62 to 68ch caps. The blocker list and its id chips use the width.
+
+### 9.5 Rejected
+
+- **Scaling the whole app with a root font size** (`html { font-size: calc(...vw) }`), or CSS `zoom` per breakpoint. This fights browser zoom: at 200 percent the viewport halves and a vw-based root shrinks the text back, which breaks WCAG 1.4.4 resize text and the 200 percent zoom rule. It also ignores the reader's font-size setting, and it scales everything evenly, when the problem is how space is shared out.
+- **Container queries for the panes.** They would be exact for the work area, but `container-type` adds containment to the pane boxes, and the panes hold position-fixed dialogs (Attach a figure renders inside the figure rail). Every width here is already a function of the viewport (the rail is fixed, the queue is a vw clamp), so a viewport query gives the same answer.
+- **Stacking the evidence below the text until 1400 px (as built).** At 1366x768 the evidence was always below the fold. Beside it from 1340, the text keeps at least 46ch.
+- **Folding the status block on `low` the way §8.3 does on `short`.** It would buy about 90 px, but it hides the counts and the reconcile line on the most common laptop height. Moving the header, the toggle and the provenance below the text buys more without hiding anything.
+- **Capping and centring the content at 2560.** That leaves empty sides. The page column puts the space to use for the whole page, which a reviewer wants anyway.
+- **A larger rail on wide screens.** It gains nothing and would contradict DESIGN.md's 248 px.
+
+### 9.6 Tests
+
+Playwright `e2e/responsive.spec.ts`, one test for each of 720x450, 1024x768, 1100x700, 1366x768, 1440x900, 1920x1080 and 2560x1440, plus 200 percent on 1440x900 (720x450 at device scale 2) and 150 percent on 1920x1080 (1280x720 at 1.5). Each test opens Scope, Verify and Export.
+
+- **Every screen**: no horizontal page scroll (`scrollWidth <= clientWidth`), and the step rail is docked from 1100 or is a bottom sheet below it.
+- **Scope**: the selection's blocks and estimated review are fully on screen and uncovered (the summary card from `wide`, the dock below it, which repeats the card's numbers). The arrangement is one, two or three columns by width.
+- **Verify** (a queued text block with evidence and a page image, in an article with a figure): Approve is fully on screen. The strip is on screen and above the text, and the text's first two lines are above the action bar, uncovered. The text is 45 to 90 of its own `ch` wide. The evidence is beside the text from `split` and below it otherwise. The page column is present only from `vast`. A rail figure scrolled into view leaves Approve on screen.
+- **Export**: the content spans at least 85 percent of the width beside the rail, with two columns from `xl`.
+
+Each test logs one `LAYOUT {...}` JSON line. Vitest `src/shell/fluid.test.tsx` covers the React side: `useMediaQuery` without and with `matchMedia`; below `vast` the page stays in the band; from `vast` it is in `page-column`, drawn once, and Z brings it back into the band zoomed; the Scope dock repeats the summary's numbers (and reads as a sentence: the first version relied on flex gaps for its spaces); Export's side column holds the override form when locked and is absent when ready with no overrides. Before this section, all nine failed (§9.1). Existing specs keep their sizes: Z1 and Z2 at 720x450, UX9 at 900x800, and the default 1280x720, which is now `low`.

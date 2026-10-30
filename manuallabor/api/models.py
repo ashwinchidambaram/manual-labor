@@ -117,6 +117,17 @@ class PageBlock(ContractModel):
     status: BlockStatus
 
 
+class BlockTitle(ContractModel):
+    """Where a block is, to name it outside the queue (Export blockers): the fields a queue card
+    titles itself from."""
+
+    block_id: BlockId
+    doc_id: DocSlug
+    page: int = Field(ge=1)
+    type: BlockType
+    section_title: str | None = None
+
+
 class DocFigure(ContractModel):
     """One figure of a document with every article it is attached to (the Verify \
 re-attach picker)."""

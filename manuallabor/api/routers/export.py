@@ -27,8 +27,11 @@ def _status(ctx: Ctx) -> ExportStatus:
         n = ctx.store.open_flag_count()
         return ExportStatus(unlocked=n == 0, open_flags=n, overrides=[])
     from manuallabor.export.pipeline import export_status
+    from manuallabor.state.review import ReviewService
 
-    return export_status(ctx.paths, store)
+    # the serving ReviewService: its cache makes an unchanged poll a dictionary read (review F4)
+    review = ctx.review if isinstance(ctx.review, ReviewService) else None
+    return export_status(ctx.paths, store, review)
 
 
 @router.get("/status", response_model=ExportStatus)

@@ -15,6 +15,11 @@ class Selection(ContractModel):
     block_ids: list[BlockId]
     article_split: ArticleSplit = ArticleSplit.per_topic
     active_view: GroupView = GroupView.topic
+    # Documents that were grouped when the selection was last written (design 08 section 10).
+    # A grouped document missing from this list arrived later and enters fully selected, the
+    # same as every document on a fresh project. None: a selection saved before this field
+    # existed, read as exactly the blocks it lists.
+    known_docs: list[DocSlug] | None = None
 
     @field_validator("block_ids", mode="before")
     @classmethod
@@ -24,6 +29,13 @@ class Selection(ContractModel):
                 return sorted(set(v), key=ids.block_sort_key)
             except ValueError:
                 return list(v)
+        return v
+
+    @field_validator("known_docs", mode="before")
+    @classmethod
+    def _sorted_docs(cls, v: Any) -> Any:
+        if isinstance(v, (list, tuple, set, frozenset)) and all(isinstance(x, str) for x in v):
+            return sorted(set(v))
         return v
 
 

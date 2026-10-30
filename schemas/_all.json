@@ -3281,12 +3281,30 @@
           },
           "title": "Block Ids",
           "type": "array"
+        },
+        "known_docs": {
+          "anyOf": [
+            {
+              "items": {
+                "maxLength": 48,
+                "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Known Docs"
         }
       },
       "required": [
         "block_ids",
         "article_split",
-        "active_view"
+        "active_view",
+        "known_docs"
       ],
       "title": "Selection",
       "type": "object"

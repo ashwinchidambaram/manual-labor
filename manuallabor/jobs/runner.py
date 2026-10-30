@@ -19,6 +19,7 @@ import sys
 import threading
 import time
 from collections.abc import Callable, Sequence
+from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
@@ -34,6 +35,19 @@ ADOPT_MAX_SILENCE = 30.0
 KILL_AFTER = 5.0
 TICK = 0.5
 TERMINAL = {"done", "failed", "cancelled", "interrupted"}
+# Finished job rows are pruned (at start and hourly) once they are older than PRUNE_AFTER, beyond
+# the newest PRUNE_KEEP of them. A finished row is read for three things: the idempotency of a
+# replayed request (`enqueue(request_id=)`: a client retry, seconds to minutes later), the Jobs
+# bar and `/api/jobs` (recent work), and its log (`/api/jobs/{id}/log`, kept on disk). A week
+# covers every retry and a week-end away; the newest PRUNE_KEEP stay so a project reopened after
+# a long break still shows what last ran. Queued and running rows are never pruned.
+PRUNE_AFTER = timedelta(days=7)
+PRUNE_KEEP = 200
+PRUNE_EVERY = 3600.0  # seconds between prunes while serving
+# The worker runs below the serve process's priority: model and parse work is CPU-bound and
+# background by design, the API must stay interactive while it runs (on a 2-core machine a
+# Docling parse at equal priority delayed every request; design 07 section 16.4).
+WORKER_NICE = 10
 
 
 def job_info(row: Any) -> JobInfo:
@@ -78,6 +92,18 @@ def _summary(o: dict[str, Any]) -> str | None:
     return f"{head}: {', '.join(extra)}" if extra else head
 
 
+def _step_of(o: dict[str, Any]) -> tuple[int, int, str] | None:
+    """A `step` event's (done, total, unit) when it is a real fraction of a known unit."""
+    try:
+        done, total = int(o["done"]), int(o["total"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    unit = o.get("unit")
+    if total <= 0 or not 0 <= done <= total or unit not in ("page", "block", "topic"):
+        return None
+    return done, total, str(unit)
+
+
 class _Tail:
     def __init__(self) -> None:
         self.offset = 0
@@ -86,8 +112,12 @@ class _Tail:
         self.units_total = 0
         self.node: str | None = None
         self.doc: str | None = None
+        self.cur: tuple[str, str] | None = None  # the unit running now (from unit_start)
+        self.step: tuple[int, int, str] | None = None  # its own count: done, total, unit
         self.message: str | None = None
         self.end: dict[str, Any] | None = None
+        # the progress fields last written to the row: an unchanged tick writes nothing
+        self.written: tuple[Any, ...] | None = None
 
 
 class JobRunner:
@@ -112,6 +142,7 @@ class JobRunner:
         self._kill_at: dict[str, float] = {}
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
+        self._next_prune = 0.0
         # worker log events other than the job lifecycle (module 10: `proposal`, `agent_outcome`)
         # are handed to these in log order; a handler must be idempotent (a resumed worker and
         # an adopted job re-read lines)
@@ -142,10 +173,12 @@ class JobRunner:
         """Queue a job. With `request_id` (the mutation that caused it) the call is idempotent:
         a replayed request returns the job it enqueued the first time."""
         if request_id is not None:
-            with self._lock:
-                for row in self.store.job_rows():
-                    if json.loads(row["plan"]).get("request_id") == request_id:
-                        return job_info(row)
+            # the store transaction makes check-then-insert atomic; never the runner's lock
+            # here (lock order, see `_enqueue`)
+            with self.store.tx():
+                row = self.store.job_by_request(request_id)
+                if row is not None:
+                    return job_info(row)
                 return self._enqueue(
                     {**plan.model_dump(mode="json"), "request_id": request_id}, kind, [], None
                 )
@@ -167,7 +200,11 @@ class JobRunner:
     def _enqueue(
         self, plan: dict[str, Any], kind: str, files: list[str], resumed_from: str | None
     ) -> JobInfo:
-        with self._lock, self.store.tx():
+        # Lock order: the runner's lock, then the store's; never the reverse. Callers enqueue
+        # inside their own `store.tx()` (the agent pass, the calibration apply), so this path
+        # takes no runner lock: the transaction alone makes the row and its plan file appear
+        # together, and a tick reads the row only after the commit (review 2, lock order).
+        with self.store.tx():
             job_id = self.store.add_job(kind=kind, plan=plan, resumed_from=resumed_from)
             spec = {"kind": kind, "plan": plan, "files": files, "mode": self.mode}
             p = self.paths.job_plan(job_id)
@@ -180,10 +217,26 @@ class JobRunner:
         row = self.store.job_row(job_id)
         if row is None:
             raise NotFound(job_id)
-        return job_info(row)
+        return self._live(job_info(row))
 
     def list(self, status: set[str] | None = None) -> builtins.list[JobInfo]:
-        return [job_info(r) for r in self.store.job_rows(status)]
+        return [self._live(job_info(r)) for r in self.store.job_rows(status)]
+
+    def _live(self, info: JobInfo) -> JobInfo:
+        """Add what lives in memory, not in the row (design 07 section 4.1): the running unit's
+        own count, and the file names of a queued or running ingest job."""
+        if info.status not in ("queued", "running"):
+            return info
+        update: dict[str, Any] = {}
+        # no lock: called under a caller's store transaction (lock order, see `_enqueue`); a
+        # dict lookup and a tuple read are atomic, and a tick replaces `step` whole
+        tail = self._tails.get(info.id)
+        step = tail.step if tail is not None else None
+        if step is not None and info.status == "running":
+            update.update(step_done=step[0], step_total=step[1], step_unit=step[2])
+        if info.kind == "ingest_run":
+            update["files"] = [Path(f).name for f in self._files_of(info.id)]
+        return info.model_copy(update=update) if update else info
 
     def cancel(self, job_id: str) -> JobInfo:
         with self._lock:
@@ -225,8 +278,21 @@ class JobRunner:
                     break
         return out
 
+    def prune(self) -> int:
+        """Delete finished job rows older than PRUNE_AFTER beyond the newest PRUNE_KEEP."""
+        with self._lock:
+            return self.store.prune_jobs(TERMINAL, self.store.clock() - PRUNE_AFTER, PRUNE_KEEP)
+
+    def _maybe_prune(self) -> None:
+        now = time.monotonic()
+        if now < self._next_prune:
+            return
+        self._next_prune = now + PRUNE_EVERY
+        self.prune()
+
     def start(self) -> None:
         self._reconcile()
+        self._maybe_prune()
         self._stop.clear()
         t = threading.Thread(target=self._loop, name="job-runner", daemon=True)
         self._thread = t
@@ -283,6 +349,7 @@ class JobRunner:
         while not self._stop.wait(TICK):
             try:
                 self.poll()
+                self._maybe_prune()
             except Exception:  # supervision must outlive a bad tick
                 import logging
 
@@ -291,7 +358,9 @@ class JobRunner:
     def poll(self) -> None:
         """One supervision tick (also called directly by tests)."""
         with self._lock:
-            for row in self.store.job_rows({"running"}):
+            running = self.store.job_rows({"running"})
+            still_running = len(running)
+            for row in running:
                 job_id = f"job-{row['n']:06d}"
                 tail = self._tails.setdefault(job_id, _Tail())
                 self._read(job_id, tail)
@@ -306,9 +375,12 @@ class JobRunner:
                 if gone:
                     self._read(job_id, tail)
                     self._finalize(job_id, tail, proc.returncode if proc is not None else None)
+                    still_running -= 1
                 else:
                     self._update_progress(job_id, tail)
-            if not self.store.job_rows({"running"}):
+            # rows only change status under this lock (the runner is the single job-row writer;
+            # a CLI run holds the project lock, so it cannot run beside serve)
+            if not still_running:
                 queued = self.store.job_rows({"queued"})
                 if queued:
                     self._start(f"job-{queued[0]['n']:06d}")
@@ -326,6 +398,9 @@ class JobRunner:
             cwd=str(paths.root),
         )
         err.close()
+        # set before the worker has imported anything: the threads it starts inherit it
+        with contextlib.suppress(OSError, AttributeError):
+            os.setpriority(os.PRIO_PROCESS, proc.pid, WORKER_NICE)
         self._procs[job_id] = proc
         self._tails[job_id] = _Tail()
         self.store.update_job(job_id, status="running", pid=proc.pid, started_at=self.store.now())
@@ -350,9 +425,16 @@ class JobRunner:
             ev = o.get("event")
             if ev == "job_start":
                 tail.units_total = int(o.get("units", 0))
+            elif ev == "unit_start":
+                tail.node, tail.doc = o.get("node"), o.get("doc")
+                tail.cur, tail.step = (str(tail.node), str(tail.doc or "")), None
+            elif ev == "step":
+                if tail.cur == (str(o.get("node")), str(o.get("doc") or "")):
+                    tail.step = _step_of(o) or tail.step
             elif ev == "unit_done":
                 tail.units_done += 1
                 tail.node, tail.doc = o.get("node"), o.get("doc")
+                tail.cur, tail.step = None, None
             elif ev == "job_end":
                 tail.end = o
             elif ev in self.event_handlers:
@@ -364,7 +446,11 @@ class JobRunner:
 
     def _update_progress(self, job_id: str, tail: _Tail) -> None:
         total = tail.units_total
-        prog = 0.0 if total <= 0 else min(1.0, tail.units_done / total)
+        fields = (tail.units_done, total, tail.node, tail.doc, tail.message, tail.step)
+        if fields == tail.written:
+            return  # nothing new in the log since the last write (most ticks)
+        inner = 0.0 if tail.step is None else tail.step[0] / tail.step[1]
+        prog = 0.0 if total <= 0 else min(1.0, (tail.units_done + inner) / total)
         row = self.store.job_row(job_id)
         if row is not None:
             prog = max(prog, float(row["progress"]))  # monotonic
@@ -372,6 +458,7 @@ class JobRunner:
             job_id, units_done=tail.units_done, units_total=total, progress=prog,
             node=tail.node, doc=tail.doc, message=tail.message,
         )  # fmt: skip
+        tail.written = fields
 
     def _finalize(self, job_id: str, tail: _Tail, exit_code: int | None) -> None:
         self._update_progress(job_id, tail)

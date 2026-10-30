@@ -133,6 +133,67 @@ def test_prompt_eval_count_far_below_estimate_raises(build: Build) -> None:
     assert cached_files(cache_dir) == []
 
 
+# build/human-test, b-pump-service-tables-p001-03: a whitespace-only verifier pair whose call was
+# dropped as "prompt truncated: Ollama evaluated 257 prompt tokens of about 328"
+P001_03_RAW = (
+    "Keep the area around the drive belt free of oil and debris. Compare the wiring harness "
+    "against the\nreference illustration before refitting. Tighten the wiring harness bolts to "
+    "35 N·m in a cross pattern. Allow\nthe unit to cool before touching the gearbox housing. "
+    "Allow the unit to cool before touching the drive belt.\nThe values for the control board "
+    "are listed below (see Table 1)."
+)
+P001_03_CLEAN = " ".join(P001_03_RAW.split("\n"))
+
+
+def test_short_prompt_with_a_low_count_is_not_truncation(build: Build) -> None:
+    """71 of 124 verifier calls in build/human-test were dropped by the ratio check: the
+    estimate (chars / 3.5) runs high for English prose, so a short prompt measured at 0.72-0.80
+    of it. A prompt whose UTF-8 bytes plus the chat-template allowance fit in num_ctx cannot
+    have been truncated, so the ratio is not consulted for it."""
+    from manuallabor.providers.litellm_provider import estimate_prompt_tokens
+    from manuallabor.scoring.verifier import verifier_messages
+
+    p, r, sink, cache_dir = build("ollama")
+    msgs = verifier_messages(P001_03_RAW, P001_03_CLEAN)
+    wire = [{"role": m.role, "content": m.content} for m in msgs]
+    assert estimate_prompt_tokens(wire) == 328  # the recorded estimate
+    r.prompt_tokens = 257
+    res = p.chat(Task.verifier, msgs)
+    assert res.log.ok and res.log.prompt_tokens == 257
+    assert len(cached_files(cache_dir)) == 1
+
+
+def test_short_prompt_reported_at_num_ctx_still_raises(build: Build) -> None:
+    p, r, _, cache_dir = build("ollama")
+    r.prompt_tokens = OLLAMA_NUM_CTX
+    with pytest.raises(ProviderError, match="prompt truncated"):
+        p.chat(Task.verifier, user("Reply ok"))
+    assert cached_files(cache_dir) == []
+
+
+def test_image_prompt_keeps_the_ratio_check(build: Build) -> None:
+    """An image part adds tokens the byte bound does not see, so a vision call keeps the
+    ratio check whatever its text length."""
+    from manuallabor.providers.litellm_provider import prompt_cannot_exceed_ctx
+
+    text = [{"role": "user", "content": "Describe the figure."}]
+    image = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "Describe the figure."},
+                {"type": "image_url", "image_url": {"url": "data:image/png;base64,AAAA"}},
+            ],
+        }
+    ]
+    assert prompt_cannot_exceed_ctx(text) is True
+    assert prompt_cannot_exceed_ctx(image) is False
+    big = [{"role": "user", "content": "x" * OLLAMA_NUM_CTX}]
+    assert prompt_cannot_exceed_ctx(big) is False
+    multibyte = [{"role": "user", "content": "°" * (OLLAMA_NUM_CTX // 2)}]  # 2 bytes each
+    assert prompt_cannot_exceed_ctx(multibyte) is False
+
+
 def test_normal_prompt_with_small_count_is_fine(build: Build) -> None:
     p, r, _, _ = build("ollama")
     assert p.chat(Task.cleanup, user("Reply ok")).log.prompt_tokens == 12

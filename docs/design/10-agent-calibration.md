@@ -276,7 +276,7 @@ Deviation from findings, on purpose: learned confusion pairs are **not** added t
 | Route | Body → response |
 |---|---|
 | POST `/api/agent/run` | `AgentRunIn{docs?, flag_ids?, request_id}` → 202 `JobInfo` (kind agent); 409 `no_open_flags` |
-| GET `/api/agent/items` (new) | → `list[AgentItemView{flag, target_id, round, pending_proposal_id, last_outcome, last_detail}]` |
+| GET `/api/agent/items` (new) | → `list[AgentItemView{flag, target_id, round, pending_proposal_id, last_outcome, last_detail, attempts}]` (`attempts`: passes that worked on the flag, design 09 §11). Only open flags: the eligible items and the open flags are two reads, and an item whose flag was resolved between them is left out (a Playwright run hit `KeyError` there, 2026-10-30; `tests/agent/test_items_race.py`) |
 | GET `/api/agent/proposals?status&flag_id&doc` | → `list[Proposal]` (rechecks, history, vision, evidence), by id |
 | POST `/api/agent/proposals/{id}/accept` | `RequestIn` → `Proposal`; 409 `not_pending` / `stale_proposal` / `checks_failed` |
 | POST `/api/agent/proposals/{id}/edit` | `ProposalEditIn{text?, bbox?, confirm_content_change=false, request_id}` → `Proposal`; 409 `EditConflict`; 422 for attach/regroup |

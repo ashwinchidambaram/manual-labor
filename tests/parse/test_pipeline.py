@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-import subprocess
 import sys
 from collections.abc import Callable
 from pathlib import Path
@@ -16,6 +15,7 @@ from manuallabor.contracts.io import read_json, read_json_list
 from manuallabor.parse.types import MergeReport, OcrOutput, ParserOutput
 from tests.parse.conftest import ALL_FIXTURES, Parsed
 from tests.parse.gt import PDF_FIXTURES
+from tests.subproc import run_bounded
 
 ALLOWED_SKIPS = {
     "empty_text",
@@ -76,7 +76,7 @@ def test_02_reparse_in_fresh_process_is_byte_identical(
 ) -> None:
     dst = copy_template()
     env = dict(os.environ, PYTHONHASHSEED="123")
-    proc = subprocess.run(
+    proc = run_bounded(
         [sys.executable, "-c", "from manuallabor.cli import app; app()", "parse", str(dst)],
         capture_output=True,
         text=True,

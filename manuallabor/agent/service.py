@@ -11,6 +11,8 @@ import threading
 from collections.abc import Sequence
 from typing import Any, Protocol
 
+from pydantic import Field
+
 from manuallabor.agent.data import target_slug
 from manuallabor.agent.errors import AgentConflict
 from manuallabor.agent.inputs import basis_sha256, eligible_items
@@ -36,6 +38,9 @@ from manuallabor.state.store import Store
 
 __all__ = ["AgentItemView", "AgentService"]
 
+# outcomes a pass records after working on an item (the others are skips decided before it)
+_RAN = frozenset({"error", "no_proposal", "stale"})
+
 
 class AgentItemView(ContractModel):
     flag: Flag
@@ -44,6 +49,10 @@ class AgentItemView(ContractModel):
     pending_proposal_id: str | None = None
     last_outcome: str | None = None
     last_detail: str | None = None
+    # How many agent passes worked on this flag: the passes started for it (`agent_run`
+    # actions), never fewer than its proposals, and at least one once a pass recorded an outcome.
+    # `round` alone cannot say it: a pass that ends in an error leaves no proposal.
+    attempts: int = Field(default=0, ge=0)
 
 
 class _Runner(Protocol):
@@ -109,34 +118,56 @@ class AgentService:
         last = project_outcomes_file(self.paths, {})
         pending = {p.flag_id: p.id for p in self.store.proposals(status=ProposalStatus.pending)}
         flags = {f.id: f for f in self.store.flags(FlagStatus.open)}
+        passes = self._passes()
+
+        def attempts(flag_id: str, round_: int, outcome: str | None) -> int:
+            ran = outcome in _RAN  # a skip is decided before a pass and is not an attempt
+            return max(passes.get(flag_id, 0), round_ - 1, 1 if ran else 0)
+
         out: list[AgentItemView] = []
         for it in items:
+            flag = flags.get(it.flag_id)
+            if flag is None:
+                # resolved between the two reads (eligible_items read the open flags first):
+                # no longer open, so not an item (Playwright run 2026-10-30, a KeyError 500)
+                continue
             o = last.get(it.flag_id) or {}
             out.append(
                 AgentItemView(
-                    flag=flags[it.flag_id],
+                    flag=flag,
                     target_id=it.target_id,
                     round=it.round,
                     pending_proposal_id=pending.get(it.flag_id),
                     last_outcome=o.get("outcome"),
                     last_detail=o.get("detail"),
+                    attempts=attempts(it.flag_id, it.round, o.get("outcome")),
                 )
             )
         for s in skips:
             f = flags.get(s.flag_id)
             if f is None:
                 continue
+            rnd = len(self.store.proposals(flag_id=f.id)) + 1
             out.append(
                 AgentItemView(
                     flag=f,
                     target_id=s.target_id,
-                    round=len(self.store.proposals(flag_id=f.id)) + 1,
+                    round=rnd,
                     pending_proposal_id=pending.get(f.id),
                     last_outcome=s.outcome,
                     last_detail=s.detail,
+                    attempts=attempts(f.id, rnd, None),
                 )
             )
         return sorted(out, key=lambda v: v.flag.id)
+
+    def _passes(self) -> dict[str, int]:
+        """flag id -> the number of agent passes started with it in their plan."""
+        n: dict[str, int] = {}
+        for a in self.store.actions_of((ActionKind.agent_run,)):
+            for fid in a.payload.get("flags") or ():
+                n[str(fid)] = n.get(str(fid), 0) + 1
+        return n
 
     # -- the run ------------------------------------------------------------------------------
 

@@ -369,6 +369,22 @@ class FakeReview:
             {"block_id": bid(1), "bbox": [0, 0, 10, 10], "type": "paragraph", "status": "queued"}
         ]
 
+    def block_statuses(self, slug: str) -> dict[str, BlockStatus]:
+        return {it.block_id: it.status for it in self.st.items.values() if it.doc_id == slug}
+
+    def titles(self, block_ids: Sequence[str]) -> list[dict[str, Any]]:
+        return [
+            {
+                "block_id": it.block_id,
+                "doc_id": it.doc_id,
+                "page": it.page,
+                "type": it.type.value,
+                "section_title": it.section_title,
+            }
+            for b in dict.fromkeys(block_ids)
+            if (it := self.st.items.get(b)) is not None
+        ]
+
 
 class FakeScope:
     def __init__(self, st: FakeState) -> None:

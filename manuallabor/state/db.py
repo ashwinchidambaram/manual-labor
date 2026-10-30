@@ -14,7 +14,10 @@ __all__ = ["StateError", "connect", "migrate"]
 def connect(path: Path, *, readonly: bool = False) -> sqlite3.Connection:
     path = Path(path)
     if readonly:
-        conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True, check_same_thread=False)
+        # a quoted file URI: `#`, `?` and `%` in a folder name are path characters, not URI
+        # syntax (an unquoted `file:{path}` opened another file, review 2 finding 2)
+        uri = f"{path.resolve().as_uri()}?mode=ro"
+        conn = sqlite3.connect(uri, uri=True, check_same_thread=False)
     else:
         path.parent.mkdir(parents=True, exist_ok=True)
         conn = sqlite3.connect(path, check_same_thread=False, isolation_level=None)

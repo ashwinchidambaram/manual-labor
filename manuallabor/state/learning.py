@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import uuid
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -18,7 +19,7 @@ from manuallabor.cleanup.learned import OCR_SOURCES
 from manuallabor.cleanup.types import FewShotExample, LearnedCleanup
 from manuallabor.contracts.config import ProjectConfig
 from manuallabor.contracts.enums import BlockType
-from manuallabor.contracts.io import dump_json, write_json, write_text_atomic
+from manuallabor.contracts.io import PART_SUFFIX, dump_json, write_json, write_text_atomic
 from manuallabor.grouping.learning import LearnedGrouping, RegroupExample
 from manuallabor.project import ProjectPaths
 from manuallabor.state import projections
@@ -33,6 +34,7 @@ __all__ = [
     "global_home",
     "project_learning",
     "provenance_for",
+    "publish_global",
 ]
 
 EXAMPLES_MAX = 200
@@ -53,6 +55,47 @@ def latest_global() -> str | None:
         return None
     names = sorted(p.name for p in d.iterdir() if p.is_dir() and not p.name.startswith("."))
     return names[-1] if names else None
+
+
+def publish_global(src: Path, *, origin: str, published_at: str) -> str:
+    """Copy a project snapshot into the global store as the next `global:<id>`; returns the id.
+
+    Safe beside other publishes, from this process or another project's (review 2 finding 5,
+    design 07 section 14.1): the id is chosen while holding an exclusive lock on
+    `<global>/.publish.lock`, the files are staged in this call's own `.part-<id>-<uuid>`
+    folder and renamed into place before the lock is released, and only that folder is ever
+    removed (on failure). Another publish's staging folder is never touched."""
+    from manuallabor.state.lock import ProjectLock
+
+    gdir = _global_dir()
+    gdir.mkdir(parents=True, exist_ok=True)
+    lock = ProjectLock(gdir / ".publish.lock", cmd="learning publish")
+    lock.acquire(nonblocking=False)
+    try:
+        latest = latest_global()
+        gid = f"{(0 if latest is None else int(latest)) + 1:03d}"
+        tmp = gdir / f".part-{gid}-{uuid.uuid4().hex}"
+        tmp.mkdir()
+        try:
+            for name in (*MATERIALIZED, "manifest.json"):
+                f = src / name
+                if not f.is_file():
+                    continue
+                d = json.loads(f.read_text(encoding="utf-8"))
+                if name == "manifest.json":
+                    d.update({"id": gid, "origin": origin, "published_at": published_at})
+                    text = json.dumps(d, sort_keys=True, indent=2) + "\n"
+                else:
+                    d["snapshot"] = f"global:{gid}"
+                    text = json.dumps(d, sort_keys=True, indent=2, ensure_ascii=False) + "\n"
+                write_text_atomic(tmp / name, text)
+            os.rename(tmp, gdir / gid)
+        except BaseException:
+            shutil.rmtree(tmp, ignore_errors=True)
+            raise
+    finally:
+        lock.release()
+    return gid
 
 
 # -- derivers (pure over action rows; module 10 registers more) --------------------------------
@@ -292,11 +335,12 @@ class LearningService:
             if self.store.get_snapshot(sid) is not None:
                 raise InvalidOp(f"snapshot {sid} already exists")
             shutil.rmtree(final)  # left by a kill between the rename and the DB commit
-        tmp = final.with_name(f".tmp-{sid}")
-        shutil.rmtree(tmp, ignore_errors=True)
+        # Staged under a unique ".part-" name: this runs in the serve process, outside the worker
+        # lock, and a job's start-up cleaner may run beside it (design 07 section 14.1).
+        tmp = final.with_name(f".part-{sid}-{uuid.uuid4().hex}")
         tmp.mkdir(parents=True)
         for name, text in files.items():
-            write_text_atomic(tmp / name, text)
+            write_text_atomic(tmp / name, text, suffix=PART_SUFFIX)
         manifest = {
             "id": sid,
             "created_at": self.store.now(),
@@ -307,7 +351,9 @@ class LearningService:
             "counts": counts,
         }
         write_text_atomic(
-            tmp / "manifest.json", json.dumps(manifest, sort_keys=True, indent=2) + "\n"
+            tmp / "manifest.json",
+            json.dumps(manifest, sort_keys=True, indent=2) + "\n",
+            suffix=PART_SUFFIX,
         )
         os.rename(tmp, final)
         return final
@@ -316,14 +362,16 @@ class LearningService:
         prev = self._replay(request_id, ActionKind.learning_snapshot)
         if prev is not None:
             return self._info(str(prev.payload["snapshot"]))
-        sid = self.store.next_snapshot_id()
-        files, counts = derive_snapshot_files(self.store, f"snapshot:{sid}")
-        last = self.store.max_action_id()
-        first = 1 if last else None
-        act = self.store.active_snapshot()
-        snaps = self.store.snapshots()
-        parent = act.id if act else (snaps[-1].id if snaps else None)
+        # The id is allocated inside the transaction that records it: two concurrent requests
+        # would otherwise both get the same id (design 07 section 14.2).
         with self.store.tx():
+            sid = self.store.next_snapshot_id()
+            files, counts = derive_snapshot_files(self.store, f"snapshot:{sid}")
+            last = self.store.max_action_id()
+            first = 1 if last else None
+            act = self.store.active_snapshot()
+            snaps = self.store.snapshots()
+            parent = act.id if act else (snaps[-1].id if snaps else None)
             aid = self.store.next_action_id()
             path = self._write_snapshot(sid, files, parent, first, last or None, counts)
             self.store.add_snapshot(
@@ -399,36 +447,36 @@ class LearningService:
         prev = self._replay(request_id, ActionKind.learning_disable_item)
         if prev is not None:
             return self._info(str(prev.payload["snapshot"]))
-        act = self.store.active_snapshot()
-        if act is None:
-            raise InvalidOp("no active snapshot")
-        src = self.paths.snapshot_dir(act.id)
-        sid = self.store.next_snapshot_id()
-        files: dict[str, str] = {}
-        found = False
-        counts: dict[str, int] = {}
-        for name in ("cleanup.json", "grouping.json", "calibration.json", "agent.json"):
-            f = src / name
-            if not f.is_file():
-                continue
-            data = json.loads(f.read_text(encoding="utf-8"))
-            data["snapshot"] = f"snapshot:{sid}"
-            total = 0
-            for key, items in list(data.items()):
-                if (
-                    isinstance(items, list)
-                    and items
-                    and all(isinstance(i, dict) and "id" in i for i in items)
-                ):
-                    kept = [i for i in items if i.get("id") != item_id]
-                    found = found or len(kept) != len(items)
-                    data[key] = kept
-                    total += len(kept)
-            files[name] = json.dumps(data, sort_keys=True, indent=2, ensure_ascii=False) + "\n"
-            counts[name.split(".")[0]] = total
-        if not found:
-            raise InvalidOp(f"no item {item_id} in snapshot {act.id}")
-        with self.store.tx():
+        with self.store.tx():  # the new id is allocated inside it (design 07 section 14.2)
+            act = self.store.active_snapshot()
+            if act is None:
+                raise InvalidOp("no active snapshot")
+            src = self.paths.snapshot_dir(act.id)
+            sid = self.store.next_snapshot_id()
+            files: dict[str, str] = {}
+            found = False
+            counts: dict[str, int] = {}
+            for name in ("cleanup.json", "grouping.json", "calibration.json", "agent.json"):
+                f = src / name
+                if not f.is_file():
+                    continue
+                data = json.loads(f.read_text(encoding="utf-8"))
+                data["snapshot"] = f"snapshot:{sid}"
+                total = 0
+                for key, items in list(data.items()):
+                    if (
+                        isinstance(items, list)
+                        and items
+                        and all(isinstance(i, dict) and "id" in i for i in items)
+                    ):
+                        kept = [i for i in items if i.get("id") != item_id]
+                        found = found or len(kept) != len(items)
+                        data[key] = kept
+                        total += len(kept)
+                files[name] = json.dumps(data, sort_keys=True, indent=2, ensure_ascii=False) + "\n"
+                counts[name.split(".")[0]] = total
+            if not found:
+                raise InvalidOp(f"no item {item_id} in snapshot {act.id}")
             aid = self.store.next_action_id()
             path = self._write_snapshot(
                 sid, files, act.id, act.source_first_action, act.source_last_action, counts
@@ -457,34 +505,11 @@ class LearningService:
         if not cfg.learning.contribute_global:
             raise InvalidOp("publishing needs learning.contribute_global")
         info = self._info(snapshot_id)
-        src = self.paths.snapshot_dir(snapshot_id)
-        gdir = _global_dir()
-        gdir.mkdir(parents=True, exist_ok=True)
-        n = 0 if latest_global() is None else int(str(latest_global()))
-        gid = f"{n + 1:03d}"
-        tmp = gdir / f".tmp-{gid}"
-        shutil.rmtree(tmp, ignore_errors=True)
-        tmp.mkdir()
-        for name in (*MATERIALIZED, "manifest.json"):
-            f = src / name
-            if not f.is_file():
-                continue
-            if name == "manifest.json":
-                m = json.loads(f.read_text(encoding="utf-8"))
-                m.update(
-                    {
-                        "id": gid,
-                        "origin": f"project:{cfg.name}",
-                        "published_at": fmt_ts(parse_ts(self.store.now())),
-                    }
-                )
-                text = json.dumps(m, sort_keys=True, indent=2) + "\n"
-            else:
-                d = json.loads(f.read_text(encoding="utf-8"))
-                d["snapshot"] = f"global:{gid}"
-                text = json.dumps(d, sort_keys=True, indent=2, ensure_ascii=False) + "\n"
-            write_text_atomic(tmp / name, text)
-        os.rename(tmp, gdir / gid)
+        gid = publish_global(
+            self.paths.snapshot_dir(snapshot_id),
+            origin=f"project:{cfg.name}",
+            published_at=fmt_ts(parse_ts(self.store.now())),
+        )
         with self.store.tx():
             aid = self.store.next_action_id()
             self.store.append_action(

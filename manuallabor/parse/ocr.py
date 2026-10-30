@@ -80,6 +80,44 @@ def _tesseract_bin() -> str | None:
     return shutil.which("tesseract")
 
 
+# A 300 dpi page takes 2 to 15 s on the reference machine; the timeout only catches a wedged
+# process, which otherwise hangs an OCR pool worker forever (design 07 section 15, F13).
+TESSERACT_PAGE_TIMEOUT_ENV = "MANUALLABOR_TESSERACT_TIMEOUT"
+TESSERACT_PAGE_TIMEOUT_DEFAULT_S = 600
+TESSERACT_PROBE_TIMEOUT_S = 30  # `--version`, `--list-langs`
+
+
+def tesseract_page_timeout() -> int:
+    """Seconds one `tesseract` page run may take: $MANUALLABOR_TESSERACT_TIMEOUT or 600."""
+    raw = os.environ.get(TESSERACT_PAGE_TIMEOUT_ENV, "").strip()
+    if not raw:
+        return TESSERACT_PAGE_TIMEOUT_DEFAULT_S
+    try:
+        value = int(raw)
+    except ValueError:
+        value = 0
+    if value <= 0:
+        raise ValueError(
+            f"{TESSERACT_PAGE_TIMEOUT_ENV} must be a positive number of seconds, got {raw!r}"
+        )
+    return value
+
+
+def _run_probe(exe: str, flag: str) -> subprocess.CompletedProcess[str]:
+    try:
+        return subprocess.run(
+            [exe, flag],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=TESSERACT_PROBE_TIMEOUT_S,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(
+            f"tesseract {flag} timed out after {TESSERACT_PROBE_TIMEOUT_S} s ({exe})"
+        ) from exc
+
+
 class TesseractAdapter:
     engine = OcrEngine.tesseract
 
@@ -90,14 +128,14 @@ class TesseractAdapter:
         exe = _tesseract_bin()
         if exe is None:
             return "unavailable"
-        first = subprocess.run([exe, "--version"], capture_output=True, text=True, check=False)
+        first = _run_probe(exe, "--version")
         out = (first.stdout or first.stderr).splitlines()
         head = out[0].strip() if out else "tesseract"
         return f"{head}; eng={self._traineddata_hash(exe)}"
 
     @staticmethod
     def _traineddata_hash(exe: str) -> str:
-        langs = subprocess.run([exe, "--list-langs"], capture_output=True, text=True, check=False)
+        langs = _run_probe(exe, "--list-langs")
         text = (langs.stdout or "") + (langs.stderr or "")
         m = re.search(r'"([^"]+)"', text)
         candidates = []
@@ -120,26 +158,35 @@ class TesseractAdapter:
             raise RuntimeError("tesseract binary not found on PATH")
         env = dict(os.environ)
         env["OMP_THREAD_LIMIT"] = "1"
-        proc = subprocess.run(
-            [
-                exe,
-                str(png),
-                "stdout",
-                "--dpi",
-                str(dpi),
-                "-l",
-                "eng",
-                "--oem",
-                "1",
-                "--psm",
-                "3",
-                "tsv",
-            ],
-            capture_output=True,
-            text=True,
-            env=env,
-            check=False,
-        )
+        timeout = tesseract_page_timeout()
+        try:
+            proc = subprocess.run(
+                [
+                    exe,
+                    str(png),
+                    "stdout",
+                    "--dpi",
+                    str(dpi),
+                    "-l",
+                    "eng",
+                    "--oem",
+                    "1",
+                    "--psm",
+                    "3",
+                    "tsv",
+                ],
+                capture_output=True,
+                text=True,
+                env=env,
+                check=False,
+                timeout=timeout,
+            )
+        except subprocess.TimeoutExpired as exc:
+            # subprocess.run has killed the child; the page fails instead of hanging the worker
+            raise RuntimeError(
+                f"tesseract timed out after {timeout} s on page {page} ({png}); "
+                f"raise {TESSERACT_PAGE_TIMEOUT_ENV} if this page is just slow"
+            ) from exc
         if proc.returncode != 0:
             raise RuntimeError(f"tesseract failed on {png}: {proc.stderr.strip()[:300]}")
         return tesseract_tsv_to_page(proc.stdout, page, size_pt, dpi)
@@ -200,6 +247,9 @@ def _rapid_engine() -> Any:
     if "engine" not in _RAPID:
         from rapidocr import RapidOCR
 
+        from manuallabor.telemetry import disable_library_telemetry
+
+        disable_library_telemetry()  # onnxruntime is imported now (design 06 section 4)
         _RAPID["engine"] = RapidOCR(
             params={
                 "Global.log_level": "error",

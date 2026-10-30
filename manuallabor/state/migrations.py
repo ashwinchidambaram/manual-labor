@@ -167,4 +167,11 @@ CREATE UNIQUE INDEX proposals_flag_round ON proposals(flag_id, round);
 CREATE INDEX proposals_status ON proposals(status);
 """
 
-MIGRATIONS: list[str] = [MIGRATION_1, MIGRATION_2]
+# review F8: the job runner reads `jobs` by status every 0.5 s tick and looks a replayed request
+# up by the request id its plan carries; both were full scans that parsed every plan
+MIGRATION_3 = """
+CREATE INDEX jobs_status ON jobs(status, n);
+CREATE INDEX jobs_request ON jobs(json_extract(plan, '$.request_id'));
+"""
+
+MIGRATIONS: list[str] = [MIGRATION_1, MIGRATION_2, MIGRATION_3]

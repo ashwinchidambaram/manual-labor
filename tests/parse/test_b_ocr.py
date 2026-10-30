@@ -431,3 +431,66 @@ def test_14_pipeline_blocks_carry_ocr_agreeing_with_text_layer(parsed: Parsed) -
     score = _f1("\n".join(pymu), "\n".join(ocr))
     print(f"word agreement pymupdf vs ocr (pipeline clean blocks): {score:.4f}")
     assert score >= 0.98
+
+
+# --------------------------------------------------------------------------- Tesseract timeouts
+# design 07 section 15 (code review F13): a wedged tesseract must fail the page, not hang the
+# pool worker forever.
+
+
+def _fake_tesseract(tmp_path: Path, script: str) -> Path:
+    exe = tmp_path / "tesseract"
+    exe.write_text("#!/bin/sh\n" + script)
+    exe.chmod(0o755)
+    return exe
+
+
+def test_tesseract_page_timeout_fails_the_page_clearly(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import time
+
+    exe = _fake_tesseract(tmp_path, "exec sleep 30\n")  # exec: the timeout kills the sleeper
+    monkeypatch.setattr(ocr_mod.shutil, "which", lambda name: str(exe))
+    monkeypatch.setenv("MANUALLABOR_TESSERACT_TIMEOUT", "1")
+    png = tmp_path / "p.png"
+    png.write_bytes(b"not really a png")
+    t0 = time.monotonic()
+    with pytest.raises(RuntimeError, match=r"tesseract timed out after 1 s on page 7"):
+        TesseractAdapter().ocr_page(png, 7, (612.0, 792.0), 300)
+    assert time.monotonic() - t0 < 10
+
+
+def test_tesseract_version_probe_has_a_timeout(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    exe = _fake_tesseract(tmp_path, "exec sleep 30\n")
+    monkeypatch.setattr(ocr_mod.shutil, "which", lambda name: str(exe))
+    monkeypatch.setattr(ocr_mod, "TESSERACT_PROBE_TIMEOUT_S", 1)
+    with pytest.raises(RuntimeError, match=r"tesseract --version timed out after 1 s"):
+        TesseractAdapter().version()
+
+
+def test_tesseract_timeout_default_and_bad_values(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("MANUALLABOR_TESSERACT_TIMEOUT", raising=False)
+    assert ocr_mod.tesseract_page_timeout() == 600
+    monkeypatch.setenv("MANUALLABOR_TESSERACT_TIMEOUT", "45")
+    assert ocr_mod.tesseract_page_timeout() == 45
+    for bad in ("0", "-3", "soon"):
+        monkeypatch.setenv("MANUALLABOR_TESSERACT_TIMEOUT", bad)
+        with pytest.raises(ValueError, match="MANUALLABOR_TESSERACT_TIMEOUT"):
+            ocr_mod.tesseract_page_timeout()
+
+
+def test_tesseract_normal_run_still_parses(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    tsv = (
+        "level\tpage_num\tblock_num\tpar_num\tline_num\tword_num\tleft\ttop\twidth\theight\tconf\ttext\n"
+        "5\t1\t1\t1\t1\t1\t300\t300\t300\t60\t96.5\tHello\n"
+    )
+    out = tmp_path / "out.tsv"
+    out.write_text(tsv)
+    exe = _fake_tesseract(tmp_path, f'cat "{out}"\n')
+    monkeypatch.setattr(ocr_mod.shutil, "which", lambda name: str(exe))
+    monkeypatch.setenv("MANUALLABOR_TESSERACT_TIMEOUT", "20")
+    page = TesseractAdapter().ocr_page(tmp_path / "p.png", 1, (612.0, 792.0), 300)
+    assert [w.text for ln in page.lines for w in ln.words] == ["Hello"]

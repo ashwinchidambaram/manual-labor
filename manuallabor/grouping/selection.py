@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Collection, Iterable, Mapping, Sequence
 
+from manuallabor import ids
 from manuallabor.contracts.block import Block
 from manuallabor.contracts.enums import ArticleSplit, BlockStatus, BlockType, GroupView
 from manuallabor.contracts.group import Group, GroupsFile
@@ -105,6 +106,27 @@ def normalize(sel: Selection, blocks_by_id: Mapping[str, Block]) -> tuple[Select
     return normalize_to(sel, {i for i, b in blocks_by_id.items() if b.type not in HF_TYPES})
 
 
+def _ids(gf: GroupsFile) -> list[str]:
+    return [b for g in gf.structure for b in g.block_ids]
+
+
+def with_new_docs(sel: Selection, groups: Mapping[str, GroupsFile]) -> Selection:
+    """The selection as the reviewer sees it (design 08 section 10): every grouped document the
+    stored selection has not seen yet (`known_docs`) is fully selected, as it would be on a fresh
+    project. A selection without `known_docs` (saved before it existed) is returned unchanged."""
+    if sel.known_docs is None:
+        return sel
+    known = set(sel.known_docs)
+    new = [b for slug, gf in sorted(groups.items()) if slug not in known for b in _ids(gf)]
+    return select_blocks(sel, new) if new else sel
+
+
+def mark_known(sel: Selection, groups: Mapping[str, GroupsFile]) -> Selection:
+    """Record every grouped document as seen: written with each selection change, so a document
+    grouped later is told apart from one the reviewer cleared."""
+    return _with(sel, known_docs=sorted({*(sel.known_docs or ()), *groups}))
+
+
 def load_groups(paths: ProjectPaths) -> dict[str, GroupsFile]:
     out: dict[str, GroupsFile] = {}
     for slug in paths.list_slugs():
@@ -132,7 +154,8 @@ def load_selection(paths: ProjectPaths) -> tuple[Selection, list[str]]:
     groups = load_groups(paths)
     if not paths.selection.is_file():
         return default_selection(paths, groups), []
-    return normalize_to(read_json(paths.selection, Selection), selectable_ids(groups))
+    sel = with_new_docs(read_json(paths.selection, Selection), groups)
+    return normalize_to(sel, selectable_ids(groups))
 
 
 def save_selection(
@@ -152,9 +175,19 @@ def scope_summary(
     threshold: float,
 ) -> ScopeSummary:
     """Pre-cleanup estimate of what the selection will become. `blocks` come from
-    load_scored_blocks, so `status` follows the threshold slider."""
+    load_scored_blocks, so `status` follows the threshold slider.
+
+    `docs`, `pages` and the article counts follow the selection and the groups alone, like
+    `blocks` (invariant 3: a document that contributes a selected block is one of the `docs`).
+    Only `figures` and `review_load` read the scored rows, so a grouped document whose scores
+    are missing or stale (design 03 section 2.10a, `blocks` has no entry for it) is still in
+    scope and counted; its figures and review load join when it is scored."""
     chosen, _ = normalize_to(sel, selectable_ids(groups))
     s = set(chosen.block_ids)
+    by_doc: dict[str, list[tuple[int, str]]] = {}
+    for bid in s:
+        slug, page, _n = ids.parse_block_id(bid)
+        by_doc.setdefault(slug, []).append((page, bid))
     docs = 0
     per_topic = 0
     figures = 0
@@ -162,15 +195,16 @@ def scope_summary(
     queued = 0
     numeric = 0
     for slug, gf in groups.items():
-        n_topics = sum(1 for t in gf.topics if s.intersection(t.block_ids))
-        picked = [b for b in blocks.get(slug, ()) if b.id in s]
-        if not picked:
+        mine = by_doc.get(slug)
+        if not mine:
             continue
         docs += 1
-        per_topic += n_topics
-        for b in picked:
+        per_topic += sum(1 for t in gf.topics if s.intersection(t.block_ids))
+        pages.update((slug, page) for page, _bid in mine)
+        for b in blocks.get(slug, ()):
+            if b.id not in s:
+                continue
             figures += b.type == BlockType.figure
-            pages.add((slug, b.page))
             if b.status == BlockStatus.queued:
                 queued += 1
                 numeric += b.has_numeric_spec

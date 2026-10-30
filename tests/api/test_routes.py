@@ -78,6 +78,7 @@ CASES: dict[tuple[str, str], tuple[str, dict[str, Any], int]] = {
     ("POST", "/api/scope/confirm"): ("/api/scope/confirm", {"json": RID}, 202),
     ("GET", "/api/verify/queue"): ("/api/verify/queue", {}, 200),
     ("GET", "/api/verify/cursor"): ("/api/verify/cursor", {}, 200),
+    ("GET", "/api/verify/titles"): (f"/api/verify/titles?ids={bid(1)}", {}, 200),
     ("PUT", "/api/verify/cursor"): ("/api/verify/cursor", {"json": {"sort": "by_page"}}, 200),
     ("GET", "/api/verify/blocks/{block_id}"): (f"/api/verify/blocks/{bid(1)}", {}, 200),
     ("POST", "/api/verify/actions"): (

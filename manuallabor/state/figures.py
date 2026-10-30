@@ -54,6 +54,8 @@ class FigureService:
     def _status(self, slug: str, block_id: str) -> BlockStatus:
         decs = [d for d in self.store.decisions(block_id=block_id)]
         flags = {f.id: f for f in self.store.flags()}
+        if not self.data.scored(slug):
+            return BlockStatus.queued  # not scored yet (design 03 section 2.10a)
         for b in self.data.machine_blocks(slug):
             if b.id == block_id:
                 return derive(b, decs, flags).status
@@ -129,9 +131,8 @@ class FigureService:
             raise InvalidOp(f"not an article id: {article_id}") from exc
         if aslug != slug:
             raise InvalidOp("a figure can only be attached to an article of its own document")
-        seq = self.store.next_override_seq("attach_overrides")
         ov = AttachOverride(
-            seq=seq,
+            seq=1,  # validation only; the real seq is allocated inside the transaction below
             op=op,  # type: ignore[arg-type]
             figure_id=figure_id,
             article_id=article_id,
@@ -149,10 +150,13 @@ class FigureService:
         if meta is not None:
             example["proposal"] = meta.get("proposal")
         with self.store.tx():
+            # Read the seq inside the transaction that inserts it: read outside, two concurrent
+            # requests got the same seq and one failed on UNIQUE (design 07 section 14.2).
+            ov = ov.model_copy(update={"seq": self.store.next_override_seq("attach_overrides")})
             aid = self.store.next_action_id()
             self.store.add_override(
                 "attach_overrides",
-                seq,
+                ov.seq,
                 slug,
                 json.dumps(ov.model_dump(mode="json"), sort_keys=True),
                 aid,
@@ -211,8 +215,8 @@ class FigureService:
             check_bbox([float(v) for v in bbox])
         except (ValueError, TypeError) as exc:
             raise InvalidOp(str(exc)) from exc
-        seq = self.store.next_figure_override_seq()
         with self.store.tx():
+            seq = self.store.next_figure_override_seq()  # inside the tx (design 07 section 14.2)
             aid = self.store.next_action_id()
             self.store.add_figure_override(seq, slug, figure_id, [float(v) for v in bbox], aid)
             self.store.append_action(

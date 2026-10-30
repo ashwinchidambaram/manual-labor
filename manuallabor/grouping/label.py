@@ -180,6 +180,115 @@ def name_topic(
     return fallback_name(headings, number)
 
 
+# -- final topic names (design 04 section 3.4.1) -------------------------------------------------
+
+_SMALL_WORDS = frozenset(
+    {"a", "an", "and", "as", "at", "by", "for", "from", "in", "into", "nor", "of", "on", "or"}
+    | {"per", "the", "to", "via", "vs", "with"}
+)
+_TOPIC_SLUG_BANNED = frozenset({ids.UNASSIGNED, "front-matter"})
+
+
+@dataclass(frozen=True)
+class TopicNameInput:
+    """One topic as named, in final-id order: its proposed title, the number of the section
+    holding most of its blocks (None when unnumbered) and its pages."""
+
+    key: str
+    title: str
+    section: str | None
+    pages: tuple[int, ...]
+
+
+def title_case(title: str) -> str:
+    """An all-lowercase title gets a capital on every word except the small joining words after
+    the first; a title with any capital letter was cased by its writer and is kept as written."""
+    t = collapse_ws(title)
+    if any(ch.isupper() for ch in t):
+        return t
+    words = t.split(" ")
+    return " ".join(
+        w if (i > 0 and w in _SMALL_WORDS) else w[:1].upper() + w[1:] for i, w in enumerate(words)
+    )
+
+
+def page_words(pages: Sequence[int]) -> str:
+    """'page 5', 'pages 3–4', 'pages 2, 6' (runs joined by an en dash)."""
+    runs: list[list[int]] = []
+    for p in sorted(set(pages)):
+        if runs and p == runs[-1][1] + 1:
+            runs[-1][1] = p
+        else:
+            runs.append([p, p])
+    parts = [str(a) if a == b else f"{a}\u2013{b}" for a, b in runs]
+    single = len(runs) == 1 and runs[0][0] == runs[0][1]
+    return f"{'page' if single else 'pages'} {', '.join(parts)}"
+
+
+def _slug_of(text: str, max_len: int) -> str | None:
+    """`ids.slugify`, or None when the text has nothing to slug (slugify's 'doc' placeholder)."""
+    s = ids.slugify(text, max_len) if max_len > 0 else ""
+    if not s or (s == "doc" and "doc" not in text.casefold()):
+        return None
+    return s
+
+
+def _qualified(base: str, qualifier: str) -> str:
+    room = TITLE_MAX - len(qualifier) - 3
+    return f"{base[:room].rstrip()} ({qualifier})"
+
+
+def finalize_topic_names(items: Sequence[TopicNameInput]) -> dict[str, tuple[str, str]]:
+    """key -> (title, slug) for every topic, deterministic in `items` order (final-id order).
+
+    1. The title is case-normalised (`title_case`).
+    2. A title equal, ignoring case, to an earlier topic's title gets a disambiguator that tells
+       it apart from every earlier topic of that name: the number of the section holding most of
+       its blocks when theirs differ, else its page range when theirs differ, else `part N` (N
+       counts the topics of that name, the first being part 1).
+    3. The slug is made from the shown title (never from a model's slug): the slug of the base
+       title cut to leave room for the slug of the disambiguator. A slug a topic may not use
+       (`unassigned`, `front-matter`, `pages-*`) is prefixed `topic-`; a title with nothing to
+       slug becomes `topic-NN` (its position). A slug still taken after that (two titles that
+       differ only in punctuation) gets the `-N` suffix of `ids.make_unique_slug`."""
+    seen: set[str] = set()
+    used: set[str] = set()
+    earlier: dict[str, list[TopicNameInput]] = {}  # casefolded base title -> topics so named
+    out: dict[str, tuple[str, str]] = {}
+    for pos, it in enumerate(items, start=1):
+        base = title_case(it.title)[:TITLE_MAX].strip() or f"Topic {pos:02d}"
+        title, qual = base, ""
+        same = earlier.setdefault(base.casefold(), [])
+        if base.casefold() in seen:
+            # a disambiguator must tell this topic apart from the earlier ones of the same name
+            quals: list[str] = []
+            if it.section and all(o.section != it.section for o in same):
+                quals.append(f"section {it.section}")
+            if it.pages and all(page_words(o.pages) != page_words(it.pages) for o in same):
+                quals.append(page_words(it.pages))
+            quals += [f"part {n}" for n in range(len(same) + 1, len(items) + 3)]
+            for q in quals:
+                cand = _qualified(base, q)
+                if cand.casefold() not in seen:
+                    title, qual = cand, q
+                    break
+        same.append(it)
+        seen.add(title.casefold())
+        qslug = _slug_of(qual, TOPIC_SLUG_MAX) if qual else None
+        room = TOPIC_SLUG_MAX - (len(qslug) + 1 if qslug else 0)
+        bslug = _slug_of(base, room)
+        if bslug is None:
+            slug = f"topic-{pos:02d}"
+        else:
+            slug = f"{bslug}-{qslug}" if qslug else bslug
+            if slug in _TOPIC_SLUG_BANNED or slug.startswith("pages-"):
+                slug = ("topic-" + slug)[:TOPIC_SLUG_MAX].rstrip("-")
+        slug = ids.make_unique_slug(slug, used)
+        used.add(slug)
+        out[it.key] = (title, slug)
+    return out
+
+
 def validate_assignments(parsed: Any, batch: Sequence[StragglerItem]) -> dict[str, str]:
     """block_id -> chosen key (or 'unassigned'); ValueError when the answer is not an exact,
     in-candidate-list cover of the batch."""

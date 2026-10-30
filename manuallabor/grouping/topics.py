@@ -33,6 +33,8 @@ from manuallabor.grouping.embed import embed_blocks
 from manuallabor.grouping.label import (
     NamedTopic,
     StragglerItem,
+    TopicNameInput,
+    finalize_topic_names,
     name_topic,
     rank_headings,
     review_stragglers,
@@ -54,6 +56,7 @@ from manuallabor.grouping.types import (
     StructureResult,
     TopicFailure,
 )
+from manuallabor.jobs import progress
 from manuallabor.providers.base import Provider, ProviderError, ProviderSet
 
 
@@ -371,6 +374,28 @@ def _dissolve_small(asm: Assembly) -> None:
                 d.pop(key, None)
 
 
+def _main_section(
+    members: Sequence[str],
+    section_of: Mapping[str, str],
+    number: Mapping[str, str | None],
+    pos: Mapping[str, int],
+) -> str | None:
+    """The number of the section holding most of `members` (ties: the one reached first in
+    reading order); None when that section is unnumbered or no member has a section."""
+    count: dict[str, int] = {}
+    first: dict[str, int] = {}
+    for b in members:
+        sec = section_of.get(b)
+        if sec is None:
+            continue
+        count[sec] = count.get(sec, 0) + 1
+        first[sec] = min(first.get(sec, pos[b]), pos[b])
+    if not count:
+        return None
+    best = min(count, key=lambda g: (-count[g], first[g]))
+    return number.get(best)
+
+
 def _page_figures(blocks: Sequence[Block]) -> tuple[list[int], int]:
     return [b.page for b in blocks], sum(1 for b in blocks if b.type == BlockType.figure)
 
@@ -437,7 +462,6 @@ def build_topics(
             )
             keys = [f"c{i + 1:02d}" for i in range(len(clusters))]
             cents = np.vstack([centroid(c, m) for m in clusters])
-            raw_slugs: dict[str, str] = {}
             for i, (key, m) in enumerate(zip(keys, clusters, strict=True)):
                 for r in m:
                     asm.placed[cand_ids[r]] = key
@@ -448,8 +472,8 @@ def build_topics(
                     i + 1, params, examples, stats,
                 )  # fmt: skip
                 asm.titles[key] = named.title
-                raw_slugs[key] = named.slug
                 asm.sources[key] = named.source
+                progress.report(slug, i + 1, len(keys), "topic")  # the jobs bar (07 §4.1)
             in_cluster = {r for m in clusters for r in m}
             decisions = _place_stragglers(
                 c,
@@ -483,7 +507,6 @@ def build_topics(
                 chunks = _split_oversized(mem, pos, c, row_of, params.max_topic_blocks, cannot)
                 asm.titles.pop(key, None)
                 asm.sources.pop(key, None)
-                raw_slugs.pop(key, None)
                 for ch in chunks:
                     number += 1
                     nk = f"c{number:02d}"
@@ -493,19 +516,28 @@ def build_topics(
                         chat, c, cand_ids, summaries, group_title, structure, rows, cent,
                         number, params, examples, stats,
                     )  # fmt: skip
-                    asm.titles[nk], raw_slugs[nk], asm.sources[nk] = (
-                        named.title, named.slug, named.source,
-                    )  # fmt: skip
+                    asm.titles[nk], asm.sources[nk] = named.title, named.source
                     for bid in ch:
                         asm.placed[bid] = nk
             _dissolve_small(asm)
-            # unique slugs in final-id order (first member in block order)
+            # final titles and slugs in final-id order (first member in block order): case
+            # normalised, no two alike, slugs from the shown title (design 04 section 3.4.1)
             alive = sorted(asm.members().items(), key=lambda kv: min(pos[b] for b in kv[1]))
-            used: set[str] = set()
-            for key, _ in alive:
-                s = ids.make_unique_slug(raw_slugs[key], used)
-                used.add(s)
-                asm.slugs[key] = s
+            sec_number = {g.id: g.section_number for g in structure.groups}
+            names = finalize_topic_names(
+                [
+                    TopicNameInput(
+                        key=key,
+                        title=asm.titles[key],
+                        section=_main_section(mem, structure.section_of, sec_number, pos),
+                        pages=tuple(sorted({by_id[b].page for b in mem})),
+                    )
+                    for key, mem in alive
+                ]
+            )
+            for key, (title, gslug) in names.items():
+                asm.titles[key] = title
+                asm.slugs[key] = gslug
 
     applied, stale, moved = apply_overrides(asm, overrides)
     before = dict(asm.slugs)

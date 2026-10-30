@@ -35,6 +35,7 @@ from manuallabor.contracts._base import (
     BlockId,
     ContractModel,
     DocSlug,
+    FlagId,
     TargetId,
     TopicSlug,
     Unit,
@@ -60,7 +61,9 @@ __all__ = [
     "DocReadiness",
     "DocStatus",
     "EditConflict",
+    "ExportFlagBlocker",
     "ExportReviewSummary",
+    "ExportScopeCounts",
     "ExportStatus",
     "ExportSummary",
     "FigureAttachment",
@@ -352,6 +355,13 @@ class RunPlanIn(ContractModel):
 
 
 class JobInfo(ContractModel):
+    """One background job (design 07 section 4). While it runs, ``node``/``doc`` name the unit it
+    is on (after the last unit: the last one finished) and ``step_done`` of ``step_total``
+    ``step_unit``s is that unit's own count of pages, blocks or topics done; all three are None
+    when the unit has reported no count (it has no estimate). ``progress`` is
+    ``(units_done + step_done/step_total) / units_total``, monotonic. ``files`` are the file
+    names an ``ingest_run`` job was given (empty for other kinds)."""
+
     id: str
     kind: str
     plan: dict[str, Any] = Field(default_factory=dict)
@@ -361,6 +371,10 @@ class JobInfo(ContractModel):
     units_total: int = 0
     node: str | None = None
     doc: str | None = None
+    step_done: int | None = Field(default=None, ge=0)
+    step_total: int | None = Field(default=None, ge=1)
+    step_unit: Literal["page", "block", "topic"] | None = None
+    files: list[str] = Field(default_factory=list)
     message: str | None = None
     created_at: UTCDateTime
     started_at: UTCDateTime | None = None
@@ -448,11 +462,21 @@ class CalibrationReport(ContractModel):
 
 
 class ExportReviewSummary(ContractModel):
+    """The blocks of one export (design 11 section 14). Every exported block (assigned to an
+    article in the manifest) is in exactly one bucket: ``blocks == auto_approved + approved +
+    edited + overrides``; an override-covered block counts only as an override. ``left_out``
+    counts the other parsed blocks by their manifest reason (``header_footer``,
+    ``not_selected``, ``empty``, ``rejected``): ``total_blocks == blocks + sum(left_out)``.
+    ``numbers_verified`` is the manifest's ``numbers_verified_blocks`` count, a cross-cut."""
+
+    blocks: int = Field(ge=0)
     auto_approved: int = Field(ge=0)
     approved: int = Field(ge=0)
     edited: int = Field(ge=0)
     overrides: int = Field(ge=0)
     numbers_verified: int = Field(ge=0)
+    total_blocks: int = Field(ge=0)
+    left_out: dict[str, int] = Field(default_factory=dict)
 
 
 class ExportSummary(ContractModel):
@@ -469,15 +493,45 @@ class ExportSummary(ContractModel):
     generated_at: UTCDateTime
 
 
+class ExportScopeCounts(ContractModel):
+    """Every in-scope body block of the ready documents (the Verify scope: page headers and
+    footers excluded) in exactly one bucket (design 11 section 14): ``in_scope ==
+    auto_approved + approved + edited + rejected + overridden + blocking``. A block that is
+    queued, flagged or carries an open flag is ``overridden`` when an active override covers it,
+    else ``blocking``; every other block is counted by its review status."""
+
+    in_scope: int = Field(ge=0)
+    auto_approved: int = Field(ge=0)
+    approved: int = Field(ge=0)
+    edited: int = Field(ge=0)
+    rejected: int = Field(ge=0)
+    overridden: int = Field(ge=0)
+    blocking: int = Field(ge=0)
+
+
+class ExportFlagBlocker(ContractModel):
+    """An open flag in scope that no override covers. A block override never covers it; only
+    an override naming the flag (or a blanket one) does (design 11 P3, section 14)."""
+
+    flag_id: FlagId
+    block_id: BlockId
+    category: FlagCategory
+    note: str | None = None
+
+
 class ExportStatus(ContractModel):
     """`unlocked` is the raw gate (no open flag, no queued in-scope block); `blockers` are the
-    blocks an active override does not cover: an export is possible iff `blockers` is empty."""
+    first blocks (reading order, at most 20) an active override does not cover: an export is
+    possible iff `blockers` is empty. `flag_blockers` lists every uncovered open flag (no cap);
+    `counts` partitions the scope (None from a store that is not a project store)."""
 
     unlocked: bool
     open_flags: int
     overrides: list[Override] = Field(default_factory=list)
     queued: int = 0
     blockers: list[BlockId] = Field(default_factory=list)
+    flag_blockers: list[ExportFlagBlocker] = Field(default_factory=list)
+    counts: ExportScopeCounts | None = None
     summary: ExportSummary | None = None
     zip_path: str | None = None
 

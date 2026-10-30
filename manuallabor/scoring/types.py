@@ -11,7 +11,8 @@ from manuallabor.contracts.block import FaithfulnessResult, Signal
 from manuallabor.contracts.enums import AttachRule, Extraction
 from manuallabor.figures.types import DedupeEntry, FigureExtraction, FigureFailure
 
-SCORING_ALGO_VERSION: Final = "5"
+# 6: the verifier flags only a real raw-vs-clean change (design 03 section 2.10a).
+SCORING_ALGO_VERSION: Final = "6"
 
 # -- comparison normalization / agreement (2.0, 2.2, 2.3) ------------------------------------
 DIGIT_WEIGHT: Final = 3

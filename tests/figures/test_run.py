@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import os
-import subprocess
 import sys
 from pathlib import Path
 
@@ -15,6 +14,7 @@ from manuallabor.cli import app
 from manuallabor.figures.pipeline import run_figures
 from manuallabor.project import ProjectPaths
 from tests.conftest import Parsed, copy_project
+from tests.subproc import run_bounded
 
 pytestmark = pytest.mark.usefixtures("requires_docling")
 
@@ -43,7 +43,7 @@ def test_13_deterministic_across_processes(
     root = tmp_path / "proj"
     copy_project(parsed.paths.root, root)
     env = {**os.environ, "PYTHONHASHSEED": "123"}
-    res = subprocess.run(
+    res = run_bounded(
         [sys.executable, "-c", "from manuallabor.cli import app; app()", "figures", str(root)],
         env=env,
         capture_output=True,

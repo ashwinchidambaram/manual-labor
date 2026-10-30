@@ -16,7 +16,14 @@ def register(app: typer.Typer) -> None:
     @app.command("serve")
     def serve_cmd(
         project: Annotated[Path, typer.Argument(help="Project directory.")],
-        host: Annotated[str, typer.Option("--host", help="Interface to bind.")] = "127.0.0.1",
+        host: Annotated[
+            str,
+            typer.Option(
+                "--host",
+                help="Interface to bind. Anything but loopback exposes the project, without "
+                "authentication, to everyone who can reach that address.",
+            ),
+        ] = "127.0.0.1",
         port: Annotated[int, typer.Option("--port", help="Port to listen on.")] = 8765,
         dev: Annotated[
             bool, typer.Option("--dev", help="API only; Vite serves the UI on 5173.")
@@ -27,6 +34,18 @@ def register(app: typer.Typer) -> None:
         no_resume: Annotated[
             bool, typer.Option("--no-resume", help="Do not re-enqueue interrupted jobs.")
         ] = False,
+        allow_host: Annotated[
+            list[str] | None,
+            typer.Option(
+                "--allow-host",
+                help="Another host name the server answers to (repeatable), e.g. a LAN DNS name "
+                "when --host is not loopback.",
+            ),
+        ] = None,
+        max_upload_mb: Annotated[
+            int,
+            typer.Option("--max-upload-mb", min=1, help="Largest request body (upload) in MB."),
+        ] = 200,
     ) -> None:
         """Start the local API and UI server."""
         from manuallabor.project import ProjectPaths
@@ -42,6 +61,8 @@ def register(app: typer.Typer) -> None:
             dev=dev,
             mock=mock,
             resume=not no_resume,
+            allow_hosts=list(allow_host or []),
+            max_upload_bytes=max_upload_mb * 1024 * 1024,
         )
         raise typer.Exit(code)
 

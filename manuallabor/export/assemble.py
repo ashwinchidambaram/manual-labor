@@ -58,6 +58,7 @@ from manuallabor.export.types import (
     FigureData,
     GateLocked,
 )
+from manuallabor.state.models import ExportReviewSummary
 
 __all__ = ["CONTRIBUTING", "assemble", "block_text", "truncate_clock"]
 
@@ -129,7 +130,7 @@ class _Ctx:
         self.generated_at = generated_at
         blocks_by_doc = {s: d.blocks for s, d in inp.docs.items()}
         scope = {s: d.scope for s, d in inp.docs.items()}
-        self.gate = export_gate(blocks_by_doc, scope, inp.flags, inp.overrides, inp.flag_seq)
+        self.gate = export_gate(blocks_by_doc, scope, inp.flags, inp.overrides)
         if self.gate.blockers:
             raise GateLocked(self.gate.open_flags, self.gate.queued, self.gate.blockers)
         self.status: dict[str, BlockStatus] = {
@@ -473,6 +474,32 @@ def _manifest(
     )
 
 
+def _review_summary(
+    ctx: _Ctx, articles: list[BuiltArticle], manifest: Manifest
+) -> ExportReviewSummary:
+    """Design 11 section 14: every exported block in exactly one bucket (an override-covered
+    block only as an override, like the frontmatter), and the rest of the parsed blocks by
+    their manifest reason, so the Export screen's numbers add up to what was parsed."""
+    n: Counter[str] = Counter()
+    for a in articles:
+        for bid in a.block_ids:
+            n["overrides" if bid in ctx.gate.covered else ctx.status[bid].value] += 1
+    stray = set(n) - {"auto_approved", "approved", "edited", "overrides"}
+    if stray:  # unreachable: assembly refuses an uncovered non-contributing block
+        raise ExportError(f"exported blocks with status {sorted(stray)}")
+    acc = manifest.accounting
+    return ExportReviewSummary(
+        blocks=sum(n.values()),
+        auto_approved=n["auto_approved"],
+        approved=n["approved"],
+        edited=n["edited"],
+        overrides=n["overrides"],
+        numbers_verified=len(manifest.review_stats.numbers_verified_blocks),
+        total_blocks=acc.total_blocks,
+        left_out=dict(sorted(Counter(acc.unassigned_reasons.values()).items())),
+    )
+
+
 def assemble(inp: AssembleInputs, clock: datetime) -> Assembled:
     """Build everything the zip holds. Raises GateLocked when the export gate is closed."""
     generated_at = truncate_clock(clock)
@@ -483,6 +510,7 @@ def assemble(inp: AssembleInputs, clock: datetime) -> Assembled:
     articles.sort(key=lambda a: a.id)
     figures = _exported_figures(ctx)
     manifest = _manifest(ctx, articles, figures)
+    review = _review_summary(ctx, articles, manifest)
     warnings = [
         f"article {a.id} is {len(a.text.encode('utf-8'))} bytes (over {MAX_ARTICLE_BYTES})"
         for a in articles
@@ -506,5 +534,6 @@ def assemble(inp: AssembleInputs, clock: datetime) -> Assembled:
         pages_covered=len(ctx.pages),
         warnings=warnings,
         generated_at=generated_at,
+        review=review,
         files=dict(sorted(files.items())),
     )

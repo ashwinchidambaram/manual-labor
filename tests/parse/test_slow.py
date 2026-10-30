@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import os
 import shutil
-import subprocess
 import sys
 import time
 from pathlib import Path
@@ -16,6 +15,7 @@ from manuallabor.ingest import ingest_files
 from manuallabor.parse.pipeline import parse_project
 from manuallabor.project import ProjectPaths
 from tests.parse.conftest import FIXTURES
+from tests.subproc import run_bounded
 
 pytestmark = pytest.mark.slow
 
@@ -52,7 +52,7 @@ def test_27_scanned_wall_time(requires_docling: None, tmp_path: Path) -> None:
     paths = _project(tmp_path)
     ingest_files(paths, [FIXTURES / "scanned.pdf"], emit=lambda _o: None)
     t0 = time.perf_counter()
-    proc = subprocess.run(
+    proc = run_bounded(
         [sys.executable, "-c", "from manuallabor.cli import app; app()", "parse", str(paths.root)],
         capture_output=True,
         text=True,

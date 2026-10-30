@@ -28,24 +28,42 @@ def get_groups(ctx: Ctx, doc: str | None = None) -> list[DocGroups]:
 def get_blocks(ctx: Ctx, doc: str | None = None) -> list[ScopeBlocks]:
     """Per-block type/status/numeric flag so the client can compute live counts (design 08 G1).
     Statuses follow the current threshold; docs that are not scored yet are omitted."""
+    # rows come from the serving ProjectData cache (keyed by blocks/scores/clean stats): a
+    # refetch after a job that did not touch a document re-reads nothing (review F5)
     from manuallabor.scoring.pipeline import load_scored_blocks
     from manuallabor.scoring.types import ScoringError
+    from manuallabor.state.data import ProjectData, sig
 
+    data = getattr(ctx.review, "data", None)
     out: list[ScopeBlocks] = []
     for slug in sorted(ctx.paths.list_slugs()):
         if doc is not None and slug != doc:
             continue
-        if not ctx.paths.doc(slug).scores.is_file():
+        dp = ctx.paths.doc(slug)
+        if not dp.scores.is_file():
             continue
+
+        def rows(slug: str = slug) -> ScopeBlocks:
+            scored = (
+                data.machine_blocks(slug)
+                if isinstance(data, ProjectData)
+                else load_scored_blocks(ctx.paths, slug)
+            )
+            return ScopeBlocks(
+                doc_id=slug,
+                blocks=[
+                    ScopeBlockRow(id=b.id, type=b.type, status=b.status, numeric=b.has_numeric_spec)
+                    for b in scored
+                ],
+            )
+
         try:
-            scored = load_scored_blocks(ctx.paths, slug)
+            if isinstance(data, ProjectData):
+                out.append(data.memo("scope_rows", slug, sig(dp.blocks, dp.scores, dp.clean), rows))
+            else:
+                out.append(rows())
         except ScoringError:
             continue  # stale scores: the doc is still re-scoring
-        rows = [
-            ScopeBlockRow(id=b.id, type=b.type, status=b.status, numeric=b.has_numeric_spec)
-            for b in scored
-        ]
-        out.append(ScopeBlocks(doc_id=slug, blocks=rows))
     return out
 
 

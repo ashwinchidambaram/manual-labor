@@ -7,7 +7,7 @@ from __future__ import annotations
 import os
 import signal
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from types import FrameType
 
@@ -48,13 +48,24 @@ def serve(
     resume: bool = True,
     static_dir: Path | None = None,
     open_services: Callable[[ProjectPaths, bool, bool], AppServices] = _default_services,
+    allow_hosts: Sequence[str] = (),
+    max_upload_bytes: int | None = None,
 ) -> int:
-    """Run until SIGINT/SIGTERM. Returns the process exit code (3 when the project is locked)."""
+    """Run until SIGINT/SIGTERM. Returns the process exit code (3 when the project is locked).
+
+    The app answers only to the host names of `allowed_hosts_for(host, allow_hosts)` and refuses
+    cross-origin writes and bodies over `max_upload_bytes` (design 07 section 15). A non-loopback
+    `host` is only bound because the caller asked for it, and prints a warning first."""
     import uvicorn
 
     from manuallabor.api.app import create_app
+    from manuallabor.api.guard import DEFAULT_MAX_BODY_BYTES, allowed_hosts_for, bind_warning
     from manuallabor.state.lock import ProjectLock
 
+    allowed = allowed_hosts_for(host, allow_hosts)
+    warning = bind_warning(host, allowed)
+    if warning is not None:
+        print(warning, file=sys.stderr, flush=True)
     lock = ProjectLock(paths.lock)
     try:
         lock.acquire(nonblocking=True)
@@ -64,10 +75,15 @@ def serve(
     services: AppServices | None = None
     try:
         services = open_services(paths, mock, resume)
+        _clean_leftovers(paths, services)
         _print_status(paths, services)
         services.runner.start()
         app = create_app(
-            services, static_dir=None if dev else (static_dir or find_frontend_dist()), dev=dev
+            services,
+            static_dir=None if dev else (static_dir or find_frontend_dist()),
+            dev=dev,
+            allowed_hosts=allowed,
+            max_body_bytes=DEFAULT_MAX_BODY_BYTES if max_upload_bytes is None else max_upload_bytes,
         )
         config = uvicorn.Config(app, host=host, port=port, workers=1, log_level="warning")
         server = uvicorn.Server(config)
@@ -87,6 +103,19 @@ def serve(
             services.runner.stop()
             services.store.close()
         lock.release()
+
+
+def _clean_leftovers(paths: ProjectPaths, services: AppServices) -> None:
+    """Remove `.part` files, staging dirs and uploads a killed serve left behind, while holding the
+    project lock and before the runner starts (design 07 section 14.1). Skipped while a worker
+    from the previous serve is still running; never blocks start-up."""
+    from manuallabor.jobs.executor import clean_leftovers_at_start
+
+    try:
+        live = [j.id for j in services.runner.list({"queued", "running"})]
+        clean_leftovers_at_start(paths, live)
+    except Exception as exc:  # housekeeping; a failure here must not stop the server
+        print(f"labor serve: start-up clean skipped ({exc})", file=sys.stderr)
 
 
 def _print_status(paths: ProjectPaths, services: AppServices) -> None:

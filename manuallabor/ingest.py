@@ -117,7 +117,8 @@ def metadata_provider(paths: ProjectPaths, warn: Callable[[str], None]) -> Provi
     """The metadata-task provider, or None when the configured provider is not available."""
     try:
         cfg = paths.load_config()
-    except Exception:
+    except Exception as exc:  # noqa: BLE001 - any unreadable config: say so, skip metadata
+        warn(f"project.json could not be read ({exc}); skipping LLM metadata inference")
         return None
     ref = cfg.model_for(Task.metadata)
     if ref is None:
@@ -126,8 +127,8 @@ def metadata_provider(paths: ProjectPaths, warn: Callable[[str], None]) -> Provi
     if factory is None:
         warn(f"metadata provider {ref.provider!r} is not available; skipping LLM inference")
         return None
-    cache = LLMCache(paths.root / ".llm_cache")
-    sink = JsonlSink(paths.root / "llm_calls.jsonl")
+    cache = LLMCache(paths.llm_cache)
+    sink = JsonlSink(paths.llm_log)
     from manuallabor.providers.base import utc_now
 
     try:
@@ -138,13 +139,13 @@ def metadata_provider(paths: ProjectPaths, warn: Callable[[str], None]) -> Provi
 
 
 def _docx_info(path: Path) -> tuple[int, str | None]:
+    import docx  # a missing python-docx is a broken install, not "no title" (code review F13)
+
     title: str | None = None
     try:
-        import docx
-
         d: Any = docx
         title = d.Document(str(path)).core_properties.title or None
-    except Exception:
+    except Exception:  # noqa: BLE001 - unreadable core properties: no title; parse reports a bad file
         title = None
     try:
         from manuallabor.parse.docx import count_virtual_pages

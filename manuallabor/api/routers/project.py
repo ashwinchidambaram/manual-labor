@@ -48,7 +48,7 @@ def _probe_out(probe: ProbeResult) -> ProbeOut:
 
 @router.get("/probe", response_model=ProbeOut, responses={404: {"model": ApiErrorBody}})
 def get_probe(ctx: Ctx) -> ProbeOut:
-    path = ctx.paths.root / "probe.json"
+    path = ctx.paths.probe
     if not path.is_file():
         raise ApiError(404, "no_probe", "no probe.json yet; POST /api/probe to run one")
     return _probe_out(read_json(path, ProbeResult))
@@ -57,7 +57,7 @@ def get_probe(ctx: Ctx) -> ProbeOut:
 @router.post("/probe", response_model=ProbeOut)
 def run_probe(ctx: Ctx, hooks: HooksDep) -> ProbeOut:
     probe = hooks.probe(ctx.paths)
-    write_json(ctx.paths.root / "probe.json", probe)
+    write_json(ctx.paths.probe, probe)
     return _probe_out(probe)
 
 
@@ -70,7 +70,7 @@ def apply_tier(body: ApplyTierIn, ctx: Ctx, hooks: HooksDep) -> ApplyTierOut:
     from manuallabor.providers.probe import ApplyError, suggest
     from manuallabor.providers.probe import apply_tier as _apply
 
-    path = ctx.paths.root / "probe.json"
+    path = ctx.paths.probe
     if not path.is_file():
         raise ApiError(404, "no_probe", "run a probe first (POST /api/probe)")
     probe = read_json(path, ProbeResult)

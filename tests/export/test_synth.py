@@ -292,27 +292,54 @@ def test_e7_a_targeted_override_does_not_cover_a_flag_raised_after_it() -> None:
     assert g.blockers == [bid(2)] and bid(2) not in g.covered
 
 
-def test_e7_target_override_coverage_follows_the_action_sequence() -> None:
-    """With the action sequence, it decides over the wall clock: a flag created by an earlier
-    action is covered, one created by a later action is not (same timestamps on purpose). A
-    blanket override still covers both, and a second flag on a covered block re-blocks it."""
+def test_e7_a_block_override_never_covers_an_open_flag() -> None:
+    """P3 (amended 2026-10-30): a block override covers the block's review state, never an
+    open flag on it, whichever was recorded first. Only an override naming the flag, or a
+    blanket one, covers a flag; a second flag on a covered block blocks again."""
     blocks = [blk(1, status=A), blk(2, status=BlockStatus.queued), blk(3, status=A)]
     scope = {"doc": {b.id for b in blocks}}
     early, late = flag(4, bid(2)), flag(6, bid(3))
-    seq = {early.id: 4, late.id: 6}
     ovs = [override(5, "r", target=bid(2)), override(5, "r", target=bid(3))]
-    g = export_gate({"doc": blocks}, scope, [early, late], ovs, seq)
-    assert g.blockers == [bid(3)] and bid(2) in g.covered
-    g = export_gate({"doc": blocks}, scope, [early, late], [override(5, "all")], seq)
-    assert g.blockers == []
-    again = flag(7, bid(2))
-    g = export_gate({"doc": blocks}, scope, [early, again], ovs[:1], {**seq, again.id: 7})
-    assert g.blockers == [bid(2)]
-    # a flag override covers only its own flag
+    g = export_gate({"doc": blocks}, scope, [early, late], ovs)
+    assert g.blockers == [bid(2), bid(3)] and not g.covered
+    assert [(f.id, b) for f, b in g.flag_blockers] == [(early.id, bid(2)), (late.id, bid(3))]
+    g = export_gate({"doc": blocks}, scope, [early, late], [override(5, "all")])
+    assert g.blockers == [] and g.flag_blockers == []
     g = export_gate(
-        {"doc": blocks}, scope, [early, again], [override(8, "f", flag_id=early.id)], seq
+        {"doc": blocks}, scope, [early, late], [*ovs, override(8, "f", flag_id=early.id)]
     )
-    assert g.blockers == [bid(2)]
+    assert g.blockers == [bid(3)] and bid(2) in g.covered
+    again = flag(7, bid(2))
+    g = export_gate({"doc": blocks}, scope, [early, again], [override(8, "f", flag_id=early.id)])
+    assert g.blockers == [bid(2)] and [f.id for f, _ in g.flag_blockers] == [again.id]
+
+
+def test_gate_counts_partition_the_scope_and_skip_page_headers() -> None:
+    """Every in-scope body block is in exactly one bucket; a page header or footer is never
+    exported (P4), so it neither blocks nor counts, even when it is queued."""
+    blocks = [
+        blk(1, status=BlockStatus.auto_approved),
+        blk(2, status=BlockStatus.approved),
+        blk(3, status=BlockStatus.edited),
+        blk(4, status=BlockStatus.queued),
+        blk(5, status=BlockStatus.queued),
+        blk(6, status=BlockStatus.rejected),
+        blk(7, type=BlockType.header, status=BlockStatus.queued),
+        blk(8, type=BlockType.footer, status=BlockStatus.auto_approved),
+        blk(9, status=BlockStatus.queued),  # out of scope
+    ]
+    scope = {"doc": {b.id for b in blocks} - {bid(9)}}
+    g = export_gate({"doc": blocks}, scope, [flag(1, bid(2))], [override(5, "r", target=bid(4))])
+    assert g.counts == {
+        "in_scope": 6,
+        "auto_approved": 1,
+        "approved": 0,
+        "edited": 1,
+        "rejected": 1,
+        "overridden": 1,
+        "blocking": 2,
+    }
+    assert g.blockers == [bid(2), bid(5)] and g.queued == 2 and g.open_flags == 1
 
 
 def test_e7_a_flag_override_covers_the_flagged_block() -> None:

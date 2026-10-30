@@ -150,6 +150,14 @@ class Store:
             for fn in callbacks:
                 fn()
 
+    @property
+    def in_tx(self) -> bool:
+        """A transaction is open on this connection. Inside one, the thread that owns it sees
+        uncommitted rows (a decision is written before its action row), so caches keyed by
+        `max_action_id` must not be read or filled (other threads block on the store lock until
+        the commit, so they never see that state)."""
+        return self._depth > 0
+
     def after_commit(self, fn: Callable[[], object]) -> None:
         if self._depth == 0:
             fn()
@@ -695,11 +703,54 @@ class Store:
             return None
         return self.q1("SELECT * FROM jobs WHERE n=?", (n,))
 
-    def job_rows(self, statuses: set[str] | None = None) -> list[sqlite3.Row]:
-        rows = self.q("SELECT * FROM jobs ORDER BY n")
+    def job_rows(self, statuses: Collection[str] | None = None) -> list[sqlite3.Row]:
+        """Job rows by `n`; with `statuses`, filtered in SQL (index `jobs_status`)."""
         if statuses is None:
-            return rows
-        return [r for r in rows if r["status"] in statuses]
+            return self.q("SELECT * FROM jobs ORDER BY n")
+        sts = sorted(statuses)
+        if not sts:
+            return []
+        marks = ",".join("?" for _ in sts)
+        return self.q(
+            f"SELECT * FROM jobs WHERE status IN ({marks}) ORDER BY n",  # noqa: S608
+            tuple(sts),
+        )
+
+    def job_by_request(self, request_id: str) -> sqlite3.Row | None:
+        """The first job enqueued under `request_id` (its plan carries it; index
+        `jobs_request`), without parsing any other plan."""
+        return self.q1(
+            "SELECT * FROM jobs WHERE json_extract(plan, '$.request_id') = ? ORDER BY n LIMIT 1",
+            (request_id,),
+        )
+
+    def prune_jobs(self, statuses: Collection[str], older_than: datetime, keep: int) -> int:
+        """Delete rows in `statuses` (terminal ones) that finished before `older_than`,
+        always keeping the newest `keep` of them. Returns the number deleted."""
+        sts = sorted(statuses)
+        if not sts:
+            return 0
+        marks = ",".join("?" for _ in sts)
+        rows = self.q(
+            f"SELECT n, finished_at FROM jobs WHERE status IN ({marks}) "  # noqa: S608
+            "ORDER BY n DESC",
+            tuple(sts),
+        )
+        old = [
+            int(r["n"])
+            for r in rows[keep:]
+            if r["finished_at"] is not None and parse_ts(r["finished_at"]) < older_than
+        ]
+        if not old:
+            return 0
+        with self.tx():
+            for i in range(0, len(old), 500):
+                chunk = old[i : i + 500]
+                self.x(
+                    f"DELETE FROM jobs WHERE n IN ({','.join('?' for _ in chunk)})",  # noqa: S608
+                    tuple(chunk),
+                )
+        return len(old)
 
     def update_job(self, job_id: str, **fields: Any) -> None:
         n = int(job_id.split("-", 1)[1])

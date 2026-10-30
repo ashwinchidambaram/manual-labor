@@ -7,7 +7,13 @@ from typing import Annotated
 from fastapi import APIRouter, Query
 
 from manuallabor.api.deps import Ctx
-from manuallabor.api.models import ApiErrorBody, CursorIn, EditConflictBody, ResolveFlagIn
+from manuallabor.api.models import (
+    ApiErrorBody,
+    BlockTitle,
+    CursorIn,
+    EditConflictBody,
+    ResolveFlagIn,
+)
 from manuallabor.contracts.enums import FlagStatus
 from manuallabor.contracts.flag import Flag
 from manuallabor.state.models import (
@@ -33,6 +39,21 @@ def get_queue(
 ) -> QueuePage:
     """`view_threshold` is a view filter for this read only; it never approves anything."""
     return ctx.review.queue(sort, view_threshold, doc, limit, offset)
+
+
+# the Export screen lists at most 20 blockers (export.types.BLOCKER_LIMIT); the cap keeps the
+# query string bounded
+TITLES_MAX = 200
+
+
+@router.get("/verify/titles", response_model=list[BlockTitle])
+def get_titles(
+    ctx: Ctx, ids: Annotated[list[str], Query(min_length=1, max_length=TITLES_MAX)]
+) -> list[BlockTitle]:
+    """Document, page, type and section heading of each named block, in the order asked, once
+    each. Unknown ids and documents not scored yet are left out. Read-only."""
+    # review F12: the Export screen titled its blockers by reading every document's whole queue
+    return [BlockTitle.model_validate(r) for r in ctx.review.titles(ids)]
 
 
 @router.get("/verify/cursor", response_model=Cursor)

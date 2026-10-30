@@ -20,6 +20,7 @@ from manuallabor.contracts.document import Document
 from manuallabor.contracts.enums import BlockType, DocKind
 from manuallabor.contracts.io import canonical_json, read_json, write_json
 from manuallabor.ingest import metadata_provider
+from manuallabor.jobs import progress
 from manuallabor.parse import geometry as g
 from manuallabor.parse.classify import ClassifyInput, body_size_of, classify_blocks
 from manuallabor.parse.headers import HFItem, detect_headers_footers
@@ -519,7 +520,9 @@ def _parse_pdf(
     # --- collect OCR ----------------------------------------------------------------------
     render_ms = 0.0
     rendered = 0
-    for p, fut in futures:  # by page index, never as_completed
+    for i, (p, fut) in enumerate(futures):  # by page index, never as_completed
+        # the jobs bar (design 07 section 4.1): OCR pages collected so far
+        progress.report(doc.slug, i, len(futures), "page")
         res: OcrJobResult = fut.result()
         render_ms += res.render_ms
         rendered += int(res.rendered)

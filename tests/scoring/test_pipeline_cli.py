@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import os
-import subprocess
 import sys
 from pathlib import Path
 
@@ -20,6 +19,7 @@ from manuallabor.project import ProjectPaths
 from manuallabor.scoring.pipeline import load_scored_blocks, run_score
 from manuallabor.scoring.types import ScoreFile
 from tests.conftest import copy_project
+from tests.subproc import run_bounded
 
 runner = CliRunner()
 
@@ -99,7 +99,7 @@ def test_cli_end_to_end(figproj_scoring: ProjectPaths, tmp_path: Path) -> None:
     # another process with a different hash seed: byte-identical outputs
     other = _copy(figproj_scoring.root, tmp_path / "b")
     env = {**os.environ, "PYTHONHASHSEED": "123"}
-    proc = subprocess.run(
+    proc = run_bounded(
         [sys.executable, "-c", "from manuallabor.cli import app; app()", "score", str(other.root)],
         env=env,
         capture_output=True,
@@ -217,8 +217,11 @@ def test_raw_vs_raw_self_test_failure_raises(monkeypatch) -> None:  # type: igno
 
 
 def test_run_score_with_mock_verifier(scored_copy: ProjectPaths) -> None:
-    """End to end: cleaned blocks go through run_score with a separate MockProvider verifier;
-    a found span becomes a 0.2 soft signal on that block only, NONE adds nothing."""
+    """End to end: cleaned blocks go through run_score with a separate MockProvider verifier.
+    A whitespace-only cleanup is never sent (no canonical token changed, design 2.10 revision
+    2026-10-30); a cleanup that changed tokens is (here an evidence-backed reorder: another
+    parser's reading has the clean order); a span on the change becomes a 0.2 soft signal on
+    that block only, with the differing fragments in its detail; NONE adds nothing."""
     from collections.abc import Sequence
 
     from manuallabor.contracts.config import ModelRef
@@ -226,6 +229,8 @@ def test_run_score_with_mock_verifier(scored_copy: ProjectPaths) -> None:
     from manuallabor.contracts.llm import Message
     from manuallabor.providers import ListSink, MockProvider, ProviderSet
     from manuallabor.providers.cache import LLMCache
+    from manuallabor.scoring.faithfulness import check_faithfulness_ex
+    from manuallabor.scoring.types import ReorderEvidence
 
     paths = scored_copy
     cfg = json.loads(paths.config.read_text())
@@ -233,15 +238,33 @@ def test_run_score_with_mock_verifier(scored_copy: ProjectPaths) -> None:
     paths.config.write_text(json.dumps(cfg))
     dp = paths.doc("clean")
     blocks = read_json_list(dp.blocks, Block)
-    paras = [b for b in blocks if b.type == BlockType.paragraph and "\n" in b.raw_text.strip()][:3]
-    assert len(paras) == 3
-    cleaned = {b.id: " ".join(b.raw_text.replace("-\n", "").split()) for b in paras}
-    flagged_id = paras[0].id
-    span = cleaned[flagged_id].split()[1] + " " + cleaned[flagged_id].split()[2]
-    write_json(
-        dp.blocks,
-        [b.model_copy(update={"clean_text": cleaned.get(b.id)}) for b in blocks],
-    )
+    paras = [b for b in blocks if b.type == BlockType.paragraph and "\n" in b.raw_text.strip()]
+    ws = paras[:3]  # whitespace-only cleanups
+    cleaned = {b.id: " ".join(b.raw_text.replace("-\n", "").split()) for b in ws}
+    alt_text: dict[str, str] = {}
+    moved: list[Block] = []
+    for b in paras[3:]:
+        lines = b.raw_text.strip().split("\n")
+        rot = "\n".join(lines[1:] + lines[:1])
+        clean = " ".join(rot.split())
+        ev = ReorderEvidence(alt_texts=(rot,))
+        if check_faithfulness_ex(b.raw_text, clean, evidence=ev).result.passed:
+            moved.append(b)
+            cleaned[b.id], alt_text[b.id] = clean, rot
+        if len(moved) == 3:
+            break
+    assert len(ws) == 3 and len(moved) == 3
+    flagged_id = moved[0].id
+    span = " ".join(moved[0].raw_text.strip().split("\n")[0].split()[:3])  # on the moved line
+
+    def update(b: Block) -> Block:
+        upd: dict[str, object] = {"clean_text": cleaned.get(b.id)}
+        if b.id in alt_text:
+            other = sorted(k for k in b.raw_text_by_parser if k != b.raw_source)[0]
+            upd["raw_text_by_parser"] = {**b.raw_text_by_parser, other: alt_text[b.id]}
+        return b.model_copy(update=upd)
+
+    write_json(dp.blocks, [update(b) for b in blocks])
 
     def responder(messages: Sequence[Message]) -> str:
         return span if cleaned[flagged_id] in messages[-1].content else "NONE"
@@ -253,25 +276,28 @@ def test_run_score_with_mock_verifier(scored_copy: ProjectPaths) -> None:
         cache=LLMCache(paths.root / ".llm_cache"),
         responses={Task.verifier: responder},
     )
-    lines: list[dict[str, object]] = []
+    lines_out: list[dict[str, object]] = []
     failed = run_score(
         paths,
         only="clean",
         force=True,
         providers=ProviderSet(by_task={Task.verifier: prov}),
-        emit=lines.append,
+        emit=lines_out.append,
     )
     assert failed == []
-    assert len(sink) == 3  # one call per cleaned block, nothing else
-    detail = str(lines[-1]["detail"])
+    assert len(sink) == 3  # one call per block whose tokens changed, none for whitespace
+    detail = str(lines_out[-1]["detail"])
     assert "verifier_flagged: 1" in detail and "verifier_ok: 2" in detail
     sf = read_json(dp.scores, ScoreFile)
     by_id = {s.block_id: s for s in sf.blocks}
-    for b in paras:
+    for b in [*ws, *moved]:
         sig = [s for s in by_id[b.id].signals if s.name == SignalName.llm_verifier]
         assert by_id[b.id].faithfulness is not None and by_id[b.id].faithfulness.passed
         if b.id == flagged_id:
-            assert [s.value for s in sig] == [0.2] and span in (sig[0].detail or "")
+            assert [s.value for s in sig] == [0.2]
+            assert sig[0].detail is not None and sig[0].detail.startswith(
+                f'verifier quoted "{span}"; raw "'
+            )
             assert by_id[b.id].status == "queued"
         else:
             assert sig == []

@@ -27,6 +27,8 @@ __all__ = [
     "Heartbeat",
     "PROJECT_NODES",
     "Plan",
+    "clean_leftovers_at_start",
+    "clean_stray_parts",
     "clean_stray_tmp",
     "execute",
     "make_plan",
@@ -130,49 +132,100 @@ class Heartbeat:
 
 
 def clean_stray_tmp(paths: ProjectPaths) -> int:
-    """Delete `*.tmp` files (and half-built snapshot dirs) a SIGKILL left behind. The caller
-    holds the worker lock, so no pipeline writer is active. Page-view renders for the API run
-    outside that lock and write `*.part` (manuallabor.parse.render.render_tmp_path), which this
-    never touches."""
-    import shutil
-
+    """Delete `*.tmp` files a SIGKILL left behind under docs/, figures/, learning/. The caller holds
+    the worker lock, so no pipeline writer is active. Everything written outside that lock (API
+    projections, learning snapshots, page renders, uploads) uses `*.part` names, which this never
+    touches; `clean_stray_parts` removes those (design 07 section 14.1). A writer may rename its
+    file between the glob and the unlink, so a vanished file is not an error."""
     n = 0
     for root in (paths.docs, paths.figures_root, paths.learning):
         if root.is_dir():
             for p in root.rglob("*.tmp"):
                 if p.is_file():
-                    p.unlink()
+                    p.unlink(missing_ok=True)
+                    n += 1
+    return n
+
+
+def clean_stray_parts(paths: ProjectPaths, keep_uploads: Collection[Path] = ()) -> int:
+    """Delete what a killed serve (or CLI writer) left outside the worker lock: `*.part` files
+    under docs/, figures/, learning/, snapshot staging dirs (`.part-*`, and legacy `.tmp-*`),
+    upload temp files (`.uploads/.incoming-*`) and `.uploads/<sha>/` dirs holding none of
+    `keep_uploads` (the files of queued or running jobs). Returns the number of entries removed.
+
+    The caller holds BOTH locks: the project lock (no API request or CLI writer is running) and
+    the worker lock (a worker renders OCR pages with `.part` too). Use `clean_leftovers_at_start`.
+    """
+    import shutil
+
+    n = 0
+    for root in (paths.docs, paths.figures_root, paths.learning):
+        if root.is_dir():
+            for p in root.rglob("*.part"):
+                if p.is_file():
+                    p.unlink(missing_ok=True)
                     n += 1
     snaps = paths.learning / "snapshots"
     if snaps.is_dir():
-        for d in snaps.glob(".tmp-*"):
+        for d in [*snaps.glob(".part-*"), *snaps.glob(".tmp-*")]:
             shutil.rmtree(d, ignore_errors=True)
             n += 1
+    up = paths.uploads
+    if up.is_dir():
+        keep_dirs = {Path(f).resolve().parent for f in keep_uploads}
+        for p in sorted(up.iterdir()):
+            if p.is_file() and p.name.startswith(".incoming-"):
+                p.unlink(missing_ok=True)
+                n += 1
+            elif p.is_dir() and p.resolve() not in keep_dirs:
+                shutil.rmtree(p, ignore_errors=True)
+                n += 1
     return n
+
+
+def clean_leftovers_at_start(paths: ProjectPaths, live_job_ids: Collection[str]) -> int | None:
+    """`labor serve` start-up: the caller holds the project lock and has not started the runner.
+    Takes the worker lock for the duration of `clean_stray_parts`; when a worker from the previous
+    serve still holds it, its files are live and nothing is removed (returns None). Uploads listed
+    in the plan files of `live_job_ids` (queued or running jobs) are kept."""
+    import json
+
+    from manuallabor.state.errors import LockHeld
+    from manuallabor.state.lock import ProjectLock
+
+    wlock = ProjectLock(paths.worker_lock, cmd="labor serve (start-up clean)")
+    try:
+        wlock.acquire(nonblocking=True)
+    except LockHeld:
+        return None
+    try:
+        keep: list[Path] = []
+        for job_id in live_job_ids:
+            try:
+                spec = json.loads(paths.job_plan(job_id).read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            keep += [Path(str(f)) for f in spec.get("files", [])]
+        return clean_stray_parts(paths, keep)
+    finally:
+        wlock.release()
 
 
 # -- planning ----------------------------------------------------------------------------------
 
 
 def _decision_count(paths: ProjectPaths, slug: str) -> int:
+    """Decisions recorded for `slug`. No project.db means none. Any error opening or reading it
+    propagates: the caller cannot know the count and must not let a re-parse through."""
     if not paths.db.is_file():
         return 0
     from manuallabor.state.store import Store
 
-    try:
-        store = Store.open(paths, readonly=True)
-    except Exception:
-        return 0
+    store = Store.open(paths, readonly=True)
     try:
         return len(store.decisions(doc_id=slug))
-    except Exception:
-        return 0
     finally:
         store.close()
-
-
-def _has_decisions(paths: ProjectPaths, slug: str) -> bool:
-    return _decision_count(paths, slug) > 0
 
 
 def reparse_refusal(n: int) -> str:
@@ -181,6 +234,27 @@ def reparse_refusal(n: int) -> str:
         f"parse would replace blocks that have {n} decision(s); they would be orphaned. "
         "Use --discard-decisions to re-parse anyway"
     )
+
+
+def reparse_unknown(exc: BaseException) -> str:
+    """The guard's message when the decisions cannot be counted (it fails closed). It never
+    suggests `--discard-decisions`: the decisions may well be there, and the fault is the
+    database or its path, which a repair fixes without losing them."""
+    return (
+        f"parse refused: cannot read project.db to count this document's decisions "
+        f"({type(exc).__name__}: {exc}); a re-parse could orphan them. Check that project.db "
+        "is readable, or restore it from a backup, then run again"
+    )
+
+
+def _reparse_guard(paths: ProjectPaths, slug: str) -> str | None:
+    """None when a re-parse of `slug` orphans nothing; otherwise the refusal message. Fails
+    closed: an unreadable database refuses (design 07 section 14.4)."""
+    try:
+        n = _decision_count(paths, slug)
+    except Exception as exc:
+        return reparse_unknown(exc)
+    return reparse_refusal(n) if n else None
 
 
 def make_plan(
@@ -218,9 +292,9 @@ def make_plan(
                 planning = True
             if planning:
                 chosen.append(node)
-        n_dec = _decision_count(paths, slug) if "parse" in chosen and not allow_reparse else 0
-        if n_dec:
-            refused.append((slug, reparse_refusal(n_dec)))
+        why = _reparse_guard(paths, slug) if "parse" in chosen and not allow_reparse else None
+        if why is not None:
+            refused.append((slug, why))
             continue
         if chosen:
             per_doc[slug] = chosen
@@ -500,9 +574,9 @@ def run_node(
         cfg = paths.load_config()
         for s in slugs:
             st = next(x for x in graph.doc_node_states(paths, s, cfg) if x.node == "parse")
-            n_dec = _decision_count(paths, s) if force or st.state != "fresh" else 0
-            if n_dec:
-                refused.append((s, reparse_refusal(n_dec)))
+            why = _reparse_guard(paths, s) if force or st.state != "fresh" else None
+            if why is not None:
+                refused.append((s, why))
         slugs = [s for s in slugs if s not in {r for r, _ in refused}]
     plan = Plan(
         units=[(node, s) for s in slugs],

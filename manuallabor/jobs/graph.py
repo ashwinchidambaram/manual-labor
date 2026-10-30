@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import threading
 from pathlib import Path
-from typing import Any, Final, Literal
+from typing import TYPE_CHECKING, Any, Final, Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -27,6 +27,10 @@ from manuallabor.scoring.pipeline import score_fingerprint
 from manuallabor.scoring.types import ScoreFile
 from manuallabor.state.interfaces import JobRunnerP
 from manuallabor.state.models import DocLearning, DocStatus, NodeState, ProjectStatus
+
+if TYPE_CHECKING:
+    from manuallabor.contracts.document import Document
+    from manuallabor.state.store import Store
 
 __all__ = [
     "DOC_NODES",
@@ -259,63 +263,113 @@ def project_node_states(paths: ProjectPaths) -> list[NodeState]:
 # -- project status --------------------------------------------------------------------------
 
 
-def _orphans(paths: ProjectPaths, slug: str) -> int:
-    """Decisions of this document whose block raw text has changed since (re-parse)."""
-    if not paths.db.is_file():
-        return 0
-    from manuallabor.state.store import Store, sha_text
+_STATUS_CACHE: dict[tuple[str, str, str], tuple[tuple[Any, ...], Any]] = {}
 
+
+def _memo(paths: ProjectPaths, slug: str, kind: str, sg: tuple[Any, ...], make: Any) -> Any:
+    """`project_status` parts cached on file stats (and the last action id where the DB is read),
+    beside the node states: `/api/status` and `/api/sources` are fetched on every screen change
+    (review F5)."""
+    key = (str(paths.root), slug, kind)
+    with _CACHE_LOCK:
+        hit = _STATUS_CACHE.get(key)
+        if hit is not None and hit[0] == sg:
+            return hit[1]
+    value = make()
+    with _CACHE_LOCK:
+        _STATUS_CACHE[key] = (sg, value)
+    return value
+
+
+def _orphans(paths: ProjectPaths, slug: str, store: Store | None) -> int:
+    """Decisions of this document whose block raw text has changed since (re-parse)."""
+    if store is None:
+        return 0
     dp = paths.doc(slug)
     if not dp.blocks.is_file():
         return 0
-    try:
-        store = Store.open(paths, readonly=True)
-    except Exception:
-        return 0
-    try:
+
+    def count() -> int:
         from manuallabor.contracts.block import Block
         from manuallabor.contracts.io import read_json_list
+        from manuallabor.state.store import sha_text
 
         raw = {b.id: sha_text(b.raw_text) for b in read_json_list(dp.blocks, Block)}
         return sum(
             1 for d in store.decisions(doc_id=slug) if raw.get(d.decision.block_id) != d.raw_sha256
         )
-    finally:
-        store.close()
+
+    if store.in_tx:
+        return count()
+    n: int = _memo(paths, slug, "orphans", (_stat(dp.blocks), store.max_action_id()), count)
+    return n
+
+
+def _status_store(paths: ProjectPaths, runner: JobRunnerP | None) -> tuple[Store | None, bool]:
+    """The serving store (the runner's), else a read-only one this call opens and closes."""
+    from manuallabor.state.store import Store
+
+    own = getattr(runner, "store", None)
+    if isinstance(own, Store):
+        return own, False
+    if not paths.db.is_file():
+        return None, False
+    try:
+        return Store.open(paths, readonly=True), True
+    except Exception:
+        return None, False
 
 
 def _learning(paths: ProjectPaths, slug: str) -> DocLearning:
     dp = paths.doc(slug)
-    group = clean = "baseline"
-    try:
-        if dp.groups.is_file():
-            group = json.loads(dp.groups.read_text(encoding="utf-8")).get(
-                "learning_snapshot", group
-            )
-        if dp.clean.is_file():
-            clean = json.loads(dp.clean.read_text(encoding="utf-8")).get("learning_snapshot", clean)
-    except (OSError, ValueError):
-        pass
-    return DocLearning(group=str(group), clean=str(clean))
+
+    def read() -> DocLearning:
+        group = clean = "baseline"
+        try:
+            if dp.groups.is_file():
+                group = json.loads(dp.groups.read_text(encoding="utf-8")).get(
+                    "learning_snapshot", group
+                )
+            if dp.clean.is_file():
+                clean = json.loads(dp.clean.read_text(encoding="utf-8")).get(
+                    "learning_snapshot", clean
+                )
+        except (OSError, ValueError):
+            pass
+        return DocLearning(group=str(group), clean=str(clean))
+
+    out: DocLearning = _memo(paths, slug, "learning", (_stat(dp.groups), _stat(dp.clean)), read)
+    return out.model_copy()
 
 
 def project_status(paths: ProjectPaths, runner: JobRunnerP | None) -> ProjectStatus:
     cfg = paths.load_config() if paths.config.is_file() else ProjectConfig(name=paths.root.name)
     docs: list[DocStatus] = []
     names: set[str] = set()
-    for slug in paths.list_slugs():
-        doc = paths.load_document(slug)
-        names.add(doc.filename)
-        docs.append(
-            DocStatus(
-                doc_id=slug,
-                kind=doc.kind,
-                pages=doc.page_count,
-                nodes=doc_node_states(paths, slug, cfg),
-                learning=_learning(paths, slug),
-                orphaned_decisions=_orphans(paths, slug),
+    store, own = _status_store(paths, runner)
+    try:
+        for slug in paths.list_slugs():
+            doc: Document = _memo(
+                paths,
+                slug,
+                "document",
+                (_stat(paths.doc(slug).document),),
+                lambda slug=slug: paths.load_document(slug),
             )
-        )
+            names.add(doc.filename)
+            docs.append(
+                DocStatus(
+                    doc_id=slug,
+                    kind=doc.kind,
+                    pages=doc.page_count,
+                    nodes=doc_node_states(paths, slug, cfg),
+                    learning=_learning(paths, slug),
+                    orphaned_decisions=_orphans(paths, slug, store),
+                )
+            )
+    finally:
+        if own and store is not None:
+            store.close()
     unreg = (
         sorted(p.name for p in paths.sources.iterdir() if p.is_file() and p.name not in names)
         if paths.sources.is_dir()

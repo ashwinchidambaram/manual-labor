@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
@@ -14,10 +16,13 @@ from manuallabor.state.errors import (
     InvalidOp,
     LockHeld,
     NoPageRender,
+    NotFound,
     OutOfScope,
     RequestIdReused,
     StateError,
 )
+
+log = logging.getLogger("manuallabor.api")
 
 
 class ApiError(Exception):
@@ -76,8 +81,10 @@ def install_handlers(app: FastAPI) -> None:
     async def _norender(_: Request, exc: NoPageRender) -> JSONResponse:
         return _json(404, "no_page_render", str(exc) or "no page render for this document")
 
-    @app.exception_handler(KeyError)
-    async def _missing(_: Request, exc: KeyError) -> JSONResponse:
+    # Only the explicit not-found of the services: a plain KeyError is a bug and falls through
+    # to `_unhandled` (design 07 section 15, code review F13).
+    @app.exception_handler(NotFound)
+    async def _missing(_: Request, exc: NotFound) -> JSONResponse:
         what = exc.args[0] if exc.args else "resource"
         return _json(404, "not_found", f"not found: {what}")
 
@@ -89,6 +96,12 @@ def install_handlers(app: FastAPI) -> None:
     async def _http(_: Request, exc: StarletteHTTPException) -> JSONResponse:
         code = "not_found" if exc.status_code == 404 else f"http_{exc.status_code}"
         return _json(exc.status_code, code, str(exc.detail))
+
+    @app.exception_handler(Exception)
+    async def _unhandled(request: Request, exc: Exception) -> JSONResponse:
+        # Starlette re-raises after this response, so uvicorn logs the traceback as well.
+        log.error("unhandled %s on %s %s", type(exc).__name__, request.method, request.url.path)
+        return _json(500, "internal_error", "internal server error; see the labor serve log")
 
     @app.exception_handler(RequestValidationError)
     async def _validation(_: Request, exc: RequestValidationError) -> JSONResponse:

@@ -30,13 +30,14 @@ from manuallabor.state.errors import InvalidOp
 from manuallabor.state.models import ActionKind, ReviewActionIn
 from manuallabor.state.store import Store
 from tests.export.helpers import CLOCK, CLOCK2, Exported, reviewer
+from tests.subproc import run_bounded
 
 LABOR = [sys.executable, "-m", "manuallabor"]
 
 
 def labor(*args: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
     e = {**os.environ, **(env or {})}
-    return subprocess.run(LABOR + list(args), capture_output=True, text=True, timeout=600, env=e)
+    return run_bounded(LABOR + list(args), timeout=600, env=e)
 
 
 def sha(p: Path) -> str:

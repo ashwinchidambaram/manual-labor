@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+import logging
 import multiprocessing
 import os
 import time
-import uuid
 from concurrent.futures import Future, ProcessPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
@@ -13,11 +13,16 @@ from typing import Any
 
 from manuallabor.contracts._base import Sha256Hex
 from manuallabor.contracts.config import ProjectConfig
-from manuallabor.contracts.io import read_json, write_json
+from manuallabor.contracts.io import PART_SUFFIX, read_json, temp_path, write_json
 from manuallabor.parse.types import OcrPage, ParseModel
 
 DEFAULT_WORKERS = 2
 WORKERS_ENV = "MANUALLABOR_WORKERS"
+# how long `OcrPool.close` waits for the workers to exit before it terminates them (01 §11.1)
+CLOSE_TIMEOUT = 10.0
+_KILL_GRACE = 3.0
+
+log = logging.getLogger(__name__)
 
 
 def pool_workers(explicit: int | None = None) -> int:
@@ -48,7 +53,7 @@ def render_tmp_path(out: Path) -> Path:
     API page renders run without the worker lock, and a job's start-up `clean_stray_tmp` removes
     every "*.tmp" under docs/ while one may be in flight.
     """
-    return out.with_name(f"{out.name}.{uuid.uuid4().hex}.part")
+    return temp_path(out, PART_SUFFIX)
 
 
 def render_page_png(pdf_path: Path, page_index: int, dpi: int, out: Path) -> bool:
@@ -152,6 +157,37 @@ def run_ocr_job(job: OcrJob) -> OcrJobResult:
     )
 
 
+def _worker_init() -> None:
+    """Pool worker start-up. A spawned worker runs neither the CLI nor the job-worker entry, so
+    it turns third-party telemetry off (importing this module already did, design 06 section 4)
+    and installs the offline guard (MANUALLABOR_OFFLINE=1) itself."""
+    from manuallabor.providers.offline import install_from_env
+    from manuallabor.telemetry import disable_library_telemetry
+
+    disable_library_telemetry()
+    install_from_env()
+
+
+def _wait_exit(procs: list[Any], timeout: float) -> list[Any]:
+    """Wait up to `timeout` seconds for the processes to exit; returns those still running.
+
+    Exit is read from each process's sentinel (closed by the kernel when it exits), never from
+    `is_alive()`: the pool's manager thread reaps workers with its own `waitpid`, and a
+    `waitpid` that loses that race reports a dead worker as alive (seen under load)."""
+    from multiprocessing.connection import wait
+
+    pending = {p.sentinel: p for p in procs}
+    deadline = time.monotonic() + timeout
+    while pending:
+        left = deadline - time.monotonic()
+        ready = wait(list(pending), max(0.0, left))
+        for r in ready:
+            pending.pop(r, None)
+        if left <= 0:
+            break
+    return list(pending.values())
+
+
 class OcrPool:
     """A lazily started spawn-context process pool; results are collected by page order."""
 
@@ -160,22 +196,48 @@ class OcrPool:
         self._workers = workers
 
     def executor(self) -> ProcessPoolExecutor:
-        """The pool, started on first use. Spawned workers do not run the CLI or job-worker
-        entry, so they install the offline guard (MANUALLABOR_OFFLINE=1) themselves."""
+        """The pool, started on first use (each worker runs `_worker_init`)."""
         if self._pool is None:
-            from manuallabor.providers.offline import install_from_env
-
             self._pool = ProcessPoolExecutor(
                 max_workers=pool_workers(self._workers),
                 mp_context=multiprocessing.get_context("spawn"),
-                initializer=install_from_env,
+                initializer=_worker_init,
             )
         return self._pool
 
     def submit(self, job: OcrJob) -> Future[OcrJobResult]:
         return self.executor().submit(run_ocr_job, job)
 
-    def close(self) -> None:
-        if self._pool is not None:
-            self._pool.shutdown(wait=True, cancel_futures=True)
-            self._pool = None
+    def processes(self) -> list[Any]:
+        """The worker processes started so far (a snapshot)."""
+        if self._pool is None:
+            return []
+        procs = getattr(self._pool, "_processes", None) or {}
+        return list(procs.values())
+
+    def close(self, timeout: float = CLOSE_TIMEOUT) -> None:
+        """Shut the pool down without ever waiting forever (design 01 section 11.1). Callers
+        have collected every result they need. Pending work is cancelled and the workers are
+        asked to exit; a worker still alive after `timeout` seconds (seen: a library's exit-time
+        teardown spinning forever) is terminated, then killed, and logged. The pool's own
+        exit-time join then finds nothing left to wait for."""
+        pool, self._pool = self._pool, None
+        if pool is None:
+            return
+        procs = list((getattr(pool, "_processes", None) or {}).values())
+        pool.shutdown(wait=False, cancel_futures=True)
+        stuck = _wait_exit(procs, timeout)
+        for p in stuck:
+            log.warning(
+                "render worker pid %s did not exit within %.0f s of shutdown; terminating it",
+                p.pid,
+                timeout,
+            )
+            p.terminate()
+        for p in _wait_exit(stuck, _KILL_GRACE):
+            log.warning("render worker pid %s ignored SIGTERM; killing it", p.pid)
+            p.kill()
+        _wait_exit(stuck, _KILL_GRACE)
+        manager = getattr(pool, "_executor_manager_thread", None)
+        if manager is not None:
+            manager.join(_KILL_GRACE)

@@ -51,7 +51,7 @@ The stage order and the per-stage output files are declared once, in `manuallabo
 
 ## 3. The project on disk
 
-`ProjectPaths` in `manuallabor/project.py` resolves the paths below, except `.llm_cache/` and `probe.json`, which older code builds by hand. Add new paths to `ProjectPaths`.
+`ProjectPaths` in `manuallabor/project.py` resolves every path below (`tests/test_project_paths.py` checks that no module builds `.llm_cache/`, `llm_calls.jsonl` or `probe.json` by hand). Add new paths to `ProjectPaths`.
 
 | Path | Holds |
 |---|---|
@@ -86,7 +86,7 @@ Inside `docs/<slug>/`: `document.json`, `blocks.json`, `scores.json`, `score_his
 
 **Running.** `executor.py` turns "everything not fresh up to `--to`" into a plan and runs it node by node, updating `stages.json` after each. `inline.py` runs plans in-process for `labor run` and `labor check`. Under `labor serve`, `runner.py` (`JobRunner`) is the only writer of the `jobs` table; it spawns `python -m manuallabor.jobs.worker <root> <job>`, which takes `.labor.worker.lock`, reads the plan file and streams NDJSON progress to `logs/jobs/`. The worker has no DB access. On restart the runner adopts a live worker or marks a dead one `interrupted` and re-enqueues its plan. SIGTERM to the worker is a cancel request.
 
-**Two rules that follow from this.** First, a job's start-up cleaner removes stray `*.tmp` files under `docs/`, `figures/` and `learning/`; anything written outside the worker lock (API page renders) must use another suffix, which is why `render_tmp_path` writes `.part`. Second, any new stage output file must be registered in `graph.py` or it will never be considered missing or stale.
+**Two rules that follow from this.** First, temp files have two suffixes with two owners (design 07 section 14.1). `*.tmp` is written only under the worker lock (pipeline stages), and a job's start-up cleaner (`clean_stray_tmp`) removes stray `*.tmp` under `docs/`, `figures/` and `learning/`. Everything the serve process writes there outside the worker lock uses a unique `*.part` name per call: the DB-to-file projections (`write_if_differs`: selection, group/attach/figure overrides, agent proposals and outcomes, the materialised `learning/*.json`), learning snapshot staging dirs (`.part-<sid>-<hex>`), page renders (`render_tmp_path`) and upload temp files (`.uploads/.incoming-*.part`). Their leftovers are removed only at `labor serve` start-up, while both the project lock and the worker lock are held (`clean_leftovers_at_start`). `write_text_atomic` takes the suffix, makes every temp name unique and fsyncs before the rename. Second, any new stage output file must be registered in `graph.py` or it will never be considered missing or stale.
 
 ## 5. Contracts and generated files
 
@@ -150,6 +150,8 @@ Routers in `manuallabor/api/routers/`, mounted in `api/app.py`:
 | `/api` agent | `agent/run`, `agent/items`, `agent/proposals` (accept, edit, reject), `accept-all-passing`, `calibration`, `calibration/apply` |
 | `/api/export` | `status`, POST `` (start an export job), `override`, `download` |
 | `/api/ui` | `guide` (first-run state) |
+
+**Packaging.** `hatch_build.py` (a hatchling build hook) force-includes `frontend/dist` into the wheel as `manuallabor/_frontend` when `frontend/dist/index.html` exists, which is the second place `serve.find_frontend_dist` looks. Release recipe: `cd frontend && npm ci && npm run build`, then `MANUALLABOR_REQUIRE_UI=1 uv build --wheel` (the hook fails instead of warning when the UI is missing). Build the wheel directly, not via the sdist: the sdist does not carry the gitignored `frontend/dist`. Editable installs (`uv sync`) skip the hook and use the checkout's `frontend/dist`. Dependencies: `uv.lock` is the pin; `pyproject.toml` has lower bounds only. `reportlab` is dev-only (fixture generator).
 
 The UI is served from the first of `$MANUALLABOR_FRONTEND_DIST`, `manuallabor/_frontend`, `frontend/dist`; `/assets` is static and a catch-all returns `index.html`. `labor serve` listens on 127.0.0.1:8765 by default; `--dev` serves the API only and expects Vite on 5173 proxying `/api`; `--mock` swaps every provider for the mock; exit code 3 means the project is locked.
 

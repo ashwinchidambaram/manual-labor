@@ -519,6 +519,7 @@ def probe(
 ) -> None:
     """Probe local hardware and suggest model settings (never installs anything)."""
     from manuallabor.contracts.io import dump_json, write_json
+    from manuallabor.project import ProjectPaths
     from manuallabor.providers import probe as pr
 
     if apply is not None and apply not in ("small", "medium", "large", "api"):
@@ -533,7 +534,7 @@ def probe(
     result = pr.run_probe(path=project)
     table = pr.suggest(result)
     if project is not None:
-        write_json(project / "probe.json", result)
+        write_json(ProjectPaths(project).probe, result)
     if apply is not None and project is not None:
         try:
             chosen = pr.apply_tier(

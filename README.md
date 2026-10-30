@@ -139,13 +139,19 @@ Scores are an overlay. `blocks.json`, the raw parse, is never touched by later s
 
 ## Requirements
 
-- macOS or Linux, Python 3.12 (managed by `uv`), Node 22 to build the UI.
+- macOS or Linux, Python 3.12 (managed by `uv`). Node 22 is needed only to build the UI from a checkout; a wheel built with `npm ci && npm run build` in `frontend/` then `uv build --wheel` carries the built UI, so installing that wheel (`uv tool install` or `pipx install`) needs no Node.
 - About 16 GB of RAM for the `small` local tier (`llama3.2:1b`, `qwen2.5:1.5b`, `qwen2.5:3b` for the agent pass, `moondream`, `nomic-embed-text`). `medium` and `large` need more; `api` needs both `ANTHROPIC_API_KEY` (chat, vision, verifier) and `OPENAI_API_KEY` (embeddings).
 - [Ollama](https://ollama.com) for local models. `labor probe` prints the exact `ollama pull` commands for a tier.
 - Docling layout models, downloaded once with `uv run docling-tools models download`. The parser never downloads at runtime.
 - Tesseract is optional; RapidOCR is bundled.
 
 A 200-page born-digital manual parses and scores in a few minutes on a laptop without a GPU. The model steps take longer and run as background jobs while you review.
+
+## Upgrading
+
+After installing a new version, run `labor run P` on each existing project (or press Run on the Scope screen). A version that changes how blocks are scored marks every document "Needs a run": until it has run, Verify and Export treat those documents as not scored yet, and your decisions, flags and selection are kept.
+
+The first run after the 2026-10-30 version also re-groups each project once. Topic names and article file names may change that one time (for example `connector-data-2.md` becomes `connector-data-section-5.md`). A block move or figure attachment you made by hand that names an old topic no longer applies: the run reports it ("N stale overrides" in the group step's output, listed under `overrides_stale` in the document's `groups.json` or `attach.json`). Redo it on the renamed topic.
 
 ## Troubleshooting
 
@@ -183,3 +189,5 @@ Issues and pull requests are welcome. Keep the faithfulness tests green: if a mo
 ## License
 
 MIT, see [LICENSE](LICENSE). The bundled Atkinson Hyperlegible font is under the SIL Open Font License (see `frontend/src/assets/fonts`).
+
+Manual Labor's own code is MIT. It depends on [PyMuPDF](https://github.com/pymupdf/pymupdf), which Artifex licenses under the GNU AGPL-3.0 or a paid commercial licence. PyMuPDF is installed from PyPI by the person installing Manual Labor and is not vendored here, so this repository stays MIT. If you redistribute a combined installation (a Docker image, a bundled app, a hosted service that exposes it to other users), that combination includes PyMuPDF, and you must meet the AGPL's terms for it (offer the corresponding source of the combined work) or buy a commercial licence from Artifex. Running Manual Labor for yourself on your own machine carries no such obligation. Other direct dependencies are permissive (MIT, BSD, Apache-2.0, MIT-CMU). Transitive MPL-2.0 packages (certifi, tqdm, pathspec) are file-level copyleft and unmodified.

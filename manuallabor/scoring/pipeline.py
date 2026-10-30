@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import functools
 import hashlib
 import json
 import time
@@ -29,6 +30,7 @@ from manuallabor.contracts.io import (
     write_text_atomic,
 )
 from manuallabor.figures.types import FigureIndex, FigureReport
+from manuallabor.jobs import progress
 from manuallabor.parse.pipeline import Emit, stdout_emit
 from manuallabor.parse.text import collapse_ws
 from manuallabor.parse.types import PageLayout
@@ -79,6 +81,7 @@ __all__ = [
     "score_block",
     "score_document",
     "score_fingerprint",
+    "scores_current",
 ]
 
 NO_VERIFIER = VerifierPlan(None, "skip_no_verifier", None)
@@ -268,7 +271,14 @@ def score_block(
             )
         )
     outcome, vs = llm_verifier(
-        block.raw_text, block.clean_text, faith_passed=faith_passed, plan=plan
+        block.raw_text,
+        block.clean_text,
+        faith_passed=faith_passed,
+        plan=plan,
+        block_type=block.type,
+        hf_strings=ctx.hf_strings,
+        page=block.page,
+        hf_pages=ctx.hf_pages,
     )
     counters[outcome] += 1
     if vs is not None:
@@ -311,21 +321,24 @@ def score_document(
     ctxs = block_contexts(doc, blocks, layouts)
     fallbacks = fallbacks or {}
     lexicon, _ignored = active_lexicon(learned, blocks)
-    out = [
-        score_block(
-            b,
-            ctxs[b.id],
-            threshold=threshold,
-            fig=fig_inputs.get(b.id),
-            variants=variants.get(b.id, ()),
-            plan=plan,
-            counters=counters,
-            fallback=fallbacks.get(b.id),
-            learned=learned,
-            lexicon=lexicon,
+    ordered = sorted(blocks, key=lambda b: b.reading_order)
+    out: list[BlockScore] = []
+    for b in ordered:
+        out.append(
+            score_block(
+                b,
+                ctxs[b.id],
+                threshold=threshold,
+                fig=fig_inputs.get(b.id),
+                variants=variants.get(b.id, ()),
+                plan=plan,
+                counters=counters,
+                fallback=fallbacks.get(b.id),
+                learned=learned,
+                lexicon=lexicon,
+            )
         )
-        for b in sorted(blocks, key=lambda b: b.reading_order)
-    ]
+        progress.report(doc.slug, len(out), len(ordered), "block")  # the jobs bar (07 §4.1)
     return sorted(out, key=lambda s: ids.block_sort_key(s.block_id))
 
 
@@ -345,6 +358,24 @@ def _load_prior(path: Path) -> ScoreFile | None:
     except ValueError:
         return None
     return sf if sf.algo_version == SCORING_ALGO_VERSION else None
+
+
+def scores_current(paths: ProjectPaths, slug: str) -> bool:
+    """Whether the document's scores.json exists, validates and was written by this
+    `SCORING_ALGO_VERSION`. A score file of another version reads exactly like a missing one
+    on every read path ("not scored yet", design 03 section 2.10a), never as an error.
+    Memoised on the file's stat, so a poll costs one `stat`."""
+    p = paths.doc(slug).scores
+    try:
+        st = p.stat()
+    except OSError:
+        return False
+    return _current_at(str(p), st.st_mtime_ns, st.st_size, st.st_ino)
+
+
+@functools.lru_cache(maxsize=256)
+def _current_at(path: str, _mtime_ns: int, _size: int, _ino: int) -> bool:
+    return _load_prior(Path(path)) is not None
 
 
 def _variants_from(prior: ScoreFile | None) -> dict[str, list[NumericVariant]]:
@@ -731,8 +762,8 @@ def run_score(
             built.append(
                 build_provider_set(
                     config,
-                    cache_dir=paths.root / ".llm_cache",
-                    sink=JsonlSink(paths.root / "llm_calls.jsonl"),
+                    cache_dir=paths.llm_cache,
+                    sink=JsonlSink(paths.llm_log),
                 )
             )
         return built[0]

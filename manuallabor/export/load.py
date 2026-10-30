@@ -20,6 +20,7 @@ from manuallabor.export.types import (
 )
 from manuallabor.figures.types import FigureReport
 from manuallabor.project import ProjectPaths
+from manuallabor.scoring.pipeline import scores_current
 from manuallabor.state.data import ProjectData
 from manuallabor.state.models import ActionKind
 from manuallabor.state.review import load_review_blocks
@@ -29,13 +30,15 @@ __all__ = ["active_overrides", "doc_ready", "last_models", "load_inputs"]
 
 
 def doc_ready(paths: ProjectPaths, slug: str) -> bool:
+    """Every input of the export exists, and the scores are of this `SCORING_ALGO_VERSION`
+    (a score file from before an upgrade is "not scored yet", design 03 section 2.10a)."""
     dp = paths.doc(slug)
     return (
         dp.blocks.is_file()
-        and dp.scores.is_file()
         and dp.clean.is_file()
         and dp.groups.is_file()
         and dp.attach.is_file()
+        and scores_current(paths, slug)
     )
 
 
@@ -129,7 +132,6 @@ def load_inputs(paths: ProjectPaths, store: Store, after_action_id: int = 0) -> 
         split=sel.article_split,
         docs=docs,
         flags=store.flags(),
-        flag_seq=store.flag_created_actions(),
         overrides=active_overrides(store, after_action_id),
         models=last_models(paths),
         learning=ManifestLearning(enabled=cfg.learning.enabled, docs=learn_docs),

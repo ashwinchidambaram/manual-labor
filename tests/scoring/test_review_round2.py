@@ -201,16 +201,25 @@ def test_reorder_evidence_unit_must_end_on_a_boundary() -> None:
 # -- 4. verifier: short numeric spans count ------------------------------------------------
 
 VRAW = "Torque the 35 Nm bolts on the cover. Set gap to 5 mm. Do not reuse gaskets."
+# both numbers changed by cleanup: a short numeric span must mark one of the changes (design
+# 2.10 revision 2026-10-30); with raw == clean there is nothing to mark and nothing flags
+VCLEAN = "Torque the 36 Nm bolts on the cover. Set gap to 4 mm. Do not reuse gaskets."
 
 
-@pytest.mark.parametrize("reply", ["35", "35 ", "5", "'5'"])
+@pytest.mark.parametrize("reply", ["35", "35 ", "5", "'5'", "36", "4"])
 def test_verifier_short_numeric_span_flags(reply: str) -> None:
-    outcome, s = validate_answer(reply, VRAW, VRAW)
+    outcome, s = validate_answer(reply, VRAW, VCLEAN)
     assert outcome == "flag" and s is not None and s.value == 0.2
 
 
 @pytest.mark.parametrize("reply", ["no", "the", "Do", ".", "--", "3", "53", "e"])
 def test_verifier_short_non_numeric_or_absent_ignored(reply: str) -> None:
+    outcome, s = validate_answer(reply, VRAW, VCLEAN)
+    assert outcome == "verifier_invalid" and s is None
+
+
+@pytest.mark.parametrize("reply", ["35", "5"])
+def test_verifier_short_numeric_span_in_unchanged_text_ignored(reply: str) -> None:
     outcome, s = validate_answer(reply, VRAW, VRAW)
     assert outcome == "verifier_invalid" and s is None
 

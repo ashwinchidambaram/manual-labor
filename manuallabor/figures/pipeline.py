@@ -53,6 +53,7 @@ from manuallabor.figures.types import (
     Reason,
 )
 from manuallabor.figures.vector import export_vector
+from manuallabor.jobs import progress
 from manuallabor.parse import geometry as g
 from manuallabor.parse.pipeline import Emit, stdout_emit
 from manuallabor.parse.types import FigureCandidate
@@ -248,6 +249,8 @@ def _extract_doc(
         else:
             pdf = pymupdf.open(str(src))
         for b in fig_blocks:
+            # the jobs bar (design 07 section 4.1): the page this figure is on
+            progress.report(doc.slug, b.page, doc.page_count, "page")
             fid = str(b.figure_id)
             cand = cand_by_id[fid]
             use_bbox = b.bbox

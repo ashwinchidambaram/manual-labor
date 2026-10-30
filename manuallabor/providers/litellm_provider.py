@@ -50,6 +50,9 @@ CLEANUP_MAX_TOKENS: Final = 4096
 CLEANUP_HEADROOM: Final = 256
 CHARS_PER_TOKEN: Final = 3.5  # conservative: real text is 3.5-4.5 chars per token
 OLLAMA_MIN_EVAL_RATIO: Final = 0.8
+# Upper bound on the tokens a chat template adds around the messages (role tags, BOS/EOS, a
+# default system line); used only to decide that a prompt cannot have reached num_ctx.
+OLLAMA_TEMPLATE_ALLOWANCE: Final = 256
 OLLAMA_NUM_CTX: Final = 8192
 OLLAMA_KEEP_ALIVE: Final = "10m"
 EMBED_BATCH: Final = 64
@@ -138,6 +141,28 @@ def _message_text(messages: Sequence[Mapping[str, Any]]) -> int:
 
 def estimate_prompt_tokens(messages: Sequence[Mapping[str, Any]]) -> int:
     return math.ceil(_message_text(messages) / CHARS_PER_TOKEN)
+
+
+def prompt_cannot_exceed_ctx(messages: Sequence[Mapping[str, Any]]) -> bool:
+    """True when the prompt cannot have reached ``OLLAMA_NUM_CTX`` under any tokenizer Ollama
+    runs: byte-level BPE and SentencePiece with byte fallback never emit more tokens than the
+    text has UTF-8 bytes, and the chat template adds at most ``OLLAMA_TEMPLATE_ALLOWANCE``.
+    Ollama only truncates a prompt that does not fit num_ctx, so such a prompt was not
+    truncated whatever ``prompt_eval_count`` says (design 06, truncation guard). A message with
+    a non-text part (an image) is never bounded this way: its tokens are not in the text."""
+    n = 0
+    for m in messages:
+        c = m.get("content")
+        if isinstance(c, str):
+            n += len(c.encode("utf-8"))
+        elif isinstance(c, list):
+            for x in c:
+                if not isinstance(x, Mapping) or x.get("type", "text") != "text":
+                    return False
+                n += len(str(x.get("text", "")).encode("utf-8"))
+        elif c is not None:
+            return False
+    return n + OLLAMA_TEMPLATE_ALLOWANCE < OLLAMA_NUM_CTX
 
 
 def max_tokens_for(task: Task | str, messages: Sequence[Mapping[str, Any]]) -> int:
@@ -418,10 +443,18 @@ class LiteLLMProvider(BaseProvider):
         usage = getattr(resp, "usage", None)
         pt = getattr(usage, "prompt_tokens", None) if usage else None
         ct = getattr(usage, "completion_tokens", None) if usage else None
+        # The ratio check only applies to a prompt that could have exceeded num_ctx: for a short
+        # prompt the estimate (chars / 3.5, deliberately high for budgets) routinely runs 20-28%
+        # above the real count, and 71 of 124 verifier calls were dropped as "truncated".
         if (
             self.spec.name == "ollama"
             and isinstance(pt, int)
-            and (pt >= OLLAMA_NUM_CTX or pt < OLLAMA_MIN_EVAL_RATIO * estimate)
+            and (
+                pt >= OLLAMA_NUM_CTX
+                or (
+                    pt < OLLAMA_MIN_EVAL_RATIO * estimate and not prompt_cannot_exceed_ctx(messages)
+                )
+            )
         ):
             raise ProviderError(
                 f"prompt truncated: Ollama evaluated {pt} prompt tokens of about {estimate} "

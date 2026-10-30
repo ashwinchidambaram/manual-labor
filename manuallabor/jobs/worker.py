@@ -13,10 +13,13 @@ import signal
 import sys
 import threading
 import time
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any
 
+from manuallabor import faults
 from manuallabor.contracts.enums import Task
+from manuallabor.jobs import progress
 from manuallabor.jobs.executor import (
     PROJECT_NODES,
     Cancelled,
@@ -35,6 +38,7 @@ from manuallabor.state.lock import ProjectLock
 EXIT_LOCK = 3
 BEAT_SECONDS = 5.0
 BEAT_MIN_INTERVAL = 0.5
+STEP_MIN_INTERVAL = 0.25
 
 
 class JobLog:
@@ -51,6 +55,80 @@ class JobLog:
 
     def close(self) -> None:
         self.f.close()
+
+
+class StepLog:
+    """The job log as the executor's `emit`, plus what the jobs bar needs (design 07 section 4.1):
+    a `unit_start` line before each planned unit runs, and `step` lines with a stage's own count
+    of pages, blocks or topics done within the current unit (`progress.report`). Step lines are
+    written at most every `STEP_MIN_INTERVAL` seconds (the first and the last count always), never
+    go backwards, and are dropped when they do not belong to the current unit."""
+
+    def __init__(
+        self,
+        log: Callable[[dict[str, Any]], None],
+        units: Sequence[tuple[str, str]],
+        *,
+        clock: Callable[[], float] = time.monotonic,
+    ) -> None:
+        self.log = log
+        self.units = list(units)
+        self.clock = clock
+        self.i = -1  # index of the current unit; -1 before job_start
+        self.cur: tuple[str, str] | None = None
+        self._last_t = float("-inf")
+        self._last_done = -1
+        self._lock = threading.Lock()
+
+    def _start(self, i: int) -> None:
+        self.i = i
+        self.cur = self.units[i] if i < len(self.units) else None
+        self._last_t, self._last_done = float("-inf"), -1
+        if self.cur is not None:
+            node, doc = self.cur
+            self.log({"event": "unit_start", "node": node, "doc": doc, "index": i})
+
+    def _ended(self, node: Any, doc: Any) -> None:
+        """The unit (node, doc) ended: start the planned unit after it."""
+        key = (str(node), str(doc or ""))
+        for j in range(max(self.i, 0), len(self.units)):
+            if self.units[j] == key:
+                self._start(j + 1)
+                return
+
+    def __call__(self, obj: dict[str, Any]) -> None:
+        with self._lock:
+            self.log(obj)
+            ev = obj.get("event")
+            if ev == "job_start":
+                self._start(0)
+            elif ev == "unit_done":
+                self._ended(obj.get("node"), obj.get("doc"))
+            elif (
+                ev is None
+                and obj.get("status") == "blocked"
+                and obj.get("doc")
+                and self.cur == (str(obj.get("node")), str(obj.get("doc")))
+            ):
+                # a blocked document unit writes no unit_done; a project-level unit (doc "")
+                # always does, so it ends there, not at its blocked line (review 2 finding 7)
+                self._ended(obj["node"], obj.get("doc"))
+
+    def step(self, doc: str, done: int, total: int, unit: progress.StepUnit) -> None:
+        with self._lock:
+            if self.cur is None or self.cur[1] != doc or done < self._last_done:
+                return
+            node = self.cur[0]
+            now = self.clock()
+            last = done == total
+            if done == self._last_done or (not last and now - self._last_t < STEP_MIN_INTERVAL):
+                return
+            self._last_t, self._last_done = now, done
+            self.log(
+                {"event": "step", "node": node, "doc": doc, "done": done, "total": total,
+                 "unit": unit}
+            )  # fmt: skip
+        faults.delay(f"step:{node}")  # e2e: a unit that is visibly still counting
 
 
 def run_job(root: Path, job_id: str) -> int:
@@ -146,8 +224,15 @@ def _run_stages(
         if rp.get("to") in PROJECT_NODES
         else make_plan(paths, cfg, to=rp.get("to", "score2"), **kwargs)
     )
-    log({"event": "job_start", "units": len(plan.units)})
-    res = execute(paths, plan, emit=log, providers=providers, cancelled=cancel.is_set, heartbeat=hb)
+    steps = StepLog(log, plan.units)
+    steps({"event": "job_start", "units": len(plan.units)})
+    prev = progress.set_reporter(steps.step)
+    try:
+        res = execute(
+            paths, plan, emit=steps, providers=providers, cancelled=cancel.is_set, heartbeat=hb
+        )
+    finally:
+        progress.set_reporter(prev)
     failed = {**res.failed, **({"plan": [s for s, _ in res.refused]} if res.refused else {})}
     if failed:
         status = "failed"

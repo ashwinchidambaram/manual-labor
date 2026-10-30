@@ -17,6 +17,7 @@ from manuallabor.contracts.figure import FigureRecord
 from manuallabor.contracts.flag import Flag
 from manuallabor.contracts.group import GroupsFile
 from manuallabor.contracts.manifest import Manifest, ManifestLearning
+from manuallabor.state.models import ExportReviewSummary
 
 EXPORT_ALGO_VERSION: Final = "1"
 MAX_ARTICLE_BYTES: Final = 500_000
@@ -97,7 +98,6 @@ class AssembleInputs:
     models: dict[str, tuple[str, str]]  # task -> (provider, model)
     learning: ManifestLearning
     tool_version: str
-    flag_seq: dict[str, int] = field(default_factory=dict)  # flag id -> created action id
 
 
 @dataclass(frozen=True)
@@ -141,5 +141,6 @@ class Assembled:
     pages_covered: int
     warnings: list[str]
     generated_at: datetime
+    review: ExportReviewSummary  # the exported blocks, one bucket each (design 11 section 14)
     # zip path -> text (str) or a file on disk (Path); sorted by path when written
     files: dict[str, str | Path] = field(default_factory=dict)

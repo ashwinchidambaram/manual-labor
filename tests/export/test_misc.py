@@ -59,9 +59,10 @@ def test_summarize_warns_about_large_articles(tmp_path: Path) -> None:
         dest = tmp_path / name
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_text(src, encoding="utf-8") if isinstance(src, str) else None
-    s = summarize(tmp_path, 123, "a" * 64)
+    s = summarize(tmp_path, 123, "a" * 64, res.review)
     assert s.warnings and s.zip_bytes == 123 and s.articles == 1 and s.docs == 1
     assert s.pages_covered == 1 and s.review.approved == 1 and s.review.numbers_verified == 0
+    assert s.review.blocks == 1 == s.review.total_blocks and s.review.left_out == {}
 
 
 def test_the_models_in_the_manifest_are_the_last_logged_per_task(tmp_path: Path) -> None:

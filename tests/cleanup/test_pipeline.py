@@ -7,7 +7,6 @@ import hashlib
 import json
 import logging
 import os
-import subprocess
 import sys
 from collections.abc import Mapping, Sequence
 from pathlib import Path
@@ -32,6 +31,7 @@ from manuallabor.scoring.pipeline import load_scored_blocks, run_score
 from manuallabor.scoring.types import ScoreFile, ScoringError
 from tests.cleanup.conftest import Proj, doc_of, mk, quiet
 from tests.conftest import copy_project
+from tests.subproc import run_bounded
 
 REPO = Path(__file__).resolve().parents[2]
 runner = CliRunner()
@@ -126,7 +126,7 @@ def test_35_byte_identical_across_processes(groupedproj: Proj, tmp_path: Path) -
         root = tmp_path / f"p{seed}"
         copy_project(groupedproj.paths.root, root)
         env = {**os.environ, "PYTHONHASHSEED": seed}
-        r = subprocess.run(
+        r = run_bounded(
             [sys.executable, "-c", "from manuallabor.cli import app; app()", "clean", str(root)],
             cwd=REPO, env=env, capture_output=True, text=True, check=False,
         )  # fmt: skip

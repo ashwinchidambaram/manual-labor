@@ -17,11 +17,16 @@ from manuallabor.contracts.group import GroupsFile
 from manuallabor.contracts.io import read_json, read_json_list
 from manuallabor.contracts.selection import Selection
 from manuallabor.figures.types import FigureReport
-from manuallabor.grouping.selection import default_selection, normalize_to, selectable_ids
+from manuallabor.grouping.selection import (
+    default_selection,
+    normalize_to,
+    selectable_ids,
+    with_new_docs,
+)
 from manuallabor.parse.types import PageLayout
 from manuallabor.project import ProjectPaths
-from manuallabor.scoring.pipeline import block_contexts, load_scored_blocks
-from manuallabor.scoring.types import BlockContext, ScoreFile
+from manuallabor.scoring.pipeline import block_contexts, load_scored_blocks, scores_current
+from manuallabor.scoring.types import BlockContext, ScoreFile, ScoringError
 from manuallabor.state.models import DocReadiness
 from manuallabor.state.store import Store
 
@@ -57,6 +62,20 @@ class ProjectData:
             self._cache[key] = (signature, value)
         return value
 
+    def memo(self, kind: str, key: str, signature: tuple[Any, ...], make: Any) -> Any:
+        """A value derived from project files and the DB, recomputed when `signature` changes.
+        Callers whose value reads decisions, flags, selection or overrides put
+        `store.max_action_id()` in the signature (every such write appends an action) and use
+        `db_signature`, which refuses to cache inside an open transaction."""
+        return self._cached(kind, key, signature, make)
+
+    def db_signature(self, *paths: Path) -> tuple[Any, ...] | None:
+        """File stats plus the last action id, or None (do not cache) while a transaction is
+        open: its own thread sees rows written before their action row."""
+        if self.store.in_tx:
+            return None
+        return (*sig(*paths), self.store.max_action_id())
+
     # -- per document files -----------------------------------------------------------------
 
     def document(self, slug: str) -> Document:
@@ -75,6 +94,31 @@ class ProjectData:
             sig(dp.blocks, dp.scores, dp.clean),
             lambda: load_scored_blocks(self.paths, slug),
         )
+
+    def scored(self, slug: str) -> bool:
+        """Whether the machine view loads: clean.json and a scores.json of this
+        `SCORING_ALGO_VERSION` that match blocks.json. False is "not scored yet" for every read
+        path (design 03 section 2.10a): a score file from before an upgrade, or one a re-parse
+        has outrun, never turns into a 500. Cached on the same stats as `machine_blocks`."""
+        return self.paths.doc(slug).clean.is_file() and self.has_scores(slug)
+
+    def has_scores(self, slug: str) -> bool:
+        """Whether `machine_blocks` loads: a scores.json of this `SCORING_ALGO_VERSION` that
+        matches blocks.json, with or without clean.json. The first scoring pass (before the
+        scope is confirmed) is enough for the Scope screen's pre-cleanup estimate (the summary
+        and `/api/scope/blocks`); Verify, figures and export need `scored`."""
+        dp = self.paths.doc(slug)
+        if not scores_current(self.paths, slug):
+            return False
+
+        def check() -> bool:
+            try:
+                self.machine_blocks(slug)
+            except ScoringError:
+                return False
+            return True
+
+        return self._cached("has_scores", slug, sig(dp.blocks, dp.scores, dp.clean), check)  # type: ignore[no-any-return]
 
     def raw_blocks(self, slug: str) -> list[Block]:
         dp = self.paths.doc(slug)
@@ -150,12 +194,14 @@ class ProjectData:
     # -- selection ----------------------------------------------------------------------------
 
     def selection(self) -> Selection:
-        """The DB selection (normalized to selectable blocks), or the default when none."""
+        """The DB selection (normalized to selectable blocks, documents grouped since it was
+        written fully selected), or the default when none."""
         groups = self.all_groups()
         body = self.store.get_selection_json()
         if body is None:
             return default_selection(self.paths, groups)
-        sel, _ = normalize_to(Selection.model_validate_json(body), selectable_ids(groups))
+        sel = with_new_docs(Selection.model_validate_json(body), groups)
+        sel, _ = normalize_to(sel, selectable_ids(groups))
         return sel
 
     def raw_selection(self) -> Selection | None:
@@ -208,14 +254,15 @@ class ProjectData:
     # -- readiness ------------------------------------------------------------------------------
 
     def readiness(self, slug: str) -> DocReadiness:
-        """ready = score2 output exists (scores.json after clean.json), fresh or stale."""
+        """ready = score2 output exists and loads (`scored`: clean.json and a scores.json of
+        this algo version), fresh or stale. A score file of another algo version is pending,
+        waiting for the first stage that is not fresh."""
         from manuallabor.jobs import graph
 
-        dp = self.paths.doc(slug)
         cfg = self.paths.load_config()
         states = graph.doc_node_states(self.paths, slug, cfg)
         by = {s.node: s for s in states}
-        ready = dp.scores.is_file() and dp.clean.is_file()
+        ready = self.scored(slug)
         stale = ready and by["score2"].state != "fresh"
         waiting = None
         if not ready:

@@ -3,21 +3,23 @@
 from __future__ import annotations
 
 import hashlib
-import shutil
+import os
+import tempfile
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, File, Query, UploadFile
+from fastapi import APIRouter, File, Query, Request, UploadFile
 from fastapi.responses import FileResponse
 
 from manuallabor.api.deps import Ctx, HooksDep
 from manuallabor.api.errors import ApiError
+from manuallabor.api.guard import DEFAULT_MAX_BODY_BYTES
 from manuallabor.api.models import ApiErrorBody, DocFigure, PageBlock, SourceInfo
 from manuallabor.contracts.block import Block
 from manuallabor.contracts.enums import BlockStatus, BlockType
 from manuallabor.contracts.figure import FigureRecord
-from manuallabor.contracts.io import read_json, read_json_list
-from manuallabor.project import ProjectPaths
+from manuallabor.contracts.io import PART_SUFFIX, read_json, read_json_list
+from manuallabor.project import DocPaths, ProjectPaths
 from manuallabor.state.models import FigureAttachment, JobInfo, RunPlanIn
 
 router = APIRouter(prefix="/api", tags=["sources"])
@@ -50,29 +52,47 @@ def list_sources(ctx: Ctx, hooks: HooksDep) -> list[SourceInfo]:
     return out
 
 
-def _save_upload(uploads: Path, f: UploadFile) -> Path:
+def _save_upload(uploads: Path, f: UploadFile, limit: int = DEFAULT_MAX_BODY_BYTES) -> Path:
+    """Stream one upload into `.uploads/<sha256>/<name>`. The temp file is unique per call (two
+    uploads of one name may be in flight at once) and named `.incoming-*.part`: this runs outside
+    the worker lock, and serve start-up removes leftovers (design 07 section 14.1). A file over
+    `limit` bytes stops the copy with a 413 and leaves no temp file (section 15; the request
+    guard caps the whole body before this runs, this is the per-file backstop)."""
     name = Path(f.filename or "").name
     if not name:
         raise ApiError(422, "bad_upload", "an uploaded file has no name")
     uploads.mkdir(parents=True, exist_ok=True)
-    tmp = uploads / f".incoming-{hashlib.sha256(name.encode()).hexdigest()[:12]}"
-    h = hashlib.sha256()
-    with tmp.open("wb") as out:
-        while chunk := f.file.read(1 << 20):
-            h.update(chunk)
-            out.write(chunk)
-    dest_dir = uploads / h.hexdigest()
-    dest_dir.mkdir(exist_ok=True)
-    dest = dest_dir / name
-    shutil.move(str(tmp), dest)
+    fd, raw = tempfile.mkstemp(dir=uploads, prefix=".incoming-", suffix=PART_SUFFIX)
+    tmp = Path(raw)
+    try:
+        h = hashlib.sha256()
+        size = 0
+        with os.fdopen(fd, "wb") as out:
+            while chunk := f.file.read(1 << 20):
+                size += len(chunk)
+                if size > limit:
+                    raise ApiError(
+                        413, "too_large", f"{name} is larger than the upload limit of {limit} bytes"
+                    )
+                h.update(chunk)
+                out.write(chunk)
+        dest_dir = uploads / h.hexdigest()
+        dest_dir.mkdir(exist_ok=True)
+        dest = dest_dir / name
+        os.replace(tmp, dest)  # same bytes under the same name: last one wins, both are right
+    finally:
+        tmp.unlink(missing_ok=True)
     return dest
 
 
 @router.post("/sources", status_code=202, response_model=JobInfo)
-def upload_sources(ctx: Ctx, files: Annotated[list[UploadFile], File()]) -> JobInfo:
+def upload_sources(
+    request: Request, ctx: Ctx, files: Annotated[list[UploadFile], File()]
+) -> JobInfo:
     if not files:
         raise ApiError(422, "bad_upload", "no files uploaded")
-    saved = [_save_upload(ctx.paths.uploads, f) for f in files]
+    limit = int(getattr(request.app.state, "max_body_bytes", DEFAULT_MAX_BODY_BYTES))
+    saved = [_save_upload(ctx.paths.uploads, f, limit) for f in files]
     return ctx.runner.enqueue(RunPlanIn(to="group"), kind="ingest_run", files=saved)
 
 
@@ -107,10 +127,49 @@ def get_page_blocks(slug: str, page: int, ctx: Ctx) -> list[PageBlock]:
 @router.get("/docs/{slug}/figures", response_model=list[DocFigure])
 def get_doc_figures(slug: str, ctx: Ctx) -> list[DocFigure]:
     """Every figure of the document with all of its attachments (articles), sorted by figure id."""
+    # A document that is not scored yet has none to review: an empty list.
+    # the file part (attachments, figure records) is cached on the files' stats and the statuses
+    # come from one cached derivation of the document (review F5: this re-derived the whole
+    # document once per figure page)
     _known_slug(ctx.paths, slug)
-    from manuallabor.cleanup.types import AttachFile
+    from manuallabor.state.data import ProjectData, sig
 
     dp = ctx.paths.doc(slug)
+    fig_files = sorted(ctx.paths.figure_dir(slug).glob("FIG-*.json"))
+    data = getattr(ctx.review, "data", None)
+    if isinstance(data, ProjectData):
+        signature = sig(dp.attach, dp.blocks, *fig_files) + tuple(p.name for p in fig_files)
+        figs: list[_FigRow] = data.memo(
+            "doc_figures", slug, signature, lambda: _figure_rows(dp, fig_files)
+        )
+    else:
+        figs = _figure_rows(dp, fig_files)
+    if not figs:
+        return []  # nothing to derive (review 2 finding 6)
+    status = ctx.review.block_statuses(slug)
+    if not status:
+        return []  # not scored yet, or by another algo version (design 03 section 2.10a)
+    out = [
+        DocFigure(
+            figure_id=rec.id,
+            block_id=block_id,
+            record=rec,
+            image_url=f"/api/figures/{rec.id}/image",
+            attachments=list(atts),
+            status=status.get(block_id, BlockStatus.queued),
+        )
+        for rec, block_id, atts in figs
+    ]
+    return sorted(out, key=lambda f: f.figure_id)
+
+
+_FigRow = tuple[FigureRecord, str, list[FigureAttachment]]
+
+
+def _figure_rows(dp: DocPaths, fig_files: list[Path]) -> list[_FigRow]:
+    """(record, figure block id, attachments) per figure record that has a figure block."""
+    from manuallabor.cleanup.types import AttachFile
+
     attachments: dict[str, list[FigureAttachment]] = {}
     if dp.attach.is_file():
         af = read_json(dp.attach, AttachFile)
@@ -126,25 +185,11 @@ def get_doc_figures(slug: str, ctx: Ctx) -> list[DocFigure]:
                 )
     blocks = read_json_list(dp.blocks, Block) if dp.blocks.is_file() else []
     block_of = {b.figure_id: b for b in blocks if b.type == BlockType.figure and b.figure_id}
-    status: dict[int, dict[str, BlockStatus]] = {}
-    out: list[DocFigure] = []
-    for path in sorted(ctx.paths.figure_dir(slug).glob("FIG-*.json")):
+    out: list[_FigRow] = []
+    for path in fig_files:
         rec = read_json(path, FigureRecord)
         blk = block_of.get(rec.id)
         if blk is None:
             continue
-        if blk.page not in status:
-            status[blk.page] = {
-                str(r["block_id"]): r["status"] for r in ctx.review.page_blocks(slug, blk.page)
-            }
-        out.append(
-            DocFigure(
-                figure_id=rec.id,
-                block_id=blk.id,
-                record=rec,
-                image_url=f"/api/figures/{rec.id}/image",
-                attachments=attachments.get(rec.id, []),
-                status=BlockStatus(status[blk.page].get(blk.id, BlockStatus.queued)),
-            )
-        )
-    return sorted(out, key=lambda f: f.figure_id)
+        out.append((rec, blk.id, attachments.get(rec.id, [])))
+    return out

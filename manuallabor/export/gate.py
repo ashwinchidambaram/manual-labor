@@ -1,4 +1,4 @@
-"""The export gate and override coverage (design 11 P2, P3). Pure."""
+"""The export gate and override coverage (design 11 P2, P3, section 14). Pure."""
 
 from __future__ import annotations
 
@@ -6,13 +6,24 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 
 from manuallabor.contracts.block import Block
-from manuallabor.contracts.enums import BlockStatus, FlagStatus
+from manuallabor.contracts.enums import BlockStatus, BlockType, FlagStatus
 from manuallabor.contracts.flag import Flag
 from manuallabor.export.types import ActiveOverride
 
-__all__ = ["Gate", "export_gate"]
+__all__ = ["COUNT_KEYS", "Gate", "export_gate"]
 
 BLOCKING = (BlockStatus.queued, BlockStatus.flagged)
+HF = (BlockType.header, BlockType.footer)
+# the buckets of `Gate.counts`; every in-scope body block is in exactly one of the last six
+COUNT_KEYS = (
+    "in_scope",
+    "auto_approved",
+    "approved",
+    "edited",
+    "rejected",
+    "overridden",
+    "blocking",
+)
 
 
 @dataclass
@@ -23,6 +34,9 @@ class Gate:
     blockers: list[str]  # blocks no active override covers, in reading order per document
     covered: dict[str, ActiveOverride] = field(default_factory=dict)  # block id -> override
     open_flag_of: dict[str, str] = field(default_factory=dict)  # block id -> its open flag id
+    # every open flag no override covers, with its block, in the blockers' order
+    flag_blockers: list[tuple[Flag, str]] = field(default_factory=list)
+    counts: dict[str, int] = field(default_factory=dict)  # COUNT_KEYS -> n
 
     @property
     def allowed(self) -> bool:
@@ -34,26 +48,27 @@ def export_gate(
     scope_by_doc: Mapping[str, set[str]],
     flags: Iterable[Flag],
     overrides: Sequence[ActiveOverride],
-    flag_seq: Mapping[str, int] | None = None,
 ) -> Gate:
-    """`blocks_by_doc` carry the human overlay. A block blocks when it is `queued` or `flagged`
-    in scope, or when an open flag targets it (a figure flag targets its figure block).
+    """`blocks_by_doc` carry the human overlay. The scope is the in-scope body blocks: a page
+    header or footer is never exported (P4), so it neither blocks nor counts. A block blocks
+    when it is `queued` or `flagged`, or when an open flag targets it (a figure flag targets its
+    figure block).
 
-    Coverage (design 11 P3): a blanket override (no target, no flag) covers every blocker. A
-    flag override covers that flag (and the blocking status of the block it targets). A target
-    override covers the block's blocking status and only the flags that were already open when
-    it was recorded: a flag raised on the block afterwards makes it a blocker again. "Afterwards"
-    compares the flag's creating action id (`flag_seq`, flag id -> `created_action_id`) with the
-    override's action id; without a sequence for a flag, the wall clock decides, and a flag
-    stamped at or after the override's time counts as raised after it.
+    Coverage (design 11 P3, amended in section 14): a blanket override (no target, no flag)
+    covers every blocker. A flag override covers that flag and the review state of the block it
+    targets. A block override covers the block's review state only, never an open flag on it,
+    whichever was recorded first: a flag is the reviewer saying "this may be wrong", and only a
+    decision that names the flag may export the block anyway.
     """
     block_of_figure = {
         str(b.figure_id): b.id for blocks in blocks_by_doc.values() for b in blocks if b.figure_id
     }
-    in_scope = {b for s in scope_by_doc.values() for b in s}
-    status = {b.id: b.status for blocks in blocks_by_doc.values() for b in blocks}
+    by_id = {b.id: b for blocks in blocks_by_doc.values() for b in blocks}
+    in_scope = {
+        b for s in scope_by_doc.values() for b in s if b in by_id and by_id[b].type not in HF
+    }
+    status = {b: by_id[b].status for b in in_scope}
     order = {b.id: (doc, b.reading_order) for doc, blocks in blocks_by_doc.items() for b in blocks}
-    seq = flag_seq or {}
 
     open_flag_of: dict[str, str] = {}
     flags_of: dict[str, list[Flag]] = {}
@@ -68,28 +83,40 @@ def export_gate(
         open_flag_of.setdefault(bid, f.id)
         flags_of.setdefault(bid, []).append(f)
 
-    queued_ids = {b for b in in_scope if status.get(b) == BlockStatus.queued}
-    raw = {b for b in in_scope if status.get(b) in BLOCKING} | set(open_flag_of)
+    queued_ids = {b for b in in_scope if status[b] == BlockStatus.queued}
+    raw = {b for b in in_scope if status[b] in BLOCKING} | set(open_flag_of)
 
     ordered = sorted(overrides, key=lambda o: o.action_id)
     covered: dict[str, ActiveOverride] = {}
+    uncovered_flags: dict[str, list[Flag]] = {}
     for b in raw:
         bflags = flags_of.get(b, [])
         used: list[ActiveOverride] = []
         ok = True
-        if status.get(b) in BLOCKING:
+        if status[b] in BLOCKING:
             hits = [ov for ov in ordered if _covers_status(ov, b, bflags, block_of_figure)]
             ok = bool(hits)
             used += hits
         for f in bflags:
-            if not ok:
-                break
-            hits = [ov for ov in ordered if _covers_flag(ov, b, f, seq, block_of_figure)]
-            ok = bool(hits)
+            hits = [ov for ov in ordered if _covers_flag(ov, f)]
+            if not hits:
+                ok = False
+                uncovered_flags.setdefault(b, []).append(f)
             used += hits
         if ok and used:
             covered[b] = max(used, key=lambda o: o.action_id)  # the latest covering override
     blockers = sorted((b for b in raw if b not in covered), key=lambda b: order.get(b, ("", 0)))
+    flag_blockers = [
+        (f, b) for b in blockers for f in sorted(uncovered_flags.get(b, []), key=lambda f: f.id)
+    ]
+
+    counts = dict.fromkeys(COUNT_KEYS, 0)
+    counts["in_scope"] = len(in_scope)
+    for b in in_scope:
+        if b in raw:
+            counts["overridden" if b in covered else "blocking"] += 1
+        else:
+            counts[status[b].value] += 1
     return Gate(
         unlocked=not raw,
         open_flags=open_flags,
@@ -97,6 +124,8 @@ def export_gate(
         blockers=blockers,
         covered=covered,
         open_flag_of=open_flag_of,
+        flag_blockers=flag_blockers,
+        counts=counts,
     )
 
 
@@ -117,19 +146,6 @@ def _covers_status(
     return ov.flag_id is not None and any(f.id == ov.flag_id for f in flags)
 
 
-def _covers_flag(
-    ov: ActiveOverride,
-    block_id: str,
-    flag: Flag,
-    seq: Mapping[str, int],
-    block_of_figure: Mapping[str, str],
-) -> bool:
-    """One open flag on the block."""
-    if _blanket(ov) or ov.flag_id == flag.id:
-        return True
-    if not _targets(ov, block_id, block_of_figure):
-        return False
-    created = seq.get(flag.id)
-    if created is not None:
-        return created < ov.action_id
-    return flag.created_at < ov.ts
+def _covers_flag(ov: ActiveOverride, flag: Flag) -> bool:
+    """One open flag: only a blanket override or the override naming it."""
+    return _blanket(ov) or ov.flag_id == flag.id

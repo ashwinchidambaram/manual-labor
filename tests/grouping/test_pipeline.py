@@ -28,6 +28,7 @@ from manuallabor.providers import ListSink, MockProvider, ProviderError
 from manuallabor.scoring.pipeline import run_score
 from tests.conftest import Scored
 from tests.grouping.conftest import Grouped, copy_project, doc_of, heading, mk, provider_set
+from tests.subproc import run_bounded
 
 REPO = Path(__file__).resolve().parents[2]
 Collect = Callable[..., tuple[list[str], list[dict[str, Any]]]]
@@ -125,7 +126,7 @@ def test_groups_json_is_byte_identical_across_processes(
     code = "from manuallabor.cli import app; app()"
     for paths, seed in ((scored_copy, "1"), (other, "2")):
         env = {**os.environ, "PYTHONHASHSEED": seed}
-        r = subprocess.run(
+        r = run_bounded(
             [sys.executable, "-c", code, "group", str(paths.root)],
             cwd=REPO, env=env, capture_output=True, text=True, check=False,
         )  # fmt: skip

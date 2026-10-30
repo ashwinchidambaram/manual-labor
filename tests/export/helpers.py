@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import re
 import shutil
-import subprocess
 import sys
 import zipfile
 from dataclasses import dataclass
@@ -25,6 +24,7 @@ from manuallabor.state.review import ReviewService, load_review_blocks
 from manuallabor.state.scope import ScopeService
 from manuallabor.state.store import Store
 from tests.conftest import FIXTURES
+from tests.subproc import run_bounded
 
 CLOCK = "2026-10-29T12:00:00Z"
 CLOCK2 = "2026-10-30T08:30:00Z"
@@ -32,13 +32,8 @@ CLOCK2 = "2026-10-30T08:30:00Z"
 
 def labor_run(root: Path, *args: str) -> None:
     """`labor run --mock` in a child process: Docling stays out of the pytest process (the API
-    tests assert that importing the app never loads it)."""
-    r = subprocess.run(
-        [sys.executable, "-m", "manuallabor", "run", str(root), "--mock", *args],
-        capture_output=True,
-        text=True,
-        timeout=1800,
-    )
+    tests assert that importing the app never loads it). Bounded: a hang fails the test."""
+    r = run_bounded([sys.executable, "-m", "manuallabor", "run", str(root), "--mock", *args])
     assert r.returncode == 0, r.stdout[-2000:] + r.stderr[-2000:]
 
 

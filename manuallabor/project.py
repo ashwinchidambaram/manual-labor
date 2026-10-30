@@ -175,6 +175,16 @@ class ProjectPaths:
         return self.root / "llm_calls.jsonl"
 
     @property
+    def llm_cache(self) -> Path:
+        """Cached model responses, one `<sha256>.json` per call (providers/cache.py)."""
+        return self.root / ".llm_cache"
+
+    @property
+    def probe(self) -> Path:
+        """The last `labor probe` / `POST /api/probe` result."""
+        return self.root / "probe.json"
+
+    @property
     def learning(self) -> Path:
         return self.root / "learning"
 

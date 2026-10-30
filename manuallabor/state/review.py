@@ -5,6 +5,7 @@ Block status is *derived* from the append-only decisions; nothing here writes a 
 from __future__ import annotations
 
 import json
+import logging
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -172,6 +173,20 @@ def load_review_blocks(paths: ProjectPaths, store: Store, slug: str) -> list[Blo
     return [overlay_block(b, derive(b, decisions.get(b.id, ()), flags)) for b in machine]
 
 
+def _title_rows(slug: str, overlays: Sequence[Block]) -> dict[str, dict[str, Any]]:
+    titles = section_titles(overlays)
+    return {
+        b.id: {
+            "block_id": b.id,
+            "doc_id": slug,
+            "page": b.page,
+            "type": b.type.value,
+            "section_title": titles.get(b.id),
+        }
+        for b in overlays
+    }
+
+
 # -- why list ----------------------------------------------------------------------------------
 
 
@@ -293,8 +308,7 @@ class ReviewService:
         for slug in self.paths.list_slugs():
             if doc_filter is not None and slug != doc_filter:
                 continue
-            dp = self.paths.doc(slug)
-            if dp.scores.is_file() and dp.clean.is_file():
+            if self.data.scored(slug):  # a score file of another algo version is not ready
                 out.append(slug)
         return out
 
@@ -307,14 +321,54 @@ class ReviewService:
     def _flags(self) -> dict[str, Flag]:
         return {f.id: f for f in self.store.flags()}
 
+    def _doc_signature(self, slug: str) -> tuple[Any, ...] | None:
+        """What a document's human overlay depends on: the machine view's files and the action
+        log (every decision, flag and resolution is written with an action). None inside a
+        transaction (never cached there)."""
+        dp = self.paths.doc(slug)
+        return self.data.db_signature(dp.blocks, dp.scores, dp.clean)
+
     def _derive_doc(self, slug: str) -> list[tuple[Block, Block, Derived]]:
-        """(machine, overlay, derived) per block of the document."""
+        """(machine, overlay, derived) per block of the document; cached until a file or the
+        action log changes (review F4/F5: every read path shares one derivation)."""
+        sg = self._doc_signature(slug)
+        if sg is None:
+            return self._derive_doc_uncached(slug)
+        out: list[tuple[Block, Block, Derived]] = self.data.memo(
+            "derived", slug, sg, lambda: self._derive_doc_uncached(slug)
+        )
+        return out
+
+    def _derive_doc_uncached(self, slug: str) -> list[tuple[Block, Block, Derived]]:
         decs = self._decisions_by_block(slug)
         flags = self._flags()
         out = []
         for b in self.data.machine_blocks(slug):
             r = derive(b, decs.get(b.id, ()), flags)
             out.append((b, overlay_block(b, r), r))
+        return out
+
+    def _derived_view(self, kind: str, slug: str, make: Any) -> Any:
+        """A projection of `_derive_doc(slug)` cached on the same signature."""
+        sg = self._doc_signature(slug)
+        if sg is None:
+            return make(self._derive_doc_uncached(slug))
+        return self.data.memo(kind, slug, sg, lambda: make(self._derive_doc(slug)))
+
+    def review_blocks(self, slug: str) -> list[Block]:
+        """The document's blocks with the human overlay (`load_review_blocks`, cached)."""
+        out: list[Block] = self._derived_view("overlays", slug, lambda d: [ov for _m, ov, _r in d])
+        return out
+
+    def block_statuses(self, slug: str) -> dict[str, BlockStatus]:
+        """Block id -> overlay status for one document (cached)."""
+        if slug not in self.paths.list_slugs():
+            raise NotFound(slug)
+        if not self.data.scored(slug):
+            return {}  # not scored yet (or by another algo version): nothing to derive
+        out: dict[str, BlockStatus] = self._derived_view(
+            "statuses", slug, lambda d: {ov.id: ov.status for _m, ov, _r in d}
+        )
         return out
 
     def _learning_use(self, slug: str, block_id: str) -> LearningUse:
@@ -489,7 +543,7 @@ class ReviewService:
             slug, _page, _n = ids.parse_block_id(block_id)
         except ValueError as exc:
             raise NotFound(block_id) from exc
-        if slug not in self.paths.list_slugs() or not self.paths.doc(slug).scores.is_file():
+        if slug not in self.paths.list_slugs() or not self.data.scored(slug):
             raise NotFound(block_id)
         for machine, ov, r in self._derive_doc(slug):
             if machine.id == block_id:
@@ -517,8 +571,10 @@ class ReviewService:
             with open_pdf(self.paths.source(doc.filename)) as d:
                 r = d[page - 1].rect
                 w, h = float(r.width), float(r.height)
-        except Exception:
-            pass
+        except Exception as exc:  # the card still renders; a zero size is visible, not silent
+            logging.getLogger(__name__).warning(
+                "page size unavailable for %s page %d: %s", slug, page, exc
+            )
         return PageRef(
             doc_id=slug,
             page=page,
@@ -1019,10 +1075,13 @@ class ReviewService:
     def page_blocks(self, slug: str, page: int) -> list[dict[str, Any]]:
         if slug not in self.paths.list_slugs():
             raise NotFound(slug)
-        out = []
-        for _m, ov, _r in self._derive_doc(slug):
-            if ov.page == page:
-                out.append(
+        if not self.data.scored(slug):
+            return []
+
+        def index(derived: Sequence[tuple[Block, Block, Derived]]) -> dict[int, list[Any]]:
+            out: dict[int, list[Any]] = {}
+            for _m, ov, _r in derived:
+                out.setdefault(ov.page, []).append(
                     {
                         "block_id": ov.id,
                         "bbox": ov.bbox,
@@ -1030,7 +1089,33 @@ class ReviewService:
                         "status": ov.status.value,
                     }
                 )
-        return out
+            return out
+
+        by_page: dict[int, list[dict[str, Any]]] = self._derived_view("pages", slug, index)
+        return [dict(r) for r in by_page.get(page, [])]
+
+    def titles(self, block_ids: Sequence[str]) -> list[dict[str, Any]]:
+        """Where each block is, for naming it elsewhere (Export blockers): document, page, type
+        and the section heading above it, the same fields a queue card carries, in the order
+        asked (once per id). Unknown ids and documents not scored yet are left out."""
+        ready = set(self._ready_docs())
+        wanted: dict[str, list[str]] = {}
+        for b in block_ids:
+            try:
+                slug = ids.parse_block_id(b)[0]
+            except ValueError:
+                continue
+            if slug in ready:
+                wanted.setdefault(slug, []).append(b)
+        found: dict[str, dict[str, Any]] = {}
+        for slug, bids in sorted(wanted.items()):
+            rows: dict[str, dict[str, Any]] = self._derived_view(
+                "titles",
+                slug,
+                lambda d, slug=slug: _title_rows(slug, [ov for _m, ov, _r in d]),
+            )
+            found.update({b: dict(rows[b]) for b in bids if b in rows})
+        return [found[b] for b in dict.fromkeys(block_ids) if b in found]
 
     # -- queries used by module 11 / status ---------------------------------------------------
 

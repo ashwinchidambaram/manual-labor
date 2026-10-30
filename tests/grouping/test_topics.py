@@ -295,7 +295,14 @@ def test_duplicate_slugs_are_made_unique_without_retries() -> None:
     gf = group_document(gt_document("clean", blocks), blocks, ps, params=off)
     topics = [t for t in gf.topics if not t.is_unassigned]
     assert len(topics) >= 3
-    assert [t.slug for t in topics] == ["belts"] + [f"belts-{i}" for i in range(2, len(topics) + 1)]
+    # design 04 section 3.4.1: the first keeps the name; later duplicates get a disambiguator
+    # (section, page range or part) in the title, and the slug is made from the shown title.
+    slugs = [t.slug for t in topics]
+    assert slugs[0] == "belts" and len(set(slugs)) == len(slugs)
+    assert all(sl.startswith("belts-") for sl in slugs[1:])
+    titles = [t.title.lower() for t in topics]
+    assert len(set(titles)) == len(titles)
+    assert all("(" in t.title for t in topics[1:])
     chat = [e for e in sink if e.task == Task.grouping]
     assert chat and all(e.ok for e in chat) and len(chat) >= len(topics)
     assert len({e.input_hash for e in chat}) == len(chat)

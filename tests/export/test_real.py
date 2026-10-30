@@ -303,7 +303,13 @@ def test_e24_summary_matches_a_recount(exported_a: Exported) -> None:
         pages |= {(fm.source_doc, p) for p in fm.pages}
     assert s.pages_covered == len(pages)
     rs = m.review_stats
-    assert s.review.approved == rs.approved and s.review.auto_approved == rs.auto_approved
+    # design 11 section 14: the summary counts the exported blocks, one bucket each (a page
+    # header is auto-approved in review_stats but never exported)
+    exported = [b for b, a in m.accounting.assignments.items() if a != "unassigned"]
+    r = s.review
+    assert r.blocks == len(exported) == r.auto_approved + r.approved + r.edited + r.overrides
+    assert r.total_blocks == rs.total_blocks == r.blocks + sum(r.left_out.values())
+    assert r.approved <= rs.approved and r.auto_approved <= rs.auto_approved
     assert s.review.numbers_verified == len(rs.numbers_verified_blocks) > 0
     assert s.zip_bytes == exported_a.zip.stat().st_size and s.docs == 2
     assert s.zip_sha256 == exported_a.sha and BlockStatus.approved.value

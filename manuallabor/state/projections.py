@@ -14,7 +14,7 @@ from pydantic import TypeAdapter
 
 from manuallabor.cleanup.types import AttachOverride
 from manuallabor.contracts.group import GroupOverride
-from manuallabor.contracts.io import dump_json, write_text_atomic
+from manuallabor.contracts.io import PART_SUFFIX, dump_json, write_text_atomic
 from manuallabor.contracts.selection import Selection
 from manuallabor.project import ProjectPaths
 from manuallabor.state.models import ActionKind
@@ -34,9 +34,11 @@ __all__ = [
 
 
 def write_if_differs(path: Path, text: str) -> bool:
+    """Projections are written by the serve process outside the worker lock, so they use a
+    `.part` temp file the job's start-up cleaner never matches (design 07 section 14.1)."""
     if path.is_file() and path.read_text(encoding="utf-8") == text:
         return False
-    write_text_atomic(path, text)
+    write_text_atomic(path, text, suffix=PART_SUFFIX)
     return True
 
 

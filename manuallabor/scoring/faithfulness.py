@@ -60,6 +60,7 @@ _AE2_LINE_END_RE: Final = re.compile(r"[^\W\d_]-[ \t]*$")
 _LOOSE_RE: Final = re.compile(r"(?<=[^\W\d_])-(?=[^\W\d_])")
 _SENTENCE_SPLIT_RE: Final = re.compile(r"(?:(?<=[.!?])|(?<=[.!?][)\"”’]))\s(?=[A-Z0-9•(])")
 _GFM_SEP_RE: Final = re.compile(r"^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)*\|?$")
+GFM_SEP_RE: Final = _GFM_SEP_RE  # a GFM separator row (AE6); also used by the verifier
 
 
 # ---------------------------------------------------------------------------------------------

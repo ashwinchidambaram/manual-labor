@@ -19,6 +19,9 @@ from manuallabor.parse.types import (
 )
 
 NAME = "docling"
+# Fixed on every machine (design 01 section 4.2, invariant 7): torch reductions are not
+# guaranteed bit-identical across thread counts, and block IDs must not depend on the core count.
+# The API keeps a core through the worker's lower priority (`jobs.runner.WORKER_NICE`).
 NUM_THREADS = 4
 MODEL_REPOS = (
     "models--docling-project--docling-layout-heron",

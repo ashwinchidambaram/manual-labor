@@ -340,8 +340,8 @@ def run_group(
             built.append(
                 build_provider_set(
                     config,
-                    cache_dir=paths.root / ".llm_cache",
-                    sink=JsonlSink(paths.root / "llm_calls.jsonl"),
+                    cache_dir=paths.llm_cache,
+                    sink=JsonlSink(paths.llm_log),
                 )
             )
         return built[0]

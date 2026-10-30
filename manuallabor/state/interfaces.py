@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
 from manuallabor.cleanup.types import AttachOverride
-from manuallabor.contracts.enums import FlagStatus
+from manuallabor.contracts.enums import BlockStatus, FlagStatus
 from manuallabor.contracts.flag import Flag
 from manuallabor.contracts.group import GroupOverride
 from manuallabor.contracts.selection import ScopeSummary
@@ -69,6 +69,9 @@ class ReviewServiceP(Protocol):
     def resolve_flag(self, flag_id: str, resolution: str, request_id: str) -> Flag: ...
     def render_page(self, slug: str, page: int, dpi: int) -> Path: ...  # NoPageRender -> 404
     def page_blocks(self, slug: str, page: int) -> list[dict[str, Any]]: ...
+    def block_statuses(self, slug: str) -> dict[str, BlockStatus]: ...  # NotFound -> 404
+    # block_id, doc_id, page, type, section_title per known id (unknown ids are left out)
+    def titles(self, block_ids: Sequence[str]) -> list[dict[str, Any]]: ...
 
 
 class ScopeServiceP(Protocol):

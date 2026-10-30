@@ -61,6 +61,7 @@ from manuallabor.contracts.selection import Selection
 from manuallabor.figures.types import FigureReport
 from manuallabor.grouping.selection import load_selection
 from manuallabor.grouping.types import GROUPING_ALGO_VERSION
+from manuallabor.jobs import progress
 from manuallabor.parse.pipeline import Emit, stdout_emit
 from manuallabor.parse.text import collapse_ws
 from manuallabor.parse.types import PageLayout
@@ -266,7 +267,9 @@ def clean_document(
     )
     entries: list[CleanEntry] = []
     hashes: list[str] = []
-    for pl in planned:
+    for i, pl in enumerate(planned):
+        # the jobs bar (design 07 section 4.1): blocks done before this one
+        progress.report(doc.slug, i, len(planned), "block")
         b, h = pl.block, pl.input_hash
         hashes.append(h)
         old = prior.get(b.id)
@@ -299,6 +302,7 @@ def clean_document(
             stats.llm_accepted += 1
         if e.llm is not None and e.llm.outcome == "rejected":
             stats.llm_rejected[e.llm.reason or "rejected"] += 1
+    progress.report(doc.slug, len(planned), len(planned), "block")
     fp = _clean_fp(selected, ctxs, hashes)
     return sorted(entries, key=lambda e: ids.block_sort_key(e.block_id)), fp
 
@@ -822,8 +826,8 @@ def run_clean(
             built.append(
                 build_provider_set(
                     config,
-                    cache_dir=paths.root / ".llm_cache",
-                    sink=JsonlSink(paths.root / "llm_calls.jsonl"),
+                    cache_dir=paths.llm_cache,
+                    sink=JsonlSink(paths.llm_log),
                 )
             )
         return built[0]

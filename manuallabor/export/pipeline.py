@@ -13,6 +13,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
+from manuallabor.contracts.enums import FlagStatus
 from manuallabor.contracts.io import canonical_json, read_json, write_json
 from manuallabor.contracts.manifest import Manifest, Override
 from manuallabor.export.assemble import assemble, truncate_clock
@@ -34,12 +35,14 @@ from manuallabor.state.data import ProjectData
 from manuallabor.state.errors import InvalidOp
 from manuallabor.state.models import (
     ActionKind,
+    ExportFlagBlocker,
     ExportReviewSummary,
+    ExportScopeCounts,
     ExportStatus,
     ExportSummary,
     NodeState,
 )
-from manuallabor.state.review import load_review_blocks
+from manuallabor.state.review import ReviewService, load_review_blocks
 from manuallabor.state.store import Store
 
 __all__ = [
@@ -68,6 +71,9 @@ class _Rec(BaseModel):
 class AssembleRecord(_Rec):
     fingerprint: str  # everything but the clock and the overrides
     override_ids: list[int] = []  # the export_override actions that were active at assemble
+    # the exported blocks by bucket (design 11 section 14); None in a record written before it,
+    # which is then rebuilt rather than skipped
+    review: ExportReviewSummary | None = None
 
 
 class ExportRecord(_Rec):
@@ -227,36 +233,69 @@ def _tree_hash(root: Path) -> str:
 # -- the gate and the status -------------------------------------------------------------------
 
 
-def _gate(paths: ProjectPaths, store: Store, cutoff: int) -> Gate:
+def _gate(
+    paths: ProjectPaths, store: Store, cutoff: int, review: ReviewService | None = None
+) -> Gate:
     from manuallabor.export.load import active_overrides
 
-    data = ProjectData(paths, store)
+    if review is None:
+        review = ReviewService(paths, store, ProjectData(paths, store))
+    data = review.data
     selected = set(data.selection().block_ids)
     blocks = {}
     scope = {}
     for slug in paths.list_slugs():
-        if doc_ready(paths, slug):
-            blocks[slug] = load_review_blocks(paths, store, slug)
+        if doc_ready(paths, slug) and data.scored(slug):
+            blocks[slug] = review.review_blocks(slug)
             scope[slug] = data.scope_ids(slug, selected)
-    return export_gate(
-        blocks,
-        scope,
-        store.flags(),
-        active_overrides(store, cutoff),
-        store.flag_created_actions(),
-    )
+    return export_gate(blocks, scope, store.flags(), active_overrides(store, cutoff))
 
 
-def export_status(paths: ProjectPaths, store: Store) -> ExportStatus:
-    st = read_state(paths)
-    cutoff = export_cutoff(store)
-    g = _gate(paths, store, cutoff)
+def _gate_signature(paths: ProjectPaths, review: ReviewService) -> tuple[Any, ...] | None:
+    """Everything the gate reads: per document the files of the machine view, its groups
+    (selection) and attachments (figure scope), and the action log, which every decision, flag,
+    selection change, override and export run appends to. None inside a transaction."""
+    files: list[Path] = []
+    slugs = paths.list_slugs()
+    for slug in slugs:
+        dp = paths.doc(slug)
+        files += [dp.blocks, dp.scores, dp.clean, dp.groups, dp.attach]
+    sg = review.data.db_signature(*files)
+    return None if sg is None else (tuple(slugs), *sg)
+
+
+def _status_parts(
+    paths: ProjectPaths, store: Store, review: ReviewService
+) -> tuple[Gate, list[Override]]:
     from manuallabor.export.load import active_overrides
 
+    cutoff = export_cutoff(store)
+    g = _gate(paths, store, cutoff, review)
     overrides = [
         Override(target_id=o.target_id, flag_id=o.flag_id, reason=o.reason, at=o.ts)
         for o in active_overrides(store, cutoff)
     ]
+    return g, overrides
+
+
+def export_status(
+    paths: ProjectPaths, store: Store, review: ReviewService | None = None
+) -> ExportStatus:
+    """The Export screen's gate. The API passes its `ReviewService`: the gate and overrides are
+    then cached on `_gate_signature`, so a poll with nothing changed costs a few stats and one
+    `MAX(id)` (review F4); the CLI builds a throwaway service."""
+    if review is None:
+        review = ReviewService(paths, store, ProjectData(paths, store))
+    sg = _gate_signature(paths, review)
+    g: Gate
+    overrides: list[Override]
+    if sg is None:
+        g, overrides = _status_parts(paths, store, review)
+    else:
+        g, overrides = review.data.memo(
+            "export_gate", "", sg, lambda: _status_parts(paths, store, review)
+        )
+    st = read_state(paths)
     zip_path = None
     summary = None
     if st.export is not None and Path(st.export.zip_path).is_file():
@@ -264,9 +303,14 @@ def export_status(paths: ProjectPaths, store: Store) -> ExportStatus:
     return ExportStatus(
         unlocked=g.unlocked,
         open_flags=g.open_flags,
-        overrides=overrides,
+        overrides=list(overrides),
         queued=g.queued,
         blockers=g.blockers[:BLOCKER_LIMIT],
+        flag_blockers=[
+            ExportFlagBlocker(flag_id=f.id, block_id=b, category=f.category, note=f.note)
+            for f, b in g.flag_blockers
+        ],
+        counts=ExportScopeCounts(**g.counts),
         summary=summary,
         zip_path=zip_path,
     )
@@ -288,15 +332,28 @@ def record_override(
     if prev is not None:
         return prev.id
     if target_id is not None:
-        known: set[str] = set()
+        block_of: dict[str, str] = {}  # block or figure id -> block id
         for slug in paths.list_slugs():
             if doc_ready(paths, slug):
                 for b in load_review_blocks(paths, store, slug):
-                    known.add(b.id)
+                    block_of[b.id] = b.id
                     if b.figure_id is not None:
-                        known.add(str(b.figure_id))
-        if target_id not in known:
+                        block_of[str(b.figure_id)] = b.id
+        if target_id not in block_of:
             raise InvalidOp(f"unknown block or figure: {target_id}")
+        if flag_id is None:
+            # design 11 section 14: a block override never covers a flag, so recording one on a
+            # flagged block would look like a decision about the flag and change nothing
+            fig_of = {v: k for k, v in block_of.items() if k != v}
+            mine = {block_of[target_id], fig_of.get(block_of[target_id])}
+            open_ids = sorted(
+                f.id for f in store.flags() if f.status == FlagStatus.open and f.target_id in mine
+            )
+            if open_ids:
+                raise InvalidOp(
+                    f"{target_id} has an open flag ({', '.join(open_ids)}): a block override "
+                    "does not cover a flag; resolve the flag, or override it by its flag id"
+                )
     if flag_id is not None and store.get_flag(flag_id) is None:
         raise InvalidOp(f"unknown flag: {flag_id}")
     with store.tx():
@@ -360,6 +417,7 @@ def run_assemble(
         if (
             not force
             and state.assemble is not None
+            and state.assemble.review is not None
             and _assemble_fresh(state.assemble, fp, active, cutoff)
             and staged.is_file()
         ):
@@ -374,7 +432,7 @@ def run_assemble(
         shutil.rmtree(paths.assembled, ignore_errors=True)
         os.replace(tmp, paths.assembled)
         state = read_state(paths)
-        state.assemble = AssembleRecord(fingerprint=fp, override_ids=active)
+        state.assemble = AssembleRecord(fingerprint=fp, override_ids=active, review=asm.review)
         _write_state(paths, state)
         emit(
             {
@@ -391,11 +449,12 @@ def run_assemble(
             st.close()
 
 
-def summarize(root: Path, zip_bytes: int, zip_sha256: str) -> ExportSummary:
-    """The Export-screen summary, recomputed from a staging tree (so a resumed export gets
-    the same one)."""
+def summarize(
+    root: Path, zip_bytes: int, zip_sha256: str, review: ExportReviewSummary
+) -> ExportSummary:
+    """The Export-screen summary: the counts of a staging tree (so a resumed export gets the
+    same one) and its exported-block buckets, recorded when the tree was assembled."""
     m = read_json(root / "manifest.json", Manifest)
-    rs = m.review_stats
     warnings = []
     for a in m.articles:
         n = (root / a.path).stat().st_size
@@ -406,13 +465,7 @@ def summarize(root: Path, zip_bytes: int, zip_sha256: str) -> ExportSummary:
         figures=len(m.figures),
         pages_covered=len({(a.source_doc, p) for a in m.articles for p in a.pages}),
         docs=len(m.docs),
-        review=ExportReviewSummary(
-            auto_approved=rs.auto_approved,
-            approved=rs.approved,
-            edited=rs.edited,
-            overrides=rs.overrides,
-            numbers_verified=len(rs.numbers_verified_blocks),
-        ),
+        review=review,
         warnings=warnings,
         zip_bytes=zip_bytes,
         zip_sha256=zip_sha256,
@@ -433,7 +486,7 @@ def run_export(
     zip that does not validate is left as `<zip>.rejected` and raises ExportError."""
     run_assemble(paths, store, clock=clock, emit=emit, force=force)
     state = read_state(paths)
-    assert state.assemble is not None
+    assert state.assemble is not None and state.assemble.review is not None
     tree_fp = _tree_hash(paths.assembled)
     dest = Path(out) if out is not None else paths.zip_path
     cand = dest.with_name(dest.name + ".candidate")
@@ -464,7 +517,7 @@ def run_export(
     rec = ExportRecord(
         fingerprint=tree_fp,
         zip_path=str(dest),
-        summary=summarize(paths.assembled, len(data), sha),
+        summary=summarize(paths.assembled, len(data), sha, state.assemble.review),
     )
     state.export = rec
     _write_state(paths, state)

@@ -58,5 +58,23 @@ def test_e26_six_fixture_round_trip(requires_docling: None, tmp_path: Path) -> N
                 # the scanned document's figures are exported (they are in scope by default)
                 assert len([f for f in m.figures if f.source_doc == slug]) >= min(1, n_figs)
         assert not m.overrides and m.review_stats.overrides == 0
+        # design 11 section 14: on all six fixtures (the scanned one included) the gate's counts
+        # partition the scope and match Verify, and the summary partitions the exported blocks
+        from manuallabor.export.pipeline import read_state
+        from manuallabor.state.store import Store
+        from tests.export.test_flags_counts import assert_partition
+
+        store = Store.open(paths)
+        try:
+            st = assert_partition(paths, store)
+        finally:
+            store.close()
+        assert st.counts is not None and st.counts.blocking == 0
+        rec = read_state(paths).export
+        assert rec is not None
+        r = rec.summary.review
+        exported = [b for b, a in m.accounting.assignments.items() if a != "unassigned"]
+        assert r.blocks == len(exported) == r.auto_approved + r.approved + r.edited + r.overrides
+        assert r.total_blocks == m.accounting.total_blocks == r.blocks + sum(r.left_out.values())
     finally:
         shutil.rmtree(kept.parent, ignore_errors=True)

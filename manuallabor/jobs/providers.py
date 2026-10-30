@@ -65,7 +65,7 @@ def provider_set_factory(
                 built.append(
                     build_provider_set(
                         mockify(cfg),
-                        cache_dir=paths.root / ".llm_cache",
+                        cache_dir=paths.llm_cache,
                         sink=sink,
                         factories=MOCK_ONLY_FACTORIES,
                     )
@@ -74,7 +74,7 @@ def provider_set_factory(
                 built.append(
                     build_provider_set(
                         cfg,
-                        cache_dir=paths.root / ".llm_cache",
+                        cache_dir=paths.llm_cache,
                         sink=sink,
                         factories=DEFAULT_FACTORIES,
                     )

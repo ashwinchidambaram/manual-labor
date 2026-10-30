@@ -171,3 +171,26 @@ def test_29_llm_title_is_marked_inferred() -> None:
     meta, _ = _llm('{"title": "Ranger Pro mower guide", "product_model": "Ranger Pro 3000"}')
     assert meta.title == "Ranger Pro mower guide" and meta.title_inferred
     assert meta.product_model == "Ranger Pro 3000" and meta.product_model_inferred
+
+
+# code review F13 (design 07 section 15): failures that used to read as "nothing there"
+
+
+def test_metadata_provider_says_why_when_project_json_is_unreadable(tmp_path: Path) -> None:
+    from manuallabor.ingest import metadata_provider
+
+    paths = _project(tmp_path)
+    paths.config.write_text("{not json")
+    warns: list[str] = []
+    assert metadata_provider(paths, warns.append) is None
+    assert len(warns) == 1 and "project.json could not be read" in warns[0]
+
+
+def test_docx_info_does_not_hide_a_missing_python_docx(monkeypatch: pytest.MonkeyPatch) -> None:
+    import sys
+
+    from manuallabor.ingest import _docx_info
+
+    monkeypatch.setitem(sys.modules, "docx", None)  # `import docx` raises ImportError
+    with pytest.raises(ImportError):
+        _docx_info(FIXTURES / "manual.docx")
