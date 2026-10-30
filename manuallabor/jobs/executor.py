@@ -131,7 +131,9 @@ class Heartbeat:
 
 def clean_stray_tmp(paths: ProjectPaths) -> int:
     """Delete `*.tmp` files (and half-built snapshot dirs) a SIGKILL left behind. The caller
-    holds the worker lock, so no writer is active."""
+    holds the worker lock, so no pipeline writer is active. Page-view renders for the API run
+    outside that lock and write `*.part` (manuallabor.parse.render.render_tmp_path), which this
+    never touches."""
     import shutil
 
     n = 0

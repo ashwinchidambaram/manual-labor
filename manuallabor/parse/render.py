@@ -41,6 +41,16 @@ class PartialOcr(ParseModel):
     page: OcrPage
 
 
+def render_tmp_path(out: Path) -> Path:
+    """The private temp file one render writes before its atomic replace into `out`.
+
+    One per call (two requests can render the same page at once), and ".part" rather than ".tmp":
+    API page renders run without the worker lock, and a job's start-up `clean_stray_tmp` removes
+    every "*.tmp" under docs/ while one may be in flight.
+    """
+    return out.with_name(f"{out.name}.{uuid.uuid4().hex}.part")
+
+
 def render_page_png(pdf_path: Path, page_index: int, dpi: int, out: Path) -> bool:
     """Render a page to a 300-DPI RGB PNG; returns True when it was (re)rendered."""
     from manuallabor.parse.pdf_pymupdf import open_pdf, pm
@@ -48,11 +58,10 @@ def render_page_png(pdf_path: Path, page_index: int, dpi: int, out: Path) -> boo
     if out.is_file() and out.stat().st_size > 0:
         return False
     out.parent.mkdir(parents=True, exist_ok=True)
-    # One temp file per call. Two requests can render the same page at once (the Verify page
-    # strip and the source pane ask for one PNG together); a shared ".tmp" name made the second
-    # os.replace fail with FileNotFoundError. Each caller writes its own file and the last atomic
-    # replace wins; the contents are identical.
-    tmp = out.with_name(f"{out.name}.{uuid.uuid4().hex}.tmp")
+    # A shared "<out>.tmp" made the second of two concurrent renders fail on os.replace, and the
+    # job cleaner deleted it under the first; see render_tmp_path. Last atomic replace wins and the
+    # contents are identical.
+    tmp = render_tmp_path(out)
     try:
         with open_pdf(pdf_path) as doc:
             pix = doc[page_index].get_pixmap(dpi=dpi, colorspace=pm().csRGB, alpha=False)
