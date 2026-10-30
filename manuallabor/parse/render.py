@@ -5,6 +5,7 @@ from __future__ import annotations
 import multiprocessing
 import os
 import time
+import uuid
 from concurrent.futures import Future, ProcessPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
@@ -47,11 +48,18 @@ def render_page_png(pdf_path: Path, page_index: int, dpi: int, out: Path) -> boo
     if out.is_file() and out.stat().st_size > 0:
         return False
     out.parent.mkdir(parents=True, exist_ok=True)
-    with open_pdf(pdf_path) as doc:
-        pix = doc[page_index].get_pixmap(dpi=dpi, colorspace=pm().csRGB, alpha=False)
-        tmp = out.with_name(out.name + ".tmp")
-        pix.save(str(tmp), output="png")
-    os.replace(tmp, out)
+    # One temp file per call. Two requests can render the same page at once (the Verify page
+    # strip and the source pane ask for one PNG together); a shared ".tmp" name made the second
+    # os.replace fail with FileNotFoundError. Each caller writes its own file and the last atomic
+    # replace wins; the contents are identical.
+    tmp = out.with_name(f"{out.name}.{uuid.uuid4().hex}.tmp")
+    try:
+        with open_pdf(pdf_path) as doc:
+            pix = doc[page_index].get_pixmap(dpi=dpi, colorspace=pm().csRGB, alpha=False)
+            pix.save(str(tmp), output="png")
+        os.replace(tmp, out)
+    finally:
+        tmp.unlink(missing_ok=True)
     return True
 
 
