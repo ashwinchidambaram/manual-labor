@@ -26,3 +26,4 @@ frontend/e2e/.cache/
 frontend/e2e/.cache.lock
 .labor.lock
 .coverage
+.claude/worktrees/

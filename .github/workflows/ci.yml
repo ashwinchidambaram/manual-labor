@@ -16,8 +16,19 @@ jobs:
         run: uv run ruff check manuallabor/ tests/
       - name: Type check
         run: uv run mypy manuallabor/
+      - name: Install Tesseract (the OCR engine the test floors are written for)
+        run: sudo apt-get update && sudo apt-get install -y tesseract-ocr
       - name: Test
         run: uv run pytest -q
+      - name: "[debug] regenerate fixtures on Linux"
+        if: always()
+        run: uv run python -c "from pathlib import Path; from tests.fixtures.gen.make_fixtures import generate; generate(Path('/tmp/fx'))"
+      - name: "[debug] upload regenerated fixtures"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-fixtures
+          path: /tmp/fx
       # Also run after pytest: `uv run labor schemas export --check` verifies that the
       # committed schemas/ match the Pydantic models. The frontend job checks the TS types
       # against those committed schemas, so a stale schema fails there too.
@@ -67,6 +78,7 @@ jobs:
       - name: Install Tesseract (OCR for the scanned fixture)
         run: sudo apt-get update && sudo apt-get install -y tesseract-ocr
       - name: Cache Docling models
+        id: docling-cache
         uses: actions/cache@v4
         with:
           path: |
@@ -74,6 +86,9 @@ jobs:
             ~/.cache/docling
           key: docling-models-${{ runner.os }}-${{ hashFiles('uv.lock') }}
           restore-keys: docling-models-${{ runner.os }}-
+      - name: Download Docling models
+        if: steps.docling-cache.outputs.cache-hit != 'true'
+        run: uv run docling-tools models download
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
         working-directory: frontend
