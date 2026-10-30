@@ -18,7 +18,7 @@ I parsed all six fixtures plus `figures-copy.pdf` (a byte copy of figures.pdf) i
 | Render-agreement check (§3.3) | native: MAD 0.40–0.83, p99 ≤ 5. twocol composite: MAD 2.58, **p99 63.5**. Image clipped by a clip path (synthetic): MAD 12.4, p99 168. | thresholds |
 | Whole-page `get_svg_image()` with a cropbox | 190 KB per figure, containing every glyph on the page and the *other* figure's raster as base64. **Rejected.** | §4 |
 | Isolate-by-redaction, then `get_svg_image()` | 2.6–3.3 KB, 0 `<image>`, 11–13 paths, byte-identical across calls, 3–12 ms. Rendered back through `pymupdf.open("svg")`, it matches the page render (differences are sub-pixel edge shifts only). | §4 |
-| 8×8 phash distances (all 25 fixture figures) | exact copies 0; 50% downscale (figures p7) **0**; scanned crop vs the clean native of the same image **2, 4, 6**; twocol composite vs its plain base image **10**; unrelated pairs **≥ 12** (min 12). 16×16 hash: composite 36, unrelated min 36 (no separation). | §6 |
+| 8×8 phash distances (all 25 fixture figures) | exact copies 0; 50% downscale (figures p7) **0**; scanned crop vs the clean native of the same image **2, 4, 6**; twocol composite vs its plain base image **10**; unrelated pairs **≥ 12** (min 12). 16×16 hash: composite 36, unrelated min 36 (no separation). Re-measured after the fixture line art moved to integer rasterisation (`wide_line`): exact 0, p7 0, scan vs native 2, 4, 6, composite vs base 10, unrelated min **10** (clean p6-01 vs manual image1). | §6 |
 
 ## 1. Package layout (`manuallabor/figures/`)
 
@@ -152,7 +152,7 @@ The cached `pages/pNNN.png` is **not** used:
   - aspect ratios within 5%;
   - both images non-blank (the 64×64 L stddev ≥ 3).
 
-  **Why 8:** the largest measured same-diagram distance is 6 (scan vs native) and the smallest different-content distance is 10 (annotated composite vs its base). Unrelated pairs are ≥ 12. 8 is the midpoint, with a margin of 2 on each side. The fixture's 50% downscale (p7) has distance 0.
+  **Why 8:** the largest measured same-diagram distance is 6 (scan vs native) and the smallest different-content distance is 10 (annotated composite vs its base). Unrelated pairs are ≥ 10 (≥ 12 before the fixture line art was re-rasterised in integer arithmetic). 8 is the midpoint, with a margin of 2 on each side. The fixture's 50% downscale (p7) has distance 0.
 - **Compatibility:**
   - A `vector` figure may only duplicate a `vector` canonical. Otherwise the `svg` path would point at a figure with no SVG, which the FigureRecord validator rejects.
   - native/crop may duplicate any canonical (they point at its PNG).

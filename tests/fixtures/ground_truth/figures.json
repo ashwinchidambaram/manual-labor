@@ -2757,7 +2757,7 @@
       "section_number": "1",
       "source_image": {
         "height": 400,
-        "sha256": "85d4b0e5bf1d26b55ddd75408216eae90ae39108756da7f059704c0fb0c87818",
+        "sha256": "9dee9fc59476731c27467cd81331fd264672ddfc3508dcbd334f24e4198ad4b8",
         "width": 600
       }
     },
@@ -2782,7 +2782,7 @@
       "section_number": "2",
       "source_image": {
         "height": 800,
-        "sha256": "4358d14c75ed68339cce5ae7748c8a6a2493e318dfc2f67c6c5326b93212bf23",
+        "sha256": "a0d461ebfaa0c08c20eaf1b9ed22e0bec4819556ba78007ebb4dd644eb790782",
         "width": 1200
       }
     },
@@ -2826,7 +2826,7 @@
       "section_number": "3",
       "source_image": {
         "height": 900,
-        "sha256": "e2c04bd840be3d4e7963228e91e8f5403eba730e2d5d4049a0396a683d8fd505",
+        "sha256": "6ff6c385ff7f98b81ac9636373df262e2ec04784ec901e036f7ba2d2feac7a82",
         "width": 900
       }
     },
@@ -2872,7 +2872,7 @@
       "section_number": "4",
       "source_image": {
         "height": 1000,
-        "sha256": "5147dd47ddc784ebcf479195c1d38aaf3d4a8d1cb79347fe322b0095868d7e2f",
+        "sha256": "504d2650bed44e52596bba9c02b454b91fc1c684803a7df8511dd1394bc9c3e9",
         "width": 1600
       }
     },
@@ -2916,7 +2916,7 @@
       "section_number": "5",
       "source_image": {
         "height": 400,
-        "sha256": "4781c37a54be3b1f4268829a48187feeb09f4a5f0b59e3a8ffcbf33104516400",
+        "sha256": "8ca19defb03601f4c2091af0d9bb8b4222c07018b074396f2da3cbf68e0e5dbe",
         "width": 600
       }
     },
@@ -2941,7 +2941,7 @@
       "section_number": "6",
       "source_image": {
         "height": 800,
-        "sha256": "4358d14c75ed68339cce5ae7748c8a6a2493e318dfc2f67c6c5326b93212bf23",
+        "sha256": "a0d461ebfaa0c08c20eaf1b9ed22e0bec4819556ba78007ebb4dd644eb790782",
         "width": 1200
       }
     },
@@ -2987,7 +2987,7 @@
       "section_number": "7",
       "source_image": {
         "height": 400,
-        "sha256": "f302c4e6973b6cf2555bf699a9137facda87aedc584e158cecb75c0aaa8cb8f0",
+        "sha256": "c7afab1b5a14d107cca619a129073b20b53c16cfc18b32179bb3f35de4f50677",
         "width": 600
       }
     },
@@ -3012,7 +3012,7 @@
       "section_number": "7",
       "source_image": {
         "height": 800,
-        "sha256": "796c6e4201af61a444ffbcb18389cf20a9c16eb5f0e950574737f8b1a2e01cf3",
+        "sha256": "8b1264f21761bb48dc8994168d08a4ef0761751dfd93d7c68e371ebca004f01c",
         "width": 1200
       }
     },
@@ -3049,7 +3049,7 @@
     792.0
   ],
   "product_model": "Acme X200",
-  "sha256": "ad3d97b10e52f9568674a130a961ccd841e5aac34908ded24e50059d18246918",
+  "sha256": "08b45e652b6845a03ec020a031e3545901b647a02980ac8c457cb65e5dbbe640",
   "text_is_reference": false,
   "title": "Acme X200 Service Manual"
 }

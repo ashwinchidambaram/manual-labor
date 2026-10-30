@@ -11,6 +11,7 @@ import argparse
 import hashlib
 import io
 import itertools
+import math
 import random
 import re
 import shutil
@@ -630,6 +631,63 @@ def box_downscale(img: Image.Image, size: tuple[int, int]) -> Image.Image:
     return Image.fromarray(((sums + n // 2) // n).astype(np.uint8), "RGB")
 
 
+def bresenham(x0: int, y0: int, x1: int, y1: int) -> tuple[np.ndarray, np.ndarray]:
+    """Integer Bresenham points from (x0, y0) to (x1, y1), both ends included."""
+    dx, sx = abs(x1 - x0), (1 if x0 < x1 else -1)
+    dy, sy = -abs(y1 - y0), (1 if y0 < y1 else -1)
+    err = dx + dy
+    xs: list[int] = []
+    ys: list[int] = []
+    x, y = x0, y0
+    while True:
+        xs.append(x)
+        ys.append(y)
+        if x == x1 and y == y1:
+            break
+        e2 = 2 * err
+        if e2 >= dy:
+            err += dy
+            x += sx
+        if e2 <= dx:
+            err += dx
+            y += sy
+    return np.array(xs, dtype=np.int64), np.array(ys, dtype=np.int64)
+
+
+def wide_line(
+    img: Image.Image, xy: tuple[int, int, int, int], fill: tuple[int, int, int], width: int
+) -> None:
+    """Draw a ``width``-pixel line in integer arithmetic only, in place.
+
+    Replaces ``ImageDraw.line(width > 1)``: Pillow's ``ImagingDrawWideLine`` builds a polygon
+    from ``hypot`` and float edge slopes, and the float rounding differs between macOS arm64
+    and Linux x86-64 (one pixel flipped in a figures.pdf image). Here the centre line is
+    Bresenham, and at every centre point a span is filled across the minor axis (vertical for
+    an x-major line, horizontal for a y-major one). The span is ``width * length / major``
+    pixels, rounded, with ``length = isqrt(dx² + dy²)``, so the perpendicular thickness stays
+    close to ``width`` as with Pillow. A square pen was tried and rejected: it fattens the
+    diagonals so much that the twocol composite's phash came within the near-duplicate
+    threshold (6 <= 8) of its base image. Rectangle and ellipse outlines stay on ``ImageDraw``:
+    Pillow draws those with integer hlines and integer quarter-ellipse steps.
+    """
+    x0, y0, x1, y1 = xy
+    xs, ys = bresenham(x0, y0, x1, y1)
+    dx, dy = abs(x1 - x0), abs(y1 - y0)
+    major = max(dx, dy, 1)
+    span = max(width, (width * math.isqrt(dx * dx + dy * dy) + major // 2) // major)
+    offs = np.arange(-(span // 2), span - span // 2, dtype=np.int64)
+    if dx >= dy:
+        px = np.repeat(xs, len(offs))
+        py = (ys[:, None] + offs[None, :]).ravel()
+    else:
+        px = (xs[:, None] + offs[None, :]).ravel()
+        py = np.repeat(ys, len(offs))
+    keep = (px >= 0) & (px < img.width) & (py >= 0) & (py < img.height)
+    arr = np.array(img)
+    arr[py[keep], px[keep]] = fill
+    img.paste(Image.fromarray(arr, "RGB"))
+
+
 def line_art(rng: random.Random, w: int, h: int) -> Image.Image:
     img = Image.new("RGB", (w, h), (255, 255, 255))
     d = ImageDraw.Draw(img)
@@ -642,7 +700,7 @@ def line_art(rng: random.Random, w: int, h: int) -> Image.Image:
         y0, y1 = sorted((rng.randint(10, h - 10), rng.randint(10, h - 10)))
         col = rng.choice(palette)
         if kind == "line":
-            d.line([x0, y0, x1, y1], fill=col, width=lw)
+            wide_line(img, (x0, y0, x1, y1), col, lw)
         elif kind == "rect":
             d.rectangle([x0, y0, x1, y1], outline=col, width=lw)
         else:
