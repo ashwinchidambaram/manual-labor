@@ -2684,7 +2684,16 @@ export interface components {
             flag?: components["schemas"]["Flag"] | null;
             next?: components["schemas"]["QueueItem"] | null;
         };
-        /** ReviewCounts */
+        /**
+         * ReviewCounts
+         * @description Review counts over the in-scope, non-header/footer blocks of ready documents.
+         *
+         *     ``queued``, ``auto_approved``, ``approved``, ``edited``, ``flagged_open`` and ``rejected``
+         *     are each counted from the block's derived status, one bucket per status, so
+         *     ``queued + auto_approved + approved + edited + flagged_open + rejected == in_scope`` is a
+         *     check over independently derived fields, not arithmetic. ``pending`` (the queue as shown,
+         *     which depends on the view threshold) and ``skipped`` are views, not buckets.
+         */
         ReviewCounts: {
             /**
              * Approved
@@ -2716,6 +2725,16 @@ export interface components {
              * @default 0
              */
             pending: number;
+            /**
+             * Queued
+             * @default 0
+             */
+            queued: number;
+            /**
+             * Rejected
+             * @default 0
+             */
+            rejected: number;
             /**
              * Skipped
              * @default 0

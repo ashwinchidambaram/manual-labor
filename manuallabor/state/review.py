@@ -369,6 +369,10 @@ class ReviewService:
                     counts.flagged_open += 1
                 elif st == BlockStatus.auto_approved:
                     counts.auto_approved += 1
+                elif st == BlockStatus.queued:
+                    counts.queued += 1
+                elif st == BlockStatus.rejected:
+                    counts.rejected += 1
                 if r.skipped and st in (BlockStatus.queued, BlockStatus.auto_approved):
                     counts.skipped += 1
                 shown = st == BlockStatus.queued or (

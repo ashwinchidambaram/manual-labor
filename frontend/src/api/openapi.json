@@ -5215,6 +5215,7 @@
       },
       "ReviewCounts": {
         "additionalProperties": false,
+        "description": "Review counts over the in-scope, non-header/footer blocks of ready documents.\n\n``queued``, ``auto_approved``, ``approved``, ``edited``, ``flagged_open`` and ``rejected``\nare each counted from the block's derived status, one bucket per status, so\n``queued + auto_approved + approved + edited + flagged_open + rejected == in_scope`` is a\ncheck over independently derived fields, not arithmetic. ``pending`` (the queue as shown,\nwhich depends on the view threshold) and ``skipped`` are views, not buckets.",
         "properties": {
           "approved": {
             "default": 0,
@@ -5244,6 +5245,16 @@
           "pending": {
             "default": 0,
             "title": "Pending",
+            "type": "integer"
+          },
+          "queued": {
+            "default": 0,
+            "title": "Queued",
+            "type": "integer"
+          },
+          "rejected": {
+            "default": 0,
+            "title": "Rejected",
             "type": "integer"
           },
           "skipped": {

@@ -118,10 +118,16 @@ def test_moved_table_cell() -> None:
 
 
 def test_rewrite_guard() -> None:
-    # quick_ratio < 0.5: the cleanup is a rewrite, reported as one whole-text deletion
+    # quick_ratio < 0.5: the cleanup is a rewrite, reported as one whole-text deletion; the
+    # number it added is still compared and reported (module 12 review)
     r = bad("Tighten the cover bolts.", "XYZ QJK 1234 !!")
-    assert len(r.violations) == 1 and r.violations[0].kind == K.deletion
-    assert r.violations[0].raw_start == 0 and r.violations[0].clean_end == len("XYZ QJK 1234 !!")
+    assert len(r.violations) == 2
+    dels = [v for v in r.violations if v.kind == K.deletion]
+    nums = [v for v in r.violations if v.kind == K.numeric_mismatch]
+    assert len(dels) == 1 and len(nums) == 1
+    assert dels[0].raw_start == 0 and dels[0].raw_end == len("Tighten the cover bolts.")
+    assert dels[0].clean_start == 0 and dels[0].clean_end == len("XYZ QJK 1234 !!")
+    assert nums[0].raw_start is None and nums[0].clean == "1234"
 
 
 def test_sorted_violations() -> None:

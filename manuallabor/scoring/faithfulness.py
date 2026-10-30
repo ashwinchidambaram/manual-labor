@@ -873,11 +873,21 @@ def level_a(
     """Violations of canonical raw vs canonical clean (design 4.4 steps 2-6)."""
     if rc.text == cc.text:
         return []
+    # The two guards below skip the alignment and report one whole-text deletion, but numbers
+    # are always compared: a rewrite or an oversize block that changed, dropped or added a
+    # number still names it as numeric_mismatch. The numeric comparison is a linear regex scan
+    # plus a multiset match, so it needs no size bound of its own.
     if len(rc.text) + len(cc.text) > FAITH_MAX_CHARS:
-        return [_violation(FaithViolationKind.deletion, raw, clean, (0, len(raw)), (0, len(clean)))]
+        return [
+            _violation(FaithViolationKind.deletion, raw, clean, (0, len(raw)), (0, len(clean))),
+            *_numeric_violations(raw, clean, rc, cc),
+        ]
     sm = sm or SequenceMatcher(None, rc.text, cc.text, autojunk=False)
     if sm.quick_ratio() < FAITH_REWRITE_QUICK_RATIO:
-        return [_violation(FaithViolationKind.deletion, raw, clean, (0, len(raw)), (0, len(clean)))]
+        return [
+            _violation(FaithViolationKind.deletion, raw, clean, (0, len(raw)), (0, len(clean))),
+            *_numeric_violations(raw, clean, rc, cc),
+        ]
     out: list[FaithfulnessViolation] = []
     ops = sm.get_opcodes()
     for tag, i1, i2, j1, j2 in ops:

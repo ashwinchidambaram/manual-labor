@@ -192,6 +192,14 @@ class QueueItem(ContractModel):
 
 
 class ReviewCounts(ContractModel):
+    """Review counts over the in-scope, non-header/footer blocks of ready documents.
+
+    ``queued``, ``auto_approved``, ``approved``, ``edited``, ``flagged_open`` and ``rejected``
+    are each counted from the block's derived status, one bucket per status, so
+    ``queued + auto_approved + approved + edited + flagged_open + rejected == in_scope`` is a
+    check over independently derived fields, not arithmetic. ``pending`` (the queue as shown,
+    which depends on the view threshold) and ``skipped`` are views, not buckets."""
+
     pending: int = 0
     auto_approved: int = 0
     approved: int = 0
@@ -199,6 +207,8 @@ class ReviewCounts(ContractModel):
     flagged_open: int = 0
     skipped: int = 0
     in_scope: int = 0
+    queued: int = 0
+    rejected: int = 0
 
 
 class DocReadiness(ContractModel):
