@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import type { DocReadiness, ExportStatus, QueueItem, ReviewCounts } from "../api/schema";
 import { Keycap } from "../onboarding/Copy";
 import { keyLabel } from "../onboarding/guide";
+import { cardTitle } from "./labels";
 import QueueCard from "./QueueCard";
 
 export const ROW = 100;
@@ -33,6 +34,7 @@ const NO_TITLES: ReadonlyMap<string, string> = new Map();
 
 export default function Queue({ items, total, pinned, currentId, docs, counts, focusTick, wantFocus, focusBlocked, onSelect, onNearEnd, threshold, gate, docTitles = NO_TITLES }: Props) {
   const scroller = useRef<HTMLDivElement>(null);
+  const idx = items.findIndex((i) => i.block_id === currentId);
   const v = useVirtualizer({
     count: items.length,
     getScrollElement: () => scroller.current,
@@ -40,14 +42,16 @@ export default function Queue({ items, total, pinned, currentId, docs, counts, f
     // Cards are 100px tall: a generous window means a jump or a fast wheel lands on rendered rows. The head of the list is
     // always rendered too, so a sort change shows its first cards at once, wherever the current block is.
     overscan: 30,
+    // The current card is always rendered too: when a refetch inserts rows ahead of it, its row moves instead of
+    // unmounting, so it keeps keyboard focus.
     rangeExtractor: (r) => {
       const head = Array.from({ length: Math.min(HEAD, r.count) }, (_, i) => i);
-      return [...new Set([...head, ...defaultRangeExtractor(r)])].sort((a, b) => a - b);
+      const cur = idx >= 0 && idx < r.count ? [idx] : [];
+      return [...new Set([...head, ...cur, ...defaultRangeExtractor(r)])].sort((a, b) => a - b);
     },
     scrollMargin: pinned ? ROW : 0,
     initialRect: { width: 320, height: 640 },
   });
-  const idx = items.findIndex((i) => i.block_id === currentId);
   useEffect(() => {
     if (idx >= 0) v.scrollToIndex(idx, { align: "auto" });
     if (idx >= 0 && idx > items.length - 50) onNearEnd();
@@ -59,13 +63,19 @@ export default function Queue({ items, total, pinned, currentId, docs, counts, f
   const unconfirmed = empty && counts.in_scope === 0 && counts.flagged_open === 0 && preparing === 0;
   const LINK = "font-medium text-act-ink underline underline-offset-2 hover:text-act-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus";
   const at = idx >= 0 ? idx + 1 : null;
+  // the folded queue (short, narrow window) still names the current block, as its card would
+  const cur = idx >= 0 ? items[idx] : pinned && pinned.block_id === currentId ? pinned : null;
+  const curTitle = cur ? cardTitle(cur.section_title, docTitles.get(cur.doc_id), cur.page, cur.type) : null;
   return (
-    <div className="flex min-h-0 flex-col border-b border-line bg-paper wide:h-full wide:border-b-0 wide:border-r" data-zone="queue">
-      <p className="flex shrink-0 items-center justify-between gap-2 border-b border-line-soft px-4 py-2 text-xs text-muted">
-        <span>
+    <div className="group/queue flex min-h-0 flex-col border-b border-line bg-paper wide:h-full wide:border-b-0 wide:border-r" data-zone="queue">
+      {/* On a short, narrow window the open card folds away and this line stands for it: Up and Down still browse, and the
+          focus ring the hidden card holds is drawn here instead. */}
+      <p className="flex shrink-0 items-center justify-between gap-2 border-b border-line-soft px-4 py-2 text-xs text-muted short-narrow:group-focus-within/queue:bg-act-wash short-narrow:group-focus-within/queue:shadow-[inset_3px_0_0_0_var(--act)] short-narrow:group-has-[:focus-visible]/queue:ring-2 short-narrow:group-has-[:focus-visible]/queue:ring-inset short-narrow:group-has-[:focus-visible]/queue:ring-focus">
+        <span className="min-w-0 truncate">
           {at !== null ? (
             <>
               Block <span className="font-semibold tabular-nums text-ink">{at}</span> of <span className="tabular-nums">{total}</span> in this list
+              {curTitle ? <span className="hidden font-semibold text-ink short-narrow:inline"> · {curTitle}</span> : null}
             </>
           ) : (
             <>
@@ -73,7 +83,7 @@ export default function Queue({ items, total, pinned, currentId, docs, counts, f
             </>
           )}
         </span>
-        <span className="flex items-center gap-1" aria-hidden="true">
+        <span className="flex shrink-0 items-center gap-1" aria-hidden="true">
           <Keycap>{keyLabel("vBrowsePrev")}</Keycap>
           <Keycap>{keyLabel("vBrowseNext")}</Keycap> browse
         </span>
@@ -83,7 +93,7 @@ export default function Queue({ items, total, pinned, currentId, docs, counts, f
         role="listbox"
         aria-label="Review queue"
         aria-orientation="vertical"
-        className="h-[6.25rem] min-h-0 overflow-auto wide:h-auto wide:flex-1"
+        className="h-[6.25rem] min-h-0 overflow-auto short-narrow:sr-only wide:h-auto wide:flex-1"
         data-testid="queue"
       >
         {pinned ? (

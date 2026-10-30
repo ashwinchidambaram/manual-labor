@@ -101,4 +101,29 @@ describe("U9 ChecksList", () => {
     expect(within(list).getByTestId("check-method")).toHaveTextContent(rail.record.extraction);
     expect(within(list).getByTestId("check-attach")).toHaveTextContent(rail.attachment?.rule ?? "unattached");
   });
+  it("review M13 P2-8: each measured check reads as a sentence first, then the value with its meaning, then the scorer's detail, muted and last", () => {
+    render(
+      <ChecksList
+        block={block({
+          signals: [
+            { name: "parser_agreement", value: 0.25, critical: true, detail: "ocr vs ocr_alt 0.25; numeric: '+ 0.05 using' vs ''" },
+            { name: "ocr_min", value: 0.41, critical: false, detail: "min 0.410 at 'M8'; 12 words" },
+          ],
+        })}
+      />,
+    );
+    const pa = screen.getByTestId("check-parsers");
+    const dd = pa.querySelector("dd")!;
+    expect(dd.firstElementChild).toHaveTextContent(/^The two readings differ$/);
+    expect(dd).toHaveTextContent("0.25 (1.00 = identical)");
+    expect(dd.lastElementChild).toHaveTextContent("critical for this block. ocr vs ocr_alt 0.25; numeric: '+ 0.05 using' vs ''");
+    expect(dd.lastElementChild!.className).toContain("text-muted");
+    expect(screen.getByTestId("check-ocr_min").querySelector("dd")!.firstElementChild).toHaveTextContent("Least certain word: “M8”");
+  });
+  it("faithfulness and numbers keep their verdict word first, followed by the sentence", () => {
+    render(<ChecksList block={block({ faithfulness: { passed: true, alignment_ratio: 1, violations: [], diff: [], numeric_variants: [] } })} />);
+    expect(screen.getByTestId("check-faithfulness")).toHaveTextContent(/Passed · Cleanup kept every word/);
+    expect(screen.getByTestId("check-numbers")).toHaveTextContent(/Passed · Every number matches the raw text/);
+  });
 });
+

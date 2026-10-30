@@ -4,7 +4,7 @@
 Deliver Manual Labor v1 per SPEC.md: every CLAUDE.md module gate (0–11) passed with its proving command pasted in docs/PROGRESS.md, and SPEC §11 acceptance recorded in docs/ACCEPTANCE.md.
 
 ## Current Phase
-M0–M12 passed and recorded in docs/PROGRESS.md; docs/ACCEPTANCE.md COMPLETE (live). Phase 13 (friendly, guided UI craft per docs/design/13-ui-craft.md) in progress 2026-10-30.
+M0–M13 passed and recorded in docs/PROGRESS.md; docs/ACCEPTANCE.md COMPLETE (live). Phase 13 (friendly, guided UI craft per docs/design/13-ui-craft.md) passed 2026-10-30.
 
 ## Phases
 Detailed tasks, model assignments, and gates: docs/plans/2026-10-28-manual-labor-build.md. Decisions and environment: findings.md.

@@ -88,7 +88,8 @@ describe("C4 GroupTree topics", () => {
     expect(screen.getAllByTestId("low-cohesion")).toHaveLength(1);
     expect(within(row("g-alpha-t002")).getByTestId("low-cohesion")).toHaveAccessibleName("Mixed subjects, cohesion 0.20");
     expect(within(row("g-beta-t001")).queryByTestId("low-cohesion")).toBeNull(); // 0.30 is not < 0.30
-    expect(within(row("g-alpha-t002")).getByTestId("row-meta")).toHaveTextContent("pp. 2-4 · 3 blocks · 1 figure · 2 sections · cohesion 0.20");
+    // review M13 P2-15: no bare cohesion number on the row; it lives in the "Mixed subjects" chip's name
+    expect(within(row("g-alpha-t002")).getByTestId("row-meta")).toHaveTextContent(/^pp\. 2-4 · 3 blocks · 1 figure · 2 sections$/);
     expect(within(row("g-alpha-t000")).queryByText(/cohesion/i)).toBeNull();
   });
   it("uses the per-document low_cohesion parameter", async () => {

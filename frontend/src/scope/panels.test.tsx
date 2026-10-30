@@ -45,7 +45,7 @@ describe("C1 SourcesList", () => {
     expect(await screen.findByTestId("unregistered")).toHaveTextContent("new.pdf: Not ingested");
     await user.upload(screen.getByTestId("upload-input"), new File(["%PDF-1"], "new.pdf", { type: "application/pdf" }));
     await waitFor(() => expect(f.uploads).toBe(1));
-    expect(await screen.findByTestId("job-row")).toHaveTextContent("run");
+    expect(await screen.findByTestId("job-row")).toHaveTextContent("Reading the new manuals");
   });
   it("arrow keys move between source rows", async () => {
     installFake();
@@ -159,7 +159,7 @@ describe("C9 JobsBar", () => {
     const bar = await screen.findByTestId("jobs-bar");
     const prog = within(bar).getByRole("progressbar", { hidden: true }) as HTMLProgressElement;
     expect(prog.value).toBe(0.5);
-    expect(bar).toHaveTextContent("1/2");
+    expect(bar).toHaveTextContent("1 of 2 steps");
     await waitFor(() => expect(screen.queryByTestId("jobs-bar")).toBeNull(), { timeout: 5000 });
     const polls = f.requests.length;
     expect(polls).toBe(3);

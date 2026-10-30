@@ -43,9 +43,19 @@ function QueueCardImpl({ item, isCurrent, pos, size, focusTick, wantFocus, focus
     // a request made while an editor/dialog is open stays pending: it must not steal focus from it
     if (isCurrent && wantFocus.current && !focusBlocked?.current && !document.querySelector("[aria-modal='true']") && ref.current) {
       wantFocus.current = false;
-      ref.current.focus();
+      // the queue scrolls its own list to the card (Queue's scrollToIndex); below `wide` the page is one document and a
+      // plain focus() would scroll it back to the queue after every decision
+      ref.current.focus({ preventScroll: true });
     }
   }, [isCurrent, focusTick, wantFocus, focusBlocked]);
+  // A card that unmounts while it holds focus (virtualised away, or a pinned copy handing over to its list card) asks
+  // the current card to take focus on its next render, so focus never falls to <body>. Unmount only.
+  useLayoutEffect(() => {
+    const el = ref.current;
+    return () => {
+      if (el && el.contains(document.activeElement)) wantFocus.current = true;
+    };
+  }, [wantFocus]);
   const why = reasonsFromQueueItem(item.reasons ?? [], item.has_numeric_spec, criticalReasons);
   const chips = reasonChips({ why, hasNumeric: item.has_numeric_spec });
   const stale = (item.reasons ?? []).includes(STALE_NAME);
@@ -65,7 +75,7 @@ function QueueCardImpl({ item, isCurrent, pos, size, focusTick, wantFocus, focus
       onClick={() => onSelect(item.block_id)}
       style={style}
       className={`flex cursor-pointer flex-col justify-center gap-[3px] overflow-hidden border-b border-line-soft px-4 transition-colors duration-150 ease-out-quart focus-visible:ring-inset ${FOCUS} ${
-        isCurrent ? "bg-act-wash shadow-[inset_0_0_0_1px_var(--act-line)]" : "bg-paper hover:bg-sunk"
+        isCurrent ? "bg-act-wash shadow-[inset_3px_0_0_0_var(--act),inset_0_0_0_1px_var(--act-line)]" : "bg-paper hover:bg-sunk"
       }`}
     >
       <div className="flex items-baseline justify-between gap-2">

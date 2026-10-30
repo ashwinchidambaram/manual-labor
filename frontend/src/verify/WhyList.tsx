@@ -1,24 +1,48 @@
 import type { WhyItem } from "../api/schema";
 import { signalHint } from "../onboarding/hints";
 import { AttentionIcon } from "../shell/Icon";
-import { human, label, STALE_NAME, weakestFromDetail } from "./labels";
-import { parserDiff, pickPair, READER, readingLines } from "./parserDiff";
+import { FAITH_NOT_RUN, faithHeldSentence, human, label, STALE_NAME, weakestFromDetail } from "./labels";
+import { pairForSignal, parserDiff, READER, readingLines, type LinePair, type ReadingPair } from "./parserDiff";
 
 interface Props {
   why: WhyItem[];
   autoApproved: { confidence: number | null; threshold: number | null } | null;
   /** each parser's raw text, for the two readings */
   parserTexts?: Record<string, string>;
+  /** the block's own faithfulness result (`block.faithfulness.passed`); null or undefined when cleanup has not run */
+  faithfulnessPassed?: boolean | null;
+  /** the parser whose text the block shows (`block.raw_source`): the text-layer side of `textlayer_vs_ocr` */
+  rawSource?: string | null;
 }
 
-const READING_SIGNALS = new Set(["parser_agreement", "textlayer_vs_ocr"]);
+/** What one check found on this block. `noted`: under 1 on a block the checks cleared (a neutral row, not a card). */
+export type WhyOutcome = "failed" | "held" | "noted" | "passed" | "not_run";
+
+const READING_SIGNALS = new Set(["parser_agreement", "textlayer_vs_ocr", "ocr_min"]);
+
+/**
+ * The outcome of one signal. Faithfulness is decided by the block's check (`faithfulness.passed`), never by its value:
+ * the scorer gives a passed check 0.5 or 0.9 when a model's cleanup was rejected or a reorder was needed, and only a
+ * failed check 0.0 (manuallabor/scoring/pipeline.py).
+ */
+export function whyOutcome(w: WhyItem, faithfulnessPassed: boolean | null | undefined, cleared: boolean): WhyOutcome {
+  if (w.value === null || w.value === undefined) return "not_run";
+  if (w.name === "faithfulness") {
+    if (faithfulnessPassed === false || (faithfulnessPassed == null && w.value === 0)) return "failed";
+    if (w.detail === FAITH_NOT_RUN) return "not_run";
+  }
+  if (w.value < 1) return cleared ? "noted" : "held";
+  return "passed";
+}
 
 /** The lines where two readings differ, as two labelled lines in the manual's typeface (design 13 F4). */
-function Readings({ texts }: { texts: Record<string, string> }) {
-  const pair = pickPair(texts);
-  if (!pair) return null;
-  const lines = readingLines(pair.ta, pair.tb).slice(0, 3);
-  if (!lines.length) return null;
+function Readings({ pair, lines, testId }: { pair: ReadingPair; lines: LinePair[]; testId: string }) {
+  if (!lines.length)
+    return (
+      <p className="mt-2 text-sm text-muted" data-testid="readings-agree">
+        The two readings agree line for line; the difference is elsewhere.
+      </p>
+    );
   const marked = (spans: { text: string; differs: boolean }[]) =>
     spans.map((s, i) =>
       s.differs ? (
@@ -30,7 +54,7 @@ function Readings({ texts }: { texts: Record<string, string> }) {
       ),
     );
   return (
-    <div className="mt-2.5 space-y-3" data-testid="parser-compare" aria-label="Where the two readings differ" role="group">
+    <div className="mt-2.5 space-y-3" data-testid={testId} aria-label="Where the two readings differ" role="group">
       {lines.map((l) => {
         const d = parserDiff(l.a, l.b);
         return (
@@ -47,14 +71,25 @@ function Readings({ texts }: { texts: Record<string, string> }) {
   );
 }
 
-/** The technical line under each check: the signal's short name, its value and what the scorer reported, verbatim. */
-function Tech({ w }: { w: WhyItem }) {
+/**
+ * The technical line under each check: the signal's short name, its value and what the scorer reported, verbatim.
+ * A check that found nothing is named neutrally ("Looked for ..., found nothing"), and a critical one is only called
+ * "a critical check": the "can hold a block on its own" clause belongs to a check that is holding one.
+ */
+function Tech({ w, outcome }: { w: WhyItem; outcome: WhyOutcome }) {
   const v = w.value === null || w.value === undefined ? "n/a" : `${w.value.toFixed(2)} of 1`;
+  const quiet = outcome === "passed" || outcome === "not_run" || (w.name === "faithfulness" && outcome !== "failed");
+  const name =
+    w.name === "has_numeric_spec"
+      ? "Rule: always reviewed (numeric spec)"
+      : outcome === "passed" || (w.name === "faithfulness" && outcome === "held")
+        ? `Looked for "${label(w.name)}", found nothing · ${v}`
+        : `${label(w.name)} · ${v}`;
   return (
     <p className="mt-1.5 break-words text-2xs leading-relaxed text-muted">
       <span className="font-medium">
-        {w.name === "has_numeric_spec" ? "Rule: always reviewed (numeric spec)" : `${label(w.name)} · ${v}`}
-        {w.critical ? " · critical: can hold a block on its own" : ""}
+        {name}
+        {w.critical ? (quiet ? " · a critical check" : " · critical: can hold a block on its own") : ""}
       </span>
       {w.detail ? (
         <>
@@ -69,21 +104,27 @@ function Tech({ w }: { w: WhyItem }) {
 /**
  * Why this block needs a person (design 13 F1). Every signal is listed in the server's order. A signal that held the
  * block is a marigold card with its evidence; a signal that found nothing wrong is a quiet row with a tick and the
- * word "Passed"; a failed cleanup check is the only red. The number and the scorer's own words follow as secondary
- * text, never in place of the sentence.
+ * word "Passed"; a failed cleanup check is the only red. On a block the checks cleared, a signal under 1 is a neutral
+ * row: it did not hold the block. The number and the scorer's own words follow as secondary text, never in place of
+ * the sentence.
  */
-export default function WhyList({ why, autoApproved, parserTexts = {} }: Props) {
+export default function WhyList({ why, autoApproved, parserTexts = {}, faithfulnessPassed, rawSource }: Props) {
   const stale = why.filter((w) => w.kind === "stale");
   const signals = why.filter((w) => w.kind === "signal");
-  const heldCount = signals.filter((w) => w.name === "has_numeric_spec" || (w.value ?? 1) < 1).length + stale.length;
-  let readingsShown = false;
+  const cleared = !!autoApproved;
+  const outcomes = signals.map((w) => (w.name === "has_numeric_spec" ? "held" : whyOutcome(w, faithfulnessPassed, cleared)));
+  const found = outcomes.filter((o) => o === "held" || o === "failed").length;
+  const shownPairs = new Set<string>();
+  let compareShown = false;
   return (
     <section aria-label="Why this needs you" className="text-sm">
       <h3 className="text-2xs font-semibold uppercase tracking-[0.07em] text-muted">Why this needs you</h3>
       <p className="mt-1 text-sm text-muted">
-        {autoApproved
+        {cleared
           ? "The checks cleared this block. Each check is listed with what it found."
-          : `${heldCount === 1 ? "One thing" : `${heldCount} things`} held this block for a person. Each check is listed with what it found.`}
+          : found === 0
+            ? "No check found anything to look at. Each check is listed with what it found."
+            : `${found === 1 ? "One check" : `${found} checks`} found something to look at. Each check is listed with what it found.`}
       </p>
       {stale.map((w) => (
         <p key={w.name} data-testid="why-stale" className="mt-2 flex gap-2 rounded-xl bg-needs-wash px-3 py-2 text-ink">
@@ -103,7 +144,8 @@ export default function WhyList({ why, autoApproved, parserTexts = {} }: Props) 
         </p>
       ) : null}
       <ul aria-label="Why this needs you, signals" className="mt-3 flex flex-col gap-2">
-        {signals.map((w) => {
+        {signals.map((w, i) => {
+          const outcome = outcomes[i];
           if (w.name === "has_numeric_spec")
             return (
               <li key={w.name} data-testid="why-rule" className="rounded-xl border border-line bg-raised px-3.5 py-3">
@@ -118,36 +160,53 @@ export default function WhyList({ why, autoApproved, parserTexts = {} }: Props) 
                   records them as checked by you.
                 </p>
                 <div className="ml-[1.375rem]">
-                  <Tech w={w} />
+                  <Tech w={w} outcome={outcome} />
                 </div>
               </li>
             );
-          const measured = w.value !== null && w.value !== undefined;
-          const held = measured && (w.value as number) < 1;
-          const failed = held && w.name === "faithfulness";
-          if (!held)
+          if (outcome === "passed" || outcome === "not_run" || outcome === "noted") {
+            const sentence =
+              outcome === "passed"
+                ? human(w.name, false)
+                : outcome === "noted"
+                  ? w.name === "faithfulness"
+                    ? faithHeldSentence(w.detail)
+                    : human(w.name, true)
+                  : w.name === "faithfulness"
+                    ? "Cleanup has not run yet"
+                    : label(w.name);
+            const word = outcome === "passed" ? "Passed" : outcome === "noted" ? "Noted" : w.name === "faithfulness" ? "Not run yet" : "Not measured";
             return (
-              <li key={w.name} data-testid="why-item" data-outcome={measured ? "passed" : "not_run"} className="px-3.5 py-1.5">
+              <li key={w.name} data-testid="why-item" data-outcome={outcome} className="px-3.5 py-1.5">
                 <p className="flex flex-wrap items-baseline gap-x-2.5 text-ink">
-                  <span aria-hidden="true" className={`w-3 text-center font-bold ${measured ? "text-done-ink" : "text-muted"}`}>
-                    {measured ? "✓" : "–"}
+                  <span aria-hidden="true" className={`w-3 text-center font-bold ${outcome === "passed" ? "text-done-ink" : "text-muted"}`}>
+                    {outcome === "passed" ? "✓" : outcome === "noted" ? "·" : "–"}
                   </span>
-                  <span className={`text-xs font-semibold ${measured ? "text-done-ink" : "text-muted"}`}>{measured ? "Passed" : "Not measured"}</span>
-                  <span>{human(w.name, false)}</span>
+                  <span className={`text-xs font-semibold ${outcome === "passed" ? "text-done-ink" : "text-muted"}`}>{word}</span>
+                  <span className={outcome === "passed" ? "" : "text-muted"}>{sentence}</span>
                 </p>
                 <div className="ml-[1.375rem]">
-                  <Tech w={w} />
+                  <Tech w={w} outcome={outcome} />
                 </div>
               </li>
             );
-          const showReadings = READING_SIGNALS.has(w.name) && !readingsShown;
-          if (showReadings) readingsShown = true;
+          }
+          const failed = outcome === "failed";
+          const pair = READING_SIGNALS.has(w.name) ? pairForSignal(w.name, parserTexts, w.detail, rawSource) : null;
+          const pairKey = pair ? `${pair.a}|${pair.b}` : null;
+          const showReadings = pair !== null && pairKey !== null && !shownPairs.has(pairKey);
+          const lines = showReadings && pair ? readingLines(pair.ta, pair.tb).slice(0, 3) : [];
+          // the first comparison on screen keeps the long-standing test id; any later one is marked as more
+          const firstReadings = lines.length > 0 && !compareShown;
+          if (firstReadings) compareShown = true;
+          if (pairKey) shownPairs.add(pairKey);
           const weak = w.name === "ocr_min" ? weakestFromDetail(w.detail) : null;
+          const heading = failed ? human(w.name, true) : w.name === "faithfulness" ? faithHeldSentence(w.detail) : null;
           return (
             <li
               key={w.name}
               data-testid="why-item"
-              data-outcome={failed ? "failed" : "held"}
+              data-outcome={outcome}
               className={`rounded-xl border px-3.5 py-3 ${failed ? "border-fail-line bg-fail-wash" : "border-needs-line bg-raised"}`}
             >
               <p className="flex gap-2.5 font-semibold text-ink">
@@ -156,20 +215,21 @@ export default function WhyList({ why, autoApproved, parserTexts = {} }: Props) 
                 </span>
                 <span>
                   {failed ? <span className="mr-1.5 text-xs font-bold text-fail">Failed</span> : null}
-                  {weak ? (
-                    <>
-                      Least certain word: <span className="manual-text">“{weak}”</span>
-                    </>
-                  ) : (
-                    human(w.name, true)
-                  )}
+                  {heading ??
+                    (weak ? (
+                      <>
+                        Least certain word: <span className="manual-text">“{weak}”</span>
+                      </>
+                    ) : (
+                      human(w.name, true)
+                    ))}
                 </span>
               </p>
               <div className="ml-[1.375rem]">
                 {weak ? <p className="mt-1 text-sm text-muted">Check every character of it against the page.</p> : null}
-                {!weak && signalHint(w.name) && !showReadings ? <p className="mt-1 text-sm text-muted">{signalHint(w.name)}</p> : null}
-                {showReadings ? <Readings texts={parserTexts} /> : null}
-                <Tech w={w} />
+                {!weak && !heading && signalHint(w.name) && !showReadings ? <p className="mt-1 text-sm text-muted">{signalHint(w.name)}</p> : null}
+                {showReadings && pair ? <Readings pair={pair} lines={lines} testId={firstReadings ? "parser-compare" : "parser-compare-more"} /> : null}
+                <Tech w={w} outcome={outcome} />
               </div>
             </li>
           );

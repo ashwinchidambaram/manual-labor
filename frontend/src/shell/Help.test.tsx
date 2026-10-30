@@ -78,16 +78,18 @@ describe("U8 Help", () => {
       expect(document.activeElement, `${tab}: Tab wraps back to Close`).toBe(close);
     }
   });
-  it("Show guide panel closes Help and docks the panel without taking focus", async () => {
+  it("Show the welcome again closes Help, opens Scope with the welcome, and takes no focus into it", async () => {
     const f = installFake();
     const { user } = renderApp("/export");
     await screen.findByTestId("export-screen");
     await user.click(screen.getByRole("button", { name: "Help" }));
-    await user.click(screen.getByTestId("show-guide"));
+    const help = screen.getByRole("dialog", { name: "Help" });
+    expect(help).toHaveTextContent("The four steps are always on screen: on the left, or along the bottom in a narrow window.");
+    await user.click(screen.getByRole("button", { name: "Show the welcome again" }));
     expect(screen.queryByRole("dialog")).toBeNull();
-    const p = await screen.findByRole("complementary", { name: "Getting started" });
     await waitFor(() => expect(f.guidePuts).toEqual([false]));
-    expect(p.contains(document.activeElement)).toBe(false);
+    const w = await screen.findByTestId("welcome", undefined, { timeout: 5000 });
+    expect(w.contains(document.activeElement)).toBe(false);
   });
   it("? while the edit conflict panel is open opens Help, and closing it restores focus to Confirm (F7)", async () => {
     const { r } = await mountVerify(3, (fk) => {

@@ -3,6 +3,7 @@ import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
 import type { CalibrationReport, Flag, Proposal } from "../api/schema";
 import { makeJob } from "../test/fixtures";
+import { makeBlockDetail, makeQueueItem } from "../test/verifyFake";
 import { renderApp } from "../test/render";
 import { installFake, server } from "../test/server";
 
@@ -59,7 +60,7 @@ describe("U10 AgentScreen", () => {
     expect(run).toHaveAccessibleDescription(/No open flags/);
     // what an agent pass is, in one sentence, before the button
     const def = screen.getByTestId("agent-definition");
-    expect(def).toHaveTextContent(/^An agent pass sends each open flag to a model/);
+    expect(def).toHaveTextContent(/^An agent pass works through your open flags\. Each flagged block goes to a model with your note/);
     expect(def.compareDocumentPosition(run) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(await screen.findByTestId("calibration-unavailable")).toHaveTextContent("not available");
     expect(screen.getByRole("link", { name: "Back to Scope" })).toBeInTheDocument();
@@ -134,8 +135,49 @@ describe("U10 AgentScreen", () => {
     const rows = within(screen.getByTestId("calibration-table")).getAllByRole("row");
     expect(rows).toHaveLength(2); // header + the one bucket with decisions
     expect(rows[1]).toHaveTextContent("0.80 to 0.8510330%");
-    expect(c).toHaveTextContent("4 numeric blocks left out");
-    expect(screen.getByTestId("calibration-suggestion")).toHaveTextContent("Suggested 0.90: edit rate above 0.90 is under the 5% target");
-    expect(c).toHaveTextContent("never applied automatically");
+    expect(c).toHaveTextContent("from 6 decisions on blocks without numbers");
+    expect(c).toHaveTextContent("4 decisions on blocks with numbers are left out");
+    expect(screen.getByTestId("calibration-suggestion")).toHaveTextContent("Suggested 0.90: blocks scoring 0.90 or more were edited less often than your goal of 5 in 100.");
+    expect(c).toHaveTextContent("The scorer's note: edit rate above 0.90 is under the 5% target");
+    expect(c).toHaveTextContent("never applied for you");
+  });
+  it("an open flag is titled from its block (file, page, type), with the category and the id; a fresh flag reads 'not tried yet'", async () => {
+    installFake({ flags: [{ ...flag, target_id: "b-beta-p009-10" }] });
+    const blocks: string[] = [];
+    server.use(
+      http.get("*/api/verify/blocks/:id", ({ params }) => {
+        blocks.push(String(params.id));
+        return HttpResponse.json(makeBlockDetail(makeQueueItem(1, { block_id: "b-beta-p009-10", doc_id: "beta", page: 9 })));
+      }),
+      http.get("*/api/agent/items", () => HttpResponse.json([{ flag: { ...flag, target_id: "b-beta-p009-10" }, target_id: "b-beta-p009-10", round: 1, pending_proposal_id: null, last_outcome: null, last_detail: null }])),
+    );
+    renderApp("/agent");
+    const row = await screen.findByTestId("agent-flag");
+    await waitFor(() => expect(row).toHaveTextContent("beta.pdf, page 9, paragraph"));
+    expect(row.firstElementChild).toHaveTextContent(/^beta\.pdf, page 9, paragraph$/);
+    expect(row).toHaveTextContent("Wrong text");
+    expect(row).toHaveTextContent("b-beta-p009-10");
+    expect(row).toHaveTextContent("not tried yet");
+    expect(row).not.toHaveTextContent("round 1");
+    expect(blocks).toEqual(["b-beta-p009-10"]);
+  });
+  it("after an agent pass the flag says how often it was tried and how the last try ended", async () => {
+    installFake({ flags: [flag] });
+    server.use(http.get("*/api/agent/items", () => HttpResponse.json([{ flag, target_id: flag.target_id, round: 2, pending_proposal_id: null, last_outcome: "rejected", last_detail: null }])));
+    renderApp("/agent");
+    const row = await screen.findByTestId("agent-flag");
+    await waitFor(() => expect(row).toHaveTextContent("tried once, last: rejected"));
+  });
+  it("calibration with no counted decisions: the designed empty state, and both sentences count the same decisions", async () => {
+    installFake({ calibration: { ...calibration, buckets: [], n_outcomes: 1, n_numeric_excluded: 1, suggested_threshold: null, suggestion_reason: "insufficient_data", suggestion_detail: "no score bucket holds 20 reviewed decisions yet" } as CalibrationReport });
+    renderApp("/agent");
+    const c = await screen.findByTestId("calibration");
+    expect(c).toHaveTextContent("Builds as you review. After 20 decisions in a score range you will see how often you edited blocks there, and a suggested threshold. It is never applied for you.");
+    expect(c).toHaveTextContent("No decisions counted yet");
+    expect(c).toHaveTextContent("1 decision on a block with numbers is left out");
+    expect(c).not.toHaveTextContent("from 1 decision");
+    expect(c).not.toHaveTextContent("Target edit rate");
+    expect(screen.getByTestId("calibration-suggestion")).toHaveTextContent("No threshold is suggested yet: a suggestion needs 20 decisions in one score range.");
   });
 });
+

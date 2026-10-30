@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useActiveJobs, useConfirmScope, useModels, useSources, useStatus } from "../api/queries";
+import { useActiveJobs, useBlockIndexData, useConfirmScope, useModels, useSources, useStatus } from "../api/queries";
 import type { Split, View } from "../api/schema";
 import { useHotkeys } from "../hooks/useHotkeys";
 import { useToast } from "../shell/Toast";
@@ -282,14 +282,34 @@ export default function ScopeScreen() {
   });
 
   const guide = useGuide();
-  const welcome = guide?.open && summary && sources.data?.length ? welcomeFacts(sources.data, summary, eng.ids.size > 0 && eng.ids.size === index.selectable.size) : null;
+  // the welcome's counts: selected blocks by type (from the block index the tree already loaded) and the manuals that
+  // are grouped and listed here; a manual without groups is still being read
+  const blockIndex = useBlockIndexData();
+  const welcomeTypes = useMemo(() => {
+    if (!blockIndex.data) return null;
+    const t: Record<string, number> = {};
+    for (const d of blockIndex.data) for (const b of d.blocks) if (eng.ids.has(b.id)) t[b.type] = (t[b.type] ?? 0) + 1;
+    return t;
+  }, [blockIndex.data, eng.ids]);
+  const readyManuals = (sources.data ?? []).filter((s) => groupedSlugs.has(s.slug)).length;
+  const welcome =
+    guide?.open && summary && sources.data?.length
+      ? welcomeFacts(sources.data, summary, eng.ids.size > 0 && eng.ids.size === index.selectable.size, { ready: readyManuals, types: welcomeTypes })
+      : null;
   const noSources = sources.isSuccess && sources.data.length === 0 && eng.docs.length === 0;
+  // the welcome is due (the guide flag says so) but its counts are still loading: keep its space so it does not push
+  // the list down when it arrives
+  const welcomeDue = !!guide?.open && !welcome && !noSources;
   const jobsList = jobs.data ?? [];
 
   return (
     <main className="flex flex-col gap-6 px-4 pb-28 pt-5 wide:px-8 wide:pb-10 wide:pt-6" data-testid="scope-screen">
       <h2 className="text-xl font-semibold tracking-[-0.01em] text-ink">Choose what goes into your knowledge base</h2>
-      {welcome && guide ? <WelcomeBand facts={welcome} onDismiss={guide.hide} /> : null}
+      {welcome && guide ? (
+        <WelcomeBand facts={welcome} onDismiss={guide.hide} />
+      ) : welcomeDue ? (
+        <div aria-hidden="true" data-testid="welcome-placeholder" className="min-h-[17.5rem] rounded-2xl bg-sunk ring-1 ring-inset ring-line-soft" />
+      ) : null}
       {guide?.saveError ? (
         <p role="alert" className="rounded-xl border border-fail-line bg-fail-wash px-3 py-2 text-sm text-ink">
           {guide.saveError}

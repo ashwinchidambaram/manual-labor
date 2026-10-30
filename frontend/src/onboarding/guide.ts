@@ -71,7 +71,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     route: "/agent",
     title: "Hand flagged blocks to a model",
     what:
-      "An agent pass sends each open flag to a model, one fresh call per item, and lists what the model proposes. Every proposal is re-checked by the same deterministic checks, and failed checks are shown, not hidden.",
+      "An agent pass works through your open flags. Each flagged block goes to a model with your note, and the model proposes a fix. Its proposal is checked again by the same checks before you see it, and a check that fails is shown, not hidden.",
     do: [
       "Run the agent pass for the open flags. You can keep reviewing while it runs.",
       "Accept, edit or reject each proposal. Accept is only offered when every re-check passed.",

@@ -373,3 +373,36 @@ K16 figure references   PASS         9  33 figure references resolve to a file a
 labor check: all checks passed
 $ gate: guide shows once per project and reopens with ?; never steals focus mid-edit (OB/UX4); tooltips on keyboard focus with Esc isolated from the editor (UX5); every check verdict traces to faithfulness.passed / violation kinds, measured signals shown as values not verdicts; Verify line reconciles from independent server counts; export lock mirrors the server and overrides are per blocker; 5 blocks processed by a first-time user from on-screen text alone (UX2); 20 queued figure flags cannot be approved by a stray key (trust.test.tsx)
 ```
+
+## M13 — Friendly, guided UI craft (Impeccable redesign) — PASSED 2026-10-30
+
+Design: docs/design/13-ui-craft.md (Impeccable audit 11/20 with eight P1 findings, shape brief, two direction mocks; owner decisions D1–D8 and D1a: B "Calm guide" with A's warmth, A's segmented Verify progress bar, server card fields, Atkinson Hyperlegible bundled, full welcome band; §8 build notes and §8.1 fix round). PRODUCT.md principles 6–8 (guide, don't lecture; trust by showing; jargon translated at point of use). Brand tokens in DESIGN.md.
+
+What changed: a step rail with a state-driven "Your next step" card replaces the guide column; a first-run welcome band names the manuals and counts blocks by type; Verify shows the magnified page strip directly above the extracted text, human queue cards (section title, first line, the uncertain word named), labelled OCR readings with the differences marked, a passed check in sage with "Passed" and red only for a failed cleanup check; Agent and Export have designed empty states and place titles for flagged blocks; everything folds to one line each at 720x450 (200 percent zoom). Server (ee6c9ed): `QueueItem.section_title/excerpt/weakest_word`, deterministic, no model. Two backend races found by the e2e runs and fixed at the cause with failing-first tests (edd799c, ff54fa9): concurrent page renders shared one temp file, and the job executor's start-up cleaner deleted a render's temp file written outside the worker lock. The frontend race behind every earlier "approve did not advance" flake (a queue refetch that left before an approve was processed, applied after it) is fixed: a snapshot older than the last settled write is refetched, never applied.
+
+Reviews: independent Opus review in a worktree (3 P1, 8 P2, 10 P3, all fixed) and an Opus first-time-user UX check (`frontend/e2e/ux-craft.spec.ts` UC1–UC8 with server evidence, plus a reader's pass; 17 findings, all fixed except per-section blocker counts, a recorded server follow-up). Test assertions changed only where design 13 §5 or §8.1 names them; T3 and T5 untouched.
+
+```
+$ cd frontend && npx tsc -b --noEmit && npm test -- --run && npm run gen-guide && npm run build
+tsc clean
+ Test Files  44 passed (44)
+      Tests  369 passed (369)
+docs/USER_GUIDE.md regenerated (vitest drift test green)
+dist/assets/index-BvG27NIT.js   512.26 kB │ gzip: 160.60 kB     ✓ built in 1.26s
+$ npx playwright test            # every spec incl. ux-craft and zoom (720x450)
+  1 skipped (UCR, opt-in reader's pass)
+  85 passed (6.0m)
+$ uv run pytest -o addopts="-m 'not slow' --basetemp=.pytest_tmp_gate13" -q
+1669 passed, 73 skipped, 3 deselected, 28 warnings in 871.28s (0:14:31)
+$ uv run ruff check manuallabor/ tests/ && uv run ruff format --check manuallabor/ tests/ && uv run mypy manuallabor/
+All checks passed! / 376 files already formatted / Success: no issues found in 191 source files
+$ uv run labor schemas export --check && uv run python -m manuallabor.api.export_openapi --check
+schemas up to date / openapi up to date
+$ uv run labor check ./tests/fixtures/project-a
+K16 figure references   PASS         8  33 figure references resolve to a file and a sidecar
+labor check: all checks passed
+$ uv run labor check --live ./tests/fixtures/project-a
+labor check: all checks passed
+```
+
+Follow-ups (additive server fields, not started): per-section blocker counts on `/api/export/status`; per-document queued counts in `/api/verify/queue` `docs[]` for quiet milestones. The server-ack latency while a re-parse job runs sits at 450–540 ms against T13's soft 500 ms budget under external load; not changed.

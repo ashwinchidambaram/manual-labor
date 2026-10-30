@@ -23,12 +23,15 @@ export interface Writes {
   failed: boolean;
   /** drop every queued (not yet started) write; they reject with CancelledError */
   cancelQueued: () => void;
+  /** how many writes have settled so far: a read that began before the last one settled may predate it */
+  settled: React.MutableRefObject<number>;
 }
 
 export function useVerifyWrites(): Writes {
   const chain = useRef<Promise<unknown>>(Promise.resolve());
   const gen = useRef(0);
   const count = useRef(0);
+  const settledN = useRef(0);
   const [pending, setPending] = useState(0);
   const [failed, setFailed] = useState(false);
 
@@ -55,6 +58,7 @@ export function useVerifyWrites(): Writes {
       }
     });
     const settled = task.catch(() => undefined).finally(() => {
+      settledN.current += 1;
       count.current -= 1;
       setPending(count.current);
     });
@@ -66,5 +70,5 @@ export function useVerifyWrites(): Writes {
     gen.current += 1;
   }, []);
 
-  return { enqueue, pending, failed, cancelQueued };
+  return { enqueue, pending, failed, cancelQueued, settled: settledN };
 }

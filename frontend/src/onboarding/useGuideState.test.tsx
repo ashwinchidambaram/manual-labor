@@ -64,7 +64,8 @@ describe("U7 useGuideState", () => {
     await waitFor(() => expect(welcome()).not.toBeNull());
     await user.click(screen.getByTestId("welcome-dismiss"));
     await waitFor(() => expect(puts).toBe(1));
-    const alert = await screen.findByText(/Hiding the welcome was not saved: disk full\./);
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Hiding the welcome was not saved: disk full.");
     expect(alert).toHaveTextContent("Dismiss it again to hide it until you reload");
     expect(welcome()).not.toBeNull();
     await user.click(screen.getByTestId("welcome-dismiss"));

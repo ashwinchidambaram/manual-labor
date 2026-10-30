@@ -47,7 +47,8 @@ function Locked({ st }: { st: ExportStatus }) {
       setOpening(null);
     }
   };
-  const titles = useBlockTitles(blockers.length > 0);
+  const { titles, ready: titlesReady } = useBlockTitles(blockers.length > 0);
+  const truncated = blockers.length >= BLOCKER_LIMIT;
   // consecutive blockers from the same section form one group: the server's order (and every id) is kept
   const groups: { key: string; title: string | null; ids: string[] }[] = [];
   for (const id of blockers) {
@@ -101,16 +102,25 @@ function Locked({ st }: { st: ExportStatus }) {
           <h4 className="text-sm font-semibold text-ink">
             Blocking blocks{" "}
             <span className="font-normal text-muted" data-testid="blocker-count">
-              ({blockers.length >= BLOCKER_LIMIT ? `first ${blockers.length} listed by the server` : plural(blockers.length, "block")})
+              ({truncated ? `first ${blockers.length} listed by the server` : plural(blockers.length, "block")})
             </span>
           </h4>
-          <p className="mt-0.5 text-xs text-muted">Grouped by the section they are in. Each one opens in Verify.</p>
-          <ul className="mt-3 divide-y divide-line-soft overflow-hidden rounded-xl border border-line bg-raised" data-testid="blocker-list">
+          {/* a cut-off list cannot give a section's total: its groups count only what is listed (a per-section server
+              count is a recorded follow-up) */}
+          <p className="mt-0.5 text-xs text-muted" data-testid="blocker-groups-note">
+            {truncated ? `Of the first ${blockers.length} the server lists, grouped by section:` : "Grouped by the section they are in."} Each one opens in Verify.
+          </p>
+          {!titlesReady ? (
+            <p className="mt-3 rounded-xl border border-line bg-raised px-4 py-3 text-sm text-muted" data-testid="blocker-list-loading" role="status" aria-busy="true">
+              Naming the blocks by their section...
+            </p>
+          ) : null}
+          <ul className="mt-3 divide-y divide-line-soft overflow-hidden rounded-xl border border-line bg-raised" data-testid="blocker-list" hidden={!titlesReady}>
             {groups.map((g, gi) => (
               <li key={`${g.key}-${gi}`} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-baseline sm:gap-4">
                 <p className="min-w-0 text-sm sm:w-56 sm:shrink-0">
                   <span className="font-semibold text-ink">{g.title ?? "Blocks"}</span>{" "}
-                  <span className="text-muted">· {plural(g.ids.length, "block")}</span>
+                  <span className="text-muted">· {truncated ? `${g.ids.length} of these ${blockers.length}` : plural(g.ids.length, "block")}</span>
                 </p>
                 <span className="flex flex-wrap gap-1.5">
                   {g.ids.map((id) => (

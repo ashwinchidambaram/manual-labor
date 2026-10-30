@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { DocReadiness, QueueSort, ReviewCounts } from "../api/schema";
 import Hint from "../onboarding/Hint";
 import { MISMATCH, reconcileReview, reviewMismatchDetail, reviewReconcileText } from "../onboarding/reconcile";
@@ -64,22 +65,37 @@ export default function StatusStrip(p: StatusStripProps) {
   const rec = reconcileReview(p.counts);
   const c = p.counts;
   const done = c.approved + c.edited;
-  // the bar is drawn from the server's independent buckets over in scope (owner decision D1a); the legend says each in words
+  // on a short window (200% zoom) the block folds to the bar and one line; the rest is one button away
+  const [details, setDetails] = useState(false);
+  // The bar is drawn from the server's independent buckets over in scope (owner decision D1a), every segment from its
+  // own count, so the bar adds up only when the counts do. When they do not, it is drawn empty (grey) and the line
+  // under it says why: a bar that "fills" with whatever is left would hide the mismatch.
   const total = Math.max(1, c.in_scope);
-  const segs = [
-    { key: "done", n: done, cls: "bg-done-mid" },
-    { key: "auto", n: c.auto_approved, cls: "hatch-cleared" },
-    { key: "flagged", n: c.flagged_open + c.rejected, cls: "hatch-flag" },
-  ];
+  const flaggedN = c.flagged_open + c.rejected;
+  const flagWords = c.rejected > 0 ? `${flaggedN} flagged or rejected` : `${c.flagged_open} flagged`;
+  const segs = rec.ok
+    ? [
+        { key: "done", n: done, cls: "bg-done-mid" },
+        { key: "auto", n: c.auto_approved, cls: "hatch-cleared" },
+        { key: "flagged", n: flaggedN, cls: "hatch-flag" },
+        { key: "queued", n: c.queued, cls: "bg-needs-fill" },
+      ]
+    : [];
   let at = 0;
   const yours = done + c.queued + c.flagged_open + c.rejected;
   return (
-    <section aria-label="Review status" className="flex shrink-0 flex-col gap-2 border-b border-line bg-raised px-4 py-3 wide:px-7">
+    <section aria-label="Review status" className="flex shrink-0 flex-col gap-2 border-b border-line bg-raised px-4 py-3 short:gap-1.5 short:py-2 wide:px-7">
+      <div className="flex items-center gap-3">
         <div
           role="img"
-          aria-label={`${done} of ${yours} checked by you, ${c.auto_approved} cleared by the checks, ${c.queued} waiting for you, ${c.flagged_open} flagged, ${c.in_scope} in scope`}
-          className="relative h-3 overflow-hidden rounded-full bg-needs-fill shadow-[inset_0_0_0_1px_var(--needs-line)]"
+          aria-label={
+            rec.ok
+              ? `${done} of ${yours} checked by you, ${c.auto_approved} cleared by the checks, ${c.queued} waiting for you, ${flagWords}, ${c.in_scope} in scope`
+              : `Progress not drawn: the review counts do not add up to the ${c.in_scope} in scope`
+          }
+          className="relative h-3 min-w-0 flex-1 overflow-hidden rounded-full bg-line-soft shadow-[inset_0_0_0_1px_var(--line)]"
           data-testid="review-bar"
+          data-reconciled={rec.ok ? "true" : "false"}
         >
           {segs.map((s) => {
             const start = at / total;
@@ -87,6 +103,21 @@ export default function StatusStrip(p: StatusStripProps) {
             return <Segment key={s.key} start={start} size={s.n / total} className={s.cls} />;
           })}
         </div>
+        <p className="hidden shrink-0 whitespace-nowrap text-sm text-muted short:block" data-testid="review-summary">
+          <span className="font-bold tabular-nums text-ink">{done}</span> of <span className="tabular-nums">{yours}</span> checked by you
+          {p.saveState !== "Saved" ? <span className={p.saveState === "Not saved" ? "font-semibold text-fail" : ""}> · {p.saveState}</span> : null}
+        </p>
+        <button
+          type="button"
+          aria-expanded={details}
+          aria-controls="review-details"
+          onClick={() => setDetails((d) => !d)}
+          className={`hidden min-h-[1.75rem] shrink-0 rounded-lg border border-line px-2 text-xs font-medium text-ink hover:bg-sunk short:inline-block ${FOCUS}`}
+        >
+          {details ? "Fewer details" : "Counts and filters"}
+        </button>
+      </div>
+      <div id="review-details" className={`flex flex-col gap-2 ${details ? "" : "short:hidden"}`}>
       <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
         <p className="flex flex-wrap items-baseline gap-x-5 gap-y-1">
           <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap">
@@ -101,6 +132,15 @@ export default function StatusStrip(p: StatusStripProps) {
           <Stat id="cnt-auto" label="cleared by the checks" value={c.auto_approved} swatch="hatch-cleared ring-1 ring-inset ring-done-mid" />
           <Stat id="cnt-queued" label="waiting for you" value={queued} partial={queuedPartial} swatch="bg-needs-fill ring-1 ring-inset ring-needs-line" />
           <Stat id="cnt-flagged" label="flagged" value={c.flagged_open} swatch="hatch-flag" />
+          {c.rejected > 0 ? (
+            <span className="-ml-3 inline-flex items-baseline gap-1.5 whitespace-nowrap text-sm text-muted">
+              and
+              <span className="font-bold tabular-nums text-ink" data-testid="cnt-rejected">
+                {c.rejected}
+              </span>
+              rejected
+            </span>
+          ) : null}
           <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap">
             <span className="text-sm font-bold tabular-nums text-ink" data-testid="cnt-scope">
               {c.in_scope}
@@ -179,7 +219,7 @@ export default function StatusStrip(p: StatusStripProps) {
               {d.state === "pending" ? `${d.doc_id}: preparing${d.waiting_for ? ` (${d.waiting_for})` : ""}` : `${d.doc_id}: re-scoring`}
             </span>
           ))}
-      
+      </div>
     </section>
   );
 }

@@ -327,7 +327,7 @@ export default function VerifyScreen() {
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <div
             data-testid="page-band"
-            className={`flex shrink-0 gap-4 border-b border-line bg-sunk px-4 py-3 wide:gap-5 wide:px-7 ${big ? "flex-col" : "items-start"}`}
+            className={`flex shrink-0 gap-4 border-b border-line bg-sunk px-4 py-3 short:py-2 wide:gap-5 wide:px-7 ${big ? "flex-col" : "items-start"}`}
           >
             {showStrip && ownDetail ? <PageStrip page={ownDetail.page} bbox={ownDetail.block.bbox as number[]} marks={marks} pageNo={ownDetail.page.page} /> : null}
             <div className={big || !showStrip ? "flex min-w-0 flex-1 flex-col gap-2" : "hidden w-[8.5rem] shrink-0 flex-col gap-1.5 wide:flex"}>
@@ -388,6 +388,7 @@ export default function VerifyScreen() {
         isFigure={!!isFigure}
         numeric={!!ownDetail?.block.has_numeric_spec}
         position={at >= 0 ? `Block ${at + 1} of ${state.total}` : null}
+        saveState={saveState}
         onApprove={() => void approve()}
         onEdit={startEdit}
         onFlag={() => state.currentId && setFlagOpen(true)}

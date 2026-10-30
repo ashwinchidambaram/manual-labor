@@ -5,32 +5,73 @@ const plural = (n: number, w: string): string => `${n} ${w}${n === 1 ? "" : "s"}
 
 export interface WelcomeFacts {
   manuals: number;
+  /** manuals whose blocks are grouped and listed on Scope; the others are still being read */
+  ready: number;
+  /** every manual's file name, in the server's order */
+  names: string[];
   pages: number;
   /** blocks and figures in the current selection, and whether that selection is every selectable block */
   blocks: number;
   figures: number;
+  /** the selected blocks by type, from the block index; null when it is not loaded */
+  types: Record<string, number> | null;
   everything: boolean;
   queued: number;
   numericQueued: number;
 }
 
-export function welcomeFacts(sources: readonly SourceInfo[], summary: ScopeSummary, everything: boolean): WelcomeFacts {
+export function welcomeFacts(
+  sources: readonly SourceInfo[],
+  summary: ScopeSummary,
+  everything: boolean,
+  extra: { ready: number; types: Record<string, number> | null } = { ready: sources.length, types: null },
+): WelcomeFacts {
   return {
     manuals: sources.length,
+    ready: extra.ready,
+    names: sources.map((s) => s.filename),
     pages: sources.reduce((n, s) => n + s.pages, 0),
     blocks: summary.blocks,
     figures: summary.figures,
+    types: extra.types,
     everything,
     queued: summary.review_load.queued,
     numericQueued: summary.review_load.numeric_queued,
   };
 }
 
+const list = (xs: string[]): string => (xs.length <= 1 ? (xs[0] ?? "") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`);
+
+/** Block types in the order a reader meets them, with the word for each. */
+const TYPE_WORDS: [string, string][] = [
+  ["paragraph", "paragraph"],
+  ["list", "list"],
+  ["table", "table"],
+  ["heading", "heading"],
+  ["caption", "caption"],
+  ["figure", "figure"],
+  ["other", "other block"],
+];
+
+/**
+ * "364 blocks: 270 paragraphs, 44 headings, 19 captions and 20 figures" when the type counts add up to the server's
+ * total; otherwise only what is certain: "364 blocks, 20 of them figures". A count is never estimated.
+ */
+export function blockBreakdown(blocks: number, figures: number, types: Record<string, number> | null): string {
+  const known = new Set(TYPE_WORDS.map(([t]) => t));
+  const sum = types ? Object.values(types).reduce((a, b) => a + b, 0) : -1;
+  const unknownTypes = types ? Object.keys(types).some((t) => !known.has(t) && (types[t] ?? 0) > 0) : true;
+  if (types && sum === blocks && !unknownTypes && blocks > 0) {
+    const parts = TYPE_WORDS.filter(([t]) => (types[t] ?? 0) > 0).map(([t, w]) => plural(types[t], w));
+    return `${plural(blocks, "block")}: ${list(parts)}`;
+  }
+  return figures > 0 ? `${plural(blocks, "block")}, ${figures} of them figure${figures === 1 ? "" : "s"}` : plural(blocks, "block");
+}
+
 /** Every number is a server count; the wording changes with them instead of rounding or guessing. */
-export function welcomeCopy(f: WelcomeFacts): { title: string; body: string; steps: { title: string; line: string }[] } {
-  const found = f.everything
-    ? `We read ${plural(f.pages, "page")} and found ${plural(f.blocks, "block")} of text (paragraphs, lists and tables) and ${plural(f.figures, "figure")}.`
-    : `We read ${plural(f.pages, "page")}. Selected right now: ${plural(f.blocks, "block")} of text and ${plural(f.figures, "figure")}.`;
+export function welcomeCopy(f: WelcomeFacts): { title: string; body: string; manuals: string; steps: { title: string; line: string }[] } {
+  const what = blockBreakdown(f.blocks, f.figures, f.types);
+  const found = f.everything ? `We read ${plural(f.pages, "page")} and found ${what}.` : `We read ${plural(f.pages, "page")}. Selected right now: ${what}.`;
   const numeric =
     f.queued === 0
       ? "Nothing needs a person yet."
@@ -39,9 +80,15 @@ export function welcomeCopy(f: WelcomeFacts): { title: string; body: string; ste
         : f.numericQueued > 0
           ? `${f.numericQueued} of them contain numbers, which a person always checks.`
           : "None of them contain numbers; each scored under the auto-approve line.";
+  const reading = f.manuals - f.ready;
+  const title =
+    reading <= 0
+      ? `Welcome. Your ${f.manuals === 1 ? "manual is" : `${f.manuals} manuals are`} read and ready.`
+      : `Welcome. ${f.ready} of your ${f.manuals} manuals ${f.ready === 1 ? "is" : "are"} ready; ${reading === 1 ? "one is" : `${reading} are`} still being read.`;
   return {
-    title: `Welcome. Your ${f.manuals === 1 ? "manual is" : `${f.manuals} manuals are`} read and ready.`,
+    title,
     body: `${found} You decide what goes into the knowledge base. Anything the checks cannot vouch for comes to you, next to the page it came from.`,
+    manuals: list(f.names),
     steps: [
       { title: "Choose what goes in", line: "Pick topics or sections. You are here." },
       { title: `Check ${plural(f.queued, "block")} against the page`, line: numeric },
@@ -78,6 +125,9 @@ export default function WelcomeBand({ facts, onDismiss }: { facts: WelcomeFacts;
         <h2 id="welcome-title" className="text-xl font-bold tracking-[-0.015em] text-ink lg:text-2xl">
           {c.title}
         </h2>
+        <p className="mt-1.5 text-sm text-muted" data-testid="welcome-manuals">
+          <span className="font-medium text-ink">Your manuals:</span> {c.manuals}
+        </p>
         <p className="mt-2 max-w-[58ch] text-base leading-relaxed text-ink">{c.body}</p>
         <div className="mt-5 flex flex-wrap items-center gap-2">
           <button

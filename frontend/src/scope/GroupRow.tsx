@@ -44,8 +44,9 @@ function GroupRowImpl(p: GroupRowProps) {
     plural(g.block_count, "block"),
     plural(g.figure_count, "figure"),
     sections > 0 || topic ? plural(sections, "section") : "",
-    topic && g.cohesion != null ? `cohesion ${g.cohesion.toFixed(2)}` : "",
   ].filter(Boolean);
+  // a group without blocks has nothing to select: "empty", not "n/a selected"
+  const empty = g.block_count === 0;
   const pct = coverageLabel(p.fraction);
   const pctLabel = p.fraction == null ? "n/a" : pct === "none" ? "0%" : pct === "all" ? "100%" : pct;
   const titleId = `row-title-${g.id}`;
@@ -134,11 +135,15 @@ function GroupRowImpl(p: GroupRowProps) {
         data-testid="coverage-chip"
         data-stale={p.stale ? "true" : "false"}
         aria-label={
-          p.fraction == null ? "coverage not available" : `${Math.round(p.fraction * 100)} percent of this ${topic ? "topic" : "section"} is in your selection`
+          empty
+            ? `this ${topic ? "topic" : "section"} has no blocks`
+            : p.fraction == null
+              ? "coverage not available"
+              : `${Math.round(p.fraction * 100)} percent of this ${topic ? "topic" : "section"} is in your selection`
         }
         className={`shrink-0 text-xs tabular-nums text-muted transition-opacity duration-150 ${p.stale ? "opacity-50" : ""}`}
       >
-        {pctLabel} selected
+        {empty ? "empty" : `${pctLabel} selected`}
       </span>
       </Hint>
     </div>

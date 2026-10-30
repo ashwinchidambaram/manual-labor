@@ -40,6 +40,21 @@ export const SIGNAL_HUMAN: Record<string, { held: string; passed: string }> = {
 };
 export const human = (name: string, held: boolean): string => SIGNAL_HUMAN[name]?.[held ? "held" : "passed"] ?? label(name);
 
+/** The faithfulness signal's detail on a block whose cleanup has not run (manuallabor/scoring/pipeline.py). */
+export const FAITH_NOT_RUN = "raw (no cleanup yet)";
+
+/**
+ * A passed faithfulness check scored under 1 (manuallabor/scoring/pipeline.py): 0.5 when a model's cleanup was
+ * rejected and the deterministic result kept, 0.9 when it passed through an evidence-backed reorder. The sentence is
+ * taken from the detail the scorer wrote, never from the number.
+ */
+export function faithHeldSentence(detail: string | null | undefined): string {
+  const d = detail ?? "";
+  if (d.startsWith("cleanup candidate rejected")) return "A model's cleanup was rejected; the deterministic cleanup was kept";
+  if (d.includes("reorder")) return "Passed after a reading-order fix backed by the page";
+  return "Cleanup passed with a note";
+}
+
 /** The least certain word, from the OCR signal's detail ("min 0.899 at '4471-A'; 68 words"). */
 export function weakestFromDetail(detail: string | null | undefined): string | null {
   const m = /at '(.+?)'(?:;|$)/.exec(detail ?? "");
@@ -79,6 +94,47 @@ export function cardTitle(sectionTitle: string | null | undefined, docTitle: str
   if (sectionTitle && sectionTitle.trim()) return sectionTitle.trim();
   if (docTitle && docTitle.trim()) return docTitle.trim();
   return `Page ${page}, ${type.replace(/_/g, " ")}`;
+}
+
+const EXCERPT_MAX = 80;
+const ELLIPSIS = "…";
+const ws = (s: string): string => s.replace(/\s+/g, " ").trim();
+
+/** manuallabor/state/card.py `cut`: whitespace-normalised, cut at a word boundary with an ellipsis. */
+export function cutExcerpt(s: string, limit = EXCERPT_MAX): string {
+  const t = ws(s);
+  if (t.length <= limit) return t;
+  let room = t.slice(0, limit - ELLIPSIS.length);
+  if (t[room.length] !== " ") {
+    const sp = room.lastIndexOf(" ");
+    if (sp > 0) room = room.slice(0, sp);
+  }
+  return room.replace(/[ ,;:]+$/, "") + ELLIPSIS;
+}
+
+/**
+ * A queue card's excerpt by the server's own rule (manuallabor/state/card.py `card_excerpt`), so a card built from a
+ * block's detail (the pinned card) reads the same as when the block comes back in the list: a figure shows its
+ * caption, else "Figure on page N"; a table its first row's cells joined by " · "; anything else its shown text.
+ */
+export function cardExcerpt(
+  block: { type: string; page: number; clean_text?: string | null; raw_text: string; table?: { cells: { row: number; col: number; text: string }[] } | null },
+  caption?: string | null,
+): string {
+  if (block.type === "figure") {
+    const cap = ws(caption ?? "");
+    return cap ? cutExcerpt(cap) : `Figure on page ${block.page}`;
+  }
+  if (block.type === "table" && block.table) {
+    const row = block.table.cells
+      .filter((c) => c.row === 0)
+      .sort((x, y) => x.col - y.col)
+      .map((c) => ws(c.text))
+      .filter(Boolean)
+      .join(" · ");
+    if (row) return cutExcerpt(row);
+  }
+  return cutExcerpt(block.clean_text ?? block.raw_text);
 }
 
 /**

@@ -273,6 +273,8 @@ export default function ExtractedPane({ detail, loading, error, view, onView, ed
           why={detail.why ?? []}
           autoApproved={b.status === "auto_approved" ? { confidence: b.confidence ?? null, threshold } : null}
           parserTexts={detail.parser_texts ?? {}}
+          faithfulnessPassed={b.faithfulness ? b.faithfulness.passed : null}
+          rawSource={b.raw_source ?? null}
         />
         <ChecksList block={b} figure={fig ?? null} why={detail.why ?? []} />
         <LearningChip learning={detail.learning ?? { provenance: "baseline", learned_rules: [], few_shot: [] }} slug={b.doc_id} />

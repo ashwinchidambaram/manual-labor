@@ -47,7 +47,7 @@ Why you can trust this:
 
 Screen: /agent (key `3`)
 
-An agent pass sends each open flag to a model, one fresh call per item, and lists what the model proposes. Every proposal is re-checked by the same deterministic checks, and failed checks are shown, not hidden.
+An agent pass works through your open flags. Each flagged block goes to a model with your note, and the model proposes a fix. Its proposal is checked again by the same checks before you see it, and a check that fails is shown, not hidden.
 
 What to do:
 
@@ -246,4 +246,4 @@ Every key below comes from the single hotkey map (frontend/src/hotkeys.ts). Keys
 
 ## Reset the guide
 
-The getting-started panel opens once per project and stays hidden after Hide guide. To see it again, open Help (`?`), stay on the Guide tab and choose Show guide panel. From a script: `PUT /api/ui/guide` with the body `{"seen": false}`. If the server cannot store the flag, the browser keeps it in localStorage instead.
+The welcome on Scope shows once per project and stays hidden after Start with step 1 or I have used this before. To see it again, open Help (`?`), stay on the Guide tab and choose Show the welcome again. From a script: `PUT /api/ui/guide` with the body `{"seen": false}`. If the server cannot store the flag, the browser keeps it in localStorage instead.

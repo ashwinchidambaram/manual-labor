@@ -5,8 +5,17 @@ import { keyLabel } from "../onboarding/guide";
 import type { PageMarks } from "./pageMarks";
 import { stripRegion } from "./pageMarks";
 
-/** The page image is rendered at most this wide (px), so a narrow block is not blown up past the 150 dpi render. */
+/**
+ * The page image is drawn at most this wide (CSS px). The strip's image is the 150 dpi render, about 1275px wide for a
+ * 612pt (US letter) page, so this allows at most about 1.33x enlargement of a letter page's render for a narrow
+ * block: legible, before the scan visibly blurs.
+ */
 const MAX_PAGE_PX = 1700;
+
+/** Highlight fills from the status tokens (marigold = needs you), with the alpha the strip needs to keep the ink legible. */
+const DIFFER_FILL = "color-mix(in srgb, var(--needs-fill) 42%, transparent)";
+const DIFFER_SWATCH = "color-mix(in srgb, var(--needs-fill) 60%, transparent)";
+const DIFFER_HATCH = "repeating-linear-gradient(45deg, color-mix(in srgb, var(--needs-fill) 45%, transparent) 0 4px, transparent 4px 8px)";
 
 /**
  * The page, magnified to the current block (design 13 F5, owner decision D2): the block's lines at reading size,
@@ -45,7 +54,7 @@ export default function PageStrip({ page, bbox, marks, pageNo }: { page: PageRef
   }, [height, w]);
   const legend = [marks.boxes.length || marks.whole ? "shaded" : null, marks.weakest ? "dashed" : null].filter(Boolean);
   return (
-    <figure className="m-0 flex min-w-0 flex-1 flex-col gap-2" data-testid="page-strip">
+    <figure className="m-0 flex min-w-0 flex-1 flex-col gap-2 short:gap-1" data-testid="page-strip">
       <figcaption className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <span className="text-2xs font-semibold uppercase tracking-[0.07em] text-muted">
           The page, at this block<span className="wide:hidden"> · page {pageNo}</span>
@@ -53,7 +62,7 @@ export default function PageStrip({ page, bbox, marks, pageNo }: { page: PageRef
         <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
           {legend.includes("shaded") ? (
             <span className="inline-flex items-center gap-1.5">
-              <span aria-hidden="true" className="inline-block h-2.5 w-3.5 rounded-[2px]" style={{ background: "rgb(238 192 91 / 0.6)" }} />
+              <span aria-hidden="true" className="inline-block h-2.5 w-3.5 rounded-[2px]" style={{ background: DIFFER_SWATCH }} />
               where the readings differ
             </span>
           ) : null}
@@ -74,7 +83,7 @@ export default function PageStrip({ page, bbox, marks, pageNo }: { page: PageRef
         tabIndex={scrollable ? 0 : undefined}
         role={scrollable ? "group" : undefined}
         aria-label={scrollable ? "The page, magnified to this block" : undefined}
-        className="max-h-[min(34vh,17rem)] overflow-auto rounded-xl border border-line bg-page shadow-lift focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+        className="max-h-[min(34vh,17rem)] overflow-auto rounded-xl border border-line bg-page shadow-lift focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus short:max-h-[5.5rem]"
       >
         {scale > 0 ? (
           <div role="img" aria-label={`Page ${pageNo}, magnified to this block`} className="relative overflow-hidden" style={{ height }}>
@@ -88,11 +97,11 @@ export default function PageStrip({ page, bbox, marks, pageNo }: { page: PageRef
             {marks.whole ? (
               <div
                 data-testid="strip-disagree-block"
-                style={{ ...box(bbox), backgroundImage: "repeating-linear-gradient(45deg, rgb(238 192 91 / 0.45) 0 4px, transparent 4px 8px)" }}
+                style={{ ...box(bbox), backgroundImage: DIFFER_HATCH }}
               />
             ) : null}
             {marks.boxes.map((b, i) => (
-              <div key={i} data-testid="strip-disagree-word" style={{ ...box(b), background: "rgb(238 192 91 / 0.42)", borderRadius: 2 }} />
+              <div key={i} data-testid="strip-disagree-word" style={{ ...box(b), background: DIFFER_FILL, borderRadius: 2 }} />
             ))}
             {marks.weakest ? (
               <div data-testid="strip-weakest" style={{ ...box(marks.weakest), outline: "2px dashed var(--needs-ink)", outlineOffset: 2, borderRadius: 2 }} />

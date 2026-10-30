@@ -3,7 +3,7 @@
 import type { BlockDetail } from "../api/schema";
 import type { NextStep } from "../shell/nextStep";
 import { weakestFromDetail } from "./labels";
-import { pickPair, readingLines } from "./parserDiff";
+import { pairForSignal, readingLines } from "./parserDiff";
 
 export const DECISION_KEYS: NonNullable<NextStep["keys"]> = [
   { id: "vApprove", label: "Approve: it matches the page" },
@@ -14,6 +14,12 @@ export const DECISION_KEYS: NonNullable<NextStep["keys"]> = [
 ];
 
 const list = (xs: string[]): string => (xs.length <= 1 ? (xs[0] ?? "") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`);
+
+/** The first words of a line, as the user sees them in the readings list (a line number alone cannot be found). */
+const opening = (s: string): string => {
+  const w = s.replace(/\s+/g, " ").trim().split(" ");
+  return `"${w.slice(0, 4).join(" ")}${w.length > 4 ? "…" : ""}"`;
+};
 
 export function coachFor(d: BlockDetail | undefined, weakestWord?: string | null): NextStep {
   if (!d) return { text: "Check each block against its page.", keys: DECISION_KEYS };
@@ -26,11 +32,21 @@ export function coachFor(d: BlockDetail | undefined, weakestWord?: string | null
   if (why.some((w) => w.kind === "stale")) return { text: "The text changed since you approved it. Compare it with the page again.", keys: DECISION_KEYS };
   if (b.status === "auto_approved") return { text: "The checks cleared this block; you are taking a second look. Compare it with the page.", keys: DECISION_KEYS };
   const parts: string[] = [];
-  if (held("parser_agreement") || held("textlayer_vs_ocr")) {
-    const pair = pickPair(d.parser_texts ?? {});
-    const lines = pair ? readingLines(pair.ta, pair.tb).map((l) => l.line) : [];
-    const uniq = [...new Set(lines)].slice(0, 3);
-    parts.push(uniq.length ? `line${uniq.length > 1 ? "s" : ""} ${list(uniq.map(String))}` : "the lines where the readings differ");
+  const reading = held("parser_agreement") ?? held("textlayer_vs_ocr");
+  if (reading) {
+    // the same pair the "Why this needs you" card shows for this signal
+    const pair = pairForSignal(reading.name, d.parser_texts ?? {}, reading.detail, b.raw_source);
+    const lines = pair ? readingLines(pair.ta, pair.tb).filter((l) => (l.a || l.b).trim()) : [];
+    const shown = lines.slice(0, 3);
+    parts.push(
+      shown.length === 0
+        ? "the two readings"
+        : shown.length === 1
+          ? `the line that starts ${opening(shown[0].a || shown[0].b)}`
+          : shown.length === 2
+            ? `the lines that start ${shown.map((l) => opening(l.a || l.b)).join(" and ")}`
+            : `the ${shown.length} lines under "The two readings differ"`,
+    );
   }
   const weak = held("ocr_min") ? (weakestFromDetail(held("ocr_min")?.detail) ?? weakestWord ?? null) : null;
   if (weak) parts.push(`the word "${weak}"`);

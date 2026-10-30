@@ -50,7 +50,7 @@ export function renderUserGuide(): string {
   out.push("");
   out.push("## Reset the guide", "");
   out.push(
-    `The getting-started panel opens once per project and stays hidden after Hide guide. To see it again, open Help (${code(keyLabel("help"))}), stay on the Guide tab and choose Show guide panel. From a script: \`PUT /api/ui/guide\` with the body \`{"seen": false}\`. If the server cannot store the flag, the browser keeps it in localStorage instead.`,
+    `The welcome on Scope shows once per project and stays hidden after Start with step 1 or I have used this before. To see it again, open Help (${code(keyLabel("help"))}), stay on the Guide tab and choose Show the welcome again. From a script: \`PUT /api/ui/guide\` with the body \`{"seen": false}\`. If the server cannot store the flag, the browser keeps it in localStorage instead.`,
     "",
   );
   return out.join("\n");

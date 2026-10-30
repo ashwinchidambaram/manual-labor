@@ -5,7 +5,7 @@ import { ApiError, client, unwrap } from "../api/client";
 import { invalidateReviewCounts, trackJob, useAgentItems, useCalibration, useOpenFlags, useProposals } from "../api/queries";
 import type { AgentItemView, CalibrationReport, Flag, Proposal } from "../api/schema";
 import Copy from "../onboarding/Copy";
-import { useBlockTitles, type BlockTitle } from "../shell/blockTitles";
+import { useFlagTitles, type BlockTitle } from "../shell/blockTitles";
 import { openInVerify } from "../shell/openInVerify";
 import { FLAG_CATEGORIES } from "../verify/labels";
 
@@ -46,6 +46,17 @@ function Target({ id }: { id: string }) {
       ) : null}
     </>
   );
+}
+
+/**
+ * How often the agent has tried this flag. The server's `round` is the round the next pass will run (proposals so far
+ * plus one), so a fresh flag is round 1 and has not been tried.
+ */
+export function triedText(it: Pick<AgentItemView, "round" | "last_outcome" | "pending_proposal_id">): string {
+  const tried = Math.max(0, it.round - 1);
+  if (tried === 0 && !it.pending_proposal_id) return "not tried yet";
+  const times = tried <= 1 ? "once" : `${tried} times`;
+  return `tried ${times}${it.last_outcome ? `, last: ${it.last_outcome}` : ""}`;
 }
 
 function FlagsSection({ flags, items, error, titles }: { flags: Flag[] | undefined; items: Map<string, AgentItemView>; error: unknown; titles: Map<string, BlockTitle> }) {
@@ -104,16 +115,12 @@ function FlagsSection({ flags, items, error, titles }: { flags: Flag[] | undefin
             const t = titles.get(f.target_id);
             return (
               <li key={f.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-4 py-3" data-testid="agent-flag">
-                {t ? (
-                  <span className="basis-full font-semibold text-ink">
-                    {t.title} <span className="font-normal text-muted">· p.{t.page}</span>
-                  </span>
-                ) : null}
+                {t ? <span className="basis-full font-semibold text-ink">{t.title}</span> : null}
                 <span className="font-medium text-ink">{CATEGORY.get(f.category) ?? f.category}</span>
                 <Target id={f.target_id} />
                 {f.note ? <q className="text-muted">{f.note}</q> : null}
                 <span className="ml-auto text-xs text-muted">
-                  {it ? (it.round > 0 ? `round ${it.round}${it.last_outcome ? `, last: ${it.last_outcome}` : ""}` : "not tried yet") : null}
+                  {it ? triedText(it) : null}
                   {it?.pending_proposal_id ? " · proposal waiting" : ""}
                 </span>
                 {it?.last_detail ? <span className="basis-full text-xs text-muted">{it.last_detail}</span> : null}
@@ -122,7 +129,7 @@ function FlagsSection({ flags, items, error, titles }: { flags: Flag[] | undefin
           })}
         </ul>
       ) : (
-        <div aria-busy="true" id="agent-flags-loading" aria-label="Loading the open flags" className="h-16 animate-pulse rounded-xl bg-sunk" />
+        <div role="status" aria-busy="true" id="agent-flags-loading" aria-label="Loading the open flags" className="h-16 animate-pulse rounded-xl bg-sunk" />
       )}
     </section>
   );
@@ -321,18 +328,33 @@ function Calibration({ c, error }: { c: CalibrationReport | undefined; error: un
   if (!c) return <div aria-busy="true" className="h-16 animate-pulse rounded-xl bg-sunk" />;
   const used = (c.buckets ?? []).filter((b) => b.n > 0);
   const pct = (v: number | null | undefined): string => (v == null ? "n/a" : `${Math.round(v * 100)}%`);
+  // one count in every sentence: the decisions the table is built from (blocks with numbers are left out)
+  const numeric = c.n_numeric_excluded ?? 0;
+  const counted = Math.max(0, (c.n_outcomes ?? 0) - numeric);
+  const goal = `${Math.round((c.target_edit_rate ?? 0) * 100)} in 100`;
+  const minN = Number(/holds? (\d+) reviewed/.exec(c.suggestion_detail ?? "")?.[1] ?? 20);
+  const t = c.suggested_threshold;
+  const suggestion =
+    t != null
+      ? `Suggested ${t.toFixed(2)}: blocks scoring ${t.toFixed(2)} or more were edited less often than your goal of ${goal}.`
+      : c.suggestion_reason === "target_not_met"
+        ? `No threshold is suggested: in no score range did you edit fewer than ${goal} blocks.`
+        : `No threshold is suggested yet: a suggestion needs ${minN} decisions in one score range.`;
   return (
     <div className="space-y-2 text-sm" data-testid="calibration">
       <p className="max-w-prose text-muted">
-        How often you edited blocks in each score range, from {plural(c.n_outcomes ?? 0, "decision")}
-        {(c.n_numeric_excluded ?? 0) > 0 ? ` (${plural(c.n_numeric_excluded ?? 0, "numeric block")} left out: they are always reviewed)` : ""}. Target edit rate{" "}
-        {pct(c.target_edit_rate)}.
+        {counted > 0
+          ? `How often you edited blocks in each score range, from ${plural(counted, "decision")} on blocks without numbers.`
+          : "No decisions counted yet."}
+        {numeric > 0
+          ? ` ${plural(numeric, "decision")} on ${numeric === 1 ? "a block" : "blocks"} with numbers ${numeric === 1 ? "is" : "are"} left out: a person always checks those blocks, so they say nothing about the scores.`
+          : ""}
       </p>
       {used.length ? (
         <table className="w-full max-w-lg text-left text-sm" data-testid="calibration-table">
           <thead>
             <tr className="text-xs text-muted">
-              <th scope="col" className="py-0.5 font-medium">Confidence</th>
+              <th scope="col" className="py-0.5 font-medium">Score range</th>
               <th scope="col" className="py-0.5 text-right font-medium">Blocks</th>
               <th scope="col" className="py-0.5 text-right font-medium">Edited</th>
               <th scope="col" className="py-0.5 text-right font-medium">Edit rate</th>
@@ -355,16 +377,16 @@ function Calibration({ c, error }: { c: CalibrationReport | undefined; error: un
           </tbody>
         </table>
       ) : (
-        <p className="rounded-xl border border-dashed border-line-strong px-3.5 py-3 text-muted">
-          No decisions yet. This builds as you review: approve or edit blocks in Verify and the edit rate of each score range appears here.
+        <p className="rounded-xl border border-dashed border-line-strong px-3.5 py-3 text-muted" data-testid="calibration-empty">
+          Builds as you review. After {minN} decisions in a score range you will see how often you edited blocks there, and a suggested threshold. It is
+          never applied for you.
         </p>
       )}
       <p data-testid="calibration-suggestion">
-        Current threshold <span className="font-semibold tabular-nums">{c.current_threshold?.toFixed(2) ?? "n/a"}</span>. Suggested{" "}
-        <span className="font-semibold tabular-nums">{c.suggested_threshold?.toFixed(2) ?? "none yet"}</span>
-        {c.suggestion_detail ? <span className="text-muted">: {c.suggestion_detail}</span> : null}
+        Current threshold <span className="font-semibold tabular-nums">{c.current_threshold?.toFixed(2) ?? "n/a"}</span>. {suggestion}
       </p>
-      <p className="text-xs text-muted">The suggestion is never applied automatically.</p>
+      {c.suggestion_detail ? <p className="text-xs text-muted">The scorer's note: {c.suggestion_detail}</p> : null}
+      {used.length ? <p className="text-xs text-muted">The suggestion is never applied for you.</p> : null}
       {(c.warnings ?? []).length ? (
         <ul role="note" className="list-disc pl-5 text-xs text-needs-ink">
           {(c.warnings ?? []).map((w) => (
@@ -383,14 +405,16 @@ export default function AgentScreen() {
   const calibration = useCalibration();
   const itemMap = new Map((items.data ?? []).map((i) => [i.flag.id, i]));
   const list = proposals.data ?? [];
-  const titles = useBlockTitles((flags.data ?? []).length > 0);
+  // flagged blocks are never in the review queue: their titles come from each block's own detail
+  const titles = useFlagTitles((flags.data ?? []).map((f) => f.target_id).filter((id) => id.startsWith("b-")));
   return (
     <main className="flex w-full flex-col gap-7 px-4 pb-16 pt-5 wide:px-8 wide:pt-6" data-testid="agent-screen">
       <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
         <div>
           <h2 className="text-xl font-semibold tracking-[-0.01em] text-ink">Fix what you flag</h2>
           <p className="mt-1 max-w-[70ch] text-base text-muted" data-testid="agent-definition">
-            An agent pass sends each open flag to a model, one fresh call per item: the flagged block is handed to a model with what you flagged, and it proposes a fix. Every proposal is re-checked by the same deterministic checks before you see it; failed checks are shown, not hidden.
+            An agent pass works through your open flags. Each flagged block goes to a model with your note, and the model proposes a fix. Its proposal
+            is checked again by the same checks before you see it; a check that fails is shown, not hidden.
           </p>
         </div>
         <Link className={`text-sm ${LINK}`} to="/scope">

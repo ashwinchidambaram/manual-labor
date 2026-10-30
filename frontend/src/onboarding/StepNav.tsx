@@ -87,14 +87,14 @@ export default function StepNav({ path, status }: { path: string; status: Export
                   aria-describedby={`step-state-${s.id}`}
                   data-testid={`step-${s.id}`}
                   className={({ isActive }) =>
-                    `group/step flex min-h-[2.75rem] items-center gap-2 rounded-lg px-1.5 py-1.5 transition-colors duration-150 ease-out-quart wide:items-start wide:gap-3 wide:px-2 wide:pb-3.5 wide:pt-2 ${FOCUS} ${
+                    `group/step flex min-h-[2.75rem] items-center gap-2 rounded-lg px-1.5 py-1.5 short-narrow:min-h-[2rem] short-narrow:py-0.5 transition-colors duration-150 ease-out-quart wide:items-start wide:gap-3 wide:px-2 wide:pb-3.5 wide:pt-2 ${FOCUS} ${
                       isActive ? "" : "hover:bg-sunk"
                     }`
                   }
                 >
                   <span
                     aria-hidden="true"
-                    className={`grid h-7 w-7 shrink-0 place-items-center rounded-full border-2 text-xs font-bold tabular-nums ${
+                    className={`grid h-7 w-7 shrink-0 place-items-center rounded-full border-2 short-narrow:h-6 short-narrow:w-6 text-xs font-bold tabular-nums ${
                       here ? "border-act bg-act text-act-on" : st.done ? "border-ink bg-ink text-raised" : "border-line bg-rail text-muted"
                     }`}
                   >

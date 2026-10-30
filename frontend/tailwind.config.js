@@ -54,5 +54,12 @@ export default {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    // A short window (a laptop at 200% zoom is about 720x450): Verify keeps the page strip and the text on screen
+    // together by folding the status block, the open queue card and the step sheet to one line each.
+    ({ addVariant }) => {
+      addVariant("short", "@media (max-height: 600px)");
+      addVariant("short-narrow", "@media (max-height: 600px) and (max-width: 1099.98px)");
+    },
+  ],
 };

@@ -444,7 +444,8 @@ test("12 job progress shown; UI interactive while a job runs", async ({ page }) 
   await waitForTree(page);
   await expect(page.getByTestId("jobs-bar")).toBeVisible();
   await expect(page.locator("progress")).toHaveAttribute("value", "0.4");
-  await expect(page.getByTestId("job-row")).toContainText("2/5");
+  // review M13 P2-11: progress reads "2 of 5 steps", never "2/5"
+  await expect(page.getByTestId("job-row")).toContainText("2 of 5 steps");
   const groups = await getGroups(page.request);
   const t = groups[0].groups.topics.find((x) => !x.is_unassigned)!;
   const resp = page.waitForResponse((r) => r.url().includes("/api/scope/selection") && r.request().method() === "PUT");

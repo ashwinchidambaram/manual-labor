@@ -166,6 +166,21 @@ describe("U10 ExportScreen", () => {
     renderApp("/export");
     expect(await screen.findByTestId("blocker-count")).toHaveTextContent(`(first ${BLOCKER_LIMIT} listed by the server)`);
   });
+  it("a cut-off list says its groups count only the listed blocks, never a section total; the banner keeps the true total", async () => {
+    const many = Array.from({ length: BLOCKER_LIMIT }, (_, i) => `b-doc-p${String(i + 1).padStart(3, "0")}-01`);
+    installFake({ exportStatus: locked({ queued: 30, open_flags: 0, blockers: many }) });
+    renderApp("/export");
+    expect(await screen.findByTestId("blocker-groups-note")).toHaveTextContent(`Of the first ${BLOCKER_LIMIT} the server lists, grouped by section:`);
+    const groups = await within(screen.getByTestId("blocker-list")).findAllByRole("listitem");
+    for (const g of groups) expect(g).toHaveTextContent(new RegExp(`\\d+ of these ${BLOCKER_LIMIT}`));
+    expect(screen.getByTestId("reason-queued")).toHaveTextContent("30 blocks");
+  });
+  it("a complete list counts each group in blocks", async () => {
+    installFake({ exportStatus: locked({ queued: 3, open_flags: 2 }) });
+    renderApp("/export");
+    expect(await screen.findByTestId("blocker-groups-note")).toHaveTextContent("Grouped by the section they are in.");
+    expect((await within(screen.getByTestId("blocker-list")).findAllByRole("listitem"))[0]).toHaveTextContent("2 blocks");
+  });
   it("unlocked: Export starts a job; a 409 renders the locked view from the refusal body", async () => {
     installFake();
     server.use(

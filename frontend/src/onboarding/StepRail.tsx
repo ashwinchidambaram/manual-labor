@@ -55,7 +55,7 @@ export default function StepRail({ path, status, mock }: { path: string; status:
       data-testid="guide-panel"
       data-step={step.id}
       onMouseDown={keepFocus}
-      className="fixed inset-x-0 bottom-0 z-30 flex flex-col gap-1.5 border-t border-line bg-rail px-3 pb-2 pt-2 shadow-[0_-6px_20px_-12px_rgb(39_32_26/0.25)] wide:static wide:z-auto wide:min-h-0 wide:flex-1 wide:gap-5 wide:overflow-y-auto wide:border-t-0 wide:bg-transparent wide:px-4 wide:pb-4 wide:pt-1 wide:shadow-none"
+      className="fixed inset-x-0 bottom-0 z-30 flex flex-col gap-1.5 border-t border-line bg-rail px-3 pb-2 pt-2 short-narrow:py-1 shadow-[0_-6px_20px_-12px_rgb(39_32_26/0.25)] wide:static wide:z-auto wide:min-h-0 wide:flex-1 wide:gap-5 wide:overflow-y-auto wide:border-t-0 wide:bg-transparent wide:px-4 wide:pb-4 wide:pt-1 wide:shadow-none"
     >
       <section
         aria-labelledby="next-step-title"

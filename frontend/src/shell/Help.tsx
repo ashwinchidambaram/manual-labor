@@ -119,9 +119,9 @@ export default function Help({ onClose, step = "scope", onShowGuide }: { onClose
           <section role="tabpanel" id="help-panel-guide" aria-labelledby="help-tab-guide" hidden={tab !== "guide"} tabIndex={0} data-testid="help-guide" className={`min-h-0 flex-1 overflow-auto px-6 py-4 ${FOCUS} focus-visible:ring-inset`}>
             {onShowGuide ? (
               <p className="mb-4 flex flex-wrap items-center gap-2 rounded-xl bg-sunk px-3.5 py-2.5 text-sm text-muted">
-                The four steps are always on the left; the welcome on Scope can be shown again.
+                The four steps are always on screen: on the left, or along the bottom in a narrow window. The welcome on Scope can be shown again.
                 <button type="button" onClick={onShowGuide} data-testid="show-guide" className={`min-h-[2rem] rounded-lg border border-line-strong bg-raised px-2.5 text-sm font-medium text-ink hover:bg-sunk ${FOCUS}`}>
-                  Show guide panel
+                  Show the welcome again
                 </button>
               </p>
             ) : null}

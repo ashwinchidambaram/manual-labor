@@ -285,7 +285,8 @@ test("UX6 Hide persists: reload keeps it hidden, the server says seen, ? reopens
   await expect(dlg).toBeVisible();
   await expect(dlg.getByRole("tab", { name: "Guide" })).toHaveAttribute("aria-selected", "true");
   // and a first-timer who hid it can find it again from the Guide tab
-  await expect(dlg.getByRole("button", { name: /Show guide panel/ })).toBeVisible();
+  // review M13 P2-19: the button names what it does
+  await expect(dlg.getByRole("button", { name: /Show the welcome again/ })).toBeVisible();
   await page.keyboard.press("Escape");
 });
 
@@ -302,8 +303,9 @@ test("UX8 Agent screen explains an agent pass and what to do with no flags; the 
     c.querySelectorAll("button").forEach((b) => b.remove());
     return c.innerText;
   });
-  expect(withoutButton).toMatch(/handed to a model/i);
-  expect(withoutButton).toMatch(/re-checked/i);
+  // review M13 P2-21: the intro is in plain words ("goes to a model with your note", "checked again by the same checks")
+  expect(withoutButton).toMatch(/goes to a model with your note/i);
+  expect(withoutButton).toMatch(/checked again by the same checks/i);
   const run = page.getByTestId("agent-run");
   if (flags.length === 0) {
     await expect(page.getByTestId("agent-empty")).toContainText("No open flags");
@@ -414,10 +416,22 @@ test("UX10 honest copy: no exclamation marks, em dashes or unexplained bare conf
   await page.goto("/export");
   await expect(page.getByTestId("export-locked")).toBeVisible();
   await scan("export");
-  await page.keyboard.press("?");
   const dlg = page.getByRole("dialog", { name: "Help" });
+  // review M13 P3-22: the Guide as it opens on each of the four screens, then the other two tabs
+  for (const path of ["/scope", "/verify", "/agent", "/export"]) {
+    await page.goto(path);
+    if (path === "/scope") await waitForTree(page);
+    if (path === "/verify") await expect(currentCard(page)).toBeFocused();
+    await page.keyboard.press("?");
+    await expect(dlg).toBeVisible();
+    await expect(dlg.getByRole("tab", { name: "Guide" })).toHaveAttribute("aria-selected", "true");
+    await scan(`help Guide from ${path}`);
+    await page.keyboard.press("Escape");
+    await expect(dlg).toHaveCount(0);
+  }
+  await page.keyboard.press("?");
   await expect(dlg).toBeVisible();
-  for (const tab of ["Guide", "Keyboard shortcuts", "Glossary"]) {
+  for (const tab of ["Keyboard shortcuts", "Glossary"]) {
     await dlg.getByRole("tab", { name: tab }).click();
     await scan(`help ${tab}`);
   }
@@ -445,18 +459,25 @@ test("UX7 Export locked: reason text, counts match the queue, override needs a r
   await expect(page.getByTestId("override-form")).toContainText("a block that starts blocking later is not covered");
   // empty reason is refused, nothing is sent
   const posted: { reason: string; target_id?: string | null; flag_id?: string | null; request_id?: string }[] = [];
+  const statusAfterPosts = (): ExportStatus => {
+    const done = new Set(posted.map((p) => p.target_id));
+    return {
+      ...st,
+      blockers: (st.blockers ?? []).filter((b) => !done.has(b)),
+      overrides: [...(st.overrides ?? []), ...posted.map((p) => ({ reason: p.reason, at: new Date().toISOString(), target_id: p.target_id ?? null, flag_id: null }))],
+    };
+  };
   await page.route("**/api/export/override", async (route) => {
     // intercepted: the shared server records nothing, so later specs see the same gate
     const body = route.request().postDataJSON() as (typeof posted)[number];
     posted.push(body);
-    const done = new Set(posted.map((p) => p.target_id));
-    await route.fulfill({
-      json: {
-        ...st,
-        blockers: (st.blockers ?? []).filter((b) => !done.has(b)),
-        overrides: [...(st.overrides ?? []), ...posted.map((p) => ({ reason: p.reason, at: new Date().toISOString(), target_id: p.target_id ?? null, flag_id: null }))],
-      } satisfies ExportStatus,
-    });
+    await route.fulfill({ json: statusAfterPosts() });
+  });
+  // the screen rereads the status after recording (and the rail's counts invalidate it): once anything was posted,
+  // the reread must agree with the intercepted posts, as the real server would
+  await page.route("**/api/export/status", async (route) => {
+    if (posted.length === 0) return route.continue();
+    await route.fulfill({ json: statusAfterPosts() });
   });
   await page.getByTestId("override-submit").click();
   await expect(page.getByRole("alert").filter({ hasText: "write why" })).toBeVisible();
@@ -471,6 +492,7 @@ test("UX7 Export locked: reason text, counts match the queue, override needs a r
   expect(posted.every((p) => p.reason === reason && p.flag_id == null && typeof p.target_id === "string")).toBe(true);
   expect(new Set(posted.map((p) => p.request_id)).size).toBe(posted.length);
   await page.unroute("**/api/export/override");
+  await page.unroute("**/api/export/status");
   // and the server's gate is untouched
   expect(((await api(request).get<ExportStatus>("/api/export/status")).overrides ?? []).length).toBe((st.overrides ?? []).length);
 });

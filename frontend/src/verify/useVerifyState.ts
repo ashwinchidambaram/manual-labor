@@ -6,6 +6,7 @@ import { useProject } from "../api/queries";
 import type { BlockDetail, EditConflict, FlagCategory, PageBlock, QueueItem, QueuePage, QueueSort, ReviewActionOut } from "../api/schema";
 import { useToast } from "../shell/Toast";
 import { cmpItems, initialState, queueReducer, type ActKind, type QueueEvent, type QueueState } from "./queueReducer";
+import { cardExcerpt, weakestFromDetail } from "./labels";
 import { stepView as stepViewBy } from "./sliderCopy";
 import { CancelledError, useVerifyWrites } from "./useVerifyWrites";
 
@@ -24,8 +25,15 @@ export const pageBlocksKey = (slug: string, page: number) => ["pageBlocks", slug
 export const fetchBlock = async (id: string): Promise<BlockDetail> =>
   unwrap(await client.GET("/api/verify/blocks/{block_id}", { params: { path: { block_id: id } } }));
 
-export function itemFromDetail(d: BlockDetail): QueueItem {
+/**
+ * A queue item for a block outside the loaded list (the pinned card), built by the server's own card rules (shared
+ * helper `cardExcerpt`), so the card reads the same when the block comes back in the list. The section title is not
+ * in the detail: it is kept from the item when this block was seen in the list before.
+ */
+export function itemFromDetail(d: BlockDetail, known?: QueueItem | null): QueueItem {
   const b = d.block;
+  const caption = b.figure_id ? ((d.figures ?? []).find((f) => f.figure_id === b.figure_id)?.record.caption_original ?? null) : null;
+  const ocrMin = d.why?.find((w) => w.kind === "signal" && w.name === "ocr_min");
   return {
     block_id: b.id,
     doc_id: b.doc_id,
@@ -36,10 +44,9 @@ export function itemFromDetail(d: BlockDetail): QueueItem {
     has_numeric_spec: b.has_numeric_spec,
     reasons: d.why?.filter((w) => w.kind === "stale" || (w.kind === "signal" && (w.value ?? 1) < 1)).map((w) => w.name).slice(0, 3) ?? [],
     stale_doc: false,
-    // the queue's own rule (first 120 characters of the text a reviewer sees); the section title is not in the detail
-    excerpt: (b.clean_text ?? b.raw_text).slice(0, 120),
-    section_title: null,
-    weakest_word: null,
+    excerpt: cardExcerpt(b, caption),
+    section_title: known?.section_title ?? null,
+    weakest_word: known?.weakest_word ?? weakestFromDetail(ocrMin?.detail) ?? null,
   };
 }
 
@@ -100,18 +107,25 @@ export function useVerifyState() {
 
   const queueQ = useQuery({
     queryKey: ["verify", "queue", applied] as const,
-    queryFn: async (): Promise<QueuePage> =>
-      unwrap(
+    queryFn: async (): Promise<QueuePage & { writesSeen: number }> => {
+      // the writes settled before this request left: if more settle while it is out, its answer may predate them
+      const writesSeen = writes.settled.current;
+      const page = unwrap(
         await client.GET("/api/verify/queue", {
           params: { query: { limit: PAGE_LIMIT, ...(applied ? { sort: applied.sort, ...(applied.view !== null ? { view_threshold: applied.view } : {}) } : {}) } },
         }),
-      ),
+      );
+      return { ...page, writesSeen };
+    },
     staleTime: Infinity,
     refetchInterval: (q) => (q.state.data?.docs.some((d) => d.state === "pending") ? 3000 : false),
   });
 
-  // Apply server snapshots only while no write is in flight (the acks are authoritative until then).
-  const stash = useRef<QueuePage | null>(null);
+  // Apply server snapshots only while no write is in flight (the acks are authoritative until then), and only a
+  // snapshot that left after the last write settled: an older one lists an approved block as queued and current, and
+  // applying it would take the reviewer back to the block they just approved. It is fetched again instead.
+  const stash = useRef<(QueuePage & { writesSeen: number }) | null>(null);
+  const refetchQueue = queueQ.refetch;
   const writesPending = useRef(0);
   writesPending.current = writes.pending;
   const apply = useCallback(
@@ -126,15 +140,17 @@ export function useVerifyState() {
     const d = queueQ.data;
     if (!d) return;
     if (writesPending.current > 0) stash.current = d;
+    else if (d.writesSeen !== writes.settled.current) void refetchQueue();
     else apply(d);
-  }, [queueQ.data, apply]);
+  }, [queueQ.data, apply, writes.settled, refetchQueue]);
   useEffect(() => {
     if (writes.pending === 0 && stash.current) {
       const d = stash.current;
       stash.current = null;
-      apply(d);
+      if (d.writesSeen !== writes.settled.current) void refetchQueue();
+      else apply(d);
     }
-  }, [writes.pending, apply]);
+  }, [writes.pending, apply, writes.settled, refetchQueue]);
 
   // -- cursor persistence --------------------------------------------------------------------------------------
 
@@ -236,7 +252,7 @@ export function useVerifyState() {
       }
       try {
         const d = await qc.fetchQuery({ queryKey: blockKey(id), queryFn: () => fetchBlock(id), staleTime: Infinity });
-        dispatch({ type: "jump", item: itemFromDetail(d) });
+        dispatch({ type: "jump", item: itemFromDetail(d, ref.current.seen[id]) });
         scheduleCursor();
       } catch (e) {
         if (e instanceof ApiError && (e.status === 422 || e.status === 404)) toast.info("Not in your selection");
@@ -252,7 +268,7 @@ export function useVerifyState() {
     if (!s.currentId || s.pinned?.block_id === s.currentId || s.items.some((i) => i.block_id === s.currentId)) return;
     let live = true;
     qc.fetchQuery({ queryKey: blockKey(s.currentId), queryFn: () => fetchBlock(s.currentId!), staleTime: Infinity })
-      .then((d) => live && dispatch({ type: "pin", item: itemFromDetail(d) }))
+      .then((d) => live && dispatch({ type: "pin", item: itemFromDetail(d, s.seen[d.block.id] ?? (s.pinned?.block_id === d.block.id ? s.pinned : null)) }))
       .catch(() => live && s.items[0] && dispatch({ type: "browse", id: s.items[0].block_id }));
     return () => {
       live = false;

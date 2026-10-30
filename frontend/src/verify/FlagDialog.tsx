@@ -71,6 +71,10 @@ export default function FlagDialog({ onSubmit, onCancel }: Props) {
         className="w-[28rem] max-w-full space-y-3 rounded-2xl bg-raised p-5 text-ink shadow-[0_24px_60px_-20px_rgb(39_32_26/0.45)]"
       >
         <h2 className="text-lg font-semibold">Flag this block</h2>
+        <p className="text-sm text-muted" data-testid="flag-next">
+          It goes to the Agent screen, where a model proposes a fix for you to accept or reject. This flag locks the export until it is resolved on
+          the Agent screen.
+        </p>
         <div ref={group} role="radiogroup" aria-label="Category" tabIndex={0} className={`flex flex-wrap gap-2 rounded p-1 ${FOCUS}`}>
           {FLAG_CATEGORIES.map((c, i) => (
             <button
@@ -100,6 +104,7 @@ export default function FlagDialog({ onSubmit, onCancel }: Props) {
             rows={3}
             className={`mt-1 w-full rounded-lg border border-line-strong bg-raised p-2 ${FOCUS}`}
           />
+          <span className="mt-1 block text-xs text-muted">In the note, Ctrl or Cmd + Enter submits.</span>
         </label>
         <p role="status" className="min-h-[1.25rem] text-sm text-fail" data-testid="flag-msg">
           {msg}
@@ -108,8 +113,16 @@ export default function FlagDialog({ onSubmit, onCancel }: Props) {
           <button type="button" onClick={onCancel} className={`min-h-[2.5rem] rounded-xl border border-line-strong bg-raised px-4 font-semibold ${FOCUS}`}>
             Cancel
           </button>
-          <button type="button" onClick={submit} className={`min-h-[2.5rem] rounded-xl bg-act px-4 font-semibold text-act-on hover:bg-act-hover ${FOCUS} focus-visible:ring-offset-2`}>
+          <button
+            type="button"
+            onClick={submit}
+            className={`inline-flex min-h-[2.5rem] items-center gap-2 rounded-xl bg-act px-4 font-semibold text-act-on hover:bg-act-hover ${FOCUS} focus-visible:ring-offset-2`}
+          >
             Submit
+            {/* Enter submits outside the note; inside it, Ctrl or Cmd + Enter (hotkeys vFlagSubmit, vFlagSubmitMod) */}
+            <kbd aria-hidden="true" className="rounded-md border border-act-line bg-act-hover px-1.5 font-mono text-2xs font-semibold leading-5 text-act-on">
+              Enter
+            </kbd>
           </button>
         </div>
       </div>

@@ -1,5 +1,5 @@
 import type { Block, FaithViolationKind, FigureRailItem, SignalName, WhyItem } from "../api/schema";
-import { label } from "../verify/labels";
+import { human, label, weakestFromDetail } from "../verify/labels";
 import { CLEANUP_ALLOWED, NUMBER_CHOICE } from "./guide";
 
 export type CheckOutcome = "passed" | "failed" | "measured" | "not_run";
@@ -10,7 +10,11 @@ export interface CheckRow {
   outcome: CheckOutcome;
   /** the visible result word(s); always text, never colour alone */
   result: string;
+  /** what a person would say about it (design 13 section 2.8.1), shown before the value; null for a plain fact */
+  sentence?: string | null;
   detail: string | null;
+  /** the scorer's own words at the end of `detail`, verbatim (set in mono, as in "Why this needs you") */
+  raw?: string | null;
 }
 
 const KIND_LABEL: Record<FaithViolationKind, string> = {
@@ -50,10 +54,13 @@ export function checkRows(block: Block, figure?: FigureRailItem | null): CheckRo
   const measured = (id: string, name: string, n: SignalName): CheckRow | null => {
     const s = sig(n);
     if (!s) return null;
+    const weak = n === "ocr_min" ? weakestFromDetail(s.detail) : null;
     return {
       id,
       name,
       outcome: "measured",
+      sentence: weak ? `Least certain word: “${weak}”` : human(n, s.value < 1),
+      raw: s.detail ?? null,
       result: `${fmtSignal(s.value)} (${SCALE[n] ?? "1.00 = nothing wrong"})`,
       detail: [s.critical ? "critical for this block" : null, s.detail ?? null].filter(Boolean).join(". ") || null,
     };
@@ -75,6 +82,7 @@ export function checkRows(block: Block, figure?: FigureRailItem | null): CheckRo
         name: "Faithfulness",
         outcome: f.passed ? "passed" : "failed",
         result: f.passed ? "Passed" : "Failed",
+        sentence: human("faithfulness", !f.passed),
         detail: `${Math.round(f.alignment_ratio * 100)}% of the text aligns with the raw parse; ${(f.violations ?? []).length ? `${plural((f.violations ?? []).length, "violation")}: ${byKind}` : "no violations"}`,
       });
       const numeric = (f.violations ?? []).filter((v) => v.kind === "numeric_mismatch");
@@ -87,6 +95,7 @@ export function checkRows(block: Block, figure?: FigureRailItem | null): CheckRo
         name: "Numbers preserved",
         outcome: numeric.length ? "failed" : "passed",
         result: numeric.length ? "Failed" : "Passed",
+        sentence: numeric.length ? "A number changed in cleanup" : "Every number matches the raw text",
         detail: [numeric.length ? numeric.map((v) => `${v.raw || "(nothing)"} became ${v.clean || "(nothing)"}`).join("; ") : null, chosen].filter(Boolean).join(". ") || null,
       });
     }
@@ -172,13 +181,33 @@ export default function ChecksList({ block, figure, why = [] }: { block: Block; 
           <div key={r.id} className="contents" data-testid={`check-${r.id}`} data-outcome={r.outcome}>
             <dt className="text-muted">{r.name}</dt>
             <dd className="min-w-0">
-              <span className={TONE[r.outcome]}>
-                <span aria-hidden="true" className="mr-1 inline-block w-3 text-center">
-                  {MARK[r.outcome]}
+              {r.outcome === "measured" && r.sentence ? (
+                // a measured agreement: the sentence first, then the value with its scale (never a verdict word)
+                <>
+                  <span className="block font-medium text-ink">{r.sentence}</span>
+                  <span className="block text-xs tabular-nums text-ink">{r.result}</span>
+                </>
+              ) : (
+                <span className={TONE[r.outcome]}>
+                  <span aria-hidden="true" className="mr-1 inline-block w-3 text-center">
+                    {MARK[r.outcome]}
+                  </span>
+                  {r.result}
+                  {r.sentence ? <span className="font-normal text-ink"> · {r.sentence}</span> : null}
                 </span>
-                {r.result}
-              </span>
-              {r.detail ? <span className="block break-words text-xs text-muted">{r.detail}</span> : null}
+              )}
+              {r.detail ? (
+                <span className="mt-0.5 block break-words text-2xs leading-relaxed text-muted">
+                  {r.raw && r.detail.endsWith(r.raw) ? (
+                    <>
+                      {r.detail.slice(0, r.detail.length - r.raw.length)}
+                      <span className="font-mono">{r.raw}</span>
+                    </>
+                  ) : (
+                    r.detail
+                  )}
+                </span>
+              ) : null}
             </dd>
           </div>
         ))}

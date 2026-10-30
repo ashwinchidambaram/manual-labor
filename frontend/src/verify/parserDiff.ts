@@ -8,9 +8,38 @@ export const PAIRS: [string, string][] = [
   ["docx", "docling"],
 ];
 
-/** First parser pair for which both texts exist, in the scoring order. */
-export function pickPair(texts: Record<string, string>): { a: string; b: string; ta: string; tb: string } | null {
+export interface ReadingPair {
+  a: string;
+  b: string;
+  ta: string;
+  tb: string;
+}
+
+/** First parser pair for which both texts exist, in the scoring order (the pair `parser_agreement` compares). */
+export function pickPair(texts: Record<string, string>): ReadingPair | null {
   for (const [a, b] of PAIRS) if (a in texts && b in texts) return { a, b, ta: texts[a], tb: texts[b] };
+  return null;
+}
+
+const TEXT_LAYER = new Set(["pymupdf", "docling"]);
+
+/**
+ * The two readings a signal compared (manuallabor/scoring/agreement.py), so its evidence shows the right pair:
+ * `parser_agreement` the pair named in its detail ("ocr vs ocr_alt 0.25"), else the first pair in scoring order;
+ * `textlayer_vs_ocr` the block's text-layer source against OCR; `ocr_min` the two OCR readings when both exist.
+ * Null when the signal compares no readings or one of them is missing.
+ */
+export function pairForSignal(name: string, texts: Record<string, string>, detail?: string | null, rawSource?: string | null): ReadingPair | null {
+  const mk = (a: string, b: string): ReadingPair | null => (a in texts && b in texts ? { a, b, ta: texts[a], tb: texts[b] } : null);
+  if (name === "parser_agreement") {
+    const m = /^([a-z_]+) vs ([a-z_]+)\b/.exec(detail ?? "");
+    return (m ? mk(m[1], m[2]) : null) ?? pickPair(texts);
+  }
+  if (name === "textlayer_vs_ocr") {
+    const src = rawSource && TEXT_LAYER.has(rawSource) && rawSource in texts ? rawSource : "pymupdf" in texts ? "pymupdf" : "docling";
+    return mk(src, "ocr");
+  }
+  if (name === "ocr_min") return mk("ocr", "ocr_alt");
   return null;
 }
 

@@ -55,6 +55,12 @@ export default function AppShell() {
                   {project.data?.name}
                 </span>
               </div>
+              {/* below `wide` the rail's footer note is not shown: model output is labelled in the header at every width */}
+              {project.data?.mock ? (
+                <p role="note" data-testid="demo-note" className="min-w-0 truncate rounded-md border border-dashed border-line-strong px-2 py-0.5 text-2xs text-muted wide:hidden">
+                  <strong className="font-semibold text-ink">Demo models are on:</strong> model output is placeholder text
+                </p>
+              ) : null}
               <Hint id="help">
                 <button
                   type="button"
