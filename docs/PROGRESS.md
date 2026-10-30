@@ -438,3 +438,41 @@ $ npx playwright test                                                          #
 $ fresh clone of origin/main at 0f4484c: uv sync, npm ci && npm run build, labor check, labor serve
 labor check: all checks passed / root 200 / GET /api/project 200
 ```
+
+## Fix wave — CI on Linux, first-user run, full code review — PASSED 2026-10-30
+
+Scope: CI had never passed on GitHub (80 of 80 runs red). A first-time user ("Dana", an agent allowed only the browser) ran two manuals through the UI on a recorded session; a fresh Fable reviewer read the whole repository. The findings were fixed by nine implementation agents in two waves, each change design-noted, failing-test-first, and read by two fresh reviewers (backend and UX), whose findings were fixed in a third round. Details per module are in the dated 2026-10-30 sections of `docs/design/`.
+
+CI on ubuntu x86-64:
+- Fixture generation is platform-independent: pixel hashes instead of PNG bytes (Pillow's zlib-ng differs per CPU), a zlib-based PNG writer for the DOCX images, an integer box downscale and an integer Bresenham line rasteriser (Pillow's wide-line path differs per architecture by one pixel). F2 byte identity holds on macOS arm64 and Linux x86-64.
+- The OCR born-digital floor is keyed by engine; the all-ties clustering test asserts a partition (scipy tie-breaking differs by platform, design 04 §3.3); Tesseract installed in the Python job; Docling models downloaded on a cache miss in the Playwright job.
+- The 2-vCPU runner cannot meet the 500 ms ack budgets while Docling runs; `latencyBudget` in `e2e/helpers.ts` doubles them below 4 cores with the reason recorded (design 09 §12). Route handlers are removed after each test.
+
+Dana's findings (report, diary, 115 screenshots and the recorded video are in the session scratchpad; the second run is below):
+- A batch of block overrides silently covered an open flag and unlocked the export (design 11 P3 amended; a block override never covers a flag; flags get their own override on the Export screen; the refusal is a 422 that names the flag).
+- A manual added after the selection was touched arrived unselected (`Selection.known_docs`; a grouped manual not yet seen is fully selected; design 08 §10).
+- The agent pass failed every item: `llama3.2:1b` cannot follow the proposal schema. `qwen2.5:3b` is the smallest local model that does (live trial on test 31b); it is the default `models.agent`, an `agent` row in the probe tiers, accounted as its own resident group so the small tier still fits 16 GB (design 06 §5.3, 10 §11).
+- Export counts did not reconcile (184 against 160 in scope): `ExportStatus.counts` partitions the scope, page headers and footers excluded; the last export sits on top after success.
+- "Verifier disagrees" was a false alarm on 36 of 37 blocks: the check accepted any span found in the text. It now skips whitespace-only cleanups and flags only a span on a real raw-versus-clean change, shown beside the verdict (design 03 §2.10a); `SCORING_ALGO_VERSION` 6; the false "prompt truncated" guard is bounded by prompt bytes (design 06).
+- Progress: named steps with real inner counts, "working, no estimate" when none, a one-line sticky bar, rail states from server truth, "Scoring in progress, N of M" instead of "All caught up", an explanation when totals move, deterministic topic naming (no more "Parts List" / "parts list"), readable article file names.
+- The UI is fluid: columns are `clamp()` of the window width, panes follow the height, verified at 720x450 to 2560x1440 and at 150 and 200 percent zoom (design 13 §9).
+
+Code review (F1 to F18): `.part` temp files for every outside-the-lock writer and a start-up cleaner for leftovers; override sequence numbers allocated inside the transaction; fail-closed re-parse guard with a quoted database URI; fsync before rename; unique upload temp names and a 200 MB cap; `ProjectPaths` for `.llm_cache` and `probe.json`; cached reads keyed on file stats plus the last action id (export status poll 200 ms to 2.7 ms, scope blocks 166 ms to 3.5 ms at 424 blocks); selection log deltas (24.8 KiB to 1.2 KiB per click); indexed, pruned jobs table; a titles endpoint for blockers; Host/Origin/Sec-Fetch-Site guard on the local API, non-loopback bind warning, no global KeyError-to-404, Tesseract timeouts; three unused runtime dependencies removed, reportlab to dev, the wheel carries the UI, README states PyMuPDF's AGPL; lock order between the agent/calibration paths and the runner fixed.
+
+Process-exit hang found by the gate: `labor run`'s spawned render workers spun forever in onnxruntime 1.31.1's telemetry teardown. `ORT_DISABLE_TELEMETRY=1` is forced at import and in every worker (the library also wrote a Microsoft telemetry store under Application Support, against invariant 6), the render pool shutdown is bounded, and every test subprocess has a timeout (`tests/subproc.run_bounded`).
+
+```
+$ uv run pytest -p no:warnings -o addopts="-m 'not slow' --basetemp=.pytest_tmp_gate"
+1869 passed, 73 skipped, 3 deselected in 2253.60s (0:37:33)
+$ uv run ruff check manuallabor/ tests/ scripts/ && uv run ruff format --check manuallabor/ tests/ scripts/ && uv run mypy manuallabor/
+All checks passed! / 410 files already formatted / Success: no issues found in 195 source files
+$ uv run labor schemas export --check && uv run labor openapi export --check
+schemas up to date / openapi up to date
+$ cd frontend && npm run typecheck && npm test -- --run
+tsc clean
+ Test Files  54 passed (54)
+      Tests  443 passed (443)
+$ npm run e2e
+99 passed, 1 skipped (opt-in reader's pass) in 8.2m; two earlier full runs 88/90 passed: later-ingest (summary docs count, a server bug, fixed) and VE3 (no timeout on a four-job wait, now 240 s)
+$ GitHub Actions on ci-linux (ubuntu-latest): python job green from 06d3ce2 on; see the run for the final commit
+```
