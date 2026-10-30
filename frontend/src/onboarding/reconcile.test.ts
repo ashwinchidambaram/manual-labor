@@ -17,7 +17,7 @@ describe("U4 reconcile", () => {
   it("doc identity: parsed = headers/footers + in topics + unassigned", () => {
     const r = reconcileDoc(alphaBlocks(), alpha());
     expect(r).toMatchObject({ parsed: 9, headerFooter: 2, inGroups: 6, unassigned: 1, missing: [], ok: true, view: "topics" });
-    expect(docReconcileText(r)).toBe("9 parsed = 2 headers and footers (excluded) + 6 in topics + 1 unassigned");
+    expect(docReconcileText(r)).toBe("9 blocks found = 6 in topics + 1 not placed + 2 page headers and footers, left out");
   });
   it("a parsed block in no group is reported as missing", () => {
     const r = reconcileDoc([...alphaBlocks(), row(bid(5, 1))], alpha());

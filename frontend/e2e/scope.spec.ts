@@ -159,8 +159,8 @@ test("E4 low-cohesion marker", async ({ page }) => {
   await waitForTree(page);
   const badges = page.getByTestId("low-cohesion");
   await expect(badges).toHaveCount(1);
-  await expect(badges.first()).toHaveText("Low cohesion");
-  await expect(badges.first()).toHaveAttribute("aria-label", "Low cohesion 0.10");
+  await expect(badges.first()).toHaveText("Mixed subjects");
+  await expect(badges.first()).toHaveAttribute("aria-label", "Mixed subjects, cohesion 0.10");
   await expect(page.locator("[data-testid=row]", { hasText: "Unassigned blocks" }).first().getByTestId("low-cohesion")).toHaveCount(0);
 });
 

@@ -1,17 +1,23 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ApiError, client, unwrap } from "../api/client";
-import { trackJob, useExportStatus } from "../api/queries";
+import { trackJob, useExportStatus, useSources } from "../api/queries";
 import type { FigureRailItem, FlagCategory, PageRef } from "../api/schema";
 import { useHotkeys } from "../hooks/useHotkeys";
+import { useNextStep } from "../shell/nextStep";
 import { useToast } from "../shell/Toast";
+import { Keycap } from "../onboarding/Copy";
+import { keyLabel } from "../onboarding/guide";
+import { coachFor } from "./coach";
+import { pageMarks } from "./pageMarks";
+import PageStrip from "./PageStrip";
 import ActionBar from "./ActionBar";
 import CropEditor from "./CropEditor";
 import ExtractedPane, { diffOps, type EditState } from "./ExtractedPane";
 import FigureRail from "./FigureRail";
 import FlagDialog from "./FlagDialog";
 import { validCrop, type BBox } from "./geometry";
-import { FOCUS } from "./labels";
+import { cardTitle, FOCUS } from "./labels";
 import Queue from "./Queue";
 import SourcePane from "./SourcePane";
 import StatusStrip from "./StatusStrip";
@@ -250,6 +256,17 @@ export default function VerifyScreen() {
   );
 
   const sourcePage = crop?.page ?? detail?.page ?? null;
+  const currentItem = state.items.find((i) => i.block_id === currentId) ?? (state.pinned?.block_id === currentId ? state.pinned : null);
+  const sources = useSources();
+  const docTitles = useMemo(() => new Map((sources.data ?? []).map((x) => [x.slug, x.filename])), [sources.data]);
+  const docTitle = currentItem ? ((sources.data ?? []).find((x) => x.slug === currentItem.doc_id)?.filename ?? null) : null;
+  const title = currentItem ? cardTitle(currentItem.section_title, docTitle, currentItem.page, currentItem.type) : null;
+  const ownDetail = detail && detail.block.id === currentId ? detail : undefined;
+  useNextStep(currentId ? coachFor(ownDetail, currentItem?.weakest_word) : null);
+  const marks = useMemo(() => pageMarks(ownDetail?.block ?? null, ownDetail?.why ?? []), [ownDetail]);
+  const showStrip = !zoom && !crop && !!ownDetail && !!ownDetail.page.render_url && ownDetail.page.width > 0 && (ownDetail.block.bbox ?? []).length === 4;
+  const big = zoom || !!crop;
+  const at = state.items.findIndex((i) => i.block_id === currentId);
   const cropState = useMemo(
     () => (crop && crop.box ? { box: crop.box, onChange: (b: BBox) => setCrop((c) => (c ? { ...c, box: b } : c)) } : null),
     [crop],
@@ -263,7 +280,7 @@ export default function VerifyScreen() {
     : null;
 
   return (
-    <main className="flex min-h-[calc(100vh-8rem)] flex-col" data-testid="verify-screen">
+    <main className="flex min-h-0 flex-1 flex-col" data-testid="verify-screen">
       <h2 className="sr-only">Verify</h2>
       <StatusStrip
         counts={state.counts}
@@ -279,32 +296,77 @@ export default function VerifyScreen() {
         saveState={saveState}
       />
       {v.queueQ.isError ? (
-        <div role="alert" className="flex items-center gap-2 bg-red-50 px-4 py-2 text-sm text-red-900" data-testid="queue-error">
+        <div role="alert" className="flex shrink-0 items-center gap-2 bg-fail-wash px-4 py-2 text-sm text-ink wide:px-7" data-testid="queue-error">
+          <span aria-hidden="true" className="font-bold text-fail">
+            ✕
+          </span>
           Could not load the review queue.
-          <button type="button" className={`rounded border border-red-500 px-2 ${FOCUS}`} onClick={() => void v.queueQ.refetch()}>
+          <button type="button" className={`min-h-[2rem] rounded-lg border border-line-strong bg-raised px-2.5 ${FOCUS}`} onClick={() => void v.queueQ.refetch()}>
             Retry
           </button>
         </div>
       ) : null}
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-0 lg:grid-cols-[18rem_1fr_1fr] xl:h-[calc(100vh-13rem)] xl:grid-cols-[20rem_1fr_1fr_16rem] group-data-[guide=open]/shell:xl:h-auto group-data-[guide=open]/shell:xl:grid-cols-[18rem_1fr_1fr] group-data-[guide=open]/shell:2xl:h-[calc(100vh-13rem)] group-data-[guide=open]/shell:2xl:grid-cols-[20rem_1fr_1fr_16rem]">
-        <div className="h-72 lg:h-auto xl:h-full">
-          <Queue
-            items={state.items}
-            total={state.total}
-            pinned={state.pinned}
-            currentId={currentId}
-            docs={state.docs}
-            counts={state.counts}
-            focusTick={v.focusTick}
-            wantFocus={v.wantFocus}
-            focusBlocked={v.focusBlocked}
-            onSelect={v.browse}
-            onNearEnd={() => void v.loadMore()}
-            threshold={v.T}
-            gate={exportGate.data}
-          />
-        </div>
-        <div className="order-3 flex min-h-0 flex-col lg:order-none">
+      {/* one row that fills the frame: the queue and the work area scroll inside it, never the frame */}
+      <div className="flex min-h-0 flex-1 flex-col wide:grid wide:grid-cols-[20rem_minmax(0,1fr)] wide:grid-rows-[minmax(0,1fr)]">
+        <Queue
+          items={state.items}
+          total={state.total}
+          pinned={state.pinned}
+          currentId={currentId}
+          docs={state.docs}
+          counts={state.counts}
+          focusTick={v.focusTick}
+          wantFocus={v.wantFocus}
+          focusBlocked={v.focusBlocked}
+          onSelect={v.browse}
+          onNearEnd={() => void v.loadMore()}
+          threshold={v.T}
+          gate={exportGate.data}
+          docTitles={docTitles}
+        />
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <div
+            data-testid="page-band"
+            className={`flex shrink-0 gap-4 border-b border-line bg-sunk px-4 py-3 wide:gap-5 wide:px-7 ${big ? "flex-col" : "items-start"}`}
+          >
+            {showStrip && ownDetail ? <PageStrip page={ownDetail.page} bbox={ownDetail.block.bbox as number[]} marks={marks} pageNo={ownDetail.page.page} /> : null}
+            <div className={big || !showStrip ? "flex min-w-0 flex-1 flex-col gap-2" : "hidden w-[8.5rem] shrink-0 flex-col gap-1.5 wide:flex"}>
+              <p className="flex items-baseline justify-between gap-2 text-2xs font-semibold uppercase tracking-[0.07em] text-muted">
+                <span>{sourcePage ? `Page ${sourcePage.page}` : "Page"}</span>
+                {big && !crop ? (
+                  <span className="flex items-center gap-1 font-normal normal-case tracking-normal">
+                    <Keycap>{keyLabel("vZoom")}</Keycap> back to the block
+                  </span>
+                ) : null}
+              </p>
+              {sourcePage ? (
+                <SourcePane page={sourcePage} detail={detail ?? null} currentId={currentId} zoom={zoom} onJump={(id) => void v.jumpTo(id)} crop={cropState} />
+              ) : (
+                <section role="region" aria-label="Source page" className="text-sm text-muted">
+                  No block selected
+                </section>
+              )}
+              {!big && sourcePage?.render_url ? (
+                <p className="flex flex-wrap items-center gap-1 text-2xs text-muted">
+                  <Keycap>{keyLabel("vZoom")}</Keycap> whole page
+                </p>
+              ) : null}
+              {crop ? (
+                <CropEditor
+                  figureId={crop.item.figure_id}
+                  box={crop.box}
+                  page={crop.page}
+                  onChange={(b) => setCrop((c) => (c ? { ...c, box: b } : c))}
+                  onSave={() => void saveCrop()}
+                  onCancel={() => {
+                    setCrop(null);
+                    focusCard();
+                  }}
+                  busy={crop.busy}
+                />
+              ) : null}
+            </div>
+          </div>
           <ExtractedPane
             detail={detail}
             loading={detailQ.isLoading && currentId !== null}
@@ -316,38 +378,16 @@ export default function VerifyScreen() {
             onConfirmConflict={() => void saveEdit(true)}
             onKeepEditing={() => setEdit((e) => (e ? { ...e, conflict: null, conflictText: null } : e))}
             threshold={v.T}
+            title={title}
+            aside={<FigureRail detail={detail} enqueue={v.writes.enqueue} onCrop={(it) => void openCrop(it)} />}
           />
-        </div>
-        <div className="order-2 flex max-h-[80vh] min-h-0 flex-col lg:order-none xl:max-h-none group-data-[guide=open]/shell:xl:max-h-[80vh] group-data-[guide=open]/shell:2xl:max-h-none">
-          {sourcePage ? (
-            <SourcePane page={sourcePage} detail={detail ?? null} currentId={currentId} zoom={zoom} onJump={(id) => void v.jumpTo(id)} crop={cropState} />
-          ) : (
-            <section role="region" aria-label="Source page" className="p-3 text-sm text-slate-600">
-              No block selected
-            </section>
-          )}
-          {crop ? (
-            <CropEditor
-              figureId={crop.item.figure_id}
-              box={crop.box}
-              page={crop.page}
-              onChange={(b) => setCrop((c) => (c ? { ...c, box: b } : c))}
-              onSave={() => void saveCrop()}
-              onCancel={() => {
-                setCrop(null);
-                focusCard();
-              }}
-              busy={crop.busy}
-            />
-          ) : null}
-        </div>
-        <div className="order-4 min-h-0 lg:col-span-3 xl:col-span-1 group-data-[guide=open]/shell:xl:col-span-3 group-data-[guide=open]/shell:2xl:col-span-1">
-          <FigureRail detail={detail} enqueue={v.writes.enqueue} onCrop={(it) => void openCrop(it)} />
         </div>
       </div>
       <ActionBar
         hasCurrent={currentId !== null}
         isFigure={!!isFigure}
+        numeric={!!ownDetail?.block.has_numeric_spec}
+        position={at >= 0 ? `Block ${at + 1} of ${state.total}` : null}
         onApprove={() => void approve()}
         onEdit={startEdit}
         onFlag={() => state.currentId && setFlagOpen(true)}

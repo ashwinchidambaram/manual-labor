@@ -5,7 +5,7 @@ import { trackJob, useCancelJob } from "../api/queries";
 import type { JobInfo } from "../api/schema";
 import { useJobsPolling } from "../hooks/useJobsPolling";
 
-const BTN = "rounded border border-slate-400 px-2 py-0.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600";
+const BTN = "min-h-[1.75rem] rounded-md border border-line-strong bg-raised px-2 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus";
 
 /** "What now" for a failed job (design 12 section 2.6): retry the same plan where that is safe, or read its log. */
 function FailedHelp({ job, onRetried }: { job: JobInfo; onRetried: () => void }) {
@@ -47,7 +47,7 @@ function FailedHelp({ job, onRetried }: { job: JobInfo; onRetried: () => void })
       </button>
       {msg ? <span className="text-xs">{msg}</span> : null}
       {log ? (
-        <pre className="basis-full max-h-40 overflow-auto whitespace-pre-wrap rounded bg-white p-1 text-xs text-slate-800" data-testid="job-log">
+        <pre className="basis-full max-h-40 overflow-auto whitespace-pre-wrap rounded-lg bg-raised p-2 font-mono text-2xs text-ink" data-testid="job-log">
           {log.length ? log.join("\n") : "The log is empty."}
         </pre>
       ) : null}
@@ -62,13 +62,13 @@ export default function JobsBar() {
 
   if (!jobs.length && !failed.length) return null;
   return (
-    <div className="flex flex-col gap-1 text-sm" data-testid="jobs-bar" aria-label="Background jobs" role="region">
+    <div className="flex shrink-0 flex-col gap-1 border-b border-line bg-sunk px-4 py-2 text-sm wide:px-8" data-testid="jobs-bar" aria-label="Background jobs" role="region">
       {jobs.map((j) => (
         <div key={j.id} className="flex items-center gap-2" data-testid="job-row">
           <span className="font-medium">{j.kind}</span>
-          <span className="text-slate-600">{[j.node, j.doc, j.message].filter(Boolean).join(" / ")}</span>
-          <progress className="h-2 w-40" max={1} value={j.progress} aria-label={`${j.kind} progress`} />
-          <span className="tabular-nums text-xs text-slate-600">
+          <span className="text-muted">{[j.node, j.doc, j.message].filter(Boolean).join(" / ")}</span>
+          <progress className="h-2 w-40 accent-[var(--act)]" max={1} value={j.progress} aria-label={`${j.kind} progress`} />
+          <span className="tabular-nums text-xs text-muted">
             {j.units_done}/{j.units_total}
           </span>
           <button type="button" className={BTN} onClick={() => cancel.mutate(j.id)}>
@@ -77,7 +77,7 @@ export default function JobsBar() {
         </div>
       ))}
       {failed.map((j) => (
-        <div key={j.id} role="alert" className="flex flex-wrap items-center gap-2 rounded bg-red-50 px-2 py-1 text-red-800" data-testid="job-failed">
+        <div key={j.id} role="alert" className="flex flex-wrap items-center gap-2 rounded-lg bg-fail-wash px-3 py-1.5 text-ink" data-testid="job-failed">
           <span>
             Job {j.kind} {j.status}: {j.error ?? j.message ?? "no details"}
           </span>

@@ -40,12 +40,12 @@ export function Marked({ text, ranges, breaks = false }: { text: string; ranges:
 
 const CLS: Record<string, string> = {
   equal: "",
-  "del-ok": "text-slate-500 line-through",
-  "del-bad": "font-bold text-red-700 line-through",
-  "ins-ok": "text-slate-500 underline",
-  "ins-bad": "font-bold text-red-700 underline",
-  "move-ok": "text-blue-700 before:content-['⇅'] before:mr-0.5",
-  "move-bad": "text-red-700 before:content-['⇅'] before:mr-0.5",
+  "del-ok": "text-muted line-through",
+  "del-bad": "font-bold text-fail line-through",
+  "ins-ok": "text-muted underline",
+  "ins-bad": "font-bold text-fail underline",
+  "move-ok": "text-muted before:content-['⇅'] before:mr-0.5",
+  "move-bad": "text-fail before:content-['⇅'] before:mr-0.5",
 };
 const TITLE: Record<string, string | undefined> = {
   "del-bad": "removed",
@@ -73,19 +73,19 @@ function SegSpan({ s }: { s: Segment }) {
 }
 
 export default function DiffView({ ops }: { ops: DiffOp[] }) {
-  if (isIdentical(ops)) return <p data-testid="diff-identical" className="text-sm text-slate-600">Identical to raw</p>;
+  if (isIdentical(ops)) return <p data-testid="diff-identical" className="font-sans text-sm text-muted">Identical to raw</p>;
   const segs = diffSegments(ops);
   return (
     <div>
-      <div data-testid="diff-view" className="whitespace-pre-wrap break-words text-sm leading-relaxed">
+      <div data-testid="diff-view" className="whitespace-pre-wrap break-words leading-[1.7]">
         {segs.map((s, i) => (
           <SegSpan key={i} s={s} />
         ))}
       </div>
-      <p className="mt-2 text-xs text-slate-600" data-testid="diff-legend">
-        Legend: <del className="text-slate-500">removed</del> <ins className="text-slate-500">added</ins>{" "}
-        <del className="font-bold text-red-700">removed (changes content)</del> <ins className="font-bold text-red-700">added (changes content)</ins>{" "}
-        <span className="text-blue-700 before:content-['⇅']">moved</span>; spaces show as ␣ and line breaks as ↵
+      <p className="mt-3 font-sans text-xs text-muted" data-testid="diff-legend">
+        Legend: <del className="text-muted">removed</del> <ins className="text-muted">added</ins>{" "}
+        <del className="font-bold text-fail">removed (changes content)</del> <ins className="font-bold text-fail">added (changes content)</ins>{" "}
+        <span className="text-muted before:content-['⇅']">moved</span>; spaces show as ␣ and line breaks as ↵
       </p>
     </div>
   );

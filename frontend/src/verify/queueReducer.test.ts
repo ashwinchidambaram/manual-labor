@@ -12,6 +12,7 @@ const item = (n: number, over: Partial<QueueItem> = {}): QueueItem => ({
   has_numeric_spec: false,
   reasons: [],
   stale_doc: false,
+  excerpt: "",
   ...over,
 });
 const ids = (s: QueueState) => s.items.map((i) => i.block_id.slice(-2));

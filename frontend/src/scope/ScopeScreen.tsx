@@ -28,20 +28,22 @@ import ViewToggle from "./ViewToggle";
 import { Keycap } from "../onboarding/Copy";
 import { keyLabel } from "../onboarding/guide";
 import Hint from "../onboarding/Hint";
+import WelcomeBand, { welcomeFacts } from "../onboarding/WelcomeBand";
+import { useGuide } from "../shell/nextStep";
 
 const VIEW_NAME: Record<View, string> = { topic: "Suggested topics", structure: "Document structure" };
-const FOCUS = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600";
+const FOCUS = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus";
 
 function Panel({ error, retry, children, testid }: { error: Error | null; retry: () => void; children: React.ReactNode; testid: string }) {
   if (!error) return <>{children}</>;
   const e = error as Error & { code?: string; detail?: string };
   return (
-    <div role="alert" data-testid={testid} className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-900">
+    <div role="alert" data-testid={testid} className="rounded-xl border border-fail-line bg-fail-wash p-3 text-sm text-ink">
       <p>
         {e.code ? `${e.code}: ` : ""}
         {e.detail ?? e.message}
       </p>
-      <button type="button" onClick={retry} className={`mt-1 rounded border border-red-400 px-2 py-0.5 ${FOCUS}`}>
+      <button type="button" onClick={retry} className={`mt-1.5 min-h-[2rem] rounded-lg border border-line-strong bg-raised px-2.5 ${FOCUS}`}>
         Retry
       </button>
     </div>
@@ -53,12 +55,12 @@ function Notice({ error, retry, testid, children }: { error: Error | null; retry
   if (!error) return null;
   const e = error as Error & { code?: string; detail?: string };
   return (
-    <div role="alert" data-testid={testid} className="flex items-center gap-2 rounded border border-amber-300 bg-amber-50 px-2 py-1 text-sm text-amber-950">
+    <div role="alert" data-testid={testid} className="flex items-center gap-2 rounded-xl border border-fail-line bg-fail-wash px-3 py-1.5 text-sm text-ink">
       <span>
         {children} ({e.code ? `${e.code}: ` : ""}
         {e.detail ?? e.message})
       </span>
-      <button type="button" onClick={retry} className={`rounded border border-amber-500 px-2 text-xs ${FOCUS}`}>
+      <button type="button" onClick={retry} className={`min-h-[2rem] rounded-lg border border-line-strong bg-raised px-2.5 text-xs ${FOCUS}`}>
         Retry
       </button>
     </div>
@@ -279,135 +281,152 @@ export default function ScopeScreen() {
     confirm: () => void onConfirm(),
   });
 
+  const guide = useGuide();
+  const welcome = guide?.open && summary && sources.data?.length ? welcomeFacts(sources.data, summary, eng.ids.size > 0 && eng.ids.size === index.selectable.size) : null;
   const noSources = sources.isSuccess && sources.data.length === 0 && eng.docs.length === 0;
   const jobsList = jobs.data ?? [];
 
   return (
-    <main
-      className="grid grid-cols-1 gap-4 p-4 lg:grid-cols-[18rem_minmax(0,1fr)_20rem] group-data-[guide=open]/shell:max-xl:pb-28"
-      data-testid="scope-screen"
-    >
-      <aside className="flex flex-col gap-4" aria-label="Sources panel">
-        <Notice error={status.error} retry={() => void status.refetch()} testid="status-error">
-          Processing status is unavailable.
-        </Notice>
-        <Panel error={sources.error} retry={() => void sources.refetch()} testid="sources-error">
-          <SourcesList
-            sources={sources.data ?? []}
-            status={status.data}
-            jobs={jobsList}
-            onGoTo={(slug) => {
-              document.querySelector(`[data-doc='${slug}']`)?.scrollIntoView({ block: "start" });
-              const first = rows.find((r) => r.docId === slug);
-              if (first) setCursor(first.group.id);
-            }}
-          />
-        </Panel>
-      </aside>
-
-      <div className="flex min-w-0 flex-col gap-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <ViewToggle view={view} onChange={changeView} />
-          <span className="text-xs text-slate-600">
-            Press <Keycap>{keyLabel("help")}</Keycap> for the guide and keyboard shortcuts
-          </span>
-        </div>
-        <Notice error={jobs.error} retry={() => void jobs.refetch()} testid="jobs-error">
-          Background jobs cannot be listed.
-        </Notice>
-        <Notice error={eng.blocksError} retry={eng.retryBlocks} testid="blocks-error">
-          Live counts are unavailable until the block index loads; the server still saves your choices.
-        </Notice>
-        <div role="status" aria-live="polite" data-testid="live" className="sr-only">
-          {live}
-        </div>
-        <Panel error={eng.groupsError ?? eng.selectionError} retry={eng.retry} testid="tree-error">
-          {noSources ? (
-            <div data-testid="scope-empty" className="rounded border border-dashed border-slate-400 px-6 py-8 text-center">
-              <p className="mx-auto max-w-prose text-sm text-slate-700">Manual Labor turns PDF and DOCX manuals into a reviewed knowledge base.</p>
-              <p className="mb-3 mt-1 font-medium">Step 1: add documents.</p>
-              <UploadButton label="Add documents" />
-            </div>
-          ) : eng.isLoading ? (
-            <div aria-busy="true" data-testid="tree-loading" className="flex flex-col gap-1">
-              {[0, 1, 2, 3].map((i) => (
-                <div key={i} className="h-12 animate-pulse rounded bg-slate-200" />
-              ))}
-            </div>
-          ) : (
-            <GroupTree
-              docs={eng.docs}
-              rows={rows}
-              view={view}
-              coverage={coverage}
-              checks={checks}
-              expanded={expanded}
-              cursor={cursorId}
-              stale={eng.pending > 0}
-              filenames={filenames}
-              ungrouped={ungrouped}
-              onCursor={setCursor}
-              onToggle={toggleRow}
-              onSelectOnly={selectOnly}
-              onSelectDoc={selectDoc}
-              onExpand={toggleExpanded}
-              onExpandKey={(id) => {
-                const a = expandAction(rows, id, expanded);
-                if (!a) return;
-                if ("expand" in a) toggleExpanded(a.expand);
-                else setCursor(a.move);
-              }}
-              onCollapseKey={(id) => {
-                const a = collapseAction(rows, id, expanded);
-                if (!a) return;
-                if ("collapse" in a) toggleExpanded(a.collapse);
-                else setCursor(a.move);
-              }}
-              onMove={(d) => setCursor(moveCursor(rows, cursorId, d))}
-              onEdge={(w) => setCursor(rows.length ? rows[w === "first" ? 0 : rows.length - 1].group.id : null)}
-            />
-          )}
-        </Panel>
-      </div>
-
-      <aside className="flex flex-col gap-4" aria-label="Summary and models">
-        {summary ? <SplitModeControl split={split} summary={summary} view={view} onChange={changeSplit} /> : null}
-        {summary ? <SelectionSummary summary={summary} processing={ungrouped.length} /> : null}
-        {summary ? (
-          <div className="flex gap-2" data-testid="select-controls">
-            <Hint id="selectAll">
-              <button type="button" onClick={selectAll} className={`flex-1 rounded border border-slate-400 bg-white px-2 py-1 text-sm hover:bg-slate-100 ${FOCUS}`}>
-                Select all
-              </button>
-            </Hint>
-            <Hint id="selectNone">
-              <button
-                type="button"
-                onClick={selectNone}
-                data-testid="clear-selection"
-                className={`flex-1 rounded border px-2 py-1 text-sm ${FOCUS} ${armed ? "border-amber-500 bg-amber-50 text-amber-950" : "border-slate-400 bg-white hover:bg-slate-100"}`}
-              >
-                {armed ? "Press again to clear" : "Clear selection"}
-              </button>
-            </Hint>
+    <main className="flex flex-col gap-6 px-4 pb-28 pt-5 wide:px-8 wide:pb-10 wide:pt-6" data-testid="scope-screen">
+      <h2 className="text-xl font-semibold tracking-[-0.01em] text-ink">Choose what goes into your knowledge base</h2>
+      {welcome && guide ? <WelcomeBand facts={welcome} onDismiss={guide.hide} /> : null}
+      {guide?.saveError ? (
+        <p role="alert" className="rounded-xl border border-fail-line bg-fail-wash px-3 py-2 text-sm text-ink">
+          {guide.saveError}
+        </p>
+      ) : null}
+      <div className="grid grid-cols-1 gap-x-8 gap-y-6 xl:grid-cols-[minmax(0,1fr)_21rem]">
+        <div className="flex min-w-0 flex-col gap-6">
+          <div className="flex flex-col gap-3" aria-label="Sources panel" role="group">
+            <Notice error={status.error} retry={() => void status.refetch()} testid="status-error">
+              Processing status is unavailable.
+            </Notice>
+            <Panel error={sources.error} retry={() => void sources.refetch()} testid="sources-error">
+              <SourcesList
+                sources={sources.data ?? []}
+                status={status.data}
+                jobs={jobsList}
+                onGoTo={(slug) => {
+                  document.querySelector(`[data-doc='${slug}']`)?.scrollIntoView({ block: "start" });
+                  const first = rows.find((r) => r.docId === slug);
+                  if (first) setCursor(first.group.id);
+                }}
+              />
+            </Panel>
           </div>
-        ) : null}
-        {/* while the guide is a bottom sheet, the primary action is pinned just above it so the sheet never covers it */}
-        <div
-          data-testid="confirm-dock"
-          className="group-data-[guide=open]/shell:max-xl:fixed group-data-[guide=open]/shell:max-xl:inset-x-0 group-data-[guide=open]/shell:max-xl:bottom-[var(--guide-sheet,0px)] group-data-[guide=open]/shell:max-xl:z-20 group-data-[guide=open]/shell:max-xl:border-t group-data-[guide=open]/shell:max-xl:border-slate-300 group-data-[guide=open]/shell:max-xl:bg-white group-data-[guide=open]/shell:max-xl:px-4 group-data-[guide=open]/shell:max-xl:py-2"
-        >
-          <ConfirmButton
-            blocks={summary?.blocks ?? 0}
-            processing={processing}
-            busy={confirm.isPending}
-            onConfirm={() => void onConfirm()}
-          />
+
+          <div className="flex min-w-0 flex-col gap-3">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+              <h3 className="text-lg font-semibold text-ink">Topics</h3>
+              <ViewToggle view={view} onChange={changeView} />
+              <span className="ml-auto flex flex-wrap items-center gap-1 text-xs text-muted">
+                <Keycap>{keyLabel("toggleView")}</Keycap> switch <span aria-hidden="true">·</span> <Keycap>{keyLabel("toggleRow")}</Keycap> select{" "}
+                <span aria-hidden="true">·</span> <Keycap>{keyLabel("moveDown")}</Keycap>
+                <Keycap>{keyLabel("moveUp")}</Keycap> move
+              </span>
+            </div>
+            <p className="-mt-1 text-sm text-muted">Same blocks, two ways to browse. Switching never changes what is selected.</p>
+            <Notice error={jobs.error} retry={() => void jobs.refetch()} testid="jobs-error">
+              Background jobs cannot be listed.
+            </Notice>
+            <Notice error={eng.blocksError} retry={eng.retryBlocks} testid="blocks-error">
+              Live counts are unavailable until the block index loads; the server still saves your choices.
+            </Notice>
+            <div role="status" aria-live="polite" data-testid="live" className="sr-only">
+              {live}
+            </div>
+            <Panel error={eng.groupsError ?? eng.selectionError} retry={eng.retry} testid="tree-error">
+              {noSources ? (
+                <div data-testid="scope-empty" className="rounded-2xl border border-dashed border-line-strong bg-raised px-6 py-10 text-center">
+                  <p className="mx-auto max-w-prose text-base text-ink">Manual Labor turns PDF and DOCX manuals into a reviewed knowledge base.</p>
+                  <p className="mb-4 mt-1 text-sm text-muted">Step 1: add documents. They are read here, on this machine.</p>
+                  <UploadButton label="Add documents" />
+                </div>
+              ) : eng.isLoading ? (
+                <div aria-busy="true" data-testid="tree-loading" className="flex flex-col gap-px overflow-hidden rounded-xl border border-line">
+                  {[0, 1, 2, 3].map((i) => (
+                    <div key={i} className="h-[3.25rem] animate-pulse bg-sunk" />
+                  ))}
+                </div>
+              ) : (
+                <GroupTree
+                  docs={eng.docs}
+                  rows={rows}
+                  view={view}
+                  coverage={coverage}
+                  checks={checks}
+                  expanded={expanded}
+                  cursor={cursorId}
+                  stale={eng.pending > 0}
+                  filenames={filenames}
+                  ungrouped={ungrouped}
+                  onCursor={setCursor}
+                  onToggle={toggleRow}
+                  onSelectOnly={selectOnly}
+                  onSelectDoc={selectDoc}
+                  onExpand={toggleExpanded}
+                  onExpandKey={(id) => {
+                    const a = expandAction(rows, id, expanded);
+                    if (!a) return;
+                    if ("expand" in a) toggleExpanded(a.expand);
+                    else setCursor(a.move);
+                  }}
+                  onCollapseKey={(id) => {
+                    const a = collapseAction(rows, id, expanded);
+                    if (!a) return;
+                    if ("collapse" in a) toggleExpanded(a.collapse);
+                    else setCursor(a.move);
+                  }}
+                  onMove={(d) => setCursor(moveCursor(rows, cursorId, d))}
+                  onEdge={(w) => setCursor(rows.length ? rows[w === "first" ? 0 : rows.length - 1].group.id : null)}
+                />
+              )}
+            </Panel>
+          </div>
         </div>
-        <Panel error={models.error} retry={() => void models.refetch()} testid="models-error">
-          {models.data ? <ModelPanel data={models.data} /> : <div aria-busy="true" className="h-24 animate-pulse rounded bg-slate-200" />}
-        </Panel>
-      </aside>
+
+        {/* sticky beside the long list, and never taller than the window: it scrolls on its own so every control stays reachable */}
+        <aside
+          className="flex flex-col gap-5 xl:sticky xl:top-6 xl:-m-1 xl:max-h-[calc(100dvh-3rem)] xl:self-start xl:overflow-y-auto xl:p-1"
+          aria-label="Summary and models"
+        >
+          <div className="flex flex-col gap-5 rounded-2xl border border-line bg-raised p-5 shadow-lift">
+            {summary ? <SplitModeControl split={split} summary={summary} view={view} onChange={changeSplit} /> : null}
+            {summary ? <SelectionSummary summary={summary} processing={ungrouped.length} /> : null}
+            {/* below the wide breakpoint the rail is a bottom sheet: the primary action is pinned just above it */}
+            <div
+              data-testid="confirm-dock"
+              className="max-wide:fixed max-wide:inset-x-0 max-wide:bottom-[var(--guide-sheet,0px)] max-wide:z-20 max-wide:border-t max-wide:border-line max-wide:bg-raised max-wide:px-4 max-wide:py-2"
+            >
+              <ConfirmButton blocks={summary?.blocks ?? 0} processing={processing} busy={confirm.isPending} onConfirm={() => void onConfirm()} />
+            </div>
+            {summary ? (
+              <div className="flex flex-wrap items-center gap-2 border-t border-line-soft pt-4 text-sm" data-testid="select-controls">
+                <Hint id="selectAll">
+                  <button type="button" onClick={selectAll} className={`min-h-[2.25rem] rounded-lg px-2.5 text-muted hover:bg-sunk hover:text-ink ${FOCUS}`}>
+                    Select all
+                  </button>
+                </Hint>
+                <Hint id="selectNone">
+                  <button
+                    type="button"
+                    onClick={selectNone}
+                    data-testid="clear-selection"
+                    className={`min-h-[2.25rem] rounded-lg px-2.5 ${FOCUS} ${armed ? "bg-needs-wash font-semibold text-needs-ink" : "text-muted hover:bg-sunk hover:text-ink"}`}
+                  >
+                    {armed ? "Press again to clear" : "Clear selection"}
+                  </button>
+                </Hint>
+              </div>
+            ) : null}
+          </div>
+          <div className="rounded-2xl border border-line bg-raised p-5">
+            <Panel error={models.error} retry={() => void models.refetch()} testid="models-error">
+              {models.data ? <ModelPanel data={models.data} /> : <div aria-busy="true" className="h-24 animate-pulse rounded-lg bg-sunk" />}
+            </Panel>
+          </div>
+        </aside>
+      </div>
     </main>
   );
 }

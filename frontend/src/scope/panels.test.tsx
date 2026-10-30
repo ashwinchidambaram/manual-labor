@@ -32,7 +32,7 @@ describe("C1 SourcesList", () => {
     expect(within(rows[0]).queryByTestId("scanned-badge")).toBeNull();
     expect(within(rows[1]).getByTestId("source-chip")).toHaveTextContent("Processing clean");
     expect(within(rows[1]).getByTestId("ocr-warning")).toHaveTextContent("OCR: 2 page(s) without a text layer");
-    expect(within(rows[1]).getByTestId("scanned-badge")).toHaveTextContent("Scanned: OCR text");
+    expect(within(rows[1]).getByTestId("scanned-badge")).toHaveTextContent("Scanned PDF");
     expect(within(rows[2]).getByTestId("source-chip")).toHaveTextContent("Failed: parse");
     expect(rows[0]).toHaveTextContent("4 pages");
     expect(screen.getByRole("button", { name: "Re-run" })).toBeInTheDocument();

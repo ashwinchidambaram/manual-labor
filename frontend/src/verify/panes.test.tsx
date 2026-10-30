@@ -69,7 +69,7 @@ describe("VC4 ExtractedPane", () => {
       f.details[vid(1)] = makeBlockDetail(f.items[0], { history: [rec(false)] }, { status: "edited" });
       f.details[vid(2)] = makeBlockDetail(f.items[1], { history: [rec(true)] }, { status: "edited" });
     });
-    expect(await screen.findByTestId("content-change-marker")).toHaveTextContent("human edit \u2014 content changed");
+    expect(await screen.findByTestId("content-change-marker")).toHaveTextContent("human edit: content changed");
     await r.user.keyboard("j");
     await waitFor(() => expect(screen.getByTestId("block-id")).toHaveTextContent(vid(2)));
     expect(screen.queryByTestId("content-change-marker")).toBeNull();
@@ -87,7 +87,7 @@ describe("VC4 ExtractedPane", () => {
       }, { has_numeric_spec: true });
     });
     const items = await screen.findAllByTestId("why-item");
-    expect(items[0]).toHaveTextContent(/parsers disagree\s*0\.31\s*critical/);
+    expect(items[0]).toHaveTextContent(/parsers disagree · 0\.31 of 1 · critical/);
     expect(items[0]).toHaveTextContent("pymupdf vs docling 0.31; numeric: '+0.05' vs '±0.05'");
     expect(items[1]).toHaveTextContent("low OCR");
     expect(screen.getByTestId("why-rule")).toHaveTextContent("Rule: always reviewed");

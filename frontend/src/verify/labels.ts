@@ -18,6 +18,34 @@ export const SIGNAL_LABEL: Record<string, string> = {
 };
 export const label = (name: string): string => SIGNAL_LABEL[name] ?? name.replace(/_/g, " ");
 
+/**
+ * What a person would say about each signal (design 13 section 2.8.2): `held` when it kept the block for you (value
+ * under 1), `passed` when it found nothing wrong (1.00). The short signal name and the number follow as secondary text;
+ * this is the only place these sentences are written.
+ */
+export const SIGNAL_HUMAN: Record<string, { held: string; passed: string }> = {
+  parser_agreement: { held: "The two readings differ", passed: "The two readings agree" },
+  textlayer_vs_ocr: { held: "The PDF text and the scan differ", passed: "The PDF text and the scan agree" },
+  ocr_min: { held: "The scanner was unsure of a word", passed: "The scanner was sure of every word" },
+  ocr_mean: { held: "The scan is faint", passed: "The scan reads clearly" },
+  reading_order_risk: { held: "The reading order may be wrong", passed: "The reading order agrees" },
+  table_consistency: { held: "Table rows or columns do not line up", passed: "The table lines up" },
+  garbage_ratio: { held: "Garbled characters", passed: "No garbled characters" },
+  faithfulness: { held: "Cleanup changed words", passed: "Cleanup kept every word" },
+  figure_method: { held: "Figure cut from the page image", passed: "Figure taken from the file itself" },
+  figure_resolution: { held: "Low-resolution figure", passed: "Figure resolution is enough" },
+  figure_attach_rule: { held: "Unsure this figure belongs here", passed: "The figure's place is certain" },
+  llm_verifier: { held: "A second model reads it differently", passed: "A second model reads it the same" },
+  has_numeric_spec: { held: "Has numbers, so a person always checks it", passed: "Has numbers, so a person always checks it" },
+};
+export const human = (name: string, held: boolean): string => SIGNAL_HUMAN[name]?.[held ? "held" : "passed"] ?? label(name);
+
+/** The least certain word, from the OCR signal's detail ("min 0.899 at '4471-A'; 68 words"). */
+export function weakestFromDetail(detail: string | null | undefined): string | null {
+  const m = /at '(.+?)'(?:;|$)/.exec(detail ?? "");
+  return m ? m[1] : null;
+}
+
 export const STALE_NAME = "changed since approval";
 
 export const STATUS_LABEL: Record<string, string> = {
@@ -44,7 +72,14 @@ const _allCategoriesOrdered: Missing extends never ? true : never = true;
 void _allCategoriesOrdered;
 export const FLAG_CATEGORIES: { id: FlagCategory; label: string }[] = FLAG_ORDER.map((id) => ({ id, label: FLAG_LABEL[id] }));
 
-export const FOCUS = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600";
+export const FOCUS = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus";
+
+/** A queue card's human title (design 13 section 2.8.3): the enclosing section heading, else the document, else the page. */
+export function cardTitle(sectionTitle: string | null | undefined, docTitle: string | null | undefined, page: number, type: string): string {
+  if (sectionTitle && sectionTitle.trim()) return sectionTitle.trim();
+  if (docTitle && docTitle.trim()) return docTitle.trim();
+  return `Page ${page}, ${type.replace(/_/g, " ")}`;
+}
 
 /**
  * A block's score with what it is judged against (PRODUCT.md: never a bare confidence number). The number is the

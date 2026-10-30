@@ -85,3 +85,60 @@ export function mapToOcrWords(words: { word: string; differs: boolean }[], ocr: 
   }
   return hits;
 }
+
+/** Display names of the readers behind each parser text. */
+export const READER: Record<string, string> = {
+  pymupdf: "PDF text layer",
+  docling: "Layout parser",
+  ocr: "OCR",
+  ocr_alt: "Second OCR",
+  docx: "Word file",
+};
+
+export interface LinePair {
+  /** 1-based line number in the first reading */
+  line: number;
+  a: string;
+  b: string;
+}
+
+const squash = (s: string): string => s.replace(/\s+/g, " ").trim();
+
+/**
+ * The lines where two readings differ (design 13 F4), so they can be shown as two readable lines instead of a log
+ * string. Lines are compared with whitespace collapsed; a line present in one reading only pairs with an empty one.
+ */
+export function readingLines(ta: string, tb: string): LinePair[] {
+  const A = ta.split("\n");
+  const B = tb.split("\n");
+  const out: LinePair[] = [];
+  let i = 0;
+  let j = 0;
+  let pendingA: string[] = [];
+  let pendingB: string[] = [];
+  let startLine = 1;
+  const flush = (): void => {
+    const n = Math.max(pendingA.length, pendingB.length);
+    for (let k = 0; k < n; k++) out.push({ line: startLine + k, a: pendingA[k] ?? "", b: pendingB[k] ?? "" });
+    pendingA = [];
+    pendingB = [];
+  };
+  for (const part of diffArrays(A, B, { comparator: (x, y) => squash(x) === squash(y) })) {
+    const n = part.count ?? part.value.length;
+    if (part.removed) {
+      if (!pendingA.length && !pendingB.length) startLine = i + 1;
+      pendingA.push(...A.slice(i, i + n));
+      i += n;
+    } else if (part.added) {
+      if (!pendingA.length && !pendingB.length) startLine = i + 1;
+      pendingB.push(...B.slice(j, j + n));
+      j += n;
+    } else {
+      flush();
+      i += n;
+      j += n;
+    }
+  }
+  flush();
+  return out;
+}

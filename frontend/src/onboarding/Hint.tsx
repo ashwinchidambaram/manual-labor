@@ -166,11 +166,11 @@ export default function Hint({ id, children, text, within = false }: { id: HintI
               data-testid="hint"
               data-hint={id}
               style={{ top: pos.top, left: pos.left }}
-              className="pointer-events-none fixed z-[60] max-w-[18rem] rounded-md bg-slate-900 px-2.5 py-1.5 text-xs leading-snug text-slate-50 shadow-lg"
+              className="pointer-events-none fixed z-[60] max-w-[18rem] rounded-lg bg-ink px-2.5 py-1.5 text-xs leading-snug text-raised shadow-lift"
             >
               {text ?? entry.text}
               {key ? (
-                <span className="ml-1.5 whitespace-nowrap text-slate-300">
+                <span className="ml-1.5 whitespace-nowrap text-line">
                   Key <Keycap dark>{key}</Keycap>
                 </span>
               ) : null}

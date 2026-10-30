@@ -59,7 +59,7 @@ export default function FlagDialog({ onSubmit, onCancel }: Props) {
     }
   };
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgb(39_32_26/0.38)] p-4">
       <div
         ref={dlg}
         role="dialog"
@@ -68,7 +68,7 @@ export default function FlagDialog({ onSubmit, onCancel }: Props) {
         data-hotkey-scope="flagDialog"
         data-testid="flag-dialog"
         onKeyDown={onKeyDown}
-        className="w-[28rem] space-y-3 rounded bg-white p-4 shadow-xl"
+        className="w-[28rem] max-w-full space-y-3 rounded-2xl bg-raised p-5 text-ink shadow-[0_24px_60px_-20px_rgb(39_32_26/0.45)]"
       >
         <h2 className="text-lg font-semibold">Flag this block</h2>
         <div ref={group} role="radiogroup" aria-label="Category" tabIndex={0} className={`flex flex-wrap gap-2 rounded p-1 ${FOCUS}`}>
@@ -84,7 +84,7 @@ export default function FlagDialog({ onSubmit, onCancel }: Props) {
                 pick(i)();
                 group.current?.focus();
               }}
-              className={`rounded border px-2 py-1 text-sm ${cat === c.id ? "border-slate-900 bg-slate-900 text-white" : "border-slate-400"}`}
+              className={`min-h-[2.25rem] rounded-lg px-2.5 text-sm ring-1 ring-inset ${cat === c.id ? "bg-ink font-semibold text-raised ring-ink" : "bg-raised text-ink ring-line-strong hover:bg-sunk"}`}
             >
               <kbd className="mr-1 font-mono text-xs">{i + 1}</kbd>
               {c.label}
@@ -98,17 +98,17 @@ export default function FlagDialog({ onSubmit, onCancel }: Props) {
             value={note}
             onChange={(e) => setNote(e.target.value)}
             rows={3}
-            className={`mt-1 w-full rounded border border-slate-400 p-1 ${FOCUS}`}
+            className={`mt-1 w-full rounded-lg border border-line-strong bg-raised p-2 ${FOCUS}`}
           />
         </label>
-        <p role="status" className="min-h-[1.25rem] text-sm text-red-800" data-testid="flag-msg">
+        <p role="status" className="min-h-[1.25rem] text-sm text-fail" data-testid="flag-msg">
           {msg}
         </p>
         <div className="flex justify-end gap-2">
-          <button type="button" onClick={onCancel} className={`rounded border border-slate-500 px-3 py-1 ${FOCUS}`}>
+          <button type="button" onClick={onCancel} className={`min-h-[2.5rem] rounded-xl border border-line-strong bg-raised px-4 font-semibold ${FOCUS}`}>
             Cancel
           </button>
-          <button type="button" onClick={submit} className={`rounded bg-slate-900 px-3 py-1 text-white ${FOCUS}`}>
+          <button type="button" onClick={submit} className={`min-h-[2.5rem] rounded-xl bg-act px-4 font-semibold text-act-on hover:bg-act-hover ${FOCUS} focus-visible:ring-offset-2`}>
             Submit
           </button>
         </div>

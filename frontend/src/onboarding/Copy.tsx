@@ -4,8 +4,8 @@ import { copyParts, keyLabel } from "./guide";
 export function Keycap({ children, dark = false }: { children: string; dark?: boolean }) {
   return (
     <kbd
-      className={`inline-block min-w-[1.4em] rounded border border-b-2 px-1 text-center font-mono text-[0.8em] font-medium leading-tight ${
-        dark ? "border-slate-500 bg-slate-800 text-slate-50" : "border-slate-400 bg-white text-slate-900"
+      className={`inline-block min-w-[1.4em] rounded-[5px] border px-1 text-center font-mono text-[0.8em] font-medium leading-tight ${
+        dark ? "border-line-strong bg-ink text-raised" : "border-line bg-raised text-ink shadow-key"
       }`}
     >
       {children}

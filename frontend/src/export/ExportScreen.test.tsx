@@ -204,7 +204,7 @@ describe("U10 step indicator states", () => {
     expect(s.agent.short).toBe("2 open flags");
     expect(s.export.short).toBe("locked: 2 open flags");
     expect(s.export.long).toBe("Step 4 of 4. Locked: 2 open flags, 3 to review.");
-    expect(stepStates("/export", undefined).export).toEqual({ short: "here", long: "Step 4 of 4. You are here." });
+    expect(stepStates("/export", undefined).export).toEqual({ short: "here", long: "Step 4 of 4. You are here.", done: false });
     expect(stepStates("/scope", locked({ blockers: [], open_flags: 0, queued: 0, unlocked: true })).export.short).toBe("ready");
   });
   it("the nav keeps the link names and shows the Export state", async () => {

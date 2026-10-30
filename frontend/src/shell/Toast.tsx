@@ -37,21 +37,21 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <Ctx.Provider value={api}>
       {children}
-      <div className="fixed bottom-4 right-4 z-40 flex max-w-md flex-col gap-2" data-testid="toasts">
+      <div className="fixed bottom-[calc(var(--guide-sheet,0px)+1rem)] right-4 z-40 flex max-w-md flex-col gap-2" data-testid="toasts">
         {items.map((t) => (
           <div
             key={t.id}
             role={t.kind === "error" ? "alert" : "status"}
             data-testid="toast"
-            className={`flex items-center gap-2 rounded border px-3 py-2 text-sm shadow ${
-              t.kind === "error" ? "border-red-300 bg-red-50 text-red-900" : "border-slate-300 bg-white text-slate-900"
+            className={`flex items-center gap-2 rounded-xl border px-3.5 py-2.5 text-sm shadow-lift ${
+              t.kind === "error" ? "border-fail-line bg-fail-wash text-ink" : "border-line bg-raised text-ink"
             }`}
           >
             <span className="flex-1">{t.message}</span>
             <button
               type="button"
               onClick={() => dismiss(t.id)}
-              className="rounded border border-current px-2 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+              className="rounded border border-current px-2 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
             >
               Dismiss
             </button>

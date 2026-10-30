@@ -15,20 +15,20 @@ Every block you select becomes text in an article. Suggested topics and Document
 What to do:
 
 1. Move through the list with `J` and `K`. `Space` selects or clears a row; `A` selects every block.
-2. `T` switches views. Low cohesion means a topic mixes subjects: check it in Document structure.
+2. `T` switches views. Mixed subjects means a topic's blocks cover different subjects: check it in Document structure.
 3. Unassigned holds the blocks no topic claimed. They are listed here, never dropped.
 4. Estimated review is how many selected blocks will need a person. `G` confirms: scoring starts and Verify opens at once.
 
 Why you can trust this:
 
-- Under each document a line adds up its blocks: parsed = headers and footers + blocks in topics + unassigned.
+- Under each document a line adds up its blocks: blocks found = blocks in topics + blocks not placed in a topic + page headers and footers, which are left out.
 - Choosing topics never changes the text. It only decides which blocks are reviewed and exported.
 
 ### 2. Review what the checks could not clear
 
 Screen: /verify (key `2`)
 
-The queue lists only the blocks the machine is unsure about, worst first, and each card says why. Blocks with numbers, units or part numbers are always queued: OCR mistakes in numbers are likely and a language model cannot see them.
+The queue lists only the blocks the checks could not clear, most doubtful first, and each card says why. Blocks with numbers, units or part numbers are always queued: OCR mistakes in numbers are likely and a language model cannot see them.
 
 What to do:
 
@@ -40,8 +40,8 @@ What to do:
 
 Why you can trust this:
 
-- Checks on this block lists each deterministic check and its result. A check that has not run says so; it is never shown as passed.
-- The status line adds up: in scope = to review + auto-approved + done + flagged + rejected. The server counts each part separately, and a mismatch is shown as a warning.
+- Why this needs you lists what held the block, with the evidence: the two readings line by line, the least certain word. Checks that found nothing wrong are marked Passed, and a check that has not run says so; it is never shown as passed.
+- The progress bar and the line under it add up: in scope = to review + auto-approved + done + flagged + rejected. The server counts each part separately, and a mismatch is shown as a warning.
 
 ### 3. Hand flagged blocks to a model
 
@@ -212,7 +212,7 @@ Every key below comes from the single hotkey map (frontend/src/hotkeys.ts). Keys
 - **Add documents**: Add PDF or DOCX files. Parsing runs in the background while you keep working.
 - **Model tier**: Use this tier's models for every task. Stages that depend on the models are marked to re-run.
 - **Review filter** (`]`): Also lists auto-approved blocks below this confidence for a second look. Their status does not change.
-- **Queue order** (`/`): Worst first, by page, or figures only.
+- **Queue order** (`/`): Most doubtful first, by page, or figures only.
 - **Original vs cleaned** (`T`): The diff shows every change cleanup made to the raw parse. Grey changes are allowed normalisation.
 - **Approve** (`A`): Accept the text as shown. On a block with numbers this records that you checked them.
 - **Edit** (`E`): Correct the text. Your edit is checked too: a change to content or numbers asks you to confirm.
@@ -222,9 +222,9 @@ Every key below comes from the single hotkey map (frontend/src/hotkeys.ts). Keys
 - **Attach a figure**: Pick a figure from this document and attach it to the current article.
 - **Export**: Builds the zip from accepted text and records the build in the action log.
 - **Override reason**: Why you are exporting with blocks not yet reviewed. It is written into manifest.json.
-- **Reason chip**: A signal that kept this block from auto-approval. Red chips are critical: the block cannot pass while they are low.
+- **Reason**: A check that kept this block from auto-approval. A critical one can hold a block on its own while it is low.
 - **Block status**: Queued waits for you; auto-approved was cleared by the checks; approved, edited and flagged are your decisions.
-- **Cohesion**: How closely a topic's blocks belong together, from 0 to 1. Low cohesion means the topic may mix subjects.
+- **Mixed subjects**: These blocks cover different subjects (cohesion, from 0 to 1, is low). Check them in Document structure.
 - **Coverage**: How much of this group is in your selection.
 - **Numbers verified by you**: You approved this block after checking its numbers against the source page.
 - **Attach rule**: How a figure was matched to its article: a caption reference, proximity on the page, or by hand.

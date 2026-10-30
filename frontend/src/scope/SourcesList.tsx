@@ -13,11 +13,13 @@ export function sourceChip(s: SourceInfo, jobs: readonly JobInfo[]): { text: str
 }
 
 const TONE = {
-  ok: "bg-green-100 text-green-900",
-  busy: "bg-sky-100 text-sky-900",
-  bad: "bg-red-100 text-red-900",
+  ok: "text-done-ink",
+  busy: "text-needs-ink",
+  bad: "text-fail",
 };
-const FOCUS = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600";
+const MARK = { ok: "✓", busy: "◔", bad: "✕" };
+const KIND: Record<string, string> = { born_digital_pdf: "Text PDF", scanned_pdf: "Scanned PDF", docx: "Word document" };
+const FOCUS = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus";
 
 export function UploadButton({ label = "Add documents" }: { label?: string }) {
   const input = useRef<HTMLInputElement>(null);
@@ -43,13 +45,13 @@ export function UploadButton({ label = "Add documents" }: { label?: string }) {
         <button
           type="button"
           onClick={() => input.current?.click()}
-          className={`rounded border border-slate-400 bg-white px-2 py-1 text-sm hover:bg-slate-100 ${FOCUS}`}
+          className={`min-h-[2.25rem] rounded-lg border border-line bg-raised px-3 text-sm font-medium text-ink hover:bg-sunk ${FOCUS}`}
         >
           {label}
         </button>
       </Hint>
       {upload.isError ? (
-        <p role="alert" className="text-xs text-red-800">
+        <p role="alert" className="text-xs text-fail">
           {upload.error.message}
         </p>
       ) : null}
@@ -80,50 +82,56 @@ export default function SourcesList({
   };
   return (
     <section aria-label="Sources" data-zone="sources" data-testid="sources">
-      <div className="mb-2 flex items-center justify-between">
-        <h2 className="text-sm font-semibold">Sources</h2>
+      <div className="mb-2.5 flex items-center justify-between gap-3">
+        <h3 className="text-2xs font-semibold uppercase tracking-[0.07em] text-muted">Your manuals</h3>
         <UploadButton />
       </div>
-      <ul className="flex flex-col gap-1" onKeyDown={onKeyDown}>
+      <ul className="grid gap-px overflow-hidden rounded-xl border border-line bg-line-soft [grid-template-columns:repeat(auto-fit,minmax(13.5rem,1fr))]" onKeyDown={onKeyDown}>
         {sources.map((s, i) => {
           const chip = sourceChip(s, jobs);
           return (
-            <li key={s.slug} className="rounded border border-slate-300 bg-white" data-testid="source-row" data-slug={s.slug}>
+            <li key={s.slug} className="flex flex-col bg-raised" data-testid="source-row" data-slug={s.slug}>
               <button
                 type="button"
                 data-source={s.slug}
                 tabIndex={i === 0 ? 0 : -1}
                 onClick={() => onGoTo(s.slug)}
-                className={`w-full px-2 py-1 text-left ${FOCUS}`}
+                className={`w-full px-4 pb-2 pt-3 text-left hover:bg-sunk focus-visible:ring-inset ${FOCUS}`}
               >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="truncate text-sm font-medium" title={s.filename}>
+                <span className="flex items-baseline justify-between gap-2">
+                  <span className="truncate text-base font-semibold text-ink" title={s.filename}>
                     {s.filename}
                   </span>
-                  <span className={`shrink-0 rounded px-1.5 text-xs ${TONE[chip.tone]}`} data-testid="source-chip">
-                    {chip.text}
+                  <span className={`flex shrink-0 items-baseline gap-1 text-xs font-semibold ${TONE[chip.tone]}`}>
+                    <span aria-hidden="true">{MARK[chip.tone]}</span>
+                    <span data-testid="source-chip">{chip.text}</span>
                   </span>
-                </div>
-                <div className="text-xs text-slate-600">
-                  <span className="mr-2 rounded bg-slate-100 px-1">{s.kind.replace(/_/g, " ")}</span>
-                  {s.pages} page{s.pages === 1 ? "" : "s"}
+                </span>
+                <span className="mt-0.5 block text-xs text-muted">
                   {s.kind === "scanned_pdf" ? (
-                    <span className="ml-2 rounded bg-amber-100 px-1 text-amber-900" data-testid="scanned-badge">
-                      Scanned: OCR text
-                    </span>
-                  ) : null}
-                </div>
+                    <span data-testid="scanned-badge">Scanned PDF</span>
+                  ) : (
+                    KIND[s.kind] ?? s.kind.replace(/_/g, " ")
+                  )}
+                  {" · "}
+                  {s.pages} page{s.pages === 1 ? "" : "s"}
+                </span>
               </button>
               {s.ocr_warning ? (
-                <p role="note" className="px-2 pb-1 text-xs text-amber-900" data-testid="ocr-warning">
-                  OCR: {s.ocr_warning}
+                <p role="note" className="mx-4 mb-3 flex gap-2 text-xs leading-snug text-ink" data-testid="ocr-warning">
+                  <span aria-hidden="true" className="text-act-ink">
+                    ◐
+                  </span>
+                  <span>
+                    <strong className="font-semibold">Read from scans.</strong> OCR: {s.ocr_warning}, so more of this manual will come to you to check.
+                  </span>
                 </p>
               ) : null}
             </li>
           );
         })}
         {(status?.unregistered_sources ?? []).map((f) => (
-          <li key={f} className="rounded border border-dashed border-slate-300 px-2 py-1 text-sm text-slate-600" data-testid="unregistered">
+          <li key={f} className="bg-raised px-4 py-3 text-sm text-muted" data-testid="unregistered">
             {f}: Not ingested
           </li>
         ))}
@@ -133,7 +141,7 @@ export default function SourcesList({
           type="button"
           onClick={() => rerun.mutate()}
           disabled={jobs.length > 0}
-          className={`mt-2 rounded border border-slate-400 bg-white px-2 py-1 text-sm hover:bg-slate-100 disabled:opacity-50 ${FOCUS}`}
+          className={`mt-2 min-h-[2.25rem] rounded-lg border border-line bg-raised px-3 text-sm font-medium hover:bg-sunk disabled:opacity-50 ${FOCUS}`}
         >
           Re-run
         </button>

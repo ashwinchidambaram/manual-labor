@@ -4,7 +4,7 @@ import Copy, { Keycap } from "../onboarding/Copy";
 import { GLOSSARY } from "../onboarding/glossary";
 import { GUARANTEES, GUIDE_STEPS, keyLabel, keycap, type StepId } from "../onboarding/guide";
 
-const FOCUS = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600";
+const FOCUS = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus";
 const TABS = [
   { id: "guide", label: "Guide" },
   { id: "keys", label: "Keyboard shortcuts" },
@@ -17,7 +17,7 @@ function Keys({ keys, mod = false }: { keys: readonly string[]; mod?: boolean })
     <>
       {keys.map((k, i) => (
         <span key={k}>
-          {i > 0 ? <span className="text-slate-500"> / </span> : null}
+          {i > 0 ? <span className="text-muted"> / </span> : null}
           <Keycap>{`${mod ? "Ctrl/Cmd+" : ""}${keycap(k)}`}</Keycap>
         </span>
       ))}
@@ -79,23 +79,23 @@ export default function Help({ onClose, step = "scope", onShowGuide }: { onClose
     .map((s) => ({ scope: s, rows: Object.values(HOTKEYS).filter((h) => h.scope === s) }))
     .filter((g) => g.rows.length > 0);
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgb(39_32_26/0.38)] p-4" onClick={onClose}>
       <div
         ref={ref}
         role="dialog"
         aria-modal="true"
         aria-label="Help"
-        className="flex max-h-[85vh] w-[40rem] max-w-full flex-col rounded bg-white shadow-xl"
+        className="flex max-h-[85vh] w-[44rem] max-w-full flex-col overflow-hidden rounded-2xl bg-raised text-ink shadow-[0_24px_60px_-20px_rgb(39_32_26/0.45)]"
         onKeyDown={onKeyDown}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between gap-2 px-4 pt-3">
-          <h2 className="text-lg font-semibold">Help</h2>
-          <button type="button" onClick={onClose} className={`rounded border border-slate-400 px-2 py-0.5 text-sm ${FOCUS}`}>
+        <div className="flex items-center justify-between gap-2 px-6 pt-5">
+          <h2 className="text-xl font-semibold">Help</h2>
+          <button type="button" onClick={onClose} className={`min-h-[2.25rem] rounded-lg border border-line-strong bg-raised px-3 text-sm font-medium hover:bg-sunk ${FOCUS}`}>
             Close
           </button>
         </div>
-        <div role="tablist" aria-label="Help sections" className="mt-2 flex gap-1 border-b border-slate-200 px-4" onKeyDown={onTabKey}>
+        <div role="tablist" aria-label="Help sections" className="mt-3 flex gap-1 border-b border-line px-6" onKeyDown={onTabKey}>
           {TABS.map((t) => (
             <button
               key={t.id}
@@ -107,8 +107,8 @@ export default function Help({ onClose, step = "scope", onShowGuide }: { onClose
               tabIndex={tab === t.id ? 0 : -1}
               data-tab={t.id}
               onClick={() => setTab(t.id)}
-              className={`-mb-px border-b-2 px-2.5 py-1.5 text-sm ${FOCUS} ${
-                tab === t.id ? "border-slate-900 font-medium text-slate-950" : "border-transparent text-slate-600 hover:text-slate-900"
+              className={`-mb-px min-h-[2.5rem] border-b-2 px-3 text-sm ${FOCUS} ${
+                tab === t.id ? "border-act font-semibold text-ink" : "border-transparent text-muted hover:text-ink"
               }`}
             >
               {t.label}
@@ -116,11 +116,11 @@ export default function Help({ onClose, step = "scope", onShowGuide }: { onClose
           ))}
         </div>
         <div className="flex min-h-0 flex-1 flex-col">
-          <section role="tabpanel" id="help-panel-guide" aria-labelledby="help-tab-guide" hidden={tab !== "guide"} tabIndex={0} data-testid="help-guide" className={`min-h-0 flex-1 overflow-auto px-4 py-3 ${FOCUS} focus-visible:ring-inset`}>
+          <section role="tabpanel" id="help-panel-guide" aria-labelledby="help-tab-guide" hidden={tab !== "guide"} tabIndex={0} data-testid="help-guide" className={`min-h-0 flex-1 overflow-auto px-6 py-4 ${FOCUS} focus-visible:ring-inset`}>
             {onShowGuide ? (
-              <p className="mb-3 flex flex-wrap items-center gap-2 text-sm text-slate-700">
-                The same steps can stay docked beside the screen while you work.
-                <button type="button" onClick={onShowGuide} data-testid="show-guide" className={`rounded border border-slate-400 px-2 py-0.5 text-sm hover:bg-slate-100 ${FOCUS}`}>
+              <p className="mb-4 flex flex-wrap items-center gap-2 rounded-xl bg-sunk px-3.5 py-2.5 text-sm text-muted">
+                The four steps are always on the left; the welcome on Scope can be shown again.
+                <button type="button" onClick={onShowGuide} data-testid="show-guide" className={`min-h-[2rem] rounded-lg border border-line-strong bg-raised px-2.5 text-sm font-medium text-ink hover:bg-sunk ${FOCUS}`}>
                   Show guide panel
                 </button>
               </p>
@@ -128,11 +128,17 @@ export default function Help({ onClose, step = "scope", onShowGuide }: { onClose
             <ol className="space-y-4">
               {GUIDE_STEPS.map((s, i) => (
                 <li key={s.id} data-guide-step={s.id} className="scroll-mt-2">
-                  <h3 className="text-sm font-semibold text-slate-950">
-                    <span className="tabular-nums text-slate-500">{i + 1}.</span> {s.title}
+                  <h3 className="flex items-baseline gap-2 text-base font-semibold text-ink">
+                    <span aria-hidden="true" className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-sunk text-xs font-bold text-muted ring-1 ring-inset ring-line">
+                      {i + 1}
+                    </span>
+                    <span>
+                      <span className="sr-only">{i + 1}. </span>
+                      {s.title}
+                    </span>
                   </h3>
-                  <p className="mt-1 text-sm text-slate-700">{s.what}</p>
-                  <ul className="mt-1 list-disc space-y-0.5 pl-5 text-sm text-slate-800 marker:text-slate-400">
+                  <p className="ml-8 mt-1 max-w-[65ch] text-sm text-muted">{s.what}</p>
+                  <ul className="ml-8 mt-1.5 list-disc space-y-1 pl-5 text-sm text-ink marker:text-line-strong">
                     {s.do.map((d) => (
                       <li key={d}>
                         <Copy text={d} />
@@ -142,21 +148,21 @@ export default function Help({ onClose, step = "scope", onShowGuide }: { onClose
                 </li>
               ))}
             </ol>
-            <h3 className="mt-5 text-sm font-semibold text-slate-950">How it works</h3>
-            <dl className="mt-1 space-y-2 text-sm">
+            <h3 className="mt-6 text-2xs font-semibold uppercase tracking-[0.07em] text-muted">How it works</h3>
+            <dl className="mt-2 space-y-3 text-sm">
               {GUARANTEES.map((g) => (
                 <div key={g.claim}>
-                  <dt className="font-medium text-slate-900">{g.claim}</dt>
-                  <dd className="text-slate-700">{g.how}</dd>
+                  <dt className="font-semibold text-ink">{g.claim}</dt>
+                  <dd className="max-w-[65ch] text-muted">{g.how}</dd>
                 </div>
               ))}
             </dl>
           </section>
-          <section role="tabpanel" id="help-panel-keys" aria-labelledby="help-tab-keys" hidden={tab !== "keys"} tabIndex={0} data-testid="help-keys" className={`min-h-0 flex-1 overflow-auto px-4 py-3 ${FOCUS} focus-visible:ring-inset`}>
+          <section role="tabpanel" id="help-panel-keys" aria-labelledby="help-tab-keys" hidden={tab !== "keys"} tabIndex={0} data-testid="help-keys" className={`min-h-0 flex-1 overflow-auto px-6 py-4 ${FOCUS} focus-visible:ring-inset`}>
             {scopes.map(({ scope, rows }) => (
-              <section key={scope} className="mb-3">
-                <h3 className="text-sm font-semibold text-slate-700">{SCOPE_TITLES[scope]}</h3>
-                <dl className="grid grid-cols-[9rem_1fr] gap-x-2 text-sm">
+              <section key={scope} className="mb-4">
+                <h3 className="mb-1 text-2xs font-semibold uppercase tracking-[0.07em] text-muted">{SCOPE_TITLES[scope]}</h3>
+                <dl className="grid grid-cols-[9rem_1fr] gap-x-3 gap-y-1 text-sm">
                   {rows.map((h) => (
                     <div key={h.label} className="contents" data-testid="hotkey-row">
                       <dt>
@@ -164,7 +170,7 @@ export default function Help({ onClose, step = "scope", onShowGuide }: { onClose
                       </dt>
                       <dd>
                         {h.label}
-                        {h.when ? <span className="text-slate-500"> ({h.when})</span> : null}
+                        {h.when ? <span className="text-muted"> ({h.when})</span> : null}
                       </dd>
                     </div>
                   ))}
@@ -172,8 +178,8 @@ export default function Help({ onClose, step = "scope", onShowGuide }: { onClose
               </section>
             ))}
             <section className="mb-1">
-              <h3 className="text-sm font-semibold text-slate-700">Inside a widget</h3>
-              <dl className="grid grid-cols-[9rem_1fr] gap-x-2 text-sm">
+              <h3 className="mb-1 text-2xs font-semibold uppercase tracking-[0.07em] text-muted">Inside a widget</h3>
+              <dl className="grid grid-cols-[9rem_1fr] gap-x-3 gap-y-1 text-sm">
                 {LOCAL_KEYS.map((k) => (
                   <div key={k.widget} className="contents">
                     <dt>
@@ -187,11 +193,11 @@ export default function Help({ onClose, step = "scope", onShowGuide }: { onClose
               </dl>
             </section>
           </section>
-          <section role="tabpanel" id="help-panel-glossary" aria-labelledby="help-tab-glossary" hidden={tab !== "glossary"} tabIndex={0} data-testid="help-glossary" className={`min-h-0 flex-1 overflow-auto px-4 py-3 ${FOCUS} focus-visible:ring-inset`}>
+          <section role="tabpanel" id="help-panel-glossary" aria-labelledby="help-tab-glossary" hidden={tab !== "glossary"} tabIndex={0} data-testid="help-glossary" className={`min-h-0 flex-1 overflow-auto px-6 py-4 ${FOCUS} focus-visible:ring-inset`}>
             <dl className="space-y-2 text-sm">
               {GLOSSARY.map((g) => (
                 <div key={g.id} data-testid="glossary-entry">
-                  <dt className="font-medium text-slate-900">
+                  <dt className="font-semibold text-ink">
                     {g.term}
                     {g.hotkey ? (
                       <span className="ml-2 font-normal">
@@ -199,7 +205,7 @@ export default function Help({ onClose, step = "scope", onShowGuide }: { onClose
                       </span>
                     ) : null}
                   </dt>
-                  <dd className="text-slate-700">{g.text}</dd>
+                  <dd className="max-w-[65ch] text-muted">{g.text}</dd>
                 </div>
               ))}
             </dl>

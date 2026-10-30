@@ -86,7 +86,7 @@ describe("C4 GroupTree topics", () => {
     expect(rows[0]).toHaveTextContent("Catch-all");
     expect(rows[0]).toHaveAttribute("role", "option");
     expect(screen.getAllByTestId("low-cohesion")).toHaveLength(1);
-    expect(within(row("g-alpha-t002")).getByTestId("low-cohesion")).toHaveAccessibleName("Low cohesion 0.20");
+    expect(within(row("g-alpha-t002")).getByTestId("low-cohesion")).toHaveAccessibleName("Mixed subjects, cohesion 0.20");
     expect(within(row("g-beta-t001")).queryByTestId("low-cohesion")).toBeNull(); // 0.30 is not < 0.30
     expect(within(row("g-alpha-t002")).getByTestId("row-meta")).toHaveTextContent("pp. 2-4 · 3 blocks · 1 figure · 2 sections · cohesion 0.20");
     expect(within(row("g-alpha-t000")).queryByText(/cohesion/i)).toBeNull();

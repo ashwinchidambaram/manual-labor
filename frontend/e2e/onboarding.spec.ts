@@ -63,8 +63,10 @@ test("OB1 fresh project: panel docked on /scope, focus in the tree, hotkeys work
 test("OB2 Hide persists on the server: reload shows no panel", async ({ page, request }) => {
   await page.goto("/scope");
   await waitForTree(page);
-  await panel(page).getByRole("button", { name: "Hide guide" }).click();
-  await expect(panel(page)).toHaveCount(0);
+  // design 13 section 5: the guide panel's Hide moved to the first-run welcome ("I have used this before")
+  const welcome = page.getByTestId("welcome");
+  await welcome.getByRole("button", { name: "I have used this before" }).click();
+  await expect(welcome).toHaveCount(0);
   await expect.poll(async () => (await api(request).get<GuideState>("/api/ui/guide")).seen).toBe(true);
   const g = await api(request).get<GuideState>("/api/ui/guide");
   expect(g.version).toBe(1);
@@ -74,7 +76,7 @@ test("OB2 Hide persists on the server: reload shows no panel", async ({ page, re
   await page.reload();
   expect((await guideGet).ok()).toBe(true);
   await waitForTree(page);
-  await expect(panel(page)).toHaveCount(0);
+  await expect(page.getByTestId("welcome")).toHaveCount(0);
 });
 
 test("OB3 ? opens Help on the Guide tab at the current step; Esc restores focus", async ({ page }) => {
@@ -101,10 +103,10 @@ test("OB4 the guide never takes focus mid-edit; ? typed in the editor is text", 
   await expect(ta).toBeFocused();
   const start = await ta.inputValue();
   await page.keyboard.type(" abc");
-  await panel(page).getByRole("button", { name: "Next" }).click();
-  await panel(page).getByRole("button", { name: "Previous" }).click();
-  await panel(page).getByRole("button", { name: "Next" }).click();
-  await expect(panel(page)).toHaveAttribute("data-step", "agent");
+  // design 13 section 5: the rail has no Next/Previous; pressing on it (the next-step card) must not take focus either
+  await panel(page).getByTestId("next-step").click();
+  await panel(page).getByTestId("next-step-text").click();
+  await expect(panel(page)).toHaveAttribute("data-step", "verify");
   await expect(ta).toBeFocused();
   await page.keyboard.type(" def?");
   await expect(ta).toHaveValue(`${start} abc def?`);
@@ -204,7 +206,7 @@ test("OB8 reconciliation lines equal the API numbers on Scope and Verify", async
     const un = d.groups.topics.filter((t) => t.is_unassigned).reduce((n, t) => n + t.block_ids.length, 0);
     expect(bl.length, `${d.doc_id} identity`).toBe(hf + inTopics + un);
     await expect(page.locator(`[data-testid=doc-heading][data-doc='${d.doc_id}'] [data-testid=doc-reconcile]`)).toHaveText(
-      `${bl.length} parsed = ${hf} headers and footers (excluded) + ${inTopics} in topics + ${un} unassigned`,
+      `${bl.length} blocks found = ${inTopics} in topics + ${un} not placed + ${hf} page headers and footers, left out`,
     );
   }
   await expect(page.getByTestId("doc-reconcile-mismatch")).toHaveCount(0);

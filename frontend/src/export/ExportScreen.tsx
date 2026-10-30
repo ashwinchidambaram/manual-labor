@@ -6,12 +6,16 @@ import { invalidateReviewCounts, qk, trackJob, useExportStatus } from "../api/qu
 import type { ExportStatus, ExportSummary, Override } from "../api/schema";
 import { useJobWatch } from "../hooks/useJobsPolling";
 import Hint from "../onboarding/Hint";
+import { useBlockTitles } from "../shell/blockTitles";
+import { AttentionIcon } from "../shell/Icon";
 import { openInVerify } from "../shell/openInVerify";
 
 /** The server lists at most this many blockers (manuallabor/export/types.py BLOCKER_LIMIT). */
 export const BLOCKER_LIMIT = 20;
-const FOCUS = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600";
-const LINK = `text-blue-700 underline underline-offset-2 hover:text-blue-900 ${FOCUS}`;
+const FOCUS = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus";
+const LINK = `font-medium text-act-ink underline underline-offset-2 hover:text-act-hover ${FOCUS}`;
+const BTN = `inline-flex min-h-[2.5rem] items-center rounded-xl border border-line-strong bg-raised px-4 text-sm font-semibold text-ink hover:bg-sunk disabled:cursor-not-allowed disabled:opacity-50 ${FOCUS} focus-visible:ring-offset-2`;
+const PRIMARY = `inline-flex min-h-[2.75rem] items-center rounded-xl bg-act px-5 text-base font-semibold text-act-on transition-colors duration-150 ease-out-quart hover:bg-act-hover disabled:cursor-not-allowed disabled:bg-line disabled:text-muted ${FOCUS} focus-visible:ring-offset-2`;
 const plural = (n: number, w: string): string => `${n} ${w}${n === 1 ? "" : "s"}`;
 const errText = (e: unknown): string => (e instanceof ApiError ? e.detail : e instanceof Error ? e.message : String(e));
 
@@ -43,19 +47,34 @@ function Locked({ st }: { st: ExportStatus }) {
       setOpening(null);
     }
   };
+  const titles = useBlockTitles(blockers.length > 0);
+  // consecutive blockers from the same section form one group: the server's order (and every id) is kept
+  const groups: { key: string; title: string | null; ids: string[] }[] = [];
+  for (const id of blockers) {
+    const t = titles.get(id);
+    const key = t ? `${t.doc}\u0000${t.title}` : "";
+    const last = groups[groups.length - 1];
+    if (last && last.key === key) last.ids.push(id);
+    else groups.push({ key, title: t ? t.title : null, ids: [id] });
+  }
   return (
-    <section aria-labelledby="export-locked" data-testid="export-locked" className="space-y-4">
-      <div>
-        <h3 id="export-locked" className="text-lg font-semibold text-slate-950">
-          Export is locked
-        </h3>
-        <p className="mt-1 max-w-prose text-sm text-slate-700">
-          Why: the export only contains text a person or the checks have accepted. These must be resolved first, or overridden with a reason.
-        </p>
+    <section aria-labelledby="export-locked" data-testid="export-locked" className="space-y-5">
+      <div className="flex gap-4">
+        <span aria-hidden="true" className="mt-1 grid h-9 w-9 shrink-0 place-items-center rounded-full bg-needs-wash text-lg text-needs-ink">
+          <AttentionIcon />
+        </span>
+        <div>
+          <h3 id="export-locked" className="text-xl font-semibold text-ink">
+            Export is locked
+          </h3>
+          <p className="mt-1 max-w-[62ch] text-base text-muted">
+            Why: the export only contains text a person or the checks have accepted. These must be resolved first, or overridden with a reason.
+          </p>
+        </div>
       </div>
-      <ul className="space-y-1.5 text-sm" data-testid="export-reasons">
+      <ul className="space-y-2 text-base" data-testid="export-reasons">
         {st.open_flags > 0 ? (
-          <li data-testid="reason-flags">
+          <li data-testid="reason-flags" className="rounded-xl bg-raised px-4 py-3 ring-1 ring-inset ring-line">
             <span className="font-semibold tabular-nums">{plural(st.open_flags, "open flag")}</span>: resolve on the{" "}
             <Link className={LINK} to="/agent">
               Agent screen
@@ -68,7 +87,7 @@ function Locked({ st }: { st: ExportStatus }) {
           </li>
         ) : null}
         {queued > 0 ? (
-          <li data-testid="reason-queued">
+          <li data-testid="reason-queued" className="rounded-xl bg-needs-wash px-4 py-3">
             <span className="font-semibold tabular-nums">{plural(queued, "block")}</span> still to review:{" "}
             <Link className={LINK} to="/verify">
               go to Verify
@@ -79,33 +98,43 @@ function Locked({ st }: { st: ExportStatus }) {
       </ul>
       {blockers.length ? (
         <div>
-          <h4 className="text-sm font-semibold text-slate-800">
+          <h4 className="text-sm font-semibold text-ink">
             Blocking blocks{" "}
-            <span className="font-normal text-slate-600" data-testid="blocker-count">
+            <span className="font-normal text-muted" data-testid="blocker-count">
               ({blockers.length >= BLOCKER_LIMIT ? `first ${blockers.length} listed by the server` : plural(blockers.length, "block")})
             </span>
           </h4>
-          <ul className="mt-1 flex flex-wrap gap-1.5" data-testid="blocker-list">
-            {blockers.map((id) => (
-              <li key={id}>
-                <a
-                  href="/verify"
-                  data-testid="blocker-link"
-                  aria-label={`Open ${id} in Verify`}
-                  aria-busy={opening === id}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    void open(id);
-                  }}
-                  className={`inline-block rounded border border-slate-300 bg-white px-1.5 py-0.5 font-mono text-xs text-blue-800 hover:border-blue-400 hover:bg-blue-50 ${FOCUS}`}
-                >
-                  {id}
-                </a>
+          <p className="mt-0.5 text-xs text-muted">Grouped by the section they are in. Each one opens in Verify.</p>
+          <ul className="mt-3 divide-y divide-line-soft overflow-hidden rounded-xl border border-line bg-raised" data-testid="blocker-list">
+            {groups.map((g, gi) => (
+              <li key={`${g.key}-${gi}`} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-baseline sm:gap-4">
+                <p className="min-w-0 text-sm sm:w-56 sm:shrink-0">
+                  <span className="font-semibold text-ink">{g.title ?? "Blocks"}</span>{" "}
+                  <span className="text-muted">· {plural(g.ids.length, "block")}</span>
+                </p>
+                <span className="flex flex-wrap gap-1.5">
+                  {g.ids.map((id) => (
+                    <a
+                      key={id}
+                      href="/verify"
+                      data-testid="blocker-link"
+                      aria-label={`Open ${id} in Verify`}
+                      aria-busy={opening === id}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        void open(id);
+                      }}
+                      className={`inline-flex min-h-[1.75rem] items-center rounded-md bg-sunk px-2 font-mono text-2xs text-ink ring-1 ring-inset ring-line hover:bg-act-wash hover:ring-act-line ${FOCUS}`}
+                    >
+                      {id}
+                    </a>
+                  ))}
+                </span>
               </li>
             ))}
           </ul>
           {error ? (
-            <p role="alert" className="mt-1 text-sm text-red-800">
+            <p role="alert" className="mt-2 text-sm text-fail">
               {error}
             </p>
           ) : null}
@@ -178,16 +207,16 @@ function OverrideForm({ blockers, onDone }: { blockers: string[]; onDone: (st: E
   };
   const n = blockers.length;
   return (
-    <form onSubmit={(e) => void submit(e)} className="space-y-2 rounded border border-slate-300 bg-white p-3" data-testid="override-form" aria-labelledby="override-title">
-      <h3 id="override-title" className="text-sm font-semibold text-slate-900">
-        Export anyway
+    <form onSubmit={(e) => void submit(e)} className="space-y-3 rounded-2xl border border-dashed border-line-strong p-5" data-testid="override-form" aria-labelledby="override-title">
+      <h3 id="override-title" className="text-base font-semibold text-ink">
+        Export before review is finished
       </h3>
-      <p className="max-w-prose text-sm text-slate-700">
+      <p className="max-w-[68ch] text-sm text-muted">
         Records one override for each of the {plural(n, "block")} listed above, with your reason. Each is exported unreviewed, with its machine-cleaned text, and listed in manifest.json. Each covers its block as it is now: a flag raised on it after you record the override blocks the export again, and a block that starts blocking later is not covered.
         {n >= BLOCKER_LIMIT ? ` The server lists at most ${BLOCKER_LIMIT} at a time; record again for the next ones.` : ""}
       </p>
-      <label htmlFor="override-reason" className="block text-sm font-medium text-slate-800">
-        Reason <span className="font-normal text-slate-600">(required)</span>
+      <label htmlFor="override-reason" className="block text-sm font-medium text-ink">
+        Reason <span className="font-normal text-muted">(required, written into manifest.json)</span>
       </label>
       <Hint id="overrideReason">
         <textarea
@@ -198,15 +227,15 @@ function OverrideForm({ blockers, onDone }: { blockers: string[]; onDone: (st: E
           rows={2}
           aria-invalid={error !== null}
           aria-describedby={error ? "override-error" : undefined}
-          className={`block w-full max-w-xl rounded border border-slate-400 p-2 text-sm ${FOCUS}`}
+          className={`block w-full max-w-xl rounded-xl border border-line-strong bg-raised p-3 text-sm text-ink ${FOCUS}`}
         />
       </Hint>
       {error ? (
-        <p id="override-error" role="alert" className="text-sm text-red-800">
+        <p id="override-error" role="alert" className="text-sm text-fail">
           {error}
         </p>
       ) : null}
-      <button type="submit" disabled={busy || n === 0} data-testid="override-submit" className={`rounded border border-slate-500 bg-white px-3 py-1 text-sm hover:bg-slate-100 disabled:opacity-50 ${FOCUS}`}>
+      <button type="submit" disabled={busy || n === 0} data-testid="override-submit" className={BTN}>
         {busy ? "Recording..." : n === 1 ? "Record override" : `Record ${n} overrides`}
       </button>
     </form>
@@ -217,13 +246,13 @@ function Overrides({ list }: { list: Override[] }) {
   if (!list.length) return null;
   return (
     <section aria-labelledby="overrides-title" data-testid="overrides">
-      <h3 id="overrides-title" className="text-sm font-semibold text-slate-900">
-        Active overrides <span className="font-normal text-slate-600">(recorded in manifest.json)</span>
+      <h3 id="overrides-title" className="text-base font-semibold text-ink">
+        Active overrides <span className="text-sm font-normal text-muted">(recorded in manifest.json)</span>
       </h3>
-      <ul className="mt-1 space-y-1 text-sm">
+      <ul className="mt-2 space-y-1.5 text-sm">
         {list.map((o, i) => (
-          <li key={`${o.at}-${i}`} className="text-slate-800">
-            <span className="text-slate-600">{fmtTime(o.at)}</span> · {o.target_id ? <span className="font-mono text-xs">{o.target_id}</span> : "blanket: every block blocking the next export, including blocks and flags that start blocking after it was recorded"}:{" "}
+          <li key={`${o.at}-${i}`} className="text-ink">
+            <span className="text-muted">{fmtTime(o.at)}</span> · {o.target_id ? <span className="font-mono text-xs">{o.target_id}</span> : "blanket: every block blocking the next export, including blocks and flags that start blocking after it was recorded"}:{" "}
             <q>{o.reason}</q>
           </li>
         ))}
@@ -246,29 +275,32 @@ function Summary({ s }: { s: ExportSummary }) {
     ["Zip size", fmtBytes(s.zip_bytes)],
   ];
   return (
-    <section aria-labelledby="summary-title" data-testid="export-summary" className="space-y-2">
-      <h3 id="summary-title" className="text-sm font-semibold text-slate-900">
-        Last export <span className="font-normal text-slate-600">{fmtTime(s.generated_at)}</span>
+    <section aria-labelledby="summary-title" data-testid="export-summary" className="space-y-3 rounded-2xl border border-line bg-raised p-5 shadow-lift">
+      <h3 id="summary-title" className="text-base font-semibold text-ink">
+        <span aria-hidden="true" className="mr-1.5 inline-grid h-6 w-6 place-items-center rounded-full bg-done-wash text-xs font-bold text-done-ink">
+          ✓
+        </span>
+        Last export <span className="text-sm font-normal text-muted">{fmtTime(s.generated_at)}</span>
       </h3>
-      <dl className="grid max-w-md grid-cols-[1fr_auto] gap-x-6 gap-y-0.5 text-sm">
+      <dl className="grid max-w-md grid-cols-[1fr_auto] gap-x-6 gap-y-1 text-base">
         {rows.map(([k, v]) => (
           <div key={k} className="contents">
-            <dt className="text-slate-700">{k}</dt>
-            <dd className="text-right tabular-nums font-medium">{v}</dd>
+            <dt className="text-ink">{k}</dt>
+            <dd className="text-right font-bold tabular-nums">{v}</dd>
           </div>
         ))}
       </dl>
-      <p className="text-xs text-slate-700">
+      <p className="text-xs text-muted">
         SHA-256 <span className="break-all font-mono" data-testid="export-sha">{s.zip_sha256}</span>
       </p>
       {(s.warnings ?? []).length ? (
-        <ul role="note" className="list-disc space-y-0.5 pl-5 text-sm text-amber-900">
+        <ul role="note" className="list-disc space-y-0.5 pl-5 text-sm text-needs-ink">
           {(s.warnings ?? []).map((w) => (
             <li key={w}>{w}</li>
           ))}
         </ul>
       ) : null}
-      <a href="/api/export/download" download data-testid="export-download" className={`inline-block rounded bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700 ${FOCUS} focus-visible:ring-offset-2`}>
+      <a href="/api/export/download" download data-testid="export-download" className={PRIMARY}>
         Download zip
       </a>
     </section>
@@ -312,19 +344,22 @@ export default function ExportScreen() {
   };
 
   return (
-    <main className="mx-auto w-full max-w-4xl space-y-6 p-4 sm:p-6" data-testid="export-screen">
+    <main className="w-full max-w-5xl space-y-7 px-4 pb-16 pt-5 wide:px-8 wide:pt-6" data-testid="export-screen">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-xl font-semibold">Export</h2>
+        <h2 className="text-xl font-semibold tracking-[-0.01em] text-ink">Export the reviewed knowledge base</h2>
         <Link className={`text-sm ${LINK}`} to="/scope">
           Back to Scope
         </Link>
       </div>
       {status.isLoading ? (
-        <div aria-busy="true" className="h-24 animate-pulse rounded bg-slate-200" />
+        <div aria-busy="true" className="h-24 animate-pulse rounded-2xl bg-sunk" />
       ) : status.isError ? (
-        <div role="alert" className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-900">
+        <div role="alert" className="rounded-xl border border-fail-line bg-fail-wash p-3 text-sm text-ink">
+          <span aria-hidden="true" className="font-bold text-fail">
+            ✕{" "}
+          </span>
           Could not read the export status: {errText(status.error)}{" "}
-          <button type="button" onClick={() => void status.refetch()} className={`ml-1 rounded border border-red-400 px-2 ${FOCUS}`}>
+          <button type="button" onClick={() => void status.refetch()} className={`ml-1 min-h-[2rem] rounded-lg border border-line-strong bg-raised px-2.5 ${FOCUS}`}>
             Retry
           </button>
         </div>
@@ -342,11 +377,14 @@ export default function ExportScreen() {
               />
             </>
           ) : (
-            <section aria-labelledby="export-ready" data-testid="export-ready" className="space-y-2">
-              <h3 id="export-ready" className="text-lg font-semibold text-slate-950">
+            <section aria-labelledby="export-ready" data-testid="export-ready" className="space-y-3">
+              <h3 id="export-ready" className="flex items-center gap-2 text-xl font-semibold text-ink">
+                <span aria-hidden="true" className="grid h-8 w-8 place-items-center rounded-full bg-done-wash text-sm font-bold text-done-ink">
+                  ✓
+                </span>
                 Ready to export
               </h3>
-              <p className="max-w-prose text-sm text-slate-700">
+              <p className="max-w-[62ch] text-base text-muted">
                 {st.unlocked
                   ? "No flag is open and nothing in scope is waiting for review."
                   : "Overrides cover every remaining block; they will be exported unreviewed and listed in manifest.json."}{" "}
@@ -358,23 +396,23 @@ export default function ExportScreen() {
                   onClick={() => void start()}
                   disabled={starting || running}
                   data-testid="export-start"
-                  className={`rounded bg-blue-700 px-4 py-2 text-sm font-medium text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-400 ${FOCUS} focus-visible:ring-offset-2`}
+                  className={PRIMARY}
                 >
                   {running ? "Exporting..." : "Export knowledge base"}
                 </button>
               </Hint>
               {running ? (
-                <p role="status" className="text-sm text-slate-700">
+                <p role="status" className="text-sm text-muted">
                   Building the export. Progress is shown in the jobs bar; you can leave this screen.
                 </p>
               ) : null}
               {job.data?.status === "failed" ? (
-                <p role="alert" className="text-sm text-red-800">
+                <p role="alert" className="text-sm text-fail">
                   Export failed: {job.data.error ?? job.data.message ?? "no details"}
                 </p>
               ) : null}
               {startError ? (
-                <p role="alert" className="text-sm text-red-800">
+                <p role="alert" className="text-sm text-fail">
                   {startError}
                 </p>
               ) : null}

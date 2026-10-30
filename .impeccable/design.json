@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-30T00:00:00Z",
+  "title": "Design System: Manual Labor",
+  "extensions": {
+    "colorMeta": {
+      "act": { "role": "primary", "displayName": "Terracotta", "canonical": "oklch(0.53 0.14 38)", "tonalRamp": ["#3d1205", "#5f2210", "#7f3118", "#953a1c", "#ad4828", "#c96a4b", "#e4a78f", "#ffe9de"] },
+      "needs-wash": { "role": "secondary", "displayName": "Marigold", "canonical": "oklch(0.935 0.065 88)", "tonalRamp": ["#2e1c00", "#4d3000", "#6c4302", "#8f5d0c", "#b98a2c", "#d9a850", "#eec05b", "#fce8b8"] },
+      "done-wash": { "role": "tertiary", "displayName": "Sage", "canonical": "oklch(0.935 0.035 150)", "tonalRamp": ["#0f2416", "#1c3a24", "#295233", "#3b6b46", "#62946c", "#8cb894", "#b9e0c0", "#daf1dd"] },
+      "fail": { "role": "tertiary", "displayName": "Brick", "canonical": "oklch(0.50 0.16 25)", "tonalRamp": ["#3a0a0b", "#5d1415", "#7f1f20", "#972527", "#ac3031", "#cf6a66", "#e6a49e", "#ffe7e4"] },
+      "paper": { "role": "neutral", "displayName": "Stone Paper", "canonical": "oklch(0.985 0.004 85)", "tonalRamp": ["#27201a", "#3d352e", "#625952", "#867f77", "#d9d3cc", "#e9e6e0", "#f5f2ed", "#fbfaf7"] },
+      "focus": { "role": "neutral", "displayName": "Focus Blue", "canonical": "oklch(0.50 0.16 255)", "tonalRamp": ["#00244a", "#003d78", "#0961bb", "#3a82d4", "#6aa2e2", "#9cc2ee", "#cfe1f7", "#ecf4fd"] }
+    },
+    "typographyMeta": {
+      "manual": { "displayName": "Manual", "purpose": "The manual's own words: extracted text, readings, excerpts, proposals, the edit box." },
+      "id": { "displayName": "Identifier", "purpose": "Block, figure and model ids; secondary, never removed." }
+    },
+    "shadows": [
+      { "name": "lift", "value": "0 1px 2px oklch(0.3 0.02 60 / 0.08), 0 8px 24px -16px oklch(0.3 0.03 60 / 0.35)", "purpose": "Surfaces you act on: next-step card, receipt, page strip, export summary." },
+      { "name": "dialog", "value": "0 24px 60px -20px rgb(39 32 26 / 0.45)", "purpose": "Help, Flag block, Attach a figure." }
+    ],
+    "motion": [
+      { "name": "ease-out-quart", "value": "cubic-bezier(0.25, 1, 0.5, 1)", "purpose": "All state transitions, 150 to 200ms; removed under prefers-reduced-motion." }
+    ],
+    "breakpoints": [
+      { "name": "wide", "value": "1100px" },
+      { "name": "roomy", "value": "1400px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one primary action per screen, with its keycap.",
+      "html": "<button class=\"ds-btn-primary\">Approve <kbd class=\"ds-key\">A</kbd></button>",
+      "css": ".ds-btn-primary{display:inline-flex;align-items:center;gap:10px;min-height:44px;padding:0 16px;border:0;border-radius:12px;background:#ad4828;color:#fefcf7;font:600 14px system-ui,sans-serif;transition:background .15s cubic-bezier(.25,1,.5,1)}.ds-btn-primary:hover{background:#953a1c}.ds-btn-primary:focus-visible{outline:none;box-shadow:0 0 0 2px #fbfaf7,0 0 0 4px #0961bb}.ds-key{font:600 12px ui-monospace,monospace;padding:0 6px;border-radius:6px;border:1px solid #e4a78f;background:#953a1c}"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Every other decision.",
+      "html": "<button class=\"ds-btn\">Edit <kbd class=\"ds-key2\">E</kbd></button>",
+      "css": ".ds-btn{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 14px;border:1px solid #867f77;border-radius:12px;background:#fffefb;color:#27201a;font:600 14px system-ui,sans-serif}.ds-btn:hover{background:#f8f5f1}.ds-btn:focus-visible{outline:none;box-shadow:0 0 0 2px #fbfaf7,0 0 0 4px #0961bb}.ds-key2{font:600 12px ui-monospace,monospace;padding:0 6px;border-radius:6px;border:1px solid #d9d3cc;background:#fbfaf7;box-shadow:0 1px 0 #d9d3cc}"
+    },
+    {
+      "name": "Status Chips",
+      "kind": "chip",
+      "refersTo": "chip-waiting",
+      "description": "One hue, one meaning, always with a word.",
+      "html": "<span class=\"ds-chip ds-w\">queued</span> <span class=\"ds-chip ds-c\">✓ numbers verified by you</span> <span class=\"ds-chip ds-f\">✕ human edit: content changed</span>",
+      "css": ".ds-chip{display:inline-block;padding:1px 8px;border-radius:999px;font:600 12px system-ui,sans-serif}.ds-w{background:#fce8b8;color:#6c4302}.ds-c{background:#daf1dd;color:#295233}.ds-f{background:#ffe7e4;color:#ac3031}"
+    },
+    {
+      "name": "Queue Card",
+      "kind": "card",
+      "refersTo": "queue-card-current",
+      "description": "Human title, excerpt in the manual face, reasons in words, id and score as support.",
+      "html": "<div class=\"ds-card\"><div class=\"ds-r\"><b>4.1 Coolant Service</b><span>p.9 · paragraph</span></div><p class=\"ds-ex\">Do not operate the unit while the cover plate…</p><p class=\"ds-why\">parsers disagree · weak OCR word “4471-A” · numeric spec</p><div class=\"ds-r ds-id\"><span>b-scanned-p009-10</span><span>score 0.12 · below 0.85</span></div></div>",
+      "css": ".ds-card{width:288px;padding:12px 16px;background:#ffe9de;box-shadow:inset 0 0 0 1px #e4a78f;font:14px system-ui,sans-serif;color:#27201a}.ds-r{display:flex;justify-content:space-between;gap:8px}.ds-r span{font-size:12px;color:#625952}.ds-ex{margin:3px 0;font-family:'Atkinson Hyperlegible',sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ds-why{margin:0 0 3px;font-size:13px;color:#6c4302}.ds-id span:first-child{font-family:ui-monospace,monospace}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Calm Guide",
+    "overview": "A knowledgeable colleague at the next desk, walking a technician through a printed maintenance task card: one step at a time, the evidence on the table, nothing hidden. Warmth comes from roles, not decoration: terracotta means your move, marigold means waiting for you, sage means cleared. The manual's own words are always set in a second, hyperlegible face.",
+    "keyCharacteristics": ["Light theme only, warm stone neutrals", "Four status hues, one meaning each, always with a word or icon", "Two voices in type: system sans for the app, Atkinson Hyperlegible for the manual", "A sentence before a score; a human title before an identifier", "Fixed-height Verify frame on wide screens"],
+    "rules": [
+      { "name": "The One Meaning Rule", "body": "Each hue has one job; blue is focus only.", "section": "colors" },
+      { "name": "The Red Is Earned Rule", "body": "Brick appears only when a check or a write failed.", "section": "colors" },
+      { "name": "The Never Colour Alone Rule", "body": "Every coloured state also carries a word or an icon.", "section": "colors" },
+      { "name": "The Two Voices Rule", "body": "Manual words in Atkinson Hyperlegible, app words in the system sans.", "section": "typography" },
+      { "name": "The Flat Until Touched Rule", "body": "If two neighbouring surfaces both have shadows, one of them is wrong.", "section": "elevation" }
+    ],
+    "dos": ["Do put a human title before every identifier and keep the id beside it in 12px mono.", "Do say what will happen before it happens.", "Do show both OCR readings as labelled lines in the manual face.", "Do keep every count a server count, with the reconciliation line under any total.", "Do respect prefers-reduced-motion."],
+    "donts": ["Don't build consumer onboarding carousels and confetti.", "Don't show a single confidence number with no reason.", "Don't drift toward dark hacker dashboards or marketing gradients.", "Don't colour a passed check red.", "Don't use exclamation marks, em dashes, hype or a time-left estimate.", "Don't use side-stripe borders, glass, or nested cards.", "Don't fetch fonts at runtime."]
+  }
+}

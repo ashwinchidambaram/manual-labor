@@ -16,6 +16,8 @@ export interface GroupRowProps {
   fraction: number | null;
   stale: boolean;
   low: boolean;
+  /** another row of this document has the same title: show the pages beside it so the two can be told apart */
+  duplicate?: boolean;
   cursor: boolean;
   onToggle: (id: string) => void;
   onExpand: (id: string) => void;
@@ -68,10 +70,8 @@ function GroupRowImpl(p: GroupRowProps) {
         p.onCursor(g.id);
         p.onToggle(g.id);
       }}
-      style={{ paddingLeft: `${0.5 + (p.depth - 1) * 1.25}rem` }}
-      className={`flex min-h-[3rem] cursor-pointer items-center gap-2 border-b border-slate-200 py-1 pr-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-600 ${
-        selected ? "bg-blue-50" : "bg-white hover:bg-slate-50"
-      }`}
+      style={{ paddingLeft: `${1 + (p.depth - 1) * 1.25}rem` }}
+      className="flex min-h-[3.25rem] cursor-pointer items-center gap-3 border-b border-line-soft bg-raised py-1.5 pr-4 transition-colors duration-150 ease-out-quart last:border-b-0 hover:bg-sunk focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
     >
       {!topic ? (
         p.hasChildren ? (
@@ -83,9 +83,11 @@ function GroupRowImpl(p: GroupRowProps) {
               e.stopPropagation();
               p.onExpand(g.id);
             }}
-            className="w-5 shrink-0 text-slate-600"
+            className="grid h-6 w-5 shrink-0 place-items-center text-muted"
           >
-            {p.expanded ? "v" : ">"}
+            <span aria-hidden="true" className={`inline-block transition-transform duration-150 ease-out-quart ${p.expanded ? "rotate-90" : ""}`}>
+              ▸
+            </span>
           </button>
         ) : (
           <span className="w-5 shrink-0" />
@@ -96,33 +98,34 @@ function GroupRowImpl(p: GroupRowProps) {
         aria-checked={p.check === "mixed" ? "mixed" : selected}
         aria-label={`Select ${g.title}`}
         data-testid="row-check"
-        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border text-[10px] leading-none ${
-          p.check === "unchecked" ? "border-slate-500 bg-white" : "border-blue-700 bg-blue-700 text-white"
+        className={`grid h-[1.125rem] w-[1.125rem] shrink-0 place-items-center rounded-[5px] border-[1.5px] text-[0.7rem] font-bold leading-none ${
+          p.check === "unchecked" ? "border-line-strong bg-raised" : "border-ink bg-ink text-raised"
         }`}
       >
-        {p.check === "checked" ? "x" : p.check === "mixed" ? "-" : ""}
+        {p.check === "checked" ? "✓" : p.check === "mixed" ? "–" : ""}
       </span>
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <span id={titleId} className="truncate text-sm font-medium" title={title}>
+        <div className="flex min-w-0 items-baseline gap-2">
+          <span id={titleId} className="min-w-0 truncate text-base font-medium text-ink" title={title}>
             {g.is_unassigned ? "Unassigned blocks" : title}
           </span>
+          {p.duplicate && !g.is_unassigned && pages(g) ? <span className="shrink-0 text-xs tabular-nums text-muted">{pages(g)}</span> : null}
           {g.is_unassigned ? (
-            <span className="shrink-0 rounded bg-slate-200 px-1.5 text-xs text-slate-800">Catch-all</span>
+            <span className="shrink-0 rounded-full bg-sunk px-2 py-px text-2xs font-semibold text-muted ring-1 ring-inset ring-line">Catch-all</span>
           ) : null}
           {p.low ? (
             <Hint id="cohesion">
               <span
-                className="shrink-0 rounded bg-amber-200 px-1.5 text-xs font-medium text-amber-950"
+                className="shrink-0 rounded-full px-2 py-px text-2xs font-semibold text-needs-ink ring-1 ring-inset ring-needs-line"
                 data-testid="low-cohesion"
-                aria-label={`Low cohesion ${g.cohesion?.toFixed(2)}`}
+                aria-label={`Mixed subjects, cohesion ${g.cohesion?.toFixed(2)}`}
               >
-                Low cohesion
+                Mixed subjects
               </span>
             </Hint>
           ) : null}
         </div>
-        <div className="truncate text-xs text-slate-600" data-testid="row-meta">
+        <div className="truncate text-xs text-muted" data-testid="row-meta">
           {meta.join(" · ")}
         </div>
       </div>
@@ -133,7 +136,7 @@ function GroupRowImpl(p: GroupRowProps) {
         aria-label={
           p.fraction == null ? "coverage not available" : `${Math.round(p.fraction * 100)} percent of this ${topic ? "topic" : "section"} is in your selection`
         }
-        className={`shrink-0 rounded border border-slate-300 px-1.5 text-xs tabular-nums ${p.stale ? "opacity-50" : ""}`}
+        className={`shrink-0 text-xs tabular-nums text-muted transition-opacity duration-150 ${p.stale ? "opacity-50" : ""}`}
       >
         {pctLabel} selected
       </span>

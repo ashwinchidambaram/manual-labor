@@ -27,7 +27,7 @@ export const HINTS = {
   applyTier: { term: "Model tier", text: "Use this tier's models for every task. Stages that depend on the models are marked to re-run." },
   // verify
   viewSlider: { term: "Review filter", text: "Also lists auto-approved blocks below this confidence for a second look. Their status does not change.", hotkey: "vViewUp" },
-  sort: { term: "Queue order", text: "Worst first, by page, or figures only.", hotkey: "vSort" },
+  sort: { term: "Queue order", text: "Most doubtful first, by page, or figures only.", hotkey: "vSort" },
   textDiff: { term: "Original vs cleaned", text: "The diff shows every change cleanup made to the raw parse. Grey changes are allowed normalisation.", hotkey: "vToggleDiff" },
   approve: { term: "Approve", text: "Accept the text as shown. On a block with numbers this records that you checked them.", hotkey: "vApprove" },
   edit: { term: "Edit", text: "Correct the text. Your edit is checked too: a change to content or numbers asks you to confirm.", hotkey: "vEdit" },
@@ -39,9 +39,9 @@ export const HINTS = {
   exportButton: { term: "Export", text: "Builds the zip from accepted text and records the build in the action log." },
   overrideReason: { term: "Override reason", text: "Why you are exporting with blocks not yet reviewed. It is written into manifest.json." },
   // non-focusable (hover only; keyboard users read them in the Help glossary)
-  reasonChip: { term: "Reason chip", text: "A signal that kept this block from auto-approval. Red chips are critical: the block cannot pass while they are low." },
+  reasonChip: { term: "Reason", text: "A check that kept this block from auto-approval. A critical one can hold a block on its own while it is low." },
   statusChip: { term: "Block status", text: "Queued waits for you; auto-approved was cleared by the checks; approved, edited and flagged are your decisions." },
-  cohesion: { term: "Cohesion", text: "How closely a topic's blocks belong together, from 0 to 1. Low cohesion means the topic may mix subjects." },
+  cohesion: { term: "Mixed subjects", text: "These blocks cover different subjects (cohesion, from 0 to 1, is low). Check them in Document structure." },
   coverage: { term: "Coverage", text: "How much of this group is in your selection." },
   numbersVerified: { term: "Numbers verified by you", text: "You approved this block after checking its numbers against the source page." },
   attachRule: { term: "Attach rule", text: "How a figure was matched to its article: a caption reference, proximity on the page, or by hand." },

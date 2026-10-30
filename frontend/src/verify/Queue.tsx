@@ -1,4 +1,4 @@
-import { useVirtualizer } from "@tanstack/react-virtual";
+import { defaultRangeExtractor, useVirtualizer } from "@tanstack/react-virtual";
 import { useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import type { DocReadiness, ExportStatus, QueueItem, ReviewCounts } from "../api/schema";
@@ -6,7 +6,9 @@ import { Keycap } from "../onboarding/Copy";
 import { keyLabel } from "../onboarding/guide";
 import QueueCard from "./QueueCard";
 
-export const ROW = 64;
+export const ROW = 100;
+/** rows always rendered at the head of the list */
+const HEAD = 8;
 
 interface Props {
   items: QueueItem[];
@@ -23,15 +25,25 @@ interface Props {
   threshold: number | null;
   /** the export gate; "Next: export" is only offered when it is open */
   gate?: ExportStatus;
+  /** document slug -> file name, the card title fallback */
+  docTitles?: ReadonlyMap<string, string>;
 }
 
-export default function Queue({ items, total, pinned, currentId, docs, counts, focusTick, wantFocus, focusBlocked, onSelect, onNearEnd, threshold, gate }: Props) {
+const NO_TITLES: ReadonlyMap<string, string> = new Map();
+
+export default function Queue({ items, total, pinned, currentId, docs, counts, focusTick, wantFocus, focusBlocked, onSelect, onNearEnd, threshold, gate, docTitles = NO_TITLES }: Props) {
   const scroller = useRef<HTMLDivElement>(null);
   const v = useVirtualizer({
     count: items.length,
     getScrollElement: () => scroller.current,
     estimateSize: () => ROW,
-    overscan: 8,
+    // Cards are 100px tall: a generous window means a jump or a fast wheel lands on rendered rows. The head of the list is
+    // always rendered too, so a sort change shows its first cards at once, wherever the current block is.
+    overscan: 30,
+    rangeExtractor: (r) => {
+      const head = Array.from({ length: Math.min(HEAD, r.count) }, (_, i) => i);
+      return [...new Set([...head, ...defaultRangeExtractor(r)])].sort((a, b) => a - b);
+    },
     scrollMargin: pinned ? ROW : 0,
     initialRect: { width: 320, height: 640 },
   });
@@ -45,15 +57,33 @@ export default function Queue({ items, total, pinned, currentId, docs, counts, f
   const empty = items.length === 0 && !pinned;
   // nothing confirmed yet: no block in scope, nothing flagged, no document still being prepared
   const unconfirmed = empty && counts.in_scope === 0 && counts.flagged_open === 0 && preparing === 0;
-  const LINK = "text-blue-700 underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600";
+  const LINK = "font-medium text-act-ink underline underline-offset-2 hover:text-act-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus";
+  const at = idx >= 0 ? idx + 1 : null;
   return (
-    <div className="flex min-h-0 flex-col border-r border-slate-300 bg-white" data-zone="queue">
+    <div className="flex min-h-0 flex-col border-b border-line bg-paper wide:h-full wide:border-b-0 wide:border-r" data-zone="queue">
+      <p className="flex shrink-0 items-center justify-between gap-2 border-b border-line-soft px-4 py-2 text-xs text-muted">
+        <span>
+          {at !== null ? (
+            <>
+              Block <span className="font-semibold tabular-nums text-ink">{at}</span> of <span className="tabular-nums">{total}</span> in this list
+            </>
+          ) : (
+            <>
+              <span className="tabular-nums">{total}</span> in this list
+            </>
+          )}
+        </span>
+        <span className="flex items-center gap-1" aria-hidden="true">
+          <Keycap>{keyLabel("vBrowsePrev")}</Keycap>
+          <Keycap>{keyLabel("vBrowseNext")}</Keycap> browse
+        </span>
+      </p>
       <div
         ref={scroller}
         role="listbox"
         aria-label="Review queue"
         aria-orientation="vertical"
-        className="min-h-0 flex-1 overflow-auto"
+        className="h-[6.25rem] min-h-0 overflow-auto wide:h-auto wide:flex-1"
         data-testid="queue"
       >
         {pinned ? (
@@ -69,6 +99,7 @@ export default function Queue({ items, total, pinned, currentId, docs, counts, f
             onSelect={onSelect}
             height={ROW}
             threshold={threshold}
+            docTitle={docTitles.get(pinned.doc_id) ?? null}
           />
         ) : null}
         <div style={{ height: v.getTotalSize(), position: "relative" }}>
@@ -88,15 +119,16 @@ export default function Queue({ items, total, pinned, currentId, docs, counts, f
                 height={ROW}
                 offset={row.start - (pinned ? ROW : 0)}
                 threshold={threshold}
+                docTitle={docTitles.get(it.doc_id) ?? null}
               />
             );
           })}
         </div>
       </div>
       {unconfirmed ? (
-        <div data-testid="queue-empty" data-variant="unconfirmed" className="space-y-1 p-3 text-sm">
-          <p className="font-medium">Nothing to review yet</p>
-          <p className="text-slate-700">
+        <div data-testid="queue-empty" data-variant="unconfirmed" className="space-y-1.5 px-4 py-5 text-sm">
+          <p className="text-base font-semibold text-ink">Nothing to review yet</p>
+          <p className="text-muted">
             Confirm your scope on the Scope screen (<Keycap>{keyLabel("goScope")}</Keycap>, then <Keycap>{keyLabel("confirm")}</Keycap>).
           </p>
           <Link className={LINK} to="/scope">
@@ -107,7 +139,7 @@ export default function Queue({ items, total, pinned, currentId, docs, counts, f
         <EmptyNext counts={counts} gate={gate} link={LINK} />
       ) : null}
       {preparing > 0 ? (
-        <p data-testid="queue-footer" className="border-t border-slate-200 px-2 py-1 text-xs text-slate-700">
+        <p data-testid="queue-footer" className="shrink-0 border-t border-line-soft bg-needs-wash px-4 py-2 text-xs text-needs-ink">
           {preparing} document{preparing === 1 ? "" : "s"} still preparing; their blocks appear here when ready. You can start now.
         </p>
       ) : null}
@@ -132,13 +164,20 @@ function EmptyNext({ counts, gate, link }: { counts: ReviewCounts; gate: ExportS
             flagged > 0 ? ` ${plural(flagged, "open flag")} also ${flagged === 1 ? "blocks" : "block"} it.` : ""
           } Check the sort and document filter, or see the Export screen for the list.`;
   return (
-    <div data-testid="queue-empty" data-variant="caught-up" className="space-y-1 p-3 text-sm">
-      <p className="font-medium">{waiting > 0 ? "Nothing in this list" : "All caught up"}</p>
-      <p className="text-slate-700" data-testid="queue-empty-counts">
+    <div data-testid="queue-empty" data-variant="caught-up" className="space-y-1.5 px-4 py-5 text-sm">
+      <p className="flex items-center gap-2 text-base font-semibold text-ink">
+        {waiting > 0 ? null : (
+          <span aria-hidden="true" className="grid h-6 w-6 place-items-center rounded-full bg-done-wash text-xs font-bold text-done-ink">
+            ✓
+          </span>
+        )}
+        {waiting > 0 ? "Nothing in this list" : "All caught up"}
+      </p>
+      <p className="text-muted" data-testid="queue-empty-counts">
         {counts.approved + counts.edited} reviewed, {counts.auto_approved} auto-approved, {counts.flagged_open} flagged.
       </p>
       {next ? (
-        <p className="text-slate-700" data-testid="queue-next">
+        <p className="text-ink" data-testid="queue-next">
           {next}
         </p>
       ) : null}

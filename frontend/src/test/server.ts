@@ -166,6 +166,8 @@ export function installFake(over: Partial<Fake> = {}): Fake {
       return HttpResponse.json(f.guide);
     }),
     http.get("*/api/export/status", () => HttpResponse.json(f.exportStatus)),
+    // block titles for Export and Agent (shell/blockTitles.ts); Verify tests install their own queue
+    http.get("*/api/verify/queue", () => HttpResponse.json({ items: [], total: 0, docs: [], counts: {}, cursor: {} })),
     http.get("*/api/flags", () => HttpResponse.json(f.flags)),
     http.get("*/api/agent/items", () => HttpResponse.json([])),
     http.get("*/api/agent/proposals", () => HttpResponse.json(f.proposals)),

@@ -20,7 +20,7 @@ export default function ViewToggle({ view, onChange }: { view: View; onChange: (
   };
   return (
     <Hint id="viewToggle" within>
-    <div role="radiogroup" aria-label="Grouping view" className="inline-flex rounded border border-slate-400" onKeyDown={onKeyDown} data-testid="view-toggle">
+    <div role="radiogroup" aria-label="Grouping view" className="inline-flex rounded-xl bg-sunk p-[3px] ring-1 ring-inset ring-line-soft" onKeyDown={onKeyDown} data-testid="view-toggle">
       {OPTIONS.map((o) => (
         <button
           key={o.value}
@@ -30,8 +30,8 @@ export default function ViewToggle({ view, onChange }: { view: View; onChange: (
           tabIndex={view === o.value ? 0 : -1}
           data-value={o.value}
           onClick={() => onChange(o.value)}
-          className={`px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-600 ${
-            view === o.value ? "bg-slate-900 text-white" : "bg-white hover:bg-slate-100"
+          className={`min-h-[2.25rem] whitespace-nowrap rounded-[9px] px-3.5 text-sm transition-colors duration-150 ease-out-quart focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
+            view === o.value ? "bg-raised font-semibold text-ink shadow-[0_1px_2px_rgb(39_32_26/0.12)]" : "font-medium text-muted hover:text-ink"
           }`}
         >
           {o.label}

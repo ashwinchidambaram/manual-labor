@@ -36,6 +36,10 @@ export function itemFromDetail(d: BlockDetail): QueueItem {
     has_numeric_spec: b.has_numeric_spec,
     reasons: d.why?.filter((w) => w.kind === "stale" || (w.kind === "signal" && (w.value ?? 1) < 1)).map((w) => w.name).slice(0, 3) ?? [],
     stale_doc: false,
+    // the queue's own rule (first 120 characters of the text a reviewer sees); the section title is not in the detail
+    excerpt: (b.clean_text ?? b.raw_text).slice(0, 120),
+    section_title: null,
+    weakest_word: null,
   };
 }
 

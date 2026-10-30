@@ -33,7 +33,7 @@ export default function LearningChip({ learning, slug }: { learning: LearningUse
         type="button"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
-        className={`rounded-full border border-violet-400 bg-violet-50 px-3 py-0.5 text-violet-900 ${FOCUS}`}
+        className={`min-h-[2rem] rounded-full border border-line-strong bg-raised px-3 text-ink hover:bg-sunk ${FOCUS}`}
       >
         Why did this change? learned ({learning.provenance})
       </button>
@@ -47,7 +47,7 @@ export default function LearningChip({ learning, slug }: { learning: LearningUse
                 type="button"
                 onClick={() => disable.mutate(id)}
                 disabled={disable.isPending}
-                className={`rounded border border-slate-400 px-2 text-xs ${FOCUS}`}
+                className={`min-h-[1.75rem] rounded-lg border border-line-strong px-2 text-xs ${FOCUS}`}
                 aria-label={`Disable ${id}`}
               >
                 Disable
@@ -59,7 +59,7 @@ export default function LearningChip({ learning, slug }: { learning: LearningUse
       {changed ? (
         <p role="status" className="mt-1 flex items-center gap-2" data-testid="learning-notice">
           Learning updated. Re-run cleanup to apply
-          <button type="button" onClick={() => rerun.mutate()} className={`rounded border border-slate-400 px-2 text-xs ${FOCUS}`}>
+          <button type="button" onClick={() => rerun.mutate()} className={`min-h-[1.75rem] rounded-lg border border-line-strong px-2 text-xs ${FOCUS}`}>
             Re-run cleanup
           </button>
         </p>

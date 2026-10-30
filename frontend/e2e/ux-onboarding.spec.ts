@@ -47,7 +47,7 @@ test("UX1 cold start: the first screen says what the app does, what the numbers 
   await waitForTree(page);
   await expect(panel(page)).toBeVisible();
   await expect(panel(page)).toHaveAttribute("data-step", "scope");
-  await expect(page.getByTestId("guide-progress")).toHaveText("Step 1 of 4");
+  await expect(page.getByTestId("step-short-scope")).toHaveText("here"); // design 13 section 5: the rail marks the step
   const guideText = await panel(page).innerText();
   const screen = await visibleText(page);
   note("guide-text-relied-on", guideText);
@@ -56,7 +56,8 @@ test("UX1 cold start: the first screen says what the app does, what the numbers 
   expect(guideText).toMatch(/knowledge base/i);
   // what the numbers mean: the summary labels and the estimated-review line explain themselves
   await expect(page.getByTestId("selection-summary")).toContainText("Estimated review");
-  expect(guideText).toMatch(/Estimated review is how many selected blocks will need a person/);
+  // design 13 section 5: the estimate is explained by the summary's own sentence
+  await expect(page.getByTestId("selection-summary")).toContainText("contain numbers, which a person always checks");
   // what to press next
   expect(guideText).toMatch(/confirms: scoring starts and Verify opens/);
   expect(guideText).toMatch(/\b[A-Za-z]\b.*selects/);
@@ -74,9 +75,9 @@ test("UX1 cold start: the first screen says what the app does, what the numbers 
     inTopicsAll += inTopics;
     unassignedAll += un;
     const line = await page.locator(`[data-testid=doc-heading][data-doc='${d.doc_id}'] [data-testid=doc-reconcile]`).innerText();
-    const m = line.match(/(\d+) parsed = (\d+) headers and footers \(excluded\) \+ (\d+) in topics \+ (\d+) unassigned/);
+    const m = line.match(/(\d+) blocks found = (\d+) in topics \+ (\d+) not placed \+ (\d+) page headers and footers, left out/);
     expect(m, `${d.doc_id}: ${line}`).not.toBeNull();
-    const [p, h, t, u] = m!.slice(1).map(Number);
+    const [p, t, u, h] = m!.slice(1).map(Number);
     expect(p).toBe(h + t + u); // the line adds up
     expect([p, h, t, u]).toEqual([bl.length, hf, inTopics, un]); // and equals the API
   }
@@ -182,7 +183,7 @@ test("UX4 the guide never steals focus: editor keeps it through a late ack and g
     await expect.poll(async () => (await decisions(request)).length).toBeGreaterThan(before); // the ack has landed
     await page.waitForTimeout(800);
     await expect(ta).toBeFocused();
-    await panel(page).getByRole("button", { name: "Next" }).click(); // guide interaction mid-edit
+    await panel(page).getByTestId("next-step").click(); // guide interaction mid-edit (design 13 section 5: no Next button)
     await expect(ta).toBeFocused();
     await page.keyboard.type("?");
     await expect(page.getByRole("dialog", { name: "Help" })).toHaveCount(0);
@@ -269,14 +270,15 @@ test("UX5 tooltips by keyboard: Tab to three controls, text appears on focus and
 test("UX6 Hide persists: reload keeps it hidden, the server says seen, ? reopens Help on the Guide tab", async ({ page, request }) => {
   await page.goto("/scope");
   await waitForTree(page);
-  await panel(page).getByRole("button", { name: "Hide guide" }).click();
-  await expect(panel(page)).toHaveCount(0);
+  // design 13 section 5: Hide moved to the first-run welcome
+  await page.getByTestId("welcome").getByRole("button", { name: "I have used this before" }).click();
+  await expect(page.getByTestId("welcome")).toHaveCount(0);
   await expect.poll(async () => (await api(request).get<GuideState>("/api/ui/guide")).seen).toBe(true);
   const guideGet = page.waitForResponse((r) => new URL(r.url()).pathname === "/api/ui/guide" && r.request().method() === "GET");
   await page.reload();
   expect((await guideGet).ok()).toBe(true);
   await waitForTree(page);
-  await expect(panel(page)).toHaveCount(0);
+  await expect(page.getByTestId("welcome")).toHaveCount(0);
   expect((await api(request).get<GuideState>("/api/ui/guide")).seen).toBe(true);
   await page.keyboard.press("?");
   const dlg = page.getByRole("dialog", { name: "Help" });
@@ -395,11 +397,9 @@ test("UX10 honest copy: no exclamation marks, em dashes or unexplained bare conf
   };
   await page.goto("/scope");
   await waitForTree(page);
-  for (let i = 0; i < 4; i++) {
-    await scan(`scope guide step ${i + 1}`);
-    if (i < 3) await panel(page).getByRole("button", { name: "Next" }).click();
-  }
-  await panel(page).getByRole("button", { name: "Hide guide" }).click();
+  // design 13 section 5: the rail shows one next step (no paging); the welcome replaces Hide guide
+  await scan("scope with welcome");
+  await page.getByTestId("welcome").getByRole("button", { name: "I have used this before" }).click();
   await scan("scope");
   const q = (await getQueue(request)).items;
   if (q[0]) await putCursor(request, q[0].block_id);

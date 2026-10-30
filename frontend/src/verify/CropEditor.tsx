@@ -33,7 +33,7 @@ export default function CropEditor({ figureId, box, page, onChange, onSave, onCa
           onCancel();
         }
       }}
-      className="space-y-2 border-t border-slate-300 bg-white p-2 text-sm"
+      className="space-y-2 rounded-xl border border-line bg-raised p-3 text-sm"
     >
       <h3 className="font-semibold">Crop {figureId}</h3>
       {box === null ? (
@@ -55,23 +55,23 @@ export default function CropEditor({ figureId, box, page, onChange, onSave, onCa
                     next[i] = e.target.value === "" ? NaN : Number(e.target.value);
                     onChange(next);
                   }}
-                  className={`rounded border border-slate-400 px-1 py-0.5 ${FOCUS}`}
+                  className={`rounded-md border border-line-strong bg-raised px-1.5 py-0.5 ${FOCUS}`}
                 />
               </label>
             ))}
           </div>
           {err ? (
-            <p role="alert" data-testid="crop-error" className="text-red-800">
+            <p role="alert" data-testid="crop-error" className="text-fail">
               {err}
             </p>
           ) : null}
         </>
       )}
       <div className="flex gap-2">
-        <button type="submit" disabled={busy || err !== null || box === null} className={`rounded bg-slate-900 px-3 py-1 text-white disabled:opacity-50 ${FOCUS}`}>
+        <button type="submit" disabled={busy || err !== null || box === null} className={`min-h-[2.25rem] rounded-lg bg-act px-3 font-semibold text-act-on hover:bg-act-hover disabled:opacity-50 ${FOCUS}`}>
           Save crop
         </button>
-        <button type="button" onClick={onCancel} className={`rounded border border-slate-500 px-3 py-1 ${FOCUS}`}>
+        <button type="button" onClick={onCancel} className={`min-h-[2.25rem] rounded-lg border border-line-strong bg-raised px-3 font-semibold ${FOCUS}`}>
           Cancel
         </button>
       </div>

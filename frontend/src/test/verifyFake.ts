@@ -33,6 +33,9 @@ export function makeQueueItem(n: number, over: Partial<QueueItem> = {}): QueueIt
     has_numeric_spec: false,
     reasons: ["ocr_mean"],
     stale_doc: false,
+    excerpt: `Text of block ${n}`,
+    section_title: null,
+    weakest_word: null,
     ...over,
   };
 }

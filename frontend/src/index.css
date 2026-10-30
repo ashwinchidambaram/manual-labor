@@ -1,3 +1,155 @@
+/*
+ * Tokens are written as sRGB hex so computed styles stay rgb() (tests and tools parse them); the OKLCH source of
+ * each value is in the comment and in DESIGN.md.
+ *
+ * Manual Labor design tokens (module 13, DESIGN.md). Light theme only: the scene is a bright plant office in daytime.
+ * Colour has one meaning per hue:
+ *   terracotta (act)  = your next action / where you are
+ *   marigold (needs)  = waiting for you
+ *   sage (done)       = cleared: by the checks or by you
+ *   brick (fail)      = something failed (a check, a save, a request)
+ *   blue (focus)      = keyboard focus, nothing else
+ * Every state also carries a word or an icon; colour is never the only signal.
+ */
+
+/* Atkinson Hyperlegible (SIL OFL 1.1, assets/fonts/OFL.txt): the manual's own words. Bundled, never fetched. */
+@font-face {
+  font-family: "Atkinson Hyperlegible";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./assets/fonts/atkinson-hyperlegible-latin-400-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Atkinson Hyperlegible";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("./assets/fonts/atkinson-hyperlegible-latin-700-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Atkinson Hyperlegible";
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./assets/fonts/atkinson-hyperlegible-latin-400-italic.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Atkinson Hyperlegible";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./assets/fonts/atkinson-hyperlegible-latin-ext-400-normal.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: "Atkinson Hyperlegible";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("./assets/fonts/atkinson-hyperlegible-latin-ext-700-normal.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  :root {
+    /* surfaces: warm stone paper, tinted toward the terracotta hue */
+    --paper: #fbfaf7; /* oklch(0.985 0.004 85) */
+    --raised: #fffefb; /* oklch(0.996 0.003 85) */
+    --rail: #f5f2ed; /* oklch(0.962 0.008 80) */
+    --sunk: #f8f5f1; /* oklch(0.972 0.006 82) */
+    --line: #d9d3cc; /* oklch(0.87 0.012 78) */
+    --line-soft: #e9e6e0; /* oklch(0.925 0.008 80) */
+    /* form-control and checkbox boundaries (3:1 against paper) */
+    --line-strong: #867f77; /* oklch(0.6 0.015 70) */
+    /* text */
+    --ink: #27201a; /* oklch(0.25 0.015 60) */
+    --muted: #625952; /* oklch(0.47 0.016 62) */
+    /* act: your next action, the current step */
+    --act: #ad4828; /* oklch(0.53 0.14 38) */
+    --act-hover: #953a1c; /* oklch(0.47 0.13 38) */
+    --on-act: #fefcf7; /* oklch(0.99 0.006 85) */
+    --act-wash: #ffe9de; /* oklch(0.95 0.03 45) */
+    --act-line: #e4a78f; /* oklch(0.78 0.08 42) */
+    --act-ink: #983d1f; /* oklch(0.48 0.13 38) */
+    /* needs: waiting for you */
+    --needs-wash: #fce8b8; /* oklch(0.935 0.065 88) */
+    --needs-fill: #eec05b; /* oklch(0.83 0.13 85) */
+    --needs-line: #d9a850; /* oklch(0.76 0.12 80) */
+    --needs-ink: #6c4302; /* oklch(0.42 0.09 70) */
+    /* done: cleared by the checks or by you */
+    --done-wash: #daf1dd; /* oklch(0.935 0.035 150) */
+    --done-mid: #62946c; /* oklch(0.62 0.08 150) */
+    --done-ink: #295233; /* oklch(0.4 0.07 150) */
+    /* fail: a failed check, save or request; nothing else is red */
+    --fail: #ac3031; /* oklch(0.5 0.16 25) */
+    --fail-wash: #ffe7e4; /* oklch(0.95 0.03 25) */
+    --fail-line: #e6a49e; /* oklch(0.78 0.08 25) */
+    /* keyboard focus only */
+    --focus: #0961bb; /* oklch(0.5 0.16 255) */
+    /* the page image sits on true paper so scans keep their own tone */
+    --page: #fefdfc; /* oklch(0.995 0.002 90) */
+    --hatch-done: #b9e0c0; /* oklch(0.87 0.06 150) */
+
+    --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+    color-scheme: light;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-size: 0.9375rem;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    font-kerning: normal;
+  }
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+  kbd {
+    font-variant-ligatures: none;
+  }
+  ::selection {
+    background: var(--needs-wash);
+    color: var(--ink);
+  }
+}
+
+@layer components {
+  /* the manual's own words: reading face, figures that never blur 0/O or 1/l/I */
+  .manual-text {
+    font-family: "Atkinson Hyperlegible", ui-sans-serif, system-ui, sans-serif;
+    font-variant-numeric: lining-nums;
+  }
+  /* diagonal hatch for flagged progress (never colour alone) */
+  .hatch-flag {
+    background-image: repeating-linear-gradient(-45deg, var(--muted) 0 2px, transparent 2px 6px);
+    background-color: var(--sunk);
+  }
+  .hatch-cleared {
+    background-image: repeating-linear-gradient(-45deg, var(--done-wash) 0 5px, var(--hatch-done) 5px 10px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+}

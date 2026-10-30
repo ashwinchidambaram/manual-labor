@@ -146,10 +146,10 @@ export function queuedBecause(block: Block, why: readonly WhyItem[]): string | n
 }
 
 const TONE: Record<CheckOutcome, string> = {
-  passed: "text-emerald-800",
-  failed: "font-semibold text-red-800",
-  measured: "text-slate-800",
-  not_run: "text-slate-600",
+  passed: "font-semibold text-done-ink",
+  failed: "font-semibold text-fail",
+  measured: "text-ink",
+  not_run: "text-muted",
 };
 const MARK: Record<CheckOutcome, string> = { passed: "✓", failed: "✗", measured: "·", not_run: "–" };
 
@@ -158,19 +158,19 @@ export default function ChecksList({ block, figure, why = [] }: { block: Block; 
   const because = queuedBecause(block, why);
   return (
     <section aria-label="Checks on this block" className="text-sm" data-testid="checks-list">
-      <h3 className="font-semibold">Checks on this block</h3>
-      <p className="mt-0.5 text-xs text-slate-600" data-testid="checks-intro">
+      <h3 className="text-2xs font-semibold uppercase tracking-[0.07em] text-muted">Checks on this block</h3>
+      <p className="mt-1 text-xs leading-relaxed text-muted" data-testid="checks-intro">
         {CLEANUP_ALLOWED} {NUMBER_CHOICE} Any other change fails the faithfulness check and is shown as a diff.
       </p>
       {because ? (
-        <p className="mt-1 text-xs font-medium text-slate-800" data-testid="checks-queued-why">
+        <p className="mt-2 text-sm font-medium text-ink" data-testid="checks-queued-why">
           {because}
         </p>
       ) : null}
-      <dl className="mt-1.5 grid grid-cols-[minmax(8rem,auto)_1fr] gap-x-3 gap-y-1">
+      <dl className="mt-2.5 grid grid-cols-[minmax(8rem,auto)_1fr] gap-x-3 gap-y-1.5">
         {rows.map((r) => (
           <div key={r.id} className="contents" data-testid={`check-${r.id}`} data-outcome={r.outcome}>
-            <dt className="text-slate-700">{r.name}</dt>
+            <dt className="text-muted">{r.name}</dt>
             <dd className="min-w-0">
               <span className={TONE[r.outcome]}>
                 <span aria-hidden="true" className="mr-1 inline-block w-3 text-center">
@@ -178,7 +178,7 @@ export default function ChecksList({ block, figure, why = [] }: { block: Block; 
                 </span>
                 {r.result}
               </span>
-              {r.detail ? <span className="block break-words text-xs text-slate-600">{r.detail}</span> : null}
+              {r.detail ? <span className="block break-words text-xs text-muted">{r.detail}</span> : null}
             </dd>
           </div>
         ))}

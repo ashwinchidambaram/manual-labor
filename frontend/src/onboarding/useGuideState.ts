@@ -25,7 +25,7 @@ function writeStorage(key: string, seen: boolean): boolean {
 }
 
 export interface GuideControl {
-  /** the panel is docked */
+  /** the first-run welcome is shown (design 13 section 2.5.2; the step rail itself is always there) */
   open: boolean;
   /** where the flag lives right now */
   source: "server" | "storage" | "session" | "loading";
@@ -65,7 +65,7 @@ export function useGuideState(root: string | undefined): GuideControl {
         // not saved: put the panel back the way the server has it and say so; a second Hide is session-only
         if (prev) qc.setQueryData<GuideState>(guideKey, prev);
         const detail = e instanceof ApiError ? e.detail : e instanceof Error ? e.message : String(e);
-        if (seen) setSaveError(`Hiding the guide was not saved: ${detail}. Hide guide again to hide it until you reload; it opens again next time.`);
+        if (seen) setSaveError(`Hiding the welcome was not saved: ${detail}. Dismiss it again to hide it until you reload; it shows again next time.`);
         else setSession(true);
       }
     },

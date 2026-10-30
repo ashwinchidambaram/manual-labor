@@ -134,22 +134,24 @@ function RailSection({ articleId, detail, enqueue, onCrop, register }: SectionPr
   });
 
   return (
-    <section aria-label={`Figures in ${articleId}`} className="space-y-1">
-      <h3 className="truncate text-xs font-semibold text-slate-700" title={articleId}>
-        {articleId}
-      </h3>
-      <Hint id="attachFigure">
-      <button
-        type="button"
-        data-rail-focusable
-        data-testid="rail-attach"
-        onClick={() => setPicking(true)}
-        className={`rounded border border-slate-500 px-2 py-0.5 text-sm ${FOCUS}`}
-      >
-        Attach a figure…
-      </button>
-      </Hint>
-      <ul role="list" aria-label="Figures in this article" className="space-y-2">
+    <section aria-label={`Figures in ${articleId}`} className="space-y-2.5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="min-w-0 text-sm text-ink">
+          In the article <span className="font-mono text-2xs text-muted">{articleId}</span>
+        </p>
+        <Hint id="attachFigure">
+          <button
+            type="button"
+            data-rail-focusable
+            data-testid="rail-attach"
+            onClick={() => setPicking(true)}
+            className={`min-h-[2.25rem] rounded-lg border border-line-strong bg-raised px-3 text-sm font-medium text-ink hover:bg-sunk ${FOCUS}`}
+          >
+            Attach a figure…
+          </button>
+        </Hint>
+      </div>
+      <ul role="list" aria-label="Figures in this article" className="space-y-2.5">
         {items.map((it) => {
           const removed = overlay.some((o) => o.kind === "remove" && o.figureId === it.figure_id);
           const pending = pendingIds.has(it.figure_id);
@@ -161,42 +163,53 @@ function RailSection({ articleId, detail, enqueue, onCrop, register }: SectionPr
               data-article-id={articleId}
               data-rail-focusable
               tabIndex={-1}
-              className={`rounded border border-slate-300 bg-white p-1 text-xs ${FOCUS} ${removed ? "opacity-40" : ""}`}
+              className={`grid grid-cols-[5.5rem_1fr] gap-3 rounded-xl border border-line bg-raised p-2.5 text-xs ${FOCUS} ${removed ? "opacity-40" : ""}`}
             >
-              <img src={`${it.image_url}?v=${it.record.phash}`} alt={it.record.caption_original ?? it.figure_id} className="mx-auto max-h-24 max-w-full object-contain" />
-              <div className="font-mono">{it.figure_id}</div>
-              {it.record.caption_original ? <div className="line-clamp-2 text-slate-700">{it.record.caption_original}</div> : null}
-              <div className="flex flex-wrap gap-1">
-                <Hint id="methodBadge">
-                  <span className="rounded bg-slate-100 px-1">{it.record.extraction}</span>
-                </Hint>
-                <Hint id="attachRule">
-                  <span data-testid="rail-rule" className="rounded bg-slate-100 px-1">
-                    {it.attachment?.rule ?? "unattached"}
-                  </span>
-                </Hint>
-                {it.attachment?.confidence !== undefined && it.attachment?.confidence !== null ? (
-                  <span className="tabular-nums">{it.attachment.confidence.toFixed(2)}</span>
-                ) : null}
-                <span>{it.status}</span>
-                {pending ? (
-                  <span data-testid="rail-pending" className="rounded bg-amber-100 px-1 text-amber-950">
-                    updating
-                  </span>
-                ) : null}
-              </div>
-              <div className="mt-1 flex gap-1">
-                <button type="button" className={`rounded border border-slate-400 px-1 ${FOCUS}`} onClick={() => void detach(it)} aria-label={`Detach ${it.figure_id}`}>
-                  Detach (x)
-                </button>
-                <button type="button" className={`rounded border border-slate-400 px-1 ${FOCUS}`} onClick={() => onCrop(it)} aria-label={`Crop ${it.figure_id}`}>
-                  Crop (c)
-                </button>
+              <img
+                src={`${it.image_url}?v=${it.record.phash}`}
+                alt={it.record.caption_original ?? it.figure_id}
+                className="max-h-24 w-full rounded-md bg-page object-contain ring-1 ring-inset ring-line-soft"
+              />
+              <div className="min-w-0 space-y-1">
+                {it.record.caption_original ? <div className="manual-text line-clamp-2 text-sm text-ink">{it.record.caption_original}</div> : null}
+                <div className="font-mono text-2xs text-muted">{it.figure_id}</div>
+                <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-muted">
+                  <Hint id="methodBadge">
+                    <span>{it.record.extraction}</span>
+                  </Hint>
+                  <span aria-hidden="true">·</span>
+                  <Hint id="attachRule">
+                    <span data-testid="rail-rule" className="font-medium text-ink">
+                      {it.attachment?.rule ?? "unattached"}
+                    </span>
+                  </Hint>
+                  {it.attachment?.confidence !== undefined && it.attachment?.confidence !== null ? (
+                    <span className="tabular-nums">match {it.attachment.confidence.toFixed(2)}</span>
+                  ) : null}
+                  <span>{it.status}</span>
+                  {pending ? (
+                    <span data-testid="rail-pending" className="font-semibold text-needs-ink">
+                      updating
+                    </span>
+                  ) : null}
+                </div>
+                <div className="flex gap-1.5 pt-0.5">
+                  <button type="button" className={`min-h-[1.75rem] rounded-md border border-line-strong px-2 text-ink hover:bg-sunk ${FOCUS}`} onClick={() => void detach(it)} aria-label={`Detach ${it.figure_id}`}>
+                    Detach (x)
+                  </button>
+                  <button type="button" className={`min-h-[1.75rem] rounded-md border border-line-strong px-2 text-ink hover:bg-sunk ${FOCUS}`} onClick={() => onCrop(it)} aria-label={`Crop ${it.figure_id}`}>
+                    Crop (c)
+                  </button>
+                </div>
               </div>
             </li>
           );
         })}
-        {q.isSuccess && items.length === 0 ? <li className="text-xs text-slate-600">No figures attached</li> : null}
+        {q.isSuccess && items.length === 0 ? (
+          <li className="rounded-xl border border-dashed border-line-strong px-3.5 py-3 text-sm text-muted">
+            No figures attached. If this article needs one from the manual, choose Attach a figure.
+          </li>
+        ) : null}
       </ul>
       {overlay.filter((o) => o.jobId).map((o) => (
         <JobWatch key={`${o.figureId}-${o.jobId}`} id={o.jobId!} onSettled={(ok, err) => void settle(o.figureId, o.jobId!)(ok, err)} />
@@ -240,12 +253,12 @@ export default function FigureRail({ detail, enqueue, onCrop }: Props) {
     },
   });
   return (
-    <aside aria-label="Figure rail" data-zone="rail" data-testid="figure-rail" className="min-h-0 space-y-3 overflow-auto border-l border-slate-300 bg-slate-50 p-2">
-      <h2 className="text-sm font-semibold">Figures</h2>
+    <aside aria-label="Figure rail" data-zone="rail" data-testid="figure-rail" className="space-y-3">
+      <h3 className="text-2xs font-semibold uppercase tracking-[0.07em] text-muted">Figures</h3>
       {detail && (detail.article_ids ?? []).length > 0 ? (
         (detail.article_ids ?? []).map((a) => <RailSection key={a} articleId={a} detail={detail} enqueue={enqueue} onCrop={onCrop} register={register} />)
       ) : (
-        <p className="text-xs text-slate-600">{detail ? "This block is not in an article" : ""}</p>
+        <p className="text-sm text-muted">{detail ? "This block is not in an article" : ""}</p>
       )}
     </aside>
   );

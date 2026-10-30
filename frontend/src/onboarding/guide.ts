@@ -37,13 +37,13 @@ export const GUIDE_STEPS: GuideStep[] = [
       "Every block you select becomes text in an article. Suggested topics and Document structure are two views of the same blocks: switching views never changes the selection, and each view shows how much of a group is selected.",
     do: [
       "Move through the list with {moveDown} and {moveUp}. {toggleRow} selects or clears a row; {selectAll} selects every block.",
-      "{toggleView} switches views. Low cohesion means a topic mixes subjects: check it in Document structure.",
+      "{toggleView} switches views. Mixed subjects means a topic's blocks cover different subjects: check it in Document structure.",
       "Unassigned holds the blocks no topic claimed. They are listed here, never dropped.",
       "Estimated review is how many selected blocks will need a person. {confirm} confirms: scoring starts and Verify opens at once.",
     ],
     keys: ["moveDown", "moveUp", "toggleRow", "selectAll", "toggleView", "confirm"],
     trust: [
-      "Under each document a line adds up its blocks: parsed = headers and footers + blocks in topics + unassigned.",
+      "Under each document a line adds up its blocks: blocks found = blocks in topics + blocks not placed in a topic + page headers and footers, which are left out.",
       "Choosing topics never changes the text. It only decides which blocks are reviewed and exported.",
     ],
   },
@@ -52,7 +52,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     route: "/verify",
     title: "Review what the checks could not clear",
     what:
-      "The queue lists only the blocks the machine is unsure about, worst first, and each card says why. Blocks with numbers, units or part numbers are always queued: OCR mistakes in numbers are likely and a language model cannot see them.",
+      "The queue lists only the blocks the checks could not clear, most doubtful first, and each card says why. Blocks with numbers, units or part numbers are always queued: OCR mistakes in numbers are likely and a language model cannot see them.",
     do: [
       "{vApprove} approves. On a block with numbers it also records that you checked the numbers.",
       "{vEdit} edits and {vSaveEdit} saves. {vFlag} flags the block with a category. {vSkip} skips, {vBack} goes back.",
@@ -62,8 +62,8 @@ export const GUIDE_STEPS: GuideStep[] = [
     ],
     keys: ["vApprove", "vEdit", "vSaveEdit", "vFlag", "vSkip", "vBack", "vToggleDiff", "vFocusRail", "vRailDetach", "vRailCrop"],
     trust: [
-      "Checks on this block lists each deterministic check and its result. A check that has not run says so; it is never shown as passed.",
-      "The status line adds up: in scope = to review + auto-approved + done + flagged + rejected. The server counts each part separately, and a mismatch is shown as a warning.",
+      "Why this needs you lists what held the block, with the evidence: the two readings line by line, the least certain word. Checks that found nothing wrong are marked Passed, and a check that has not run says so; it is never shown as passed.",
+      "The progress bar and the line under it add up: in scope = to review + auto-approved + done + flagged + rejected. The server counts each part separately, and a mismatch is shown as a warning.",
     ],
   },
   {

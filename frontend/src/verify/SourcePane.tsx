@@ -4,7 +4,7 @@ import { client, unwrap } from "../api/client";
 import type { BlockDetail, PageBlock, PageRef } from "../api/schema";
 import { useHotkeys } from "../hooks/useHotkeys";
 import { FOCUS } from "./labels";
-import { disagreeWords, mapToOcrWords, pickPair } from "./parserDiff";
+import { pageMarks } from "./pageMarks";
 import { moveCorner, pointStyle, rectStyle, type BBox, type Corner } from "./geometry";
 import { pageBlocksKey } from "./useVerifyState";
 
@@ -48,19 +48,13 @@ export default function SourcePane({ page, detail, currentId, zoom, onJump, crop
   }, [rects]);
 
   const own = detail && detail.page.doc_id === page.doc_id && detail.page.page === page.page ? detail.block : null;
-  const words = useMemo(() => {
-    if (!own) return { boxes: [] as number[][], whole: false };
-    const pair = pickPair(own.raw_text_by_parser ?? {});
-    if (!pair || pair.ta === pair.tb) return { boxes: [], whole: false };
-    const ocr = own.ocr_words ?? [];
-    const hits = mapToOcrWords(disagreeWords(pair.ta, pair.tb), ocr);
-    return { boxes: hits.map((h) => h.bbox as number[]), whole: hits.length === 0 };
-  }, [own]);
+  const words = useMemo(() => pageMarks(own), [own]);
 
+  // only the whole-page view scrolls to the block; the small locator never moves the screen
   useEffect(() => {
-    if (!currentId || crop) return;
+    if (!currentId || crop || !zoom) return;
     wrap.current?.querySelector<HTMLElement>("[data-current='true']")?.scrollIntoView?.({ block: "center", inline: "nearest" });
-  }, [currentId, rects.length, page.page, crop]);
+  }, [currentId, rects.length, page.page, crop, zoom]);
 
   const focusable = rects.filter((r) => r.type !== "header" && r.type !== "footer");
   const move = (d: 1 | -1): void => {
@@ -74,11 +68,11 @@ export default function SourcePane({ page, detail, currentId, zoom, onJump, crop
 
   if (page.render_url === null)
     return (
-      <section role="region" aria-label="Source page" className="min-h-0 overflow-auto p-3 text-sm" data-zone="source">
-        <p data-testid="no-page-image" className="rounded bg-slate-100 p-2">
+      <section role="region" aria-label="Source page" className="min-h-0 overflow-auto text-sm" data-zone="source">
+        <p data-testid="no-page-image" className="rounded-lg bg-raised px-3 py-2 text-muted ring-1 ring-inset ring-line">
           No page image for Word documents
         </p>
-        {detail ? <pre className="mt-2 whitespace-pre-wrap font-sans">{detail.block.raw_text}</pre> : null}
+        {detail ? <pre className="manual-text mt-2 max-h-40 overflow-auto whitespace-pre-wrap text-sm text-ink">{detail.block.raw_text}</pre> : null}
       </section>
     );
 
@@ -117,9 +111,15 @@ export default function SourcePane({ page, detail, currentId, zoom, onJump, crop
   };
 
   return (
-    <section role="region" aria-label="Source page" className="min-h-0 overflow-auto bg-slate-100 p-2" data-zone="source" data-testid="source-pane">
-      <div ref={wrap} className="relative" style={{ width: zoom ? "200%" : "100%" }}>
-        <img src={src} alt={`Page ${page.page} of ${page.doc_id}`} className="block w-full select-none bg-white" draggable={false} />
+    <section
+      role="region"
+      aria-label="Source page"
+      className={`min-h-0 rounded-lg border border-line bg-page ${zoom || crop ? "max-h-[min(60vh,40rem)] overflow-auto shadow-lift" : "overflow-hidden"}`}
+      data-zone="source"
+      data-testid="source-pane"
+    >
+      <div ref={wrap} className="relative w-full">
+        <img src={src} alt={`Page ${page.page} of ${page.doc_id}`} className="block w-full select-none bg-page" draggable={false} />
         {page.width > 0 && !crop
           ? painted.map((r) => {
               const isHF = r.type === "header" || r.type === "footer";
@@ -137,10 +137,10 @@ export default function SourcePane({ page, detail, currentId, zoom, onJump, crop
                   style={{ position: "absolute", ...rectStyle(r.bbox, page) }}
                   className={`${FOCUS} ${
                     isHF
-                      ? "cursor-default border border-dashed border-slate-400"
+                      ? "cursor-default border border-dashed border-line"
                       : cur
-                        ? "border-2 border-blue-600 bg-blue-500/10"
-                        : "border border-slate-500/40 hover:bg-blue-500/10"
+                        ? "border-2 border-act bg-[rgb(173_72_40/0.08)]"
+                        : "border border-[rgb(134_127_119/0.45)] hover:bg-[rgb(173_72_40/0.08)]"
                   }`}
                 />
               );
@@ -150,7 +150,7 @@ export default function SourcePane({ page, detail, currentId, zoom, onJump, crop
           <div
             data-testid="disagree-block"
             title="parsers disagree"
-            style={{ position: "absolute", pointerEvents: "none", ...rectStyle(own.bbox, page), backgroundImage: "repeating-linear-gradient(45deg, rgba(220,38,38,.25) 0 4px, transparent 4px 8px)" }}
+            style={{ position: "absolute", pointerEvents: "none", ...rectStyle(own.bbox, page), backgroundImage: "repeating-linear-gradient(45deg, rgb(238 192 91 / 0.5) 0 4px, transparent 4px 8px)" }}
           />
         ) : null}
         {page.width > 0 && !crop
@@ -159,7 +159,7 @@ export default function SourcePane({ page, detail, currentId, zoom, onJump, crop
                 key={i}
                 data-testid="disagree-word"
                 style={{ position: "absolute", pointerEvents: "none", ...rectStyle(b, page) }}
-                className="bg-red-500/30 outline outline-1 outline-red-600"
+                className="bg-[rgb(238_192_91/0.5)] outline outline-1 outline-needs-ink"
               />
             ))
           : null}
@@ -168,7 +168,7 @@ export default function SourcePane({ page, detail, currentId, zoom, onJump, crop
             <div
               data-testid="crop-box"
               style={{ position: "absolute", pointerEvents: "none", ...rectStyle(crop.box, page) }}
-              className="border-2 border-emerald-600 bg-emerald-500/10"
+              className="border-2 border-act bg-[rgb(173_72_40/0.08)]"
             />
             {CORNERS.map((c) => (
               <button
@@ -179,7 +179,7 @@ export default function SourcePane({ page, detail, currentId, zoom, onJump, crop
                 onKeyDown={(e) => onHandleKey(e, c.id)}
                 onPointerDown={(e) => onHandlePointer(e, c.id)}
                 style={{ position: "absolute", transform: "translate(-50%, -50%)", ...pointStyle(crop.box[c.xi], crop.box[c.yi], page) }}
-                className={`h-4 w-4 cursor-move rounded-full border-2 border-white bg-emerald-600 ${FOCUS}`}
+                className={`h-4 w-4 cursor-move rounded-full border-2 border-raised bg-act ${FOCUS}`}
               />
             ))}
           </>

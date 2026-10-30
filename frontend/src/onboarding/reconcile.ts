@@ -43,7 +43,7 @@ export function reconcileDoc(blocks: readonly ScopeBlockRow[], doc: DocGroups): 
 }
 
 export function docReconcileText(r: DocReconcile): string {
-  return `${r.parsed} parsed = ${r.headerFooter} headers and footers (excluded) + ${r.inGroups} in ${r.view} + ${r.unassigned} unassigned`;
+  return `${r.parsed} blocks found = ${r.inGroups} in ${r.view} + ${r.unassigned} not placed + ${r.headerFooter} page headers and footers, left out`;
 }
 
 export function docMismatchDetail(r: DocReconcile): string {

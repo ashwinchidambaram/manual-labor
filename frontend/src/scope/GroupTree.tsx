@@ -102,6 +102,15 @@ export default function GroupTree(p: GroupTreeProps) {
     return m;
   }, [blockIndex.data, p.docs]);
   const paramsOf = new Map(p.docs.map((d) => [d.doc_id, d.groups.params]));
+  // titles that appear twice in one document of this view get their page range beside them (design 13 F12)
+  const dupes = useMemo(() => {
+    const seen = new Map<string, number>();
+    for (const r of p.rows) {
+      const k = `${r.docId}\u0000${r.group.title}`;
+      seen.set(k, (seen.get(k) ?? 0) + 1);
+    }
+    return seen;
+  }, [p.rows]);
   const noticeDocs = new Map(p.docs.map((d) => [d.doc_id, d]));
   const out: JSX.Element[] = [];
   let lastDoc = "";
@@ -116,26 +125,29 @@ export default function GroupTree(p: GroupTreeProps) {
           role="presentation"
           data-doc={r.docId}
           data-testid="doc-heading"
-          className="sticky top-0 z-10 flex flex-wrap items-center gap-x-2 border-b border-slate-300 bg-slate-100 px-2 py-1 text-sm font-semibold"
+          className="sticky top-0 z-10 flex flex-col gap-0.5 border-b border-line-soft bg-sunk px-4 py-2.5 [&:not(:first-child)]:border-t [&:not(:first-child)]:border-t-line"
         >
-          <span>{p.filenames.get(r.docId) ?? r.docId}</span>
+          <span className="flex flex-wrap items-baseline gap-x-2">
+          <span className="text-base font-semibold text-ink">{p.filenames.get(r.docId) ?? r.docId}</span>
           {d && d.groups.learning_snapshot !== "baseline" ? (
-            <span className="rounded bg-violet-100 px-1.5 text-xs font-normal text-violet-900">
+            <span className="text-xs text-muted">
               learned grouping: {d.groups.learning_snapshot}
             </span>
           ) : null}
           {d && d.groups.topic_status === "failed" ? (
-            <span role="note" className="text-xs font-normal text-amber-900" data-testid="topics-failed">
+            <span role="note" className="text-xs text-needs-ink" data-testid="topics-failed">
               Topics unavailable: {d.groups.topic_error ?? "unknown error"}. Structure view still works.
             </span>
           ) : null}
+          </span>
           {rec ? (
             rec.ok ? (
-              <span className="ml-auto text-xs font-normal tabular-nums text-slate-600" data-testid="doc-reconcile">
+              <span className="text-xs tabular-nums text-muted [&_b]:font-semibold [&_b]:text-ink" data-testid="doc-reconcile">
                 {docReconcileText(rec)}
               </span>
             ) : (
-              <span role="note" className="ml-auto rounded bg-amber-100 px-1.5 text-xs font-normal text-amber-950" data-testid="doc-reconcile-mismatch">
+              <span role="note" className="text-xs font-medium text-fail" data-testid="doc-reconcile-mismatch">
+                <span aria-hidden="true">✕ </span>
                 {MISMATCH(docMismatchDetail(rec))}
               </span>
             )
@@ -160,6 +172,7 @@ export default function GroupTree(p: GroupTreeProps) {
         fraction={rowFraction(c, p.view)}
         stale={p.stale}
         low={params ? lowCohesion(r.group, params) : false}
+        duplicate={(dupes.get(`${r.docId}\u0000${r.group.title}`) ?? 0) > 1}
         cursor={r.group.id === p.cursor}
         onToggle={p.onToggle}
         onExpand={p.onExpand}
@@ -169,7 +182,7 @@ export default function GroupTree(p: GroupTreeProps) {
   }
   for (const slug of p.ungrouped)
     out.push(
-      <div key={`pending-${slug}`} data-testid="grouping-placeholder" className="border-b border-slate-200 px-2 py-2 text-sm text-slate-600">
+      <div key={`pending-${slug}`} data-testid="grouping-placeholder" className="border-b border-line-soft bg-raised px-4 py-3 text-sm text-muted">
         {p.filenames.get(slug) ?? slug}: grouping...
       </div>,
     );
@@ -182,7 +195,7 @@ export default function GroupTree(p: GroupTreeProps) {
       aria-label={structure ? "Document structure" : "Suggested topics"}
       aria-multiselectable="true"
       data-testid="group-tree"
-      className="overflow-auto rounded border border-slate-300"
+      className="overflow-auto rounded-xl border border-line bg-raised"
     >
       {out}
     </div>
