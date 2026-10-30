@@ -5,6 +5,7 @@ import { trackJob } from "../api/queries";
 import type { LearningUse } from "../api/schema";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "../shell/Toast";
+import Hint from "../onboarding/Hint";
 import { FOCUS } from "./labels";
 
 export default function LearningChip({ learning, slug }: { learning: LearningUse; slug: string }) {
@@ -27,6 +28,7 @@ export default function LearningChip({ learning, slug }: { learning: LearningUse
   if (rules.length + shots.length === 0) return null;
   return (
     <section aria-label="Learning" className="text-sm" data-testid="learning-chip">
+      <Hint id="learningChip">
       <button
         type="button"
         aria-expanded={open}
@@ -35,6 +37,7 @@ export default function LearningChip({ learning, slug }: { learning: LearningUse
       >
         Why did this change? learned ({learning.provenance})
       </button>
+      </Hint>
       {open ? (
         <ul className="mt-1 space-y-1">
           {[...rules, ...shots].map((id) => (

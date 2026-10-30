@@ -195,6 +195,7 @@ export const LOCAL_KEYS: { widget: string; keys: string[]; label: string }[] = [
     keys: ["arrowleft", "arrowright", "arrowup", "arrowdown"],
     label: "Move to and select the neighbouring option",
   },
+  { widget: "Help tabs", keys: ["arrowleft", "arrowright"], label: "Switch between Guide, Keyboard shortcuts and Glossary" },
 ];
 
 /** Normalised key name of a keyboard event; "shift+x" only for letters. */

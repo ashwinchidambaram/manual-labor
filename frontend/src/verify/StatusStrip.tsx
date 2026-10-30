@@ -1,4 +1,6 @@
 import type { DocReadiness, QueueSort, ReviewCounts } from "../api/schema";
+import Hint from "../onboarding/Hint";
+import { MISMATCH, reconcileReview, reviewReconcileText } from "../onboarding/reconcile";
 import { FOCUS } from "./labels";
 import { normalizeView, sliderCopy } from "./sliderCopy";
 
@@ -46,6 +48,7 @@ export default function StatusStrip(p: StatusStripProps) {
   const queuedPartial = filtered && p.viewAddedPartial;
   const queued = Math.max(0, p.counts.pending - (!filtered ? 0 : queuedPartial ? p.counts.auto_approved : p.viewAdded));
   const T = p.threshold;
+  const rec = reconcileReview(p.counts);
   return (
     <section aria-label="Review status" className="flex flex-wrap items-center gap-x-6 gap-y-1 border-b border-slate-300 bg-white px-4 py-2">
       <Stat id="cnt-queued" label="Queued" value={queued} partial={queuedPartial} />
@@ -54,6 +57,7 @@ export default function StatusStrip(p: StatusStripProps) {
       <Stat id="cnt-done" label="Done" value={p.counts.approved + p.counts.edited} />
       <Stat id="cnt-scope" label="In scope" value={p.counts.in_scope} />
       <div className="flex items-center gap-2">
+        <Hint id="viewSlider">
         <input
           type="range"
           aria-label="Also review auto-approved blocks below"
@@ -64,6 +68,7 @@ export default function StatusStrip(p: StatusStripProps) {
           onChange={(e) => p.onView(normalizeView(Number(e.target.value), T))}
           className={`w-40 ${FOCUS}`}
         />
+        </Hint>
         <span className="text-sm text-slate-700" data-testid="view-copy">
           {sliderCopy(p.view, T, p.viewAdded, p.viewAddedPartial, p.view !== p.appliedView)}
           {p.view !== null && p.view === p.appliedView && p.viewAddedPartial ? " (loaded)" : ""}
@@ -74,6 +79,7 @@ export default function StatusStrip(p: StatusStripProps) {
       </div>
       <label className="flex items-center gap-1 text-sm">
         <span className="sr-only">Sort</span>
+        <Hint id="sort">
         <select
           aria-label="Sort"
           value={p.sort}
@@ -86,10 +92,21 @@ export default function StatusStrip(p: StatusStripProps) {
             </option>
           ))}
         </select>
+        </Hint>
       </label>
       <span className="ml-auto text-sm text-slate-700" data-testid="save-state" role="status">
         {p.saveState}
       </span>
+      {rec.ok ? (
+        <p className="basis-full text-xs tabular-nums text-slate-600" data-testid="reconcile-review">
+          {reviewReconcileText(rec)}
+          {rec.skipped > 0 ? ` (${rec.skipped} skipped)` : ""}
+        </p>
+      ) : (
+        <p role="note" className="basis-full rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-950" data-testid="reconcile-mismatch">
+          {MISMATCH(`in scope ${rec.inScope}, but ${rec.auto} auto-approved + ${rec.done} done + ${rec.flagged} flagged is more`)}
+        </p>
+      )}
       {p.docs
         .filter((d) => d.state === "pending" || d.stale)
         .map((d) => (

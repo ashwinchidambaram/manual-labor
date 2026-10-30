@@ -264,7 +264,7 @@ export default function VerifyScreen() {
           </button>
         </div>
       ) : null}
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-0 lg:grid-cols-[18rem_1fr_1fr] xl:h-[calc(100vh-13rem)] xl:grid-cols-[20rem_1fr_1fr_16rem]">
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-0 lg:grid-cols-[18rem_1fr_1fr] xl:h-[calc(100vh-13rem)] xl:grid-cols-[20rem_1fr_1fr_16rem] group-data-[guide=open]/shell:xl:h-auto group-data-[guide=open]/shell:xl:grid-cols-[18rem_1fr_1fr] group-data-[guide=open]/shell:2xl:h-[calc(100vh-13rem)] group-data-[guide=open]/shell:2xl:grid-cols-[20rem_1fr_1fr_16rem]">
         <div className="h-72 lg:h-auto xl:h-full">
           <Queue
             items={state.items}
@@ -294,7 +294,7 @@ export default function VerifyScreen() {
             threshold={v.T}
           />
         </div>
-        <div className="order-2 flex max-h-[80vh] min-h-0 flex-col lg:order-none xl:max-h-none">
+        <div className="order-2 flex max-h-[80vh] min-h-0 flex-col lg:order-none xl:max-h-none group-data-[guide=open]/shell:xl:max-h-[80vh] group-data-[guide=open]/shell:2xl:max-h-none">
           {sourcePage ? (
             <SourcePane page={sourcePage} detail={detail ?? null} currentId={currentId} zoom={zoom} onJump={(id) => void v.jumpTo(id)} crop={cropState} />
           ) : (
@@ -317,7 +317,7 @@ export default function VerifyScreen() {
             />
           ) : null}
         </div>
-        <div className="order-4 min-h-0 lg:col-span-3 xl:col-span-1">
+        <div className="order-4 min-h-0 lg:col-span-3 xl:col-span-1 group-data-[guide=open]/shell:xl:col-span-3 group-data-[guide=open]/shell:2xl:col-span-1">
           <FigureRail detail={detail} enqueue={v.writes.enqueue} onCrop={(it) => void openCrop(it)} />
         </div>
       </div>

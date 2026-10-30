@@ -14,6 +14,7 @@
     "check-types-fresh": "node scripts/gen-types.mjs && git diff --exit-code -- src/types/generated.ts",
     "gen-api": "node scripts/gen-api.mjs",
     "check-api-fresh": "node scripts/gen-api.mjs && git diff --exit-code -- src/api/types.ts",
+    "gen-guide": "vite-node scripts/gen-guide.ts",
     "test:ci": "vitest run"
   },
   "dependencies": {

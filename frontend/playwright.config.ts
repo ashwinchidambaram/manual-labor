@@ -3,6 +3,8 @@ import { defineConfig, devices } from "@playwright/test";
 // One shared server and project: selection state is global, so tests run serially.
 export default defineConfig({
   testDir: "e2e",
+  // marks the getting-started guide as seen so existing specs never see the panel (design 12 section 3)
+  globalSetup: "./e2e/global-setup.ts",
   workers: 1,
   fullyParallel: false,
   retries: process.env.CI ? 1 : 0,

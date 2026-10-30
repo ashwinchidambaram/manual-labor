@@ -42,6 +42,11 @@ export default function SelectionSummary({ summary, processing }: { summary: Sco
           {processing} document{processing === 1 ? "" : "s"} still processing
         </p>
       ) : null}
+      {processing > 0 ? (
+        <p className="mt-0.5 text-xs text-slate-600" data-testid="docs-processing-hint">
+          You can choose topics as soon as a document is ready.
+        </p>
+      ) : null}
     </section>
   );
 }

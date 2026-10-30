@@ -1,6 +1,7 @@
 import { useRef } from "react";
 import { useRerun, useUploadSources } from "../api/queries";
 import type { JobInfo, ProjectStatus, SourceInfo } from "../api/schema";
+import Hint from "../onboarding/Hint";
 
 export function sourceChip(s: SourceInfo, jobs: readonly JobInfo[]): { text: string; tone: "ok" | "busy" | "bad" } {
   const failed = s.nodes.find((n) => n.state === "failed");
@@ -38,13 +39,15 @@ export function UploadButton({ label = "Add documents" }: { label?: string }) {
           e.target.value = "";
         }}
       />
-      <button
-        type="button"
-        onClick={() => input.current?.click()}
-        className={`rounded border border-slate-400 bg-white px-2 py-1 text-sm hover:bg-slate-100 ${FOCUS}`}
-      >
-        {label}
-      </button>
+      <Hint id="addDocuments">
+        <button
+          type="button"
+          onClick={() => input.current?.click()}
+          className={`rounded border border-slate-400 bg-white px-2 py-1 text-sm hover:bg-slate-100 ${FOCUS}`}
+        >
+          {label}
+        </button>
+      </Hint>
       {upload.isError ? (
         <p role="alert" className="text-xs text-red-800">
           {upload.error.message}

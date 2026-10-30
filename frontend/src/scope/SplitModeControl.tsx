@@ -1,4 +1,5 @@
 import type { ScopeSummary, Split, View } from "../api/schema";
+import Hint from "../onboarding/Hint";
 
 export default function SplitModeControl({
   split,
@@ -25,6 +26,7 @@ export default function SplitModeControl({
   };
   return (
     <div data-testid="split-mode">
+      <Hint id="splitMode" within>
       <div role="radiogroup" aria-label="Article split" className="flex flex-col gap-1" onKeyDown={onKeyDown}>
         {opts.map((o) => (
           <button
@@ -43,6 +45,7 @@ export default function SplitModeControl({
           </button>
         ))}
       </div>
+      </Hint>
       {view === "structure" ? (
         <p className="mt-1 text-xs text-slate-600" data-testid="split-hint">
           Per-topic article counts always come from the topic view.

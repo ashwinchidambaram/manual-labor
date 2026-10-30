@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useApplyTier, useRunProbe } from "../api/queries";
 import type { ScopeModels, ModelRef, Tier } from "../api/schema";
+import Hint from "../onboarding/Hint";
 
 const TASKS = ["cleanup", "grouping", "vision", "verifier", "embeddings"] as const;
 const OPTIONAL = ["metadata", "agent"] as const;
@@ -135,6 +136,7 @@ export default function ModelPanel({ data }: { data: ScopeModels }) {
               </button>
             </div>
           ) : null}
+          <Hint id="applyTier">
           <button
             type="button"
             data-testid="apply-tier"
@@ -144,6 +146,7 @@ export default function ModelPanel({ data }: { data: ScopeModels }) {
           >
             Apply {tier}
           </button>
+          </Hint>
           {apply.isSuccess ? (
             <p role="status" className="mt-1 text-xs text-green-900" data-testid="apply-result">
               Applied {tier}: {apply.data.stale.length} stage{apply.data.stale.length === 1 ? "" : "s"} will re-run.

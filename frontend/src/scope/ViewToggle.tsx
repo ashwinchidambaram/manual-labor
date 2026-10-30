@@ -1,4 +1,5 @@
 import type { View } from "../api/schema";
+import Hint from "../onboarding/Hint";
 
 const OPTIONS: { value: View; label: string }[] = [
   { value: "topic", label: "Suggested topics" },
@@ -18,6 +19,7 @@ export default function ViewToggle({ view, onChange }: { view: View; onChange: (
     requestAnimationFrame(() => group.querySelector<HTMLElement>(`[data-value="${next.value}"]`)?.focus());
   };
   return (
+    <Hint id="viewToggle" within>
     <div role="radiogroup" aria-label="Grouping view" className="inline-flex rounded border border-slate-400" onKeyDown={onKeyDown} data-testid="view-toggle">
       {OPTIONS.map((o) => (
         <button
@@ -36,5 +38,6 @@ export default function ViewToggle({ view, onChange }: { view: View; onChange: (
         </button>
       ))}
     </div>
+    </Hint>
   );
 }

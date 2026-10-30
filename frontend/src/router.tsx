@@ -1,7 +1,9 @@
 import { createBrowserRouter, createMemoryRouter, Navigate, type RouteObject } from "react-router-dom";
 import ScopeScreen from "./scope/ScopeScreen";
 import AppShell from "./shell/AppShell";
-import { ComingSoon, NotFound } from "./shell/Stubs";
+import AgentScreen from "./agent/AgentScreen";
+import ExportScreen from "./export/ExportScreen";
+import { NotFound } from "./shell/Stubs";
 import VerifyScreen from "./verify/VerifyScreen";
 
 export const routes: RouteObject[] = [
@@ -11,8 +13,8 @@ export const routes: RouteObject[] = [
       { path: "/", element: <Navigate to="/scope" replace /> },
       { path: "/scope", element: <ScopeScreen /> },
       { path: "/verify", element: <VerifyScreen /> },
-      { path: "/agent", element: <ComingSoon name="Agent" /> },
-      { path: "/export", element: <ComingSoon name="Export" /> },
+      { path: "/agent", element: <AgentScreen /> },
+      { path: "/export", element: <ExportScreen /> },
       { path: "*", element: <NotFound /> },
     ],
   },

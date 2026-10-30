@@ -57,3 +57,20 @@ export type FigureAttachment = S["FigureAttachment"];
 export type DocFigure = S["DocFigure"];
 export type AttachOut = S["AttachOut"];
 export type LearningUse = S["LearningUse"];
+
+// Trust evidence, Agent and Export screens, onboarding (module 12)
+export type SignalName = S["SignalName"];
+export type Signal = S["Signal"];
+export type FaithfulnessResult = S["FaithfulnessResult"];
+export type FaithViolationKind = S["FaithViolationKind"];
+export type ExportStatus = S["ExportStatus"];
+export type ExportSummary = S["ExportSummary"];
+export type Override = S["Override"];
+export type Flag = S["Flag"];
+export type Proposal = S["Proposal"];
+export type RecheckResult = S["RecheckResult"];
+export type EvidenceRef = S["EvidenceRef"];
+export type AgentItemView = S["AgentItemView"];
+export type CalibrationReport = S["CalibrationReport"];
+export type CalibrationBucket = S["CalibrationBucket"];
+export type GuideState = S["GuideState"];

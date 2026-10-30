@@ -1,5 +1,6 @@
 import { memo } from "react";
 import type { Group, View } from "../api/schema";
+import Hint from "../onboarding/Hint";
 import { coverageLabel, type CheckState } from "./derive";
 
 export interface GroupRowProps {
@@ -110,19 +111,22 @@ function GroupRowImpl(p: GroupRowProps) {
             <span className="shrink-0 rounded bg-slate-200 px-1.5 text-xs text-slate-800">Catch-all</span>
           ) : null}
           {p.low ? (
-            <span
-              className="shrink-0 rounded bg-amber-200 px-1.5 text-xs font-medium text-amber-950"
-              data-testid="low-cohesion"
-              aria-label={`Low cohesion ${g.cohesion?.toFixed(2)}`}
-            >
-              Low cohesion
-            </span>
+            <Hint id="cohesion">
+              <span
+                className="shrink-0 rounded bg-amber-200 px-1.5 text-xs font-medium text-amber-950"
+                data-testid="low-cohesion"
+                aria-label={`Low cohesion ${g.cohesion?.toFixed(2)}`}
+              >
+                Low cohesion
+              </span>
+            </Hint>
           ) : null}
         </div>
         <div className="truncate text-xs text-slate-600" data-testid="row-meta">
           {meta.join(" · ")}
         </div>
       </div>
+      <Hint id="coverage">
       <span
         data-testid="coverage-chip"
         data-stale={p.stale ? "true" : "false"}
@@ -133,6 +137,7 @@ function GroupRowImpl(p: GroupRowProps) {
       >
         {pctLabel} selected
       </span>
+      </Hint>
     </div>
   );
 }

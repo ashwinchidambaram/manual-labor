@@ -1,3 +1,4 @@
+import Hint from "../onboarding/Hint";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, client, unwrap } from "../api/client";
@@ -137,6 +138,7 @@ function RailSection({ articleId, detail, enqueue, onCrop, register }: SectionPr
       <h3 className="truncate text-xs font-semibold text-slate-700" title={articleId}>
         {articleId}
       </h3>
+      <Hint id="attachFigure">
       <button
         type="button"
         data-rail-focusable
@@ -146,6 +148,7 @@ function RailSection({ articleId, detail, enqueue, onCrop, register }: SectionPr
       >
         Attach a figure…
       </button>
+      </Hint>
       <ul role="list" aria-label="Figures in this article" className="space-y-2">
         {items.map((it) => {
           const removed = overlay.some((o) => o.kind === "remove" && o.figureId === it.figure_id);
@@ -164,10 +167,14 @@ function RailSection({ articleId, detail, enqueue, onCrop, register }: SectionPr
               <div className="font-mono">{it.figure_id}</div>
               {it.record.caption_original ? <div className="line-clamp-2 text-slate-700">{it.record.caption_original}</div> : null}
               <div className="flex flex-wrap gap-1">
-                <span className="rounded bg-slate-100 px-1">{it.record.extraction}</span>
-                <span data-testid="rail-rule" className="rounded bg-slate-100 px-1">
-                  {it.attachment?.rule ?? "unattached"}
-                </span>
+                <Hint id="methodBadge">
+                  <span className="rounded bg-slate-100 px-1">{it.record.extraction}</span>
+                </Hint>
+                <Hint id="attachRule">
+                  <span data-testid="rail-rule" className="rounded bg-slate-100 px-1">
+                    {it.attachment?.rule ?? "unattached"}
+                  </span>
+                </Hint>
                 {it.attachment?.confidence !== undefined && it.attachment?.confidence !== null ? (
                   <span className="tabular-nums">{it.attachment.confidence.toFixed(2)}</span>
                 ) : null}

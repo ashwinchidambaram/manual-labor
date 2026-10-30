@@ -242,7 +242,7 @@ describe("C11 keyboard", () => {
     const { user } = await loaded();
     await waitFor(() => expect(document.activeElement).toBe(row("g-alpha-t000")));
     await user.keyboard("?");
-    const dlg = screen.getByRole("dialog", { name: "Keyboard help" });
+    const dlg = screen.getByRole("dialog", { name: "Help" });
     expect(dlg).toHaveTextContent("Toggle the row");
     expect(dlg).toHaveTextContent("Go to Scope");
     await user.keyboard("j"); // tree hotkeys are muted while the dialog is open

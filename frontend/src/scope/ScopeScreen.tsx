@@ -25,6 +25,7 @@ import SelectionSummary from "./SelectionSummary";
 import SourcesList, { UploadButton } from "./SourcesList";
 import SplitModeControl from "./SplitModeControl";
 import ViewToggle from "./ViewToggle";
+import Hint from "../onboarding/Hint";
 
 const VIEW_NAME: Record<View, string> = { topic: "Suggested topics", structure: "Document structure" };
 const FOCUS = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600";
@@ -190,6 +191,8 @@ export default function ScopeScreen() {
   const selectAll = useCallback(() => apply({ op: "select", block_ids: [...latest.current.index.selectable] }), [apply]);
   // `n` throws the whole selection away: it must be pressed twice within 3 s.
   const clearArmed = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // mirrors clearArmed for the mouse control's label
+  const [armed, setArmed] = useState(false);
   useEffect(
     () => () => {
       if (clearArmed.current) clearTimeout(clearArmed.current);
@@ -200,12 +203,15 @@ export default function ScopeScreen() {
     if (clearArmed.current) {
       clearTimeout(clearArmed.current);
       clearArmed.current = null;
+      setArmed(false);
       apply({ op: "deselect", block_ids: [...latest.current.ids] });
       return;
     }
     setLive("Press n again to clear the selection");
+    setArmed(true);
     clearArmed.current = setTimeout(() => {
       clearArmed.current = null;
+      setArmed(false);
     }, 3000);
   }, [apply]);
 
@@ -298,7 +304,7 @@ export default function ScopeScreen() {
         <div className="flex flex-wrap items-center gap-3">
           <ViewToggle view={view} onChange={changeView} />
           <span className="text-xs text-slate-600">
-            Press <kbd className="rounded border px-1">?</kbd> for keyboard help
+            Press <kbd className="rounded border px-1">?</kbd> for the guide and keyboard shortcuts
           </span>
         </div>
         <Notice error={jobs.error} retry={() => void jobs.refetch()} testid="jobs-error">
@@ -312,8 +318,9 @@ export default function ScopeScreen() {
         </div>
         <Panel error={eng.groupsError ?? eng.selectionError} retry={eng.retry} testid="tree-error">
           {noSources ? (
-            <div data-testid="scope-empty" className="rounded border border-dashed border-slate-400 p-6 text-center">
-              <p className="mb-2">No documents yet. Add PDF or DOCX files to begin.</p>
+            <div data-testid="scope-empty" className="rounded border border-dashed border-slate-400 px-6 py-8 text-center">
+              <p className="mx-auto max-w-prose text-sm text-slate-700">Manual Labor turns PDF and DOCX manuals into a reviewed knowledge base.</p>
+              <p className="mb-3 mt-1 font-medium">Step 1: add documents.</p>
               <UploadButton label="Add documents" />
             </div>
           ) : eng.isLoading ? (
@@ -361,6 +368,25 @@ export default function ScopeScreen() {
       <aside className="flex flex-col gap-4" aria-label="Summary and models">
         {summary ? <SplitModeControl split={split} summary={summary} view={view} onChange={changeSplit} /> : null}
         {summary ? <SelectionSummary summary={summary} processing={ungrouped.length} /> : null}
+        {summary ? (
+          <div className="flex gap-2" data-testid="select-controls">
+            <Hint id="selectAll">
+              <button type="button" onClick={selectAll} className={`flex-1 rounded border border-slate-400 bg-white px-2 py-1 text-sm hover:bg-slate-100 ${FOCUS}`}>
+                Select all
+              </button>
+            </Hint>
+            <Hint id="selectNone">
+              <button
+                type="button"
+                onClick={selectNone}
+                data-testid="clear-selection"
+                className={`flex-1 rounded border px-2 py-1 text-sm ${FOCUS} ${armed ? "border-amber-500 bg-amber-50 text-amber-950" : "border-slate-400 bg-white hover:bg-slate-100"}`}
+              >
+                {armed ? "Press again to clear" : "Clear selection"}
+              </button>
+            </Hint>
+          </div>
+        ) : null}
         <ConfirmButton
           blocks={summary?.blocks ?? 0}
           processing={processing}

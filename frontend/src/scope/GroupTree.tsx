@@ -1,6 +1,8 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
+import { useBlockIndexData } from "../api/queries";
 import type { DocGroups, GroupCoverage, View } from "../api/schema";
 import { useHotkeys } from "../hooks/useHotkeys";
+import { MISMATCH, docMismatchDetail, docReconcileText, reconcileDoc, type DocReconcile } from "../onboarding/reconcile";
 import { lowCohesion, rowFraction, type CheckState, type Row } from "./derive";
 import GroupRow from "./GroupRow";
 
@@ -88,6 +90,17 @@ export default function GroupTree(p: GroupTreeProps) {
       : {}),
   });
 
+  // "nothing dropped": per document, parsed blocks reconcile against the groups (design 12 section 2.5)
+  const blockIndex = useBlockIndexData();
+  const reconciled = useMemo(() => {
+    const m = new Map<string, DocReconcile>();
+    const byDoc = new Map((blockIndex.data ?? []).map((d) => [d.doc_id, d.blocks]));
+    for (const d of p.docs) {
+      const blocks = byDoc.get(d.doc_id);
+      if (blocks) m.set(d.doc_id, reconcileDoc(blocks, d));
+    }
+    return m;
+  }, [blockIndex.data, p.docs]);
   const paramsOf = new Map(p.docs.map((d) => [d.doc_id, d.groups.params]));
   const noticeDocs = new Map(p.docs.map((d) => [d.doc_id, d]));
   const out: JSX.Element[] = [];
@@ -96,13 +109,14 @@ export default function GroupTree(p: GroupTreeProps) {
     if (r.docId !== lastDoc) {
       lastDoc = r.docId;
       const d = noticeDocs.get(r.docId);
+      const rec = reconciled.get(r.docId);
       out.push(
         <div
           key={`doc-${r.docId}`}
           role="presentation"
           data-doc={r.docId}
           data-testid="doc-heading"
-          className="sticky top-0 z-10 flex items-center gap-2 border-b border-slate-300 bg-slate-100 px-2 py-1 text-sm font-semibold"
+          className="sticky top-0 z-10 flex flex-wrap items-center gap-x-2 border-b border-slate-300 bg-slate-100 px-2 py-1 text-sm font-semibold"
         >
           <span>{p.filenames.get(r.docId) ?? r.docId}</span>
           {d && d.groups.learning_snapshot !== "baseline" ? (
@@ -114,6 +128,17 @@ export default function GroupTree(p: GroupTreeProps) {
             <span role="note" className="text-xs font-normal text-amber-900" data-testid="topics-failed">
               Topics unavailable: {d.groups.topic_error ?? "unknown error"}. Structure view still works.
             </span>
+          ) : null}
+          {rec ? (
+            rec.ok ? (
+              <span className="ml-auto text-xs font-normal tabular-nums text-slate-600" data-testid="doc-reconcile">
+                {docReconcileText(rec)}
+              </span>
+            ) : (
+              <span role="note" className="ml-auto rounded bg-amber-100 px-1.5 text-xs font-normal text-amber-950" data-testid="doc-reconcile-mismatch">
+                {MISMATCH(docMismatchDetail(rec))}
+              </span>
+            )
           ) : null}
         </div>,
       );

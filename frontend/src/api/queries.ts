@@ -13,6 +13,11 @@ export const qk = {
   models: ["models"] as const,
   jobs: ["jobs", "active"] as const,
   blocks: ["block-index"] as const,
+  exportStatus: ["export", "status"] as const,
+  flags: ["flags", "open"] as const,
+  agentItems: ["agent", "items"] as const,
+  proposals: ["agent", "proposals"] as const,
+  calibration: ["calibration"] as const,
 };
 
 export const useProject = () =>
@@ -141,7 +146,16 @@ export function useApplyTier() {
 }
 
 /** Query-key prefixes of later screens (Verify) that a finished job makes stale. */
-export const JOB_INVALIDATION_PREFIXES: readonly (readonly string[])[] = [["verify"], ["rail"], ["docFigures"], ["pageBlocks"]];
+export const JOB_INVALIDATION_PREFIXES: readonly (readonly string[])[] = [
+  ["verify"],
+  ["rail"],
+  ["docFigures"],
+  ["pageBlocks"],
+  ["export"],
+  ["flags"],
+  ["agent"],
+  ["calibration"],
+];
 
 /** Query keys refreshed whenever a background job finishes successfully (design 1.2); `extra` adds more. */
 export function invalidateAfterJob(qc: QueryClient, extra: readonly QueryKey[] = []): void {
@@ -156,4 +170,49 @@ export function invalidateAfterJob(qc: QueryClient, extra: readonly QueryKey[] =
     ...extra,
   ];
   for (const key of keys) void qc.invalidateQueries({ queryKey: key });
+}
+
+// Export, Agent and the step indicator (module 12). Read-mostly: every number shown comes from these answers.
+export const useExportStatus = (enabled = true) =>
+  useQuery({
+    queryKey: qk.exportStatus,
+    queryFn: async () => unwrap(await client.GET("/api/export/status")),
+    staleTime: 0,
+    enabled,
+  });
+
+export const useOpenFlags = () =>
+  useQuery({
+    queryKey: qk.flags,
+    queryFn: async () => unwrap(await client.GET("/api/flags", { params: { query: { status: "open" } } })),
+    staleTime: 0,
+  });
+
+export const useAgentItems = () =>
+  useQuery({
+    queryKey: qk.agentItems,
+    queryFn: async () => unwrap(await client.GET("/api/agent/items")),
+    staleTime: 0,
+    retry: false,
+  });
+
+export const useProposals = () =>
+  useQuery({
+    queryKey: qk.proposals,
+    queryFn: async () => unwrap(await client.GET("/api/agent/proposals", { params: { query: { status: "pending" } } })),
+    staleTime: 0,
+    retry: false,
+  });
+
+export const useCalibration = () =>
+  useQuery({
+    queryKey: qk.calibration,
+    queryFn: async () => unwrap(await client.GET("/api/calibration", { params: { query: {} } })),
+    staleTime: 0,
+    retry: false,
+  });
+
+/** After a review-changing write elsewhere (agent decision, override), refresh every count that depends on it. */
+export function invalidateReviewCounts(qc: QueryClient): void {
+  for (const key of [["export"], ["flags"], ["agent"], ["calibration"], ["verify"]]) void qc.invalidateQueries({ queryKey: key });
 }

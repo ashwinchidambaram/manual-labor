@@ -1,3 +1,6 @@
+import Copy from "../onboarding/Copy";
+import Hint from "../onboarding/Hint";
+
 export default function ConfirmButton({
   blocks,
   processing,
@@ -10,8 +13,16 @@ export default function ConfirmButton({
   onConfirm: () => void;
 }) {
   const reason = blocks === 0 ? "Nothing selected" : processing ? "Documents are still being processed" : null;
+  // what to do about it, with the keys from HOTKEYS
+  const fix =
+    blocks === 0
+      ? " Select at least one topic or section ({toggleRow} on a row, {selectAll} for all)."
+      : processing
+        ? " Confirm once every document has finished processing."
+        : "";
   return (
     <div>
+      <Hint id="confirm">
       <button
         type="button"
         onClick={onConfirm}
@@ -22,9 +33,11 @@ export default function ConfirmButton({
       >
         Confirm scope and go to Verify
       </button>
+      </Hint>
       {reason ? (
         <p id="confirm-reason" className="mt-1 text-xs text-slate-600" data-testid="confirm-reason">
           {reason}
+          <Copy text={fix} />
         </p>
       ) : null}
     </div>

@@ -1,6 +1,6 @@
 import { http, HttpResponse, delay } from "msw";
 import { setupServer } from "msw/node";
-import type { DocGroups, JobInfo, ProjectStatus, ScopeBlocks, ScopeModels, SelectionOp, SelectionOut, SourceInfo } from "../api/schema";
+import type { CalibrationReport, DocGroups, ExportStatus, Flag, GuideState, JobInfo, ProjectStatus, Proposal, ScopeBlocks, ScopeModels, SelectionOp, SelectionOut, SourceInfo } from "../api/schema";
 import { buildGroupsIndex } from "../scope/derive";
 import { reduce } from "../scope/selectionReducer";
 import { installVerifyFake } from "./verifyFake";
@@ -40,6 +40,13 @@ export interface Fake {
   statusError: boolean;
   jobsError: boolean;
   blocksError: boolean;
+  /** module 12: guide flag (null = the endpoint answers 500), export gate, agent data */
+  guide: GuideState | null;
+  guidePuts: boolean[];
+  exportStatus: ExportStatus;
+  flags: Flag[];
+  proposals: Proposal[];
+  calibration: CalibrationReport | null;
 }
 
 export function installFake(over: Partial<Fake> = {}): Fake {
@@ -71,6 +78,12 @@ export function installFake(over: Partial<Fake> = {}): Fake {
     statusError: false,
     jobsError: false,
     blocksError: false,
+    guide: { seen: true, seen_at: "2026-10-29T00:00:00Z", version: 1 },
+    guidePuts: [],
+    exportStatus: { unlocked: true, open_flags: 0, queued: 0, blockers: [], overrides: [], summary: null, zip_path: null },
+    flags: [],
+    proposals: [],
+    calibration: null,
     ...over,
   };
   server.events.on("request:start", ({ request }) => {
@@ -142,6 +155,23 @@ export function installFake(over: Partial<Fake> = {}): Fake {
       if (f.applyTier) return HttpResponse.json(f.applyTier.body, { status: f.applyTier.status });
       return HttpResponse.json({ models: f.models.models, stale: [{ node: "clean", state: "stale" }, { node: "score2", state: "stale" }] });
     }),
+  );
+  server.use(
+    http.get("*/api/ui/guide", () => (f.guide ? HttpResponse.json(f.guide) : HttpResponse.json({ detail: "no meta", code: "internal" }, { status: 500 }))),
+    http.put("*/api/ui/guide", async ({ request }) => {
+      const { seen } = (await request.json()) as { seen: boolean };
+      f.guidePuts.push(seen);
+      if (!f.guide) return HttpResponse.json({ detail: "no meta", code: "internal" }, { status: 500 });
+      f.guide = { seen, seen_at: seen ? "2026-10-29T00:00:01Z" : null, version: 1 };
+      return HttpResponse.json(f.guide);
+    }),
+    http.get("*/api/export/status", () => HttpResponse.json(f.exportStatus)),
+    http.get("*/api/flags", () => HttpResponse.json(f.flags)),
+    http.get("*/api/agent/items", () => HttpResponse.json([])),
+    http.get("*/api/agent/proposals", () => HttpResponse.json(f.proposals)),
+    http.get("*/api/calibration", () =>
+      f.calibration ? HttpResponse.json(f.calibration) : HttpResponse.json({ detail: "the calibration service is not available", code: "no_calibration" }, { status: 503 }),
+    ),
   );
   installVerifyFake(); // an empty review queue, so navigating to /verify from other tests is harmless
   return f;

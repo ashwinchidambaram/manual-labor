@@ -15,12 +15,12 @@ describe("App shell", () => {
     expect(await screen.findByTestId("project-name")).toHaveTextContent("demo");
   });
 
-  it("shows stubs for later screens and NotFound", async () => {
+  it("shows the Agent screen and NotFound", async () => {
     installFake();
     const { user, router } = renderApp("/scope");
     await screen.findByTestId("group-tree");
     await user.click(screen.getByRole("link", { name: "Agent" }));
-    expect(screen.getByTestId("stub-agent")).toBeInTheDocument();
+    expect(await screen.findByTestId("agent-screen")).toBeInTheDocument();
     await user.click(screen.getByRole("link", { name: "Back to Scope" }));
     expect(router.state.location.pathname).toBe("/scope");
     await router.navigate("/nope");

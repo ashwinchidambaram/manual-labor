@@ -1,5 +1,7 @@
 import { memo, useLayoutEffect, useMemo, useRef } from "react";
 import type { QueueItem } from "../api/schema";
+import Hint from "../onboarding/Hint";
+import { signalHint } from "../onboarding/hints";
 import { FOCUS, STALE_NAME, STATUS_LABEL } from "./labels";
 import { reasonChips, reasonsFromQueueItem } from "./reasons";
 
@@ -76,9 +78,9 @@ function QueueCardImpl({ item, isCurrent, pos, size, focusTick, wantFocus, focus
         {stale || chips.status.length ? <span className="rounded bg-amber-100 px-1.5 text-xs text-amber-950">{STALE_NAME}</span> : null}
         {item.stale_doc ? <span className="rounded bg-amber-100 px-1.5 text-xs text-amber-950">re-scoring</span> : null}
         {chips.reasons.map((c) => (
-          <span key={c.name} className={`rounded px-1.5 text-xs ${TONE[c.tone]}`}>
-            {c.text}
-          </span>
+          <Hint key={c.name} id="reasonChip" text={signalHint(c.name) ?? undefined}>
+            <span className={`rounded px-1.5 text-xs ${TONE[c.tone]}`}>{c.text}</span>
+          </Hint>
         ))}
         {chips.overflow.length ? (
           <span title={chips.overflow.join(", ")} className="rounded bg-slate-100 px-1.5 text-xs text-slate-700">
