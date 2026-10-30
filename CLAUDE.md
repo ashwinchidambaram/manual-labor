@@ -2,97 +2,108 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Read `SPEC.md` first. It says *what*. This file says *how you work*.
+Manual Labor turns manuals (PDF, scanned PDF, DOCX) into a reviewed knowledge base with a human in the loop. `README.md` says what it does for a person. `SPEC.md` says what it must do. `docs/ARCHITECTURE.md` says where the code is and how the parts connect. This file says how to work on it.
 
-## Where to start
+## State of the build
 
-- `docs/PROGRESS.md` is the source of truth for which build-order gate was last passed. If it does not exist, nothing has been built: start at module 0 (and `git init` first; the repo was created on 2026-10-28 with only `SPEC.md` and this file).
-- `docs/design/<module>.md` must exist and be approved before that module's implementation starts.
+Every module in the build order below is complete, gated and recorded in `docs/PROGRESS.md` (M0 to M11 the spec build, M12 onboarding and trust evidence, M13 the UI redesign). `docs/ACCEPTANCE.md` records the SPEC §11 acceptance run as COMPLETE on live local models. New work is a change to a finished product, not a continuation of the build: design it, implement it against the design, have it reviewed by a fresh agent, run the gate, record it.
 
-## Operating principles
+Open follow-ups the owner has not decided on (do not start them unasked):
 
-1. **Plan before code, per module.** The spec is high-level on purpose. For every module below, produce a short design (interfaces, data shapes, failure modes, test plan) before implementation, and get it approved unless told to run autonomously.
-2. **Fresh context for focused work.** Use subagents for anything that benefits from a clean, full context window: designing a module, implementing it, reviewing it, or writing its tests. Do not let one long session accumulate stale assumptions. Pass each subagent exactly what it needs: the relevant spec sections, the contracts in `manuallabor/contracts/`, and the fixture paths — not the whole conversation.
-3. **The implementer never grades its own work.** Every module gets a review from a subagent that did not write it, with a brief limited to: the spec section, the code, the tests, and the question "does this meet the acceptance criteria and the contracts?" Fix what it finds; re-review if the fix was non-trivial.
-4. **Faithfulness is a hard invariant.** Any change to cleanup, scoring, or assembly must keep the faithfulness tests green. If a model-based step makes a test fail, the fix is to constrain or reject the model output, never to loosen the test.
-5. **Deterministic core, probabilistic edges.** Parsing, IDs, scoring math, faithfulness alignment, assembly, export: pure functions with unit tests. LLM calls: behind one interface, temperature 0, cached by input hash, mockable in tests.
-6. **Contracts are code.** The data shapes in SPEC §6 live as Pydantic models in `manuallabor/contracts/` and as JSON schemas exported from them. The frontend types are generated from those schemas. Change the model → regenerate → both sides move together.
+- Additive server fields: per-section blocker counts on `/api/export/status` and per-document queued counts in `/api/verify/queue` `docs[]`, for quiet milestones in the UI.
+- The agent task's default local model (`llama3.2:1b`) cannot follow the proposal schema; `labor probe --apply medium` or the api tier fixes it per project.
+- Parsed-fixture caching to shorten the full pytest run (15 to 19 minutes) and Playwright (about 6 minutes).
 
-## Repo layout (fixed — module 0 creates it, everyone else follows it)
+## Invariants (never trade these away)
 
-- `manuallabor/` — the Python package: CLI `labor`, FastAPI app, pipeline stages. `manuallabor/contracts/` holds the Pydantic models for SPEC §6; `schemas/` holds the JSON schemas exported from them.
-- `frontend/` — React + TypeScript + Vite app. Its types are generated from `schemas/`, never hand-written.
-- `tests/` — pytest. `tests/fixtures/` holds the golden PDFs/DOCX, hand-written ground truth, and `project-a/` (the smoke-test project).
-- `docs/design/`, `docs/PROGRESS.md`, `docs/ACCEPTANCE.md` — per-module designs, gate log, final checklist.
+1. **Faithfulness is hard.** Cleanup is lossless normalisation (the allowed edits AE1 to AE7 in `docs/design/03-scoring.md`). If a model-based step makes a faithfulness test fail, constrain or reject the model output. Never loosen the test. If a sentence reads better after cleanup, that is a bug.
+2. **The model never rates itself.** Confidence comes from disagreement between independent sources (two parsers, text layer against OCR, a separate verifier model) and deterministic checks. A model's self-reported confidence is not a signal.
+3. **Nothing is dropped silently.** Every parsed block ends up in a group or in `unassigned`, and the manifest's `accounting` proves it. Every count the UI shows reconciles against separately computed server counts.
+4. **Deterministic core, probabilistic edges.** Parsing, IDs, scoring, faithfulness, assembly and export are pure functions with unit tests. Model calls go through one `Provider` interface at temperature 0, cached by input hash, mockable with `--mock`.
+5. **Contracts are code.** Shapes live as Pydantic models in `manuallabor/contracts/`. Change the model, regenerate schemas, OpenAPI and TypeScript, commit all of it together. Never hand-edit a generated file (list in `docs/ARCHITECTURE.md` §5).
+6. **Fully local.** No runtime network calls except to configured model providers. Fonts are bundled. API keys come from environment variables only and are never written into a project.
+7. **IDs are stable.** Block and figure IDs derive from document slug, page and per-page index in reading order, computed once at parse. Re-parsing the same bytes reproduces them.
+8. **Model output is validated before use.** Cleaned text and agent proposals pass the same deterministic checks as everything else; a failed re-check is shown, not hidden.
 
 ## Commands
 
-Python (from repo root):
+Python, from the repo root:
 
 ```
-uv run pytest -q                                   # all unit + contract tests
-uv run pytest tests/test_scoring.py::test_combiner -q   # one test
-uv run pytest -q -k faithfulness                   # tests matching a keyword
-uv run ruff check manuallabor/ && uv run ruff format --check manuallabor/
-uv run mypy manuallabor/                           # strict mode is configured in pyproject
-uv run labor check ./tests/fixtures/project-a      # end-to-end smoke, LLM mocked
-uv run labor check --live ./tests/fixtures/project-a   # same with real local models; skips if none
-uv run labor serve ./my-project                    # API + UI
+uv run pytest                                          # unit + contract tests; slow tests deselected by default
+uv run pytest tests/scoring/test_combine.py -q         # one file
+uv run pytest -q -k faithfulness                       # by keyword
+uv run pytest -q -m slow                               # the slow (Docling/OCR) tests
+uv run ruff check manuallabor/ tests/ && uv run ruff format --check manuallabor/ tests/
+uv run mypy manuallabor/                               # strict
+uv run labor schemas export --check                    # JSON schemas match the contracts
+uv run labor openapi export --check                    # frontend/src/api/openapi.json matches the app
+uv run labor check ./tests/fixtures/project-a          # end-to-end smoke, models mocked
+uv run labor check --live ./tests/fixtures/project-a   # same with real local models; skips cleanly if none
+MANUALLABOR_REQUIRE_DOCLING=1 bash scripts/acceptance.sh --live   # full SPEC §11 acceptance, ~95 min
 ```
 
-Frontend (from `frontend/`): `npm test` (unit), `npm run e2e` (Playwright). The schema-export and type-generation commands are defined in module 0; whatever names it picks, record them in `docs/PROGRESS.md` and run both whenever a contract model changes.
+Frontend, from `frontend/`:
 
-## Build order (each is a milestone with its own verification gate)
+```
+npm run typecheck && npm test -- --run                 # tsc, vitest
+npm run gen-types && npm run gen-api && npm run gen-guide   # after a contract, route or guide-text change
+npm run check-types-fresh && npm run check-api-fresh   # drift checks
+npm run build                                          # dist served by `labor serve`
+npm run e2e                                            # Playwright; builds the fixture project on first run
+```
 
-| # | Module | Gate to pass before moving on |
-|---|---|---|
-| 0 | Repo scaffold, contracts, fixtures, CI | `uv run pytest` green; schemas exported; 5 fixture PDFs + 1 DOCX in `tests/fixtures/` with hand-written ground truth for a sample of blocks and all figures |
-| 1 | Ingest + dual parse + block model | Both parsers run on every fixture; blocks have stable IDs across re-runs; headers/footers detected on ≥2 fixtures |
-| 2 | Figure extraction | ≥95% native/vector on the figure-heavy fixture; phash dedupe works across two copies of the same file |
-| 3 | Scoring + faithfulness check | Unit tests for every signal and the combiner; seeded corruptions (swap a digit, merge two columns, drop a table row) all land below threshold |
-| 4 | Grouping (structure + topic views) | Every block assigned exactly once; coverage mapping between views is correct on all fixtures; cohesion computed |
-| 5 | Cleanup + figure attachment | Faithfulness violations = 0 on auto-approved blocks; attach rule recorded; caption-ref attachments correct on fixtures |
-| 6 | Provider layer + hardware probe | Ollama + Anthropic + OpenAI-compatible each pass the same contract test; probe returns a suggestion table on Linux/macOS |
-| 7 | API + project state | Resumable: kill mid-run, restart, continue; every action persisted |
-| 8 | UI: Scope | Toggle preserves selection; counts live; keyboard-navigable |
-| 9 | UI: Verify | 20 blocks processed keyboard-only in a Playwright test; diff view correct; figure re-attach works |
-| 10 | Agent pass + calibration | Proposals re-checked; rejected proposals return to queue with history; calibration suggests a threshold from seeded decisions |
-| 11 | Assemble + export | Zip validates; every FIG reference resolves; README generated; SPEC §11 acceptance checklist run end-to-end and recorded in `docs/ACCEPTANCE.md` |
+Codegen order after a contract change: `uv run labor schemas export`, `uv run labor openapi export`, then `npm run gen-types` and `npm run gen-api`. After editing `frontend/src/onboarding/*.ts` or `hotkeys.ts`, run `npm run gen-guide`; a vitest fails while `docs/USER_GUIDE.md` is stale.
 
-Do not start module N+1 until module N's gate is recorded as passed (a short note in `docs/PROGRESS.md` with the command that proves it).
+Run the app on a scratch copy, never on a fixture:
 
-## Subagent pattern (use this literally)
+```
+rm -rf build/demo-project && cp -R frontend/e2e/.cache/project build/demo-project
+uv run labor serve build/demo-project --mock --port 8780
+curl -X PUT localhost:8780/api/ui/guide -H 'content-type: application/json' -d '{"seen":false}'   # first-run state
+```
 
-For each module:
+`labor serve ./tests/fixtures/project-a` writes state into the fixture. Do not do it.
 
-1. **Design subagent** → writes `docs/design/<module>.md`: interfaces, data flow, edge cases, test list. Input: SPEC sections, contracts, prior designs it depends on.
-2. **Implement subagent** → implements against the design, writes unit tests, runs them. Input: the design doc, contracts, fixtures. It reports what it could not satisfy rather than quietly changing the design.
-3. **Review subagent** (fresh, has not seen 1 or 2's conversation) → reads design + code + tests, runs the gate, lists defects ranked by severity, and checks specifically for: faithfulness regressions, nondeterminism, contract drift, untested branches, model output used without validation.
-4. **Fix** → implementer (or a new one) addresses the review. Re-run the gate. Record in `docs/PROGRESS.md`.
+## How to make a change
 
-For the UI modules, add a **UX check subagent** that drives the app with Playwright against a fixture project and confirms the keyboard flows and the behaviors in SPEC §7.
+1. **Read the design for the module you are touching** in `docs/design/`. It records the alternatives that were rejected and why. If the change contradicts a decision there, say so and update the design in the same commit.
+2. **Design before code** for anything beyond a small fix: a short section appended to the module's design (interfaces, data shapes, failure modes, test list). The owner approves it unless told to run autonomously.
+3. **Failing test first.** For a bug, reproduce it with a test that fails, then fix. For a feature, write the tests from the design. A "flaky" test is a hypothesis, not a diagnosis: read the assertion message, the server lines in the e2e log and the Playwright trace's network bodies, then rerun alone three times. Three of three flakes in this repo were real races.
+4. **Fresh reviewer.** The implementer never grades its own work. A subagent that has not seen the implementation conversation reads the design, the code and the tests, runs the gate, and checks specifically for faithfulness regressions, nondeterminism, contract drift, untested branches and model output used without validation. Fix what it finds; re-review a non-trivial fix. For UI changes add a UX-check agent that drives the app with Playwright as a first-time user and asserts through the API as well as the screen.
+5. **Run the gate yourself** and paste the output into `docs/PROGRESS.md`. A gate passes because the command ran, not because the code should work.
+6. **Commit** one gate per commit; the message states the gate and the command that proved it.
 
-## Verification you must run yourself, every time
+## Working with subagents here
 
-- `uv run pytest -q` (unit + contract tests)
-- `uv run labor check ./tests/fixtures/project-a` — an end-to-end smoke that parses, scores, auto-selects, assembles, and validates the export against the manifest schema, with LLM calls mocked
-- `uv run labor check --live ./tests/fixtures/project-a` — same with real local models when available (skips cleanly if not)
-- Frontend: `npm test` and `npm run e2e`
+- Give each agent exactly what it needs: the spec section, the design, the contracts, the fixture paths. Not the conversation.
+- Reviewers run in a git worktree of HEAD so an in-progress edit cannot change what they see.
+- Resource cap on a 16 GB machine: at most two Docling-bearing pytest runs plus one Playwright run at a time, each with its own `--basetemp=.pytest_tmp_<name>`. A shared temp dir wiped by a concurrent run invalidates a gate silently. Keep more than 3 GB of disk free; `.pytest_tmp_*` dirs are safe to delete when no run is active.
+- Never kill a process that belongs to another Claude session.
 
-A gate is not passed because the code "should" work; it is passed because the command above ran and its output is pasted into `docs/PROGRESS.md`.
+## Things that are easy to get wrong
 
-## Things that are easy to get wrong here
+- **Writing a path by hand.** Every project path comes from `ProjectPaths` / `DocPaths` in `manuallabor/project.py`. A new stage output must also be registered in `manuallabor/jobs/graph.py` or it will never be seen as missing or stale.
+- **Temp files under `docs/`.** A job's start-up cleaner deletes stray `*.tmp` there. Writers outside the worker lock (API page renders) use `.part`, one unique name per call. A temp-file fix has two halves: the writer's unique name and every cleaner whose glob could match it.
+- **Applying a stale queue snapshot after a write.** The Verify queue discards any response that started before the latest settled write (`useVerifyWrites` / `useVerifyState`). Keep that when touching the queue or approve path.
+- **Treating `faithfulness` below 1.0 as failed.** 0.9 is a pass via evidence-backed reorder and 0.5 is "cleanup candidate rejected, deterministic result kept". Failed is `passed == false`.
+- **Blocking the UI on model calls.** All model work is a background job with progress; the review queue stays usable while later blocks are still scoring.
+- **Forgetting the scanned case.** Exercise every feature on `scanned.pdf`, not just `clean.pdf`.
+- **Figure IDs from array position.** See invariant 7.
+- **Colour as the only signal, or a verdict without its evidence.** The UI rules are in `PRODUCT.md` and `DESIGN.md`: terracotta is your action, marigold is waiting for you, sage is cleared, brick is failed, blue is focus only; every count reconciles on screen; every explanation sits where the decision is; works keyboard-only and at 200 percent zoom.
 
-- **Treating a model's self-reported confidence as a signal.** Don't. Use disagreement between independent sources (two parsers, text layer vs OCR, a separate verifier model) and deterministic checks.
-- **Letting cleanup "improve" the text.** Cleanup is lossless normalization. If a sentence reads better after the LLM touched it, that is a bug.
-- **Silently dropping blocks.** Every block from the parse must end up assigned (to a group or `unassigned`) and accounted for in the manifest.
-- **Figure IDs tied to array position.** IDs derive from doc slug + page + per-page index in reading order, computed once at parse. Re-parsing the same bytes must reproduce them.
-- **Blocking the UI on LLM calls.** All model work is background jobs with progress; the review queue is usable while later blocks are still being scored.
-- **Forgetting the scanned case.** Every feature must be exercised on the scanned fixture, not just the clean one.
+## Repo layout
+
+- `manuallabor/`: the Python package, CLI `labor`, FastAPI app, pipeline stages. `contracts/` holds the Pydantic models; `schemas/` at the root holds the JSON exported from them.
+- `frontend/`: React + TypeScript + Vite. `src/types/generated.ts` and `src/api/types.ts` are generated.
+- `tests/`: pytest, mirroring the package. `tests/fixtures/` holds generated golden PDFs and DOCX with ground truth, and `project-a/` for the smoke test.
+- `scripts/`: `acceptance.sh`, `e2e-project.sh`, `e2e-serve.sh`, helpers.
+- `docs/design/`: one design per module. `docs/PROGRESS.md`: gates. `docs/ACCEPTANCE.md`: final checklist with evidence. `docs/USER_GUIDE.md`: generated.
+- `task_plan.md`, `progress.md`, `findings.md`, `docs/plans/`: the planning files from the autonomous build. History, not instructions.
 
 ## Conventions
 
-- Python: ruff + mypy strict on `manuallabor/`; Pydantic v2; structured logging (one JSON line per LLM call).
-- Frontend: TypeScript strict; components small; a single `hotkeys.ts` map; no global state library until it's needed.
-- Commits: one module gate per PR-sized commit; message states the gate and the command that proved it.
-- Docs: `docs/design/*.md` (per module), `docs/PROGRESS.md` (gates), `docs/ACCEPTANCE.md` (final checklist with evidence).
+- Python: ruff + mypy strict on `manuallabor/`; Pydantic v2; structured logging, one JSON line per model call in the project's `llm_calls.jsonl`.
+- Frontend: TypeScript strict; small components; a single `hotkeys.ts` map; TanStack Query, no global state library.
+- Tests: deterministic; model calls mocked unless marked `live`; Docling tests skip when its models are not cached, fail under `MANUALLABOR_REQUIRE_DOCLING=1`.
+- Commits end with `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`.
