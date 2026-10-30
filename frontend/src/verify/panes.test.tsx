@@ -127,6 +127,22 @@ describe("VC4 ExtractedPane", () => {
     expect(screen.getByRole("radiogroup")).toHaveFocus();
   });
 
+  it("design 12 section 4: an open hover tooltip takes the first Esc (edit kept); the second Esc cancels the editor", async () => {
+    const { r } = await mountVerify(3);
+    await cardFocused(vid(1));
+    await r.user.keyboard("e");
+    const ta = await screen.findByLabelText("Edit block text");
+    await waitFor(() => expect(ta).toHaveFocus());
+    await r.user.keyboard(" kept");
+    await r.user.hover(screen.getByRole("combobox", { name: "Sort" }));
+    await screen.findByRole("tooltip", {}, { timeout: 2000 });
+    await r.user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("tooltip")).toBeNull());
+    expect((screen.getByLabelText("Edit block text") as HTMLTextAreaElement).value).toMatch(/ kept$/);
+    await r.user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByLabelText("Edit block text")).toBeNull());
+  });
+
   it("e edits, Ctrl+Enter posts the text and focus returns to the queue", async () => {
     const { f, r } = await mountVerify(3);
     await cardFocused(vid(1));

@@ -118,7 +118,10 @@ function Locked({ st }: { st: ExportStatus }) {
 /**
  * Export anyway: one override per listed blocker (review M12 #6). A blanket override (no target) would also cover
  * blocks and flags that start blocking later, until the next export; per-blocker overrides cover exactly what the
- * reader saw. Request ids are stable per form and blocker, so a retry after a partial failure records nothing twice.
+ * reader saw: the block's queued state and the flags open on it now (a flag raised on it afterwards blocks again,
+ * design 11 P3). Request ids are stable per form and blocker, so a retry after a partial failure records nothing
+ * twice. The status is refreshed first and after every write: a block that no longer blocks is skipped. A 422 on one
+ * block (it vanished or its id is unknown) is reported and the rest are still recorded; any other failure stops.
  */
 function OverrideForm({ blockers, onDone }: { blockers: string[]; onDone: (st: ExportStatus) => void }) {
   const [reason, setReason] = useState("");
@@ -134,23 +137,44 @@ function OverrideForm({ blockers, onDone }: { blockers: string[]; onDone: (st: E
     setBusy(true);
     setError(null);
     const targets = [...blockers];
-    let last: ExportStatus | null = null;
-    let done = 0;
+    let latest: ExportStatus;
     try {
-      for (const id of targets) {
-        last = unwrap(await client.POST("/api/export/override", { body: { reason: reason.trim(), target_id: id, flag_id: null, request_id: `${rid}:${id}` } }));
-        done++;
+      latest = unwrap(await client.GET("/api/export/status"));
+    } catch (err) {
+      setError(`Could not refresh the export status: ${errText(err)}. Nothing recorded; try again.`);
+      setBusy(false);
+      return;
+    }
+    let recorded = 0;
+    let skipped = 0;
+    const rejected: string[] = [];
+    let stopped: string | null = null;
+    for (const id of targets) {
+      if (!(latest.blockers ?? []).includes(id)) {
+        skipped++;
+        continue;
       }
+      try {
+        latest = unwrap(await client.POST("/api/export/override", { body: { reason: reason.trim(), target_id: id, flag_id: null, request_id: `${rid}:${id}` } }));
+        recorded++;
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 422) {
+          rejected.push(`${id} (${errText(err)})`);
+          continue;
+        }
+        stopped = `Override not recorded for ${id}: ${errText(err)}.`;
+        break;
+      }
+    }
+    onDone(latest);
+    const tally = `${recorded} of ${targets.length} recorded${skipped ? `, ${skipped} skipped because they no longer block` : ""}.`;
+    if (stopped) setError(`${stopped} ${tally} Record overrides again to retry the rest.`);
+    else if (rejected.length) setError(`Override refused for ${rejected.join(", ")}. ${tally}`);
+    else {
       setReason("");
       setRid(crypto.randomUUID());
-    } catch (err) {
-      setError(
-        `Override not recorded for ${targets[done]}: ${errText(err)}. ${done} of ${targets.length} recorded; Record overrides again to retry the rest.`,
-      );
-    } finally {
-      if (last) onDone(last);
-      setBusy(false);
     }
+    setBusy(false);
   };
   const n = blockers.length;
   return (
@@ -159,7 +183,7 @@ function OverrideForm({ blockers, onDone }: { blockers: string[]; onDone: (st: E
         Export anyway
       </h3>
       <p className="max-w-prose text-sm text-slate-700">
-        Records one override for each of the {plural(n, "block")} listed above, with your reason. Each is exported unreviewed, with its machine-cleaned text, and listed in manifest.json. A block or flag that starts blocking later is not covered.
+        Records one override for each of the {plural(n, "block")} listed above, with your reason. Each is exported unreviewed, with its machine-cleaned text, and listed in manifest.json. Each covers its block as it is now: a flag raised on it after you record the override blocks the export again, and a block that starts blocking later is not covered.
         {n >= BLOCKER_LIMIT ? ` The server lists at most ${BLOCKER_LIMIT} at a time; record again for the next ones.` : ""}
       </p>
       <label htmlFor="override-reason" className="block text-sm font-medium text-slate-800">
@@ -199,7 +223,7 @@ function Overrides({ list }: { list: Override[] }) {
       <ul className="mt-1 space-y-1 text-sm">
         {list.map((o, i) => (
           <li key={`${o.at}-${i}`} className="text-slate-800">
-            <span className="text-slate-600">{fmtTime(o.at)}</span> · {o.target_id ? <span className="font-mono text-xs">{o.target_id}</span> : "every block blocking the next export, including any that start blocking later"}:{" "}
+            <span className="text-slate-600">{fmtTime(o.at)}</span> · {o.target_id ? <span className="font-mono text-xs">{o.target_id}</span> : "blanket: every block blocking the next export, including blocks and flags that start blocking after it was recorded"}:{" "}
             <q>{o.reason}</q>
           </li>
         ))}

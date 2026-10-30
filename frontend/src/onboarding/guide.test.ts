@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { HOTKEYS, type HotkeyId } from "../hotkeys";
-import { GUARANTEES, GUIDE_STEPS, copyParts, copyText, keyLabel, keycap, stepForPath } from "./guide";
+import { CLEANUP_ALLOWED, GUARANTEES, GUIDE_STEPS, copyParts, copyText, keyLabel, keycap, stepForPath } from "./guide";
 
 const allCopy = (): string[] => GUIDE_STEPS.flatMap((s) => [s.title, s.what, ...s.do, ...s.trust]).concat(GUARANTEES.flatMap((g) => [g.claim, g.how]));
 
@@ -57,5 +57,10 @@ describe("U1 guide content", () => {
     for (const t of ["whitespace", "hyphenated", "headers and footers", "reading order", "ligatures", "table layout", "bullets"]) expect(text).toContain(t);
     expect(text).toMatch(/chosen between text layer and OCR is recorded, not failed/);
     expect(text).toMatch(/leaves its flag open/);
+  });
+  it("reading order is accepted only when another reader attests it, never on layout alone (faithfulness.py, design 03 4.5)", () => {
+    expect(CLEANUP_ALLOWED).toContain("fix reading order only where the other parser or OCR read the block in the cleaned order");
+    expect(CLEANUP_ALLOWED).toContain("page layout alone is not evidence");
+    expect(CLEANUP_ALLOWED).not.toMatch(/where the layout gives evidence/);
   });
 });

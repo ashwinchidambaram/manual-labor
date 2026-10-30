@@ -130,6 +130,26 @@ def test_e22_override_route_is_idempotent_and_validated(unreviewed_env: Env) -> 
     assert sum(1 for a in store.iter_actions() if a.kind.value == "export_override") == 1
 
 
+def test_e22_a_flag_raised_after_a_target_override_blocks_again(unreviewed_env: Env) -> None:
+    """Override queued X, then flag X in Verify: X is a blocker again (real store, action ids)."""
+    c = unreviewed_env.client
+    first = c.get("/api/export/status").json()["blockers"][0]
+    s = c.post(
+        "/api/export/override", json={"reason": "r", "target_id": first, "request_id": "ov-x"}
+    ).json()
+    assert first not in s["blockers"]
+    flagged = {
+        "kind": "flag",
+        "block_id": first,
+        "flag": {"category": "wrong_text", "target_id": first},
+        "request_id": "fl-x",
+    }
+    assert c.post("/api/verify/actions", json=flagged).status_code == 200
+    s = c.get("/api/export/status").json()
+    assert first in s["blockers"] and s["open_flags"] == 1
+    assert c.post("/api/export").status_code == 409
+
+
 def test_e22_post_runs_the_export_in_the_worker_and_download_matches(unreviewed_env: Env) -> None:
     env = unreviewed_env
     c = env.client

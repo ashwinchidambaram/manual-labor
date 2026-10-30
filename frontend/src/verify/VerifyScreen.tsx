@@ -144,21 +144,28 @@ export default function VerifyScreen() {
     async (category: FlagCategory, note: string | null) => {
       setFlagOpen(false);
       const id = state.currentId;
+      if (!id) return;
       // a crop or missing-figure flag on a figure block targets the figure (design 09 O6). The figure id is only in
-      // the block's detail: if the flag is raised before it arrived, load it first instead of flagging the block.
-      let d = detail && detail.block.id === id ? detail : undefined;
+      // the block's detail. The queue advances at once like every other action (no key can land on the flagged
+      // block); if the detail has not arrived yet, the figure id is loaded inside the queued write, and if that
+      // fails the flag is not sent (never silently re-targeted at the block).
+      const d = detail && detail.block.id === id ? detail : undefined;
       const item = state.items.find((i) => i.block_id === id) ?? (state.pinned?.block_id === id ? state.pinned : null);
       const figureCategory = category === "bad_crop" || category === "missing_figure";
-      if (!d && id && figureCategory && item?.type === "figure")
-        d = await qc.fetchQuery({ queryKey: blockKey(id), queryFn: () => fetchBlock(id), staleTime: Infinity }).catch(() => undefined);
-      const target = d?.block.type === "figure" && figureCategory ? d.block.figure_id : null;
-      const res = v.act("flag", { flag: { category, note, target_id: target ?? null }, expectId: id });
+      const target = d && d.block.type === "figure" && figureCategory ? d.block.figure_id : null;
+      const flagTarget =
+        !d && figureCategory && item?.type === "figure"
+          ? async () => {
+              const got = await qc.fetchQuery({ queryKey: blockKey(id), queryFn: () => fetchBlock(id), staleTime: Infinity });
+              return got.block.type === "figure" ? (got.block.figure_id ?? null) : null;
+            }
+          : undefined;
+      const res = v.act("flag", { flag: { category, note, target_id: target ?? null }, flagTarget });
       v.requestFocus();
       const r = await res;
       if (r.ok) announce(`Flagged ${id}. Next: ${r.out.next?.block_id ?? "none"}`);
-      else if (r.error instanceof Error && r.error.message.endsWith("no longer the current block")) toast.error(`Flag not sent: ${r.error.message}`);
     },
-    [detail, state.currentId, state.items, state.pinned, qc, v, announce, toast],
+    [detail, state.currentId, state.items, state.pinned, qc, v, announce],
   );
 
   const openCrop = useCallback(

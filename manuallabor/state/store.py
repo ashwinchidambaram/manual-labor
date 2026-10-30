@@ -417,6 +417,11 @@ class Store:
             rows = self.q("SELECT * FROM flags WHERE status=? ORDER BY n", (status.value,))
         return [_flag(r) for r in rows]
 
+    def flag_created_actions(self) -> dict[str, int]:
+        """Flag id -> the id of the action that created it (the monotonic action sequence)."""
+        rows = self.q("SELECT n, created_action_id FROM flags ORDER BY n")
+        return {f"flag-{r['n']:06d}": int(r["created_action_id"]) for r in rows}
+
     def open_flags_for(self, target_id: str) -> list[Flag]:
         rows = self.q(
             "SELECT * FROM flags WHERE target_id=? AND status='open' ORDER BY n", (target_id,)

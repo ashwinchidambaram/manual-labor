@@ -76,7 +76,7 @@ describe("U10 ExportScreen", () => {
     const { user } = renderApp("/export");
     await screen.findByTestId("export-locked");
     expect(screen.getByTestId("override-form")).toHaveTextContent("one override for each of the 2 blocks listed above");
-    expect(screen.getByTestId("override-form")).toHaveTextContent("A block or flag that starts blocking later is not covered");
+    expect(screen.getByTestId("override-form")).toHaveTextContent("a flag raised on it after you record the override blocks the export again, and a block that starts blocking later is not covered");
     await user.click(screen.getByTestId("override-submit"));
     expect(screen.getByRole("alert")).toHaveTextContent("Please write why");
     expect(bodies).toEqual([]);
@@ -114,6 +114,47 @@ describe("U10 ExportScreen", () => {
     await waitFor(() => expect(ids).toHaveLength(4));
     expect(ids[2]).toBe(ids[0]);
     expect(ids[3]).toBe(ids[1]);
+  });
+  it("a 422 on one blocker does not stop the others from being recorded", async () => {
+    installFake({ exportStatus: locked({ blockers: ["b-doc-p001-01", "b-doc-p001-02", "b-doc-p001-03"] }) });
+    const sent: string[] = [];
+    server.use(
+      http.post("*/api/export/override", async ({ request }) => {
+        const b = (await request.json()) as { target_id: string };
+        sent.push(b.target_id);
+        if (b.target_id === "b-doc-p001-01") return HttpResponse.json({ detail: "unknown block", code: "unknown_target" }, { status: 422 });
+        return HttpResponse.json(locked({ blockers: ["b-doc-p001-01", "b-doc-p001-02", "b-doc-p001-03"] }));
+      }),
+    );
+    const { user } = renderApp("/export");
+    await screen.findByTestId("export-locked");
+    await user.type(screen.getByTestId("override-reason"), "deadline");
+    await user.click(screen.getByTestId("override-submit"));
+    expect(await screen.findByText(/Override refused for b-doc-p001-01 \(unknown block\)\. 2 of 3 recorded\./)).toBeInTheDocument();
+    expect(sent).toEqual(["b-doc-p001-01", "b-doc-p001-02", "b-doc-p001-03"]);
+  });
+  it("blocks that no longer block after refreshing the status are skipped", async () => {
+    const f = installFake({ exportStatus: locked() });
+    const sent: string[] = [];
+    let gets = 0;
+    server.use(
+      http.get("*/api/export/status", () => {
+        gets++;
+        // the screen loaded both blockers; by the time the form is sent, the first was approved elsewhere
+        return HttpResponse.json(gets === 1 ? f.exportStatus : locked({ blockers: ["b-doc-p001-02"] }));
+      }),
+      http.post("*/api/export/override", async ({ request }) => {
+        const b = (await request.json()) as { target_id: string };
+        sent.push(b.target_id);
+        return HttpResponse.json(locked({ blockers: [] }));
+      }),
+    );
+    const { user } = renderApp("/export");
+    await screen.findByTestId("export-locked");
+    expect(screen.getAllByTestId("blocker-link")).toHaveLength(2);
+    await user.type(screen.getByTestId("override-reason"), "deadline");
+    await user.click(screen.getByTestId("override-submit"));
+    await waitFor(() => expect(sent).toEqual(["b-doc-p001-02"]));
   });
   it("'first N listed' appears only when the server's list is at its limit", async () => {
     installFake({ exportStatus: locked({ queued: 3, open_flags: 2 }) });

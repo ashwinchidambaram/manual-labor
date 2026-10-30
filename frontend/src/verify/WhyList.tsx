@@ -4,7 +4,7 @@ import { label, STALE_NAME } from "./labels";
 
 interface Props {
   why: WhyItem[];
-  autoApproved: { confidence: number | null; threshold: number } | null;
+  autoApproved: { confidence: number | null; threshold: number | null } | null;
 }
 
 export default function WhyList({ why, autoApproved }: Props) {
@@ -21,7 +21,7 @@ export default function WhyList({ why, autoApproved }: Props) {
       ))}
       {autoApproved ? (
         <p data-testid="why-auto" className="mt-1 text-slate-700">
-          Auto-approved ({autoApproved.confidence?.toFixed(2) ?? "n/a"} ≥ {autoApproved.threshold.toFixed(2)}); shown by your view filter
+          Auto-approved ({autoApproved.confidence?.toFixed(2) ?? "n/a"}{autoApproved.threshold !== null ? ` ≥ ${autoApproved.threshold.toFixed(2)}` : ""}); shown by your view filter
         </p>
       ) : null}
       <ul aria-label="Why this needs you, signals" className="mt-1 space-y-1">

@@ -18,7 +18,8 @@ export interface StatusStripProps {
   /** the view filter the list was built with (the server cursor); differs from `view` while a change is saving */
   appliedView: number | null;
   docs: DocReadiness[];
-  threshold: number;
+  /** null until the project has loaded */
+  threshold: number | null;
   view: number | null;
   sort: QueueSort;
   onView: (v: number | null) => void;
@@ -56,6 +57,11 @@ export default function StatusStrip(p: StatusStripProps) {
       <Stat id="cnt-flagged" label="Flagged" value={p.counts.flagged_open} />
       <Stat id="cnt-done" label="Done" value={p.counts.approved + p.counts.edited} />
       <Stat id="cnt-scope" label="In scope" value={p.counts.in_scope} />
+      {T === null ? (
+        <span className="text-sm text-slate-600" data-testid="view-copy">
+          Loading the review threshold
+        </span>
+      ) : (
       <div className="flex items-center gap-2">
         <Hint id="viewSlider">
         <input
@@ -77,6 +83,7 @@ export default function StatusStrip(p: StatusStripProps) {
           Show all
         </button>
       </div>
+      )}
       <label className="flex items-center gap-1 text-sm">
         <span className="sr-only">Sort</span>
         <Hint id="sort">

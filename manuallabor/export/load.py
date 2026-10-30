@@ -129,6 +129,7 @@ def load_inputs(paths: ProjectPaths, store: Store, after_action_id: int = 0) -> 
         split=sel.article_split,
         docs=docs,
         flags=store.flags(),
+        flag_seq=store.flag_created_actions(),
         overrides=active_overrides(store, after_action_id),
         models=last_models(paths),
         learning=ManifestLearning(enabled=cfg.learning.enabled, docs=learn_docs),

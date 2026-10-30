@@ -10,13 +10,16 @@ import { HINTS, type HintId } from "./hints";
 const NAV_KEYS = new Set(["Tab", "Shift", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End", "PageUp", "PageDown"]);
 let pointerFocus = false;
 let navKey = false;
-if (typeof document !== "undefined") {
+// Registered on `window` in the capture phase at module load: before any open tooltip's own window-capture Esc
+// listener (same target and phase run in registration order, and stopPropagation does not stop them), so an Esc the
+// tooltip swallows still resets the bookkeeping instead of leaving the previous Tab as the "last key".
+if (typeof window !== "undefined") {
   const pointer = (): void => {
     pointerFocus = true;
   };
-  document.addEventListener("pointerdown", pointer, true);
-  document.addEventListener("mousedown", pointer, true);
-  document.addEventListener(
+  window.addEventListener("pointerdown", pointer, true);
+  window.addEventListener("mousedown", pointer, true);
+  window.addEventListener(
     "keydown",
     (e) => {
       pointerFocus = false;

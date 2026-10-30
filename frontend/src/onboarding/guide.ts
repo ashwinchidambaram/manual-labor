@@ -13,7 +13,7 @@ export type StepId = "scope" | "verify" | "agent" | "export";
  * plain words. ChecksList, the guide and the glossary all quote these, so the claim is made in one place.
  */
 export const CLEANUP_ALLOWED =
-  "Cleanup may only change whitespace, join words hyphenated across a line break, remove known headers and footers, fix reading order where the layout gives evidence, turn ligatures, Unicode variants and soft hyphens into plain text, rebuild table layout without changing any cell, and normalise list bullets.";
+  "Cleanup may only change whitespace, join words hyphenated across a line break, remove known headers and footers, fix reading order only where the other parser or OCR read the block in the cleaned order (page layout alone is not evidence), turn ligatures, Unicode variants and soft hyphens into plain text, rebuild table layout without changing any cell, and normalise list bullets.";
 export const NUMBER_CHOICE =
   "Where the PDF text layer and OCR read a number differently by a look-alike character (0 and O, 1 and l) and the other reading confirms it, the number chosen between text layer and OCR is recorded, not failed.";
 

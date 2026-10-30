@@ -97,6 +97,7 @@ class AssembleInputs:
     models: dict[str, tuple[str, str]]  # task -> (provider, model)
     learning: ManifestLearning
     tool_version: str
+    flag_seq: dict[str, int] = field(default_factory=dict)  # flag id -> created action id
 
 
 @dataclass(frozen=True)

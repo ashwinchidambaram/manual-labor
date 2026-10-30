@@ -30,7 +30,7 @@ interface Props {
   pinned?: boolean;
   criticalReasons?: number;
   /** the auto-approve threshold the score is judged against */
-  threshold: number;
+  threshold: number | null;
 }
 
 function QueueCardImpl({ item, isCurrent, pos, size, focusTick, wantFocus, focusBlocked, onSelect, height, offset, pinned, criticalReasons, threshold }: Props) {

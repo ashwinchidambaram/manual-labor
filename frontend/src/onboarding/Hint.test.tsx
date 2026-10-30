@@ -100,4 +100,24 @@ describe("U5 Hint", () => {
     await new Promise((r) => setTimeout(r, 50));
     expect(screen.queryByRole("tooltip")).toBeNull();
   });
+  it("an Esc the open tooltip swallows still counts as the last key: focus the app then moves shows no tooltip", async () => {
+    const user = userEvent.setup();
+    render(
+      <div>
+        <Hint id="confirm">
+          <button type="button">Go</button>
+        </Hint>
+        <Hint id="confirm">
+          <button type="button">Other</button>
+        </Hint>
+      </div>,
+    );
+    await user.tab();
+    await screen.findByRole("tooltip");
+    await user.keyboard("{Escape}"); // stopped by the tooltip before any document listener
+    await waitFor(() => expect(screen.queryByRole("tooltip")).toBeNull());
+    screen.getByRole("button", { name: "Other" }).focus(); // the app moves focus after that Esc
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.queryByRole("tooltip")).toBeNull();
+  });
 });

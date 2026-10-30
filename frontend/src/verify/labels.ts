@@ -50,9 +50,11 @@ export const FOCUS = "focus-visible:outline-none focus-visible:ring-2 focus-visi
  * A block's score with what it is judged against (PRODUCT.md: never a bare confidence number). The number is the
  * scorer's combined confidence; the threshold is the auto-approve line from the project config.
  */
-export function scoreText(conf: number | null | undefined, threshold: number): string {
+/** `threshold` is null until the project has loaded: then the bare score, never a guessed comparison. */
+export function scoreText(conf: number | null | undefined, threshold: number | null): string {
   if (conf === null || conf === undefined) return "score n/a · not scored yet";
   const v = conf.toFixed(2);
+  if (threshold === null) return `score ${v}`;
   const t = threshold.toFixed(2);
   const cmp = conf < threshold ? (v === t ? "just below" : "below") : "at or above";
   return `score ${v} · ${cmp} ${t}`;

@@ -20,7 +20,7 @@ interface Props {
   focusBlocked?: React.MutableRefObject<boolean>;
   onSelect: (id: string) => void;
   onNearEnd: () => void;
-  threshold: number;
+  threshold: number | null;
   /** the export gate; "Next: export" is only offered when it is open */
   gate?: ExportStatus;
 }

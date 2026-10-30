@@ -48,7 +48,7 @@ interface Props {
   onEditText: (t: string) => void;
   onConfirmConflict: () => void;
   onKeepEditing: () => void;
-  threshold: number;
+  threshold: number | null;
 }
 
 export default function ExtractedPane({ detail, loading, error, view, onView, edit, onEditText, onConfirmConflict, onKeepEditing, threshold }: Props) {

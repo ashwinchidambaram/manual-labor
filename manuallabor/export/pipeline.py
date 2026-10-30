@@ -238,7 +238,13 @@ def _gate(paths: ProjectPaths, store: Store, cutoff: int) -> Gate:
         if doc_ready(paths, slug):
             blocks[slug] = load_review_blocks(paths, store, slug)
             scope[slug] = data.scope_ids(slug, selected)
-    return export_gate(blocks, scope, store.flags(), active_overrides(store, cutoff))
+    return export_gate(
+        blocks,
+        scope,
+        store.flags(),
+        active_overrides(store, cutoff),
+        store.flag_created_actions(),
+    )
 
 
 def export_status(paths: ProjectPaths, store: Store) -> ExportStatus:

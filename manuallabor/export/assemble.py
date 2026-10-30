@@ -129,7 +129,7 @@ class _Ctx:
         self.generated_at = generated_at
         blocks_by_doc = {s: d.blocks for s, d in inp.docs.items()}
         scope = {s: d.scope for s, d in inp.docs.items()}
-        self.gate = export_gate(blocks_by_doc, scope, inp.flags, inp.overrides)
+        self.gate = export_gate(blocks_by_doc, scope, inp.flags, inp.overrides, inp.flag_seq)
         if self.gate.blockers:
             raise GateLocked(self.gate.open_flags, self.gate.queued, self.gate.blockers)
         self.status: dict[str, BlockStatus] = {

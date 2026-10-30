@@ -45,6 +45,20 @@ export interface ActOpts {
   flag?: { category: FlagCategory; note: string | null; target_id?: string | null };
   /** act only if this is still the current block (an await happened between the decision and the act) */
   expectId?: string | null;
+  /** resolves the flag's target inside the queued write (a figure flag before the block's detail arrived). The queue
+   * has already moved on, so no key can land on the flagged block; if it rejects, the flag is not sent. */
+  flagTarget?: () => Promise<string | null>;
+}
+
+/** The flag's target could not be resolved: the flag was not sent. */
+export class FlagTargetError extends Error {
+  constructor(
+    readonly blockId: string,
+    readonly cause: unknown,
+  ) {
+    super(`could not load the figure of ${blockId}`);
+    this.name = "FlagTargetError";
+  }
 }
 export type ActResult = { ok: true; out: ReviewActionOut } | { ok: false; error: unknown; conflict?: EditConflict };
 
@@ -53,7 +67,8 @@ export function useVerifyState() {
   const toast = useToast();
   const writes = useVerifyWrites();
   const project = useProject();
-  const T = project.data?.config.threshold ?? 0.85;
+  // null until the project has loaded: scores are shown bare until then, never against a guessed threshold
+  const T: number | null = project.data?.config.threshold ?? null;
 
   // the reducer runs synchronously so two fast key presses see each other's effects
   const ref = useRef<QueueState>(initialState);
@@ -176,7 +191,9 @@ export function useVerifyState() {
   const setSort = useCallback((sort: QueueSort) => applyControls({ ...controlsRef.current, sort }, 0), [applyControls]);
   const setView = useCallback((view: number | null) => applyControls({ ...controlsRef.current, view }, 250), [applyControls]);
   const stepView = useCallback(
-    (dir: 1 | -1) => applyControls({ ...controlsRef.current, view: stepViewBy(controlsRef.current.view, dir, T) }, 250),
+    (dir: 1 | -1) => {
+      if (T !== null) applyControls({ ...controlsRef.current, view: stepViewBy(controlsRef.current.view, dir, T) }, 250);
+    },
     [applyControls, T],
   );
   const cycleSort = useCallback(
@@ -285,6 +302,14 @@ export function useVerifyState() {
       const doc = id ? (s.items.find((i) => i.block_id === id) ?? s.seen[id] ?? s.pinned) : null;
       return writes
         .enqueue(async () => {
+          let flag = opts.flag;
+          if (flag && opts.flagTarget) {
+            try {
+              flag = { ...flag, target_id: await opts.flagTarget() };
+            } catch (cause) {
+              throw new FlagTargetError(id ?? "", cause);
+            }
+          }
           const out: ReviewActionOut = unwrap(
             await client.POST("/api/verify/actions", {
               body: {
@@ -292,7 +317,7 @@ export function useVerifyState() {
                 ...(id ? { block_id: id } : {}),
                 ...(opts.text !== undefined ? { text: opts.text } : {}),
                 confirm_content_change: opts.confirm ?? false,
-                ...(opts.flag ? { flag: { category: opts.flag.category, note: opts.flag.note, target_id: opts.flag.target_id ?? null } } : {}),
+                ...(flag ? { flag: { category: flag.category, note: flag.note, target_id: flag.target_id ?? null } } : {}),
                 request_id: rid,
               },
             }),
@@ -323,7 +348,10 @@ export function useVerifyState() {
           }
           writes.cancelQueued();
           dispatch({ type: "fail", rid });
-          toast.error(`Not saved: ${error instanceof ApiError ? error.detail : "network error"}`);
+          if (error instanceof FlagTargetError) {
+            const why = error.cause instanceof ApiError ? error.cause.detail : "network error";
+            toast.error(`Flag not sent: ${error.message} (${why})`);
+          } else toast.error(`Not saved: ${error instanceof ApiError ? error.detail : "network error"}`);
           void qc.invalidateQueries({ queryKey: ["verify", "queue"] });
           requestFocus();
           return { ok: false, error };

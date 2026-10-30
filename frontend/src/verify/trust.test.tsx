@@ -3,6 +3,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import { delay, http, HttpResponse } from "msw";
 import { server } from "../test/server";
 import { describe, expect, it } from "vitest";
+import { makeProject } from "../test/fixtures";
 import { counts, makeBlockDetail, makeQueueItem, vid } from "../test/verifyFake";
 import { card, mountVerify } from "./helpers.test-util";
 import StatusStrip from "./StatusStrip";
@@ -34,6 +35,27 @@ describe("M12 trust: scores carry their meaning", () => {
     expect(within(card(vid(2))).getByTestId("queue-score")).toHaveTextContent(/^score 0\.90 · at or above 0\.85$/);
     expect(within(card(vid(3))).getByTestId("queue-score")).toHaveTextContent(/^score n\/a · not scored yet$/);
     expect(await screen.findByTestId("block-confidence")).toHaveTextContent(/^score 0\.10 · below 0\.85$/);
+  });
+});
+
+describe("M12 re-review minor 7: no threshold is guessed before the project loads", () => {
+  it("cards and header show the bare score until the threshold arrives, then the comparison", async () => {
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((r) => (release = r));
+    await mountVerify(2, () => {
+      server.use(
+        http.get("*/api/project", async () => {
+          await gate;
+          return HttpResponse.json({ ...makeProject(), config: { ...makeProject().config, threshold: 0.6 } });
+        }),
+      );
+    });
+    expect(within(card(vid(1))).getByTestId("queue-score")).toHaveTextContent(/^score 0\.10$/);
+    expect(await screen.findByTestId("block-confidence")).toHaveTextContent(/^score 0\.10$/);
+    expect(screen.getByTestId("view-copy")).toHaveTextContent("Loading the review threshold");
+    release();
+    await waitFor(() => expect(within(card(vid(1))).getByTestId("queue-score")).toHaveTextContent(/^score 0\.10 · below 0\.60$/));
+    expect(screen.getByTestId("block-confidence")).toHaveTextContent(/^score 0\.10 · below 0\.60$/);
   });
 });
 
@@ -74,10 +96,11 @@ describe("M12 e2e finding: a figure flag raised before the block's detail arrive
     const { f, r } = await mountVerify(2, (fk) => {
       fk.items = [makeQueueItem(1, { type: "figure" }), makeQueueItem(2)];
       const d = makeBlockDetail(fk.items[0]);
+      const d2 = makeBlockDetail(fk.items[1]);
       server.use(
         http.get("*/api/verify/blocks/:id", async ({ params }) => {
           await delay(400);
-          return HttpResponse.json(String(params.id) === d.block.id ? d : makeBlockDetail(fk.items[1]));
+          return HttpResponse.json(String(params.id) === d.block.id ? d : d2);
         }),
       );
     });
@@ -86,5 +109,44 @@ describe("M12 e2e finding: a figure flag raised before the block's detail arrive
     await r.user.keyboard("4{Enter}");
     await waitFor(() => expect(f.actions).toHaveLength(1), { timeout: 3000 });
     expect(f.actions[0]).toMatchObject({ kind: "flag", block_id: vid(1), flag: { category: "bad_crop", target_id: "FIG-doc-p001-01" } });
+  });
+});
+
+describe("M12 re-review major 1: a figure flag never waits on the current block", () => {
+  it("a key pressed while the figure id loads acts on the NEXT block, after the flag", async () => {
+    const { f, r } = await mountVerify(3, (fk) => {
+      fk.items = [makeQueueItem(1, { type: "figure" }), makeQueueItem(2), makeQueueItem(3)];
+      server.use(
+        http.get("*/api/verify/blocks/:id", async ({ params }) => {
+          await delay(400);
+          const it = fk.items.find((i) => i.block_id === String(params.id)) ?? makeQueueItem(Number(String(params.id).slice(-2)), { type: "figure" });
+          return HttpResponse.json(makeBlockDetail(it));
+        }),
+      );
+    });
+    await r.user.keyboard("f");
+    await screen.findByRole("dialog", { name: "Flag block" });
+    await r.user.keyboard("4{Enter}a");
+    await waitFor(() => expect(f.actions).toHaveLength(2), { timeout: 3000 });
+    expect(f.actions.map((a) => [a.kind, a.block_id])).toEqual([
+      ["flag", vid(1)],
+      ["approve", vid(2)],
+    ]);
+    expect(f.actions[0]).toMatchObject({ flag: { category: "bad_crop", target_id: "FIG-doc-p001-01" } });
+    expect(new Set(f.actions.map((a) => a.request_id)).size).toBe(2);
+  });
+
+  it("the figure id cannot be loaded (500): no flag is sent, a toast says so, the block is untouched", async () => {
+    const { f, r } = await mountVerify(3, (fk) => {
+      fk.items = [makeQueueItem(1, { type: "figure" }), makeQueueItem(2), makeQueueItem(3)];
+      fk.detailErrors[vid(1)] = { status: 500, detail: "disk full" };
+    });
+    await r.user.keyboard("f");
+    await screen.findByRole("dialog", { name: "Flag block" });
+    await r.user.keyboard("4{Enter}");
+    expect(await screen.findByText(/Flag not sent: could not load the figure of b-doc-p001-01/)).toBeInTheDocument();
+    await waitFor(() => expect(card(vid(1))).toHaveAttribute("aria-selected", "true"));
+    expect(f.actions).toHaveLength(0);
+    expect(f.items.map((i) => i.block_id)).toContain(vid(1));
   });
 });

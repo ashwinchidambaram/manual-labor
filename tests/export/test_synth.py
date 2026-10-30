@@ -3,7 +3,7 @@ inputs: every branch of assemble without a parser."""
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -278,6 +278,41 @@ def test_e7_a_targeted_override_covers_only_its_block() -> None:
         two_open(), overrides=[override(5, "r", target=bid(2)), override(6, "s", target=bid(3))]
     )
     assert [o.reason for o in run(both).manifest.overrides] == ["r", "s"]
+
+
+def test_e7_a_targeted_override_does_not_cover_a_flag_raised_after_it() -> None:
+    """A target override covers the queued state and the flags open when it was recorded. A flag
+    raised on the block afterwards (wall clock here: the pure gate has no action sequence) makes
+    the block a blocker again, so it cannot ship with machine text."""
+    blocks = [blk(1, status=A), blk(2, status=BlockStatus.queued)]
+    later = flag(9, bid(2)).model_copy(update={"created_at": CLOCK + timedelta(minutes=1)})
+    g = export_gate(
+        {"doc": blocks}, {"doc": {b.id for b in blocks}}, [later], [override(5, "r", target=bid(2))]
+    )
+    assert g.blockers == [bid(2)] and bid(2) not in g.covered
+
+
+def test_e7_target_override_coverage_follows_the_action_sequence() -> None:
+    """With the action sequence, it decides over the wall clock: a flag created by an earlier
+    action is covered, one created by a later action is not (same timestamps on purpose). A
+    blanket override still covers both, and a second flag on a covered block re-blocks it."""
+    blocks = [blk(1, status=A), blk(2, status=BlockStatus.queued), blk(3, status=A)]
+    scope = {"doc": {b.id for b in blocks}}
+    early, late = flag(4, bid(2)), flag(6, bid(3))
+    seq = {early.id: 4, late.id: 6}
+    ovs = [override(5, "r", target=bid(2)), override(5, "r", target=bid(3))]
+    g = export_gate({"doc": blocks}, scope, [early, late], ovs, seq)
+    assert g.blockers == [bid(3)] and bid(2) in g.covered
+    g = export_gate({"doc": blocks}, scope, [early, late], [override(5, "all")], seq)
+    assert g.blockers == []
+    again = flag(7, bid(2))
+    g = export_gate({"doc": blocks}, scope, [early, again], ovs[:1], {**seq, again.id: 7})
+    assert g.blockers == [bid(2)]
+    # a flag override covers only its own flag
+    g = export_gate(
+        {"doc": blocks}, scope, [early, again], [override(8, "f", flag_id=early.id)], seq
+    )
+    assert g.blockers == [bid(2)]
 
 
 def test_e7_a_flag_override_covers_the_flagged_block() -> None:
