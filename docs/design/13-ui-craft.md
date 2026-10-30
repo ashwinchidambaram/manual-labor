@@ -377,6 +377,7 @@ Answer these and the brief is confirmed.
 ## 7. Owner decisions (confirmed 2026-10-30)
 
 - D1 Direction: **B "Calm guide" with A's warmth**: B's step rail, "Your next step" card and page-above-text Verify layout; A's sage/marigold/terracotta status colours, the progress bar that adds up to in-scope, and A's welcome band.
+- D1a (owner, 2026-10-30): keep A's Verify progress bar exactly as mocked: a segmented bar over the whole in-scope total with "N of M checked by you", "cleared by the checks", "waiting for you", "flagged", each segment a status colour, with the reconciliation line beneath it.
 - D2 Page placement on Verify: directly above the extracted text (B), magnified to the block, with the whole page one key away (Z).
 - D3 Reading face for the manual's text: **Atkinson Hyperlegible**; the app's own words in the regular sans.
 - D4 Server change approved: queue items gain `section_title`, `excerpt`, `weakest_word`, computed by deterministic rules, no model involved.
