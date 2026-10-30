@@ -13,8 +13,8 @@ I parsed all six fixtures plus `figures-copy.pdf` (a byte copy of figures.pdf) i
 | Figure blocks | `raw_text == ""` on all of them. Labels inside a region are absorbed into `raw_text_by_parser` (the twocol composite has `pymupdf: "A B C"`). Caption blocks follow their figure in reading order, 0.8–4.4 pt below it. | §7 |
 | Module 1 defect | `b-scanned-p006-08` (type caption) = `"Figure 2. Idler pulley mounting positions.\nKeep th…"`: the caption got fused with the next paragraph. | §7 trim rule |
 | Region content (`get_image_info`, `get_drawings`, words) | 8 natives: 1 placement, coverage 1.000, 0 drawings, 0 words. 6 vectors: 0 images, 9–13 stroke paths all inside the bbox, a full-bbox frame rect, 0 words. twocol composite: 1 image + 5 paths + 3 words (A/B/C). | §2 |
-| Native pixels | Every native fixture image is DeviceRGB, 8 bpc, no smask, Flate. `Pixmap(doc, xref)` → `Image.frombytes` → `save(PNG, optimize=False)` gives **exactly** the GT `source_image.sha256` (14/14 fixture images incl. twocol/clean). `extract_image()["image"]` bytes do **not** match: MuPDF rebuilds the PNG. | §3, test 3 |
-| DOCX blobs | `document.part.related_parts[rid].blob` sha256 == GT sha256 (image/png, 900×600, extent 3 in → 300 dpi). | §8 |
+| Native pixels | Every native fixture image is DeviceRGB, 8 bpc, no smask, Flate. `Pixmap(doc, xref)` → `Image.frombytes` → `save(PNG, optimize=False)` gave **exactly** the GT `source_image.sha256` (14/14 fixture images incl. twocol/clean) while the GT held PNG-file hashes; the GT now holds pixel hashes (see the fixture comparison note in §3). `extract_image()["image"]` bytes do **not** match: MuPDF rebuilds the PNG. | §3, test 3 |
+| DOCX blobs | `document.part.related_parts[rid].blob` is image/png, 900×600, extent 3 in → 300 dpi; its decoded pixels match GT `source_image.sha256` (a pixel hash). | §8 |
 | Render-agreement check (§3.3) | native: MAD 0.40–0.83, p99 ≤ 5. twocol composite: MAD 2.58, **p99 63.5**. Image clipped by a clip path (synthetic): MAD 12.4, p99 168. | thresholds |
 | Whole-page `get_svg_image()` with a cropbox | 190 KB per figure, containing every glyph on the page and the *other* figure's raster as base64. **Rejected.** | §4 |
 | Isolate-by-redaction, then `get_svg_image()` | 2.6–3.3 KB, 0 `<image>`, 11–13 paths, byte-identical across calls, 3–12 ms. Rendered back through `pymupdf.open("svg")`, it matches the page render (differences are sub-pixel edge shifts only). | §4 |
@@ -102,7 +102,7 @@ Module 1's `image_xrefs`/`has_drawings` are **hints only**: its drawing clusters
    - **JPEG / JPX / JBIG2 → PNG, losslessly from the decoded pixels.** The contract allows only `.png|.svg` (code: `figure.py` `_DEDUP_RE`/`parse_figure_file`). The report records `source_format` (`extract_image()["ext"]`), `source_xref`, `bpc`, and `source_sha256` (of the raw `extract_image` bytes, for provenance). The original JPEG is not stored (disk).
 6. **Size and resolution:** `width, height` = pixel dims after orientation. `effective_dpi = min(w / (R.w/72), h / (R.h/72))`, rounded to 0.1.
 
-**Fixture comparison:** the generator saved the sources with `PIL.save(PNG, optimize=False)`. `encode_png` uses the same parameters, so the native output file's sha256 equals GT `source_image.sha256` exactly. Test 3 asserts that. If a Pillow upgrade ever breaks byte equality, the fallback assertion is pixel equality, and test 3 says so in its failure message.
+**Fixture comparison:** GT `source_image.sha256` is a pixel hash (`tests/fixtures/gen/ground_truth.pixel_sha256`: RGB pixels plus size), not a PNG-file hash. PNG bytes are not portable: Pillow's bundled zlib-ng encodes the same pixels differently on macOS arm64 and Linux x86-64, which broke the fixture byte-identity gate (F2) on CI. Test 3 decodes each native output PNG and asserts its pixel hash equals the GT, which is the property that matters (lossless extraction).
 
 ## 4. Vector (`vector.py`): isolate by redaction, then MuPDF's own SVG/PNG
 
@@ -285,16 +285,16 @@ The cached `pages/pNNN.png` is **not** used:
 |---|---|---|
 | 1 | figures | 14 sidecars; `extraction` == GT `expected_extraction` for **every** figure (8 native, 6 vector), so 14/14 ≥ 95% (the gate); reasons `single_image` / `vector_only` |
 | 2 | twocol | p4-01 → `crop`, reason `image_with_drawings`, `crop_source == "render"`; p2-01, p2-02 → native |
-| 3 | figures, twocol, clean | for every GT figure with `source_image` and method native: own PNG sha256 == GT sha256, (width, height) == GT (pixel-equality fallback documented in the assertion message) |
+| 3 | figures, twocol, clean | for every GT figure with `source_image` and method native: pixel hash of the own PNG == GT `source_image.sha256` (a pixel hash), (width, height) == GT |
 | 4 | figures | each vector: the SVG parses with `xml.etree`, has ≥ 1 `<path>` and 0 `<image>`; PNG ≥ 1000 px wide, and the fraction of non-white pixels is between 0.5% and 60%; the SVG rendered via `pymupdf.open("svg")` at 72 dpi agrees with the PNG downscaled (MAD ≤ 6) |
 | 5 | figures | p6-01: `duplicate_of = FIG-figures-p002-01`, kind exact, `file == "../figures/FIG-figures-p002-01.png"`; p7-01: kind near, distance ≤ 8, same file target; no other figure in the doc is a duplicate; the exported file set (sidecar targets) has 12 distinct PNGs |
 | 6 | twin (gate) | every `figures-copy` sidecar has `file` (and `svg` for vectors) under `../figures/`, kind exact; copy p2-01, p6-01 → `FIG-figures-p002-01`; p7-01 → same; a manifest built from `index.json` (`ManifestFigure`) validates contract (f) |
 | 7 | figproj (all fixtures) | twocol p2-01 → clean p6-01 (exact), twocol p2-02 → clean p6-02 (exact); scanned p5-01, p6-01, p6-02 → near dups of the clean natives; twocol p4-01 composite is **not** a duplicate (d = 10 > 8); manual and figures images are not duplicates of anything outside their docs |
 | 8 | all | every sidecar validates as `FigureRecord`; its `file`/`svg` resolve to existing files relative to `figures/<slug>/` |
 | 9 | all | figure blocks ↔ sidecars ∪ failures is a bijection (no silent drops); fixtures have 0 failures; tables.pdf has 0 figure blocks and 0 sidecars |
-| 10 | clean | 3 native, SHA == GT |
+| 10 | clean | 3 native, pixel hash == GT |
 | 11 | scanned | 3 crop, reason `scanned_page`, `crop_source == "raster"`, `effective_dpi == 300`; each PNG has an IoU ≥ 0.9 between its render_rect and the GT bbox + 2 pt; the bottom 3 % of rows has < 1% dark pixels (no caption ink) |
-| 12 | manual | 2 native, bbox None, page 1/2, PNG bytes == the DOCX blob (sha == GT), `effective_dpi == 300` |
+| 12 | manual | 2 native, bbox None, page 1/2, PNG bytes == the DOCX blob (sha256 of the bytes in the set of part blobs), pixel hash == GT, `effective_dpi == 300` |
 | 13 | figures | determinism: run in a subprocess with `PYTHONHASHSEED=123` on a fresh copy, so all `figures/**` and reports are byte-identical |
 | 14 | figproj | idempotent: a second `run_figures` emits `skip` for every doc; PNG/SVG/JSON mtimes are unchanged; `--force` reproduces identical bytes |
 | 15 | figproj | captions: `caption_original` == GT caption for every GT figure (figures 13 + p3-01 None, twocol 3, clean 3, scanned 3 incl. the trimmed fused p6-02, manual 2) |

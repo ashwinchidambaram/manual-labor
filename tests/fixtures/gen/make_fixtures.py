@@ -14,9 +14,11 @@ import itertools
 import random
 import re
 import shutil
+import struct
 import sys
 import tempfile
 import zipfile
+import zlib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -43,6 +45,7 @@ from tests.fixtures.gen.ground_truth import (
     GTFigure,
     GTSourceImage,
     GTTable,
+    pixel_sha256,
 )
 
 SEED = 20261028
@@ -350,11 +353,7 @@ class Layout:
 
     # -- figures
     def add_image(self, key: str, img: Image.Image) -> GTSourceImage:
-        buf = io.BytesIO()
-        img.save(buf, format="PNG", optimize=False)
-        info = GTSourceImage(
-            sha256=hashlib.sha256(buf.getvalue()).hexdigest(), width=img.width, height=img.height
-        )
+        info = GTSourceImage(sha256=pixel_sha256(img), width=img.width, height=img.height)
         self.images[key] = (ImageReader(img), info)
         return info
 
@@ -587,6 +586,50 @@ class Layout:
 # ----------------------------------------------------------------------------- images
 
 
+def png_bytes(img: Image.Image) -> bytes:
+    """Encode an image as an 8-bit RGB PNG with Python's own ``zlib``, byte-stable everywhere.
+
+    Pillow's PNG writer goes through its bundled zlib-ng, which emits different deflate
+    streams on macOS arm64 and Linux x86-64 for identical pixels, so any PNG whose bytes end
+    up inside a fixture is written here instead: signature, IHDR, one IDAT (filter type 0 on
+    every scanline, ``zlib.compress(level=9)``) and IEND, each chunk with ``zlib.crc32``.
+    """
+    arr = np.asarray(img.convert("RGB"), dtype=np.uint8)
+    h, w = arr.shape[:2]
+    rows = np.zeros((h, 1 + w * 3), dtype=np.uint8)
+    rows[:, 1:] = arr.reshape(h, w * 3)
+
+    def chunk(tag: bytes, data: bytes) -> bytes:
+        return struct.pack(">I", len(data)) + tag + data + struct.pack(">I", zlib.crc32(tag + data))
+
+    ihdr = struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0)
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", ihdr)
+        + chunk(b"IDAT", zlib.compress(rows.tobytes(), 9))
+        + chunk(b"IEND", b"")
+    )
+
+
+def box_downscale(img: Image.Image, size: tuple[int, int]) -> Image.Image:
+    """Area-average (box filter) downscale by an integer factor per axis, in integer arithmetic.
+
+    Replaces ``Image.resize(..., Image.LANCZOS)``, whose floating-point kernel gave one
+    different pixel on Linux x86-64 than on macOS arm64. Each output pixel is the mean of its
+    ``fx * fy`` source pixels, summed in int64 and rounded half up with integer division, so
+    the result is identical on every platform.
+    """
+    ow, oh = size
+    rgb = np.asarray(img.convert("RGB"), dtype=np.int64)
+    h, w = rgb.shape[:2]
+    if w % ow or h % oh:
+        raise ValueError(f"box_downscale needs integer factors: {w}x{h} -> {ow}x{oh}")
+    fx, fy = w // ow, h // oh
+    n = fx * fy
+    sums = rgb.reshape(oh, fy, ow, fx, 3).sum(axis=(1, 3))
+    return Image.fromarray(((sums + n // 2) // n).astype(np.uint8), "RGB")
+
+
 def line_art(rng: random.Random, w: int, h: int) -> Image.Image:
     img = Image.new("RGB", (w, h), (255, 255, 255))
     d = ImageDraw.Draw(img)
@@ -739,7 +782,7 @@ def build_figures(path: Path) -> tuple[Layout, int]:
     imgs = {k: line_art(rng, *wh) for k, wh in sizes.items()}
     for k, img in imgs.items():
         lay.add_image(k, img)
-    lay.add_image("R1n", imgs["R1"].resize((600, 400), Image.LANCZOS))
+    lay.add_image("R1n", box_downscale(imgs["R1"], (600, 400)))
     # (kind, key, w, h, flags)
     plan: list[list[tuple[str, str, float, float, str]]] = [
         [("v", "V1", 260, 160, ""), ("r", "R2", 240, 160, "")],
@@ -879,9 +922,7 @@ def build_docx(path: Path) -> tuple[list[Blk], list[Fig]]:
 
     def picture(key: int, number: int, w_in: float) -> None:
         img = line_art(rng, 900, 600)
-        buf = io.BytesIO()
-        img.save(buf, format="PNG", optimize=False)
-        d.add_picture(io.BytesIO(buf.getvalue()), width=Inches(w_in))
+        d.add_picture(io.BytesIO(png_bytes(img)), width=Inches(w_in))
         add(BlockType.figure, "", [])
         cap = f"Figure {number}. {C.FIGURE_CAPTIONS[key]}"
         d.add_paragraph(cap, style="Caption")
@@ -896,9 +937,7 @@ def build_docx(path: Path) -> tuple[list[Blk], list[Fig]]:
                 cblk,
                 None,
                 state["section"],  # type: ignore[arg-type]
-                GTSourceImage(
-                    sha256=hashlib.sha256(buf.getvalue()).hexdigest(), width=900, height=600
-                ),
+                GTSourceImage(sha256=pixel_sha256(img), width=900, height=600),
             )
         )
 

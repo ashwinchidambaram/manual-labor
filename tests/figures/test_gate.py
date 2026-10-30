@@ -21,6 +21,7 @@ from manuallabor.figures.native import agreement
 from manuallabor.parse import geometry as g
 from manuallabor.project import ProjectPaths
 from tests.figures.conftest import GT_STEMS, entry, index, load_gt, report, sidecar
+from tests.fixtures.gen.ground_truth import pixel_sha256
 
 pytestmark = pytest.mark.usefixtures("requires_docling")
 
@@ -29,6 +30,11 @@ DOCX_STEM = "manual"
 
 def _png(paths: ProjectPaths, slug: str, fid: str) -> bytes:
     return paths.figure_file(slug, fid, "png").read_bytes()
+
+
+def _pixels(png: bytes) -> str:
+    """GT `source_image.sha256` is a pixel hash (see `pixel_sha256`), not a PNG-file hash."""
+    return pixel_sha256(Image.open(io.BytesIO(png)))
 
 
 @pytest.mark.acc3
@@ -70,9 +76,7 @@ def test_03_native_pixels_equal_gt(figproj: ProjectPaths) -> None:
             data = _png(figproj, stem, fid)
             e = entry(figproj, stem, fid)
             assert (e.width, e.height) == (src["width"], src["height"]), fid
-            assert sha256_bytes(data) == src["sha256"], (
-                f"{fid}: PNG bytes differ from GT; if Pillow was upgraded, compare pixels instead"
-            )
+            assert _pixels(data) == src["sha256"], f"{fid}: PNG pixels differ from GT"
             n += 1
     assert n == 8 + 2 + 3
 
@@ -216,7 +220,7 @@ def test_10_clean(figproj: ProjectPaths) -> None:
     for f in gt:
         e = entry(figproj, "clean", f["expected_id"])
         assert e.method == Extraction.native
-        assert sha256_bytes(_png(figproj, "clean", f["expected_id"])) == f["source_image"]["sha256"]
+        assert _pixels(_png(figproj, "clean", f["expected_id"])) == f["source_image"]["sha256"]
 
 
 def test_11_scanned(figproj: ProjectPaths) -> None:
@@ -249,8 +253,9 @@ def test_12_manual_docx(figproj: ProjectPaths) -> None:
         sc = sidecar(figproj, "manual", fid)
         assert (e.method, e.bbox, sc.bbox) == (Extraction.native, None, None)
         assert sc.page == f["page"]
-        sha = sha256_bytes(_png(figproj, "manual", fid))
-        assert sha == f["source_image"]["sha256"] and sha in part_blobs
+        png = _png(figproj, "manual", fid)
+        # pixels match the GT source; the bytes are the DOCX part's blob, copied unchanged
+        assert _pixels(png) == f["source_image"]["sha256"] and sha256_bytes(png) in part_blobs
         assert e.effective_dpi == 300
 
 

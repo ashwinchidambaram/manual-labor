@@ -4512,7 +4512,7 @@
       "section_number": "2.2",
       "source_image": {
         "height": 600,
-        "sha256": "d265d929a0a305e93f63c9caf3714080150536a678318112874da7eeb7e1161a",
+        "sha256": "2e7c5abfdddbd99c8c0963230a94f8723dab32bd235f2aeb9e0a7eaf3ab151a2",
         "width": 900
       }
     },
@@ -4537,7 +4537,7 @@
       "section_number": "2.3",
       "source_image": {
         "height": 600,
-        "sha256": "418c58326deeed9144dc33ae28473fb33dfe211cf4363e7927d578cb9e79ebc7",
+        "sha256": "b6c287e016d59949b50469dacca1d79d05d5bf6f1a2add253e5a30bab7e0788f",
         "width": 900
       }
     },
@@ -4562,7 +4562,7 @@
       "section_number": "2.3",
       "source_image": {
         "height": 600,
-        "sha256": "73328a8ae2f8184eb5c633aa12d62d32115d1143171198d166d937732c0197f7",
+        "sha256": "dd26fc1529ff92da0131d97b25397bb0712b23a9142579696c322090a6360cc6",
         "width": 900
       }
     }

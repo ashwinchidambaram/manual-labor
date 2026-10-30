@@ -435,7 +435,7 @@
       "section_number": "1.1",
       "source_image": {
         "height": 600,
-        "sha256": "31ed90d4692bf113fa201712b1cf26b061ca266838a65ee14cfb272796d38645",
+        "sha256": "a304c9e663a2214e9f3b5cb0933871f3c1f8009a5f8aa20bf35c3f3ede5935a0",
         "width": 900
       }
     },
@@ -455,7 +455,7 @@
       "section_number": "2",
       "source_image": {
         "height": 600,
-        "sha256": "e7a364b7bb1003871974490d53b0e3dafc48a3dd64e43105dec47e7eaae35004",
+        "sha256": "df9cb9d7f9a0938bc8a08fc01435d8fef4d5a2085f38ea8fac2ae836b9677e38",
         "width": 900
       }
     }
@@ -468,7 +468,7 @@
   "page_count": 2,
   "page_size": null,
   "product_model": "Acme X200",
-  "sha256": "c16ce46738507e01fb0808e67f9b8fa592f556b601cea4ffdabec4c05d0c8c6b",
+  "sha256": "2670e340598b57f9fa1f05b902afaedeaf9eadcaf9c936a7538f82321567577e",
   "text_is_reference": false,
   "title": "Acme X200 Service Manual"
 }
