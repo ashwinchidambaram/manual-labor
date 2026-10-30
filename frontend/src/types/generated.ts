@@ -956,7 +956,7 @@ export interface TaskSuggestion {
   large: TierOption;
   medium: TierOption;
   small: TierOption;
-  task: 'cleanup' | 'grouping' | 'vision' | 'verifier' | 'embeddings';
+  task: 'cleanup' | 'grouping' | 'vision' | 'verifier' | 'embeddings' | 'agent';
 }
 /**
  * This interface was referenced by `_All`'s JSON-Schema

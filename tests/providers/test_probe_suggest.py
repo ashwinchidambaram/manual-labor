@@ -26,7 +26,11 @@ def test_present_models_have_no_pull_command() -> None:
     assert emb.small.present  # nomic-embed-text:latest matches
     vision = next(r for r in t.rows if r.task == "vision")
     assert not vision.small.present and vision.small.pull_command == "ollama pull moondream"
-    assert t.pull_commands["small"] == ["ollama pull moondream", "ollama pull qwen2.5:1.5b"]
+    assert t.pull_commands["small"] == [
+        "ollama pull moondream",
+        "ollama pull qwen2.5:1.5b",
+        "ollama pull qwen2.5:3b",
+    ]
 
 
 def test_big_apple_max_picks_highest_fitting_tier() -> None:
@@ -82,3 +86,23 @@ def test_deterministic_text() -> None:
     b = pr.render_table(p, pr.suggest(p))
     assert a == b and "Commands to run yourself" in a and a.isascii()
     assert "ollama pull moondream" in a
+
+
+def test_agent_has_its_own_row_and_the_small_tier_still_fits_16gb() -> None:
+    """llama3.2:1b cannot follow the proposal schema (tests/agent/test_live.py); qwen2.5:3b is the
+    smallest local model that does. The agent runs in its own job after the pipeline, so its
+    memory is not added to the pipeline models' (design 06 section 5.3)."""
+    probe = ps.mac_probe()
+    t = pr.suggest(probe)
+    agent = next(r for r in t.rows if r.task == "agent")
+    assert (agent.small.model, agent.medium.model, agent.large.model) == (
+        "qwen2.5:3b",
+        "qwen2.5:7b",
+        "qwen2.5:14b",
+    )
+    assert agent.api.provider == "anthropic"
+    assert t.default_tier == "small" and agent.small.fits
+    assert "ollama pull qwen2.5:3b" in t.pull_commands["small"]
+    assert pr.tier_models(t, "small")["agent"] == {"provider": "ollama", "model": "qwen2.5:3b"}
+    budget = probe.effective_model_memory_gb - 3.0
+    assert pr.tier_memory_need_gb(t, "small") <= budget

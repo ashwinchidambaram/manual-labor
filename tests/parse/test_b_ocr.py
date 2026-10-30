@@ -207,8 +207,10 @@ def test_14_attach_on_born_digital(clean_ocr: OcrOutput) -> None:
         ocr_all.append(b.raw_text_by_parser["ocr"])
         scores.append(_f1(b.raw_text_by_parser["pymupdf"], b.raw_text_by_parser["ocr"]))
     doc_f1 = _f1("\n".join(pymu_all), "\n".join(ocr_all))
-    print(f"token F1 pymupdf vs ocr (clean, doc): {doc_f1:.4f}")
-    assert doc_f1 >= 0.95
+    engine = clean_ocr.engine.value
+    print(f"token F1 pymupdf vs ocr (clean, doc, {engine}): {doc_f1:.4f}")
+    floors = {"tesseract": 0.95, "rapidocr": 0.85}  # same floors as test 13
+    assert doc_f1 >= floors[engine], (engine, doc_f1)
 
 
 def test_14_attach_is_pure_and_deterministic(clean_ocr: OcrOutput) -> None:

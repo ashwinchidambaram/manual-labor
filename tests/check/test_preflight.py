@@ -61,12 +61,19 @@ def test_missing_models_list_the_pull_commands(cfg: Path, monkeypatch: pytest.Mo
     )
     ok, reason, pulls = _live_preflight(cfg)
     assert not ok and "nomic-embed-text" in reason and "qwen2.5:1.5b" in reason
-    assert pulls == ["ollama pull nomic-embed-text", "ollama pull qwen2.5:1.5b"]
+    assert pulls == [
+        "ollama pull nomic-embed-text",
+        "ollama pull qwen2.5:1.5b",
+        "ollama pull qwen2.5:3b",
+    ]
 
 
 def test_all_present_applies_the_small_tier(cfg: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     have = ["llama3.2:1b", "moondream:latest", "nomic-embed-text:latest", "qwen2.5:1.5b"]
     monkeypatch.setattr(pr, "run_probe", lambda **_k: fake_probe(have))
+    ok, reason, pulls = _live_preflight(cfg)
+    assert not ok and pulls == ["ollama pull qwen2.5:3b"]  # the agent model counts too
+    monkeypatch.setattr(pr, "run_probe", lambda **_k: fake_probe([*have, "qwen2.5:3b"]))
     ok, reason, pulls = _live_preflight(cfg)
     assert ok, reason
     from manuallabor.contracts.config import ProjectConfig

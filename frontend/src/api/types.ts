@@ -3056,7 +3056,7 @@ export interface components {
              * Task
              * @enum {string}
              */
-            task: "cleanup" | "grouping" | "vision" | "verifier" | "embeddings";
+            task: "cleanup" | "grouping" | "vision" | "verifier" | "embeddings" | "agent";
         };
         /** ThresholdIn */
         ThresholdIn: {

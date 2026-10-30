@@ -23,6 +23,7 @@ VERIFIED, FAILED, NOT_VERIFIED = "VERIFIED", "FAILED", "NOT VERIFIED"
 PULLS = [
     "ollama pull llama3.2:1b",
     "ollama pull qwen2.5:1.5b",
+    "ollama pull qwen2.5:3b",
     "ollama pull moondream",
     "ollama pull nomic-embed-text",
 ]

@@ -512,7 +512,8 @@ def _live_preflight(tmp_cfg: Path) -> tuple[bool, str, list[str]]:
         return False, f"Ollama is not reachable at {result.ollama.host}", ["ollama serve"]
     cfg = read_json(tmp_cfg, ProjectConfig)
     refs = [
-        getattr(cfg.models, t) for t in ("cleanup", "grouping", "vision", "embeddings", "verifier")
+        getattr(cfg.models, t)
+        for t in ("cleanup", "grouping", "vision", "embeddings", "verifier", "agent")
     ]
     if any(r is not None and r.provider == "mock" for r in refs):
         try:
@@ -523,7 +524,7 @@ def _live_preflight(tmp_cfg: Path) -> tuple[bool, str, list[str]]:
     have = {m.name for m in result.ollama.models}
     have |= {n.removesuffix(":latest") for n in have}
     missing: list[str] = []
-    for t in ("cleanup", "grouping", "vision", "embeddings", "verifier"):
+    for t in ("cleanup", "grouping", "vision", "embeddings", "verifier", "agent"):
         ref = cfg.model_for(Task(t))
         if ref is not None and ref.provider == "ollama" and ref.model not in have:
             missing.append(ref.model)

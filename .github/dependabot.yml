@@ -1,0 +1,22 @@
+# Keep the three lockfiles current. Python uses uv (uv.lock), the frontend uses npm, and the
+# workflow pins actions. Grouped so a week's bumps arrive as one PR per ecosystem.
+version: 2
+updates:
+  - package-ecosystem: "uv"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      python:
+        patterns: ["*"]
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+    groups:
+      frontend:
+        patterns: ["*"]
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"

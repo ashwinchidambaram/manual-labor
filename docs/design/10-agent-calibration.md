@@ -344,18 +344,18 @@ Before/after = `current` vs `proposal_text` (diff from `faithfulness` detail spa
 | 28 | global (`MANUALLABOR_HOME=tmp`) | publish refused without `contribute_global`; two projects pooled under `use_global`; global files contain no raw text or ids |
 | 29 | API | every §6 route: status codes and shapes; no 501 left under `/agent` or `/calibration`; `labor openapi export --check` clean |
 | 30 | API process with provider `chat/vision/embed` patched to raise | every agent/calibration route still works |
-| 31 | **live** (`MANUALLABOR_LIVE=1`; Ollama `llama3.2:1b` as agent, `moondream` as vision; `SKIP live:` if absent) | test 1's seeds; run, then accept-all-passing; **0 accepted proposals with a failing check**; every proposal has rechecks; failing ones stay pending |
+| 31 | **live** (`MANUALLABOR_LIVE=1`; Ollama `qwen2.5:3b` as agent, `moondream` as vision; `SKIP live:` if absent) | test 1's seeds; run, then accept-all-passing; **0 accepted proposals with a failing check**; every proposal has rechecks; failing ones stay pending |
 
 ## 11. Open issues (each resolved with a choice)
 1. **Bucket size** 0.05 fixed (20 buckets), sparse below 20; the suggestion uses pooled ≥ t, not single buckets, so sparsity is handled by the 50-sample rule and Wilson bounds.
 2. **"Global" on one machine** = all opted-in projects under one `$MANUALLABOR_HOME`; outcomes only, no text; read only with `use_global`.
-3. **Page image to the VLM**: the block's bbox + 4 pt at 300 DPI, gray, ≤ 1024 px. Whole-page images are not sent to the vision reader. The agent model gets a page image only with `agent.page_image` (default off: the small default agent model is text-only); then the page is rendered at 100 DPI, ≤ 1024 px, with candidate boxes drawn and labelled for bad_crop.
+3. **Page image to the VLM**: the block's bbox + 4 pt at 300 DPI, gray, ≤ 1024 px. Whole-page images are not sent to the vision reader. The agent model gets a page image only with `agent.page_image` (default off: the small tier's agent model, `qwen2.5:3b`, is text-only); then the page is rendered at 100 DPI, ≤ 1024 px, with candidate boxes drawn and labelled for bad_crop.
 4. **Prompt constraints**: versioned prompts; data in tags; the reply is schema-constrained with choice enums; no confidence asked; priors give reviewer reasons and failed check names, never the model's rationale; one item per call.
 5. **Content-changing accepts.** An attested correction is a content change against raw (`faith_passed=0`, diff stored), the same class as a confirmed human edit. Module 11 lists both in the manifest (suggested key `content_changes`).
 6. **Verifier on proposals**: not used. It would flag every intended correction; the independent readers and the vision reader are the second readers here.
 7. **Never-extracted figures** (missing_figure with no candidate) are `unsupported`: IDs are fixed at parse, so a new figure is a re-parse decision.
 8. **Selection bias**: only reviewed blocks are outcomes; auto-approved blocks are unknown, never counted as correct.
 9. **Learned items can only make the machine more careful** (queue more, lower confidence) or change proposals. Raising confidence, lowering the threshold or loosening any check needs an explicit human apply.
-10. **Agent model = cleanup model** (07 fallback) is acceptable: nothing is self-graded; every check is deterministic or uses an independent reader.
+10. **Agent model.** `TaskModels.agent` defaults to `qwen2.5:3b` and the probe tiers carry an `agent` row (design 06 §5.3); `null` still falls back to the cleanup model (07). The small cleanup model `llama3.2:1b` cannot follow the proposal schema, so the fallback was the wrong default (2026-10-30, Dana's run: every agent item ended in `proposal_text is missing`). Nothing is self-graded either way; every check is deterministic or uses an independent reader.
 11. **Embeddings in `regroup_similarity`** run in the worker only; accept relies on the basis hash, so no endpoint ever calls a model.
 12. **`BlockStatus.rejected`** is not produced by module 10 (07 open issue 10); module 11 decides.

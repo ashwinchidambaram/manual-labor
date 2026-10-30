@@ -115,11 +115,33 @@ def test_clustering_tiny_inputs_do_not_crash(n: int) -> None:
     assert out == ([] if n == 0 else [list(range(n))])
 
 
-def test_small_and_all_dissolved_become_one_cluster() -> None:
+def test_small_doc_is_one_cluster() -> None:
     orth = np.eye(5)
     assert cluster(center(orth), _ids(5), PARAMS) == [[0, 1, 2, 3, 4]]
-    big = np.eye(13)  # n >= SMALL_DOC but every singleton is dissolved
-    assert cluster(center(big), _ids(13), PARAMS) == [list(range(13))]
+
+
+def test_three_separated_groups_above_small_doc() -> None:
+    rows = []
+    for g, size in enumerate([5, 4, 4]):
+        for i in range(size):
+            v = np.zeros(8)
+            v[g] = 1.0
+            v[3 + (g * 4 + i) % 5] += 0.05 * (1 + i)  # distinct distances, no ties
+            rows.append(v)
+    c = center(np.array(rows))
+    assert cluster(c, _ids(13), PARAMS) == [[0, 1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]]
+
+
+def test_all_equal_distances_still_partition() -> None:
+    """13 orthogonal rows: every pairwise distance is identical, so the dendrogram is decided by
+    tie-breaking inside scipy's linkage, which differs between platforms (macOS gives one cluster,
+    Linux two). The contract is a partition that is deterministic on one machine, not a particular
+    shape (design 04 section 3.3)."""
+    c = center(np.eye(13))
+    out = cluster(c, _ids(13), PARAMS)
+    assert cluster(c, _ids(13), PARAMS) == out
+    assert sorted(i for m in out for i in m) == list(range(13))
+    assert all(len(m) >= PARAMS.min_topic_blocks for m in out)
 
 
 def test_size_cap_and_cannot_link() -> None:

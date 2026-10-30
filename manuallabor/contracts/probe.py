@@ -79,7 +79,7 @@ class TierOption(ContractModel):
 
 
 class TaskSuggestion(ContractModel):
-    task: Literal["cleanup", "grouping", "vision", "verifier", "embeddings"]
+    task: Literal["cleanup", "grouping", "vision", "verifier", "embeddings", "agent"]
     small: TierOption
     medium: TierOption
     large: TierOption

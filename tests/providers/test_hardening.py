@@ -304,7 +304,7 @@ def _project_json(tmp_path: Path, **extra: Any) -> Path:
     return cfg
 
 
-def test_apply_tier_resets_metadata_and_agent_unless_kept(tmp_path: Path) -> None:
+def test_apply_tier_writes_the_agent_and_resets_metadata_unless_kept(tmp_path: Path) -> None:
     from manuallabor.providers import probe as pr
     from tests.providers import probe_support as ps
 
@@ -313,7 +313,8 @@ def test_apply_tier_resets_metadata_and_agent_unless_kept(tmp_path: Path) -> Non
     cfg = _project_json(tmp_path)
     pr.apply_tier(cfg, table, "small", probe=probe)
     models = json.loads(cfg.read_text())["models"]
-    assert models["metadata"] is None and models["agent"] is None
+    assert models["metadata"] is None
+    assert models["agent"] == {"provider": "ollama", "model": "qwen2.5:3b"}
     cfg = _project_json(tmp_path)
     pr.apply_tier(cfg, table, "small", probe=probe, keep_overrides=True)
     models = json.loads(cfg.read_text())["models"]

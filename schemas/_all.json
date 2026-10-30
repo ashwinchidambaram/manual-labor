@@ -3577,8 +3577,7 @@
             {
               "type": "null"
             }
-          ],
-          "default": null
+          ]
         },
         "cleanup": {
           "$ref": "#/$defs/ModelRef"
@@ -3647,7 +3646,8 @@
             "grouping",
             "vision",
             "verifier",
-            "embeddings"
+            "embeddings",
+            "agent"
           ],
           "title": "Task",
           "type": "string"

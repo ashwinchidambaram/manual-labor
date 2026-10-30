@@ -28,6 +28,12 @@ def _default_vision() -> ModelRef:
     return ModelRef(provider="ollama", model="moondream")
 
 
+def _default_agent() -> ModelRef:
+    """Smallest local model that follows the agent's proposal schema; the cleanup default does
+    not (tests/agent/test_live.py). `null` still means "use the cleanup model"."""
+    return ModelRef(provider="ollama", model="qwen2.5:3b")
+
+
 def _default_verifier() -> ModelRef:
     """A different model than the cleanup default: a verifier that is the cleanup model only
     re-reads its own output (the pipeline skips it as `skip_same_model`)."""
@@ -43,7 +49,7 @@ class TaskModels(ContractModel):
     )
     verifier: ModelRef | None = Field(default_factory=_default_verifier)
     metadata: ModelRef | None = None
-    agent: ModelRef | None = None
+    agent: ModelRef | None = Field(default_factory=_default_agent)
 
     @model_validator(mode="after")
     def _verifier_differs_from_cleanup(self) -> TaskModels:

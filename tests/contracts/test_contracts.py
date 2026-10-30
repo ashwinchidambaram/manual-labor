@@ -519,9 +519,15 @@ def test_c13_config() -> None:
     bad(c.ProjectConfig, {"name": "x", "parsers": ["a", "a"]})
     bad(c.ProjectConfig, {"name": "x", "ocr_dpi": 200})
     assert cfg.model_for(c.Task.metadata) == cfg.models.grouping
-    assert cfg.model_for(c.Task.agent) == cfg.models.cleanup
-    cfg2 = c.ProjectConfig.model_validate({"name": "x", "models": {"verifier": None}})
+    assert cfg.models.agent is not None and cfg.models.agent.model == "qwen2.5:3b"
+    assert cfg.model_for(c.Task.agent) == cfg.models.agent
+    cfg2 = c.ProjectConfig.model_validate(
+        {"name": "x", "models": {"verifier": None, "agent": None}}
+    )
     assert cfg2.model_for(c.Task.verifier) is None
+    assert (
+        cfg2.model_for(c.Task.agent) == cfg2.models.cleanup
+    )  # null still means "the cleanup model"
     assert cfg.model_for(c.Task.vision) == cfg.models.vision
     ref = c.ModelRef(provider="mock", model="m")
     cfg3 = cfg.model_copy(update={"models": cfg.models.model_copy(update={"agent": ref})})

@@ -24,7 +24,7 @@ from tests.agent.conftest import AEnv
 OLLAMA = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
 if "://" not in OLLAMA:
     OLLAMA = "http://" + OLLAMA
-AGENT_MODEL, VISION_MODEL = "llama3.2:1b", "moondream"
+AGENT_MODEL, VISION_MODEL = "qwen2.5:3b", "moondream"  # the small tier's agent and vision models
 
 
 def _missing() -> list[str]:
@@ -108,10 +108,6 @@ def _live_providers(aenv: AEnv) -> ProviderSet:
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="llama3.2:1b cannot follow the schema; use --apply medium",
-)
 def test_31b_live_numeric_block_with_named_value_gets_a_proposal(aenv: AEnv, capsys: Any) -> None:
     """Not vacuous: a numeric block whose text layer reads `3S N·m` (docling and OCR read
     `35`) and whose flag note names the right value must produce a proposal. Whatever it

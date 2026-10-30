@@ -11,7 +11,6 @@ Every module in the build order below is complete, gated and recorded in `docs/P
 Open follow-ups the owner has not decided on (do not start them unasked):
 
 - Additive server fields: per-section blocker counts on `/api/export/status` and per-document queued counts in `/api/verify/queue` `docs[]`, for quiet milestones in the UI.
-- The agent task's default local model (`llama3.2:1b`) cannot follow the proposal schema. Per project, set `models.agent` to a 7B-class model or an API model (`labor probe --apply medium` is refused on a 16 GB machine without `--force`, and `--apply` resets `models.agent` unless `--keep-overrides`). A better default is still undecided.
 - Parsed-fixture caching to shorten the full pytest run (15 to 19 minutes) and Playwright (about 6 minutes).
 
 ## Invariants (never trade these away)

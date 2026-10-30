@@ -17,7 +17,7 @@ from manuallabor.providers import probe as pr
 from tests.providers import probe_support as ps
 
 runner = CliRunner()
-TASKS = ["cleanup", "grouping", "vision", "verifier", "embeddings"]
+TASKS = ["cleanup", "grouping", "vision", "verifier", "embeddings", "agent"]
 
 
 def make_project(tmp_path: Path) -> Path:

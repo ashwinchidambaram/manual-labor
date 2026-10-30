@@ -30,7 +30,15 @@ from manuallabor.contracts.probe import (
     TierOption,
 )
 from manuallabor.providers.base import utc_now
-from manuallabor.providers.probe_catalog import API, API_KEY_ENV, CATALOG, TASKS, Candidate
+from manuallabor.providers.probe_catalog import (
+    AGENT_TASKS,
+    API,
+    API_KEY_ENV,
+    CATALOG,
+    PIPELINE_TASKS,
+    TASKS,
+    Candidate,
+)
 from manuallabor.providers.registry import normalize_ollama_host
 
 Runner = Callable[[Sequence[str], float], str | None]
@@ -430,7 +438,7 @@ def suggest(probe: ProbeResult) -> SuggestionTable:
 
 
 def tier_models(table: SuggestionTable, tier: Tier) -> dict[str, dict[str, str]]:
-    """{task: {"provider":..., "model":...}} for the five configurable tasks."""
+    """{task: {"provider":..., "model":...}} for every tier task (`probe_catalog.TASKS`)."""
     return {
         r.task: {
             "provider": getattr(r, tier).provider,
@@ -495,10 +503,20 @@ class ApplyError(Exception):
 
 
 def tier_memory_need_gb(table: SuggestionTable, tier: Tier) -> float:
-    """Weights of every distinct model of the tier plus one KV-cache allowance (Ollama keeps
-    them resident for `keep_alive`, so the sum is the honest worst case)."""
-    uniq = {getattr(r, tier).model: getattr(r, tier).approx_gb for r in table.rows}
-    return float(sum(uniq.values())) + KV_OVERHEAD_GB
+    """Memory the tier's models need together: the larger of the pipeline group and the agent
+    group (`PIPELINE_TASKS`, `AGENT_TASKS`), each the sum of its distinct models' weights plus
+    one KV-cache allowance. Ollama keeps a group resident for `keep_alive`, so the sum within a
+    group is the honest worst case; the two groups never run in the same job."""
+
+    def need(tasks: tuple[str, ...]) -> float:
+        uniq = {
+            getattr(r, tier).model: getattr(r, tier).approx_gb
+            for r in table.rows
+            if r.task in tasks
+        }
+        return float(sum(uniq.values())) + KV_OVERHEAD_GB
+
+    return max(need(PIPELINE_TASKS), need(AGENT_TASKS))
 
 
 def tier_pull_gb(table: SuggestionTable, tier: Tier) -> float:
@@ -521,8 +539,9 @@ def apply_tier(
 ) -> dict[str, dict[str, str]]:
     """Rewrite `models` of project.json for `tier`; every other key is preserved.
 
-    metadata/agent overrides are reset to their fallbacks (grouping / cleanup model) unless
-    `keep_overrides`, so that a tier switch never leaves a stale model behind."""
+    The `metadata` override is reset to its fallback (the grouping model) unless
+    `keep_overrides`, so that a tier switch never leaves a stale model behind; `agent` is a
+    tier task and is written like the others (kept as is under `keep_overrides`)."""
     from manuallabor.contracts.config import ProjectConfig
     from manuallabor.contracts.io import write_json
 
@@ -559,10 +578,11 @@ def apply_tier(
     models = raw.get("models")
     models = dict(models) if isinstance(models, dict) else {}
     for task, ref in chosen.items():
+        if task == "agent" and keep_overrides and models.get("agent"):
+            continue
         models[task] = {"provider": ref["provider"], "model": ref["model"]}
     if not keep_overrides:
         models["metadata"] = None
-        models["agent"] = None
     raw["models"] = models
     try:
         ProjectConfig.model_validate(raw)

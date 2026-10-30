@@ -110,7 +110,7 @@ Also `parse`, `figures`, `score`, `group`, `clean`, `assemble`, `learning`, `dec
 
 `project.json` is created by `labor ingest` (and by `run` and `export`) with defaults. Keys you are most likely to change:
 
-- `models`: one `{provider, model, api_base, api_key_env}` per task: `cleanup`, `grouping`, `vision`, `embeddings`, `verifier`, and optionally `metadata` and `agent`. Providers: `ollama`, `anthropic`, `openai`, `openai_compatible`, `vllm`, `llamacpp`, `mock`. `labor probe --apply` fills this in; it resets `agent` unless you pass `--keep-overrides`.
+- `models`: one `{provider, model, api_base, api_key_env}` per task: `cleanup`, `grouping`, `vision`, `embeddings`, `verifier`, and optionally `metadata` and `agent`. Providers: `ollama`, `anthropic`, `openai`, `openai_compatible`, `vllm`, `llamacpp`, `mock`. `labor probe --apply` fills all of them in, including `agent`; it resets `metadata` unless you pass `--keep-overrides`.
 - `threshold` (0.85) and `doc_thresholds` to pin a value per document.
 - `cleanup.llm`: `off`, `residual` (model only where the rules left something) or `always`.
 - `ocr_engine` (`auto` uses Tesseract when it is on `PATH`, otherwise the bundled RapidOCR) and `ocr_dpi` (300 minimum).
@@ -140,7 +140,7 @@ Scores are an overlay. `blocks.json`, the raw parse, is never touched by later s
 ## Requirements
 
 - macOS or Linux, Python 3.12 (managed by `uv`), Node 22 to build the UI.
-- About 16 GB of RAM for the `small` local tier (`llama3.2:1b`, `qwen2.5:1.5b`, `moondream`, `nomic-embed-text`). `medium` and `large` need more; `api` needs both `ANTHROPIC_API_KEY` (chat, vision, verifier) and `OPENAI_API_KEY` (embeddings).
+- About 16 GB of RAM for the `small` local tier (`llama3.2:1b`, `qwen2.5:1.5b`, `qwen2.5:3b` for the agent pass, `moondream`, `nomic-embed-text`). `medium` and `large` need more; `api` needs both `ANTHROPIC_API_KEY` (chat, vision, verifier) and `OPENAI_API_KEY` (embeddings).
 - [Ollama](https://ollama.com) for local models. `labor probe` prints the exact `ollama pull` commands for a tier.
 - Docling layout models, downloaded once with `uv run docling-tools models download`. The parser never downloads at runtime.
 - Tesseract is optional; RapidOCR is bundled.
@@ -154,7 +154,7 @@ A 200-page born-digital manual parses and scores in a few minutes on a laptop wi
 - **Parse fails with "docling models not cached"**: run `uv run docling-tools models download` once, or set `MANUALLABOR_DOCLING_ARTIFACTS`. Set `MANUALLABOR_ALLOW_MODEL_DOWNLOAD=1` only if you want a one-time runtime download.
 - **A manual says "Not run yet"**: it was ingested from the CLI and the pipeline has not run. Press Run on the Scope screen, or stop `serve` and run `labor run`.
 - **A stage shows stale**: the source file, the threshold or a learning layer changed since it ran. `labor run` recomputes only what is stale; `labor status -v` names the reason.
-- **The agent pass proposes nothing usable**: the 1B local model cannot follow the proposal schema. Set `models.agent` in `project.json` to a 7B-class model (for example `qwen2.5:7b`) or an API model.
+- **Every agent item ends in an error such as `proposal_text is missing`**: the agent model cannot follow the proposal schema. The default `qwen2.5:3b` can; `llama3.2:1b` and `qwen2.5:1.5b` cannot. Check `models.agent` in `project.json`, or set it to a 7B-class model or an API model for better proposals.
 
 ## Development
 
