@@ -95,3 +95,31 @@ describe("WhyList: each reading signal shows its own pair of readings", () => {
     expect(screen.getByTestId("readings-agree")).toHaveTextContent("The two readings agree line for line; the difference is elsewhere");
   });
 });
+
+describe("WhyList: the verifier's flag shows the change it points at (design 03 §2.10, 2026-10-30)", () => {
+  const detail = 'verifier quoted "53 N·m"; raw "35" -> clean "53"';
+  it("a held verifier card shows the raw and clean text of the change next to the verdict, and the quoted span", () => {
+    render(<WhyList why={[sig("llm_verifier", 0.2, detail)]} autoApproved={null} />);
+    const r = rows()[0];
+    expect(r).toHaveAttribute("data-outcome", "held");
+    const ev = within(r).getByTestId("verifier-evidence");
+    const raw = within(ev).getByText("35");
+    const clean = within(ev).getByText("53");
+    expect(raw.previousElementSibling).toHaveTextContent(/^Raw$/);
+    expect(clean.previousElementSibling).toHaveTextContent(/^Clean$/);
+    expect(ev).toHaveTextContent("“53 N·m”");
+    expect(r).toHaveTextContent("A second model pointed at a change cleanup made");
+    expect(r).not.toHaveTextContent("How closely");
+  });
+  it("a side the change does not have reads 'nothing'; quotes inside a fragment survive", () => {
+    render(<WhyList why={[sig("llm_verifier", 0.2, 'verifier quoted "not"; raw "" -> clean "do \\"not\\""')]} autoApproved={null} />);
+    const ev = screen.getByTestId("verifier-evidence");
+    expect(within(ev).getByText("nothing")).toBeInTheDocument();
+    expect(ev).toHaveTextContent('do "not"');
+  });
+  it("an older detail without the change shows no evidence block (the scorer's words stay on the technical line)", () => {
+    render(<WhyList why={[sig("llm_verifier", 0.2, "verifier: 'cover bolts'")]} autoApproved={null} />);
+    expect(screen.queryByTestId("verifier-evidence")).toBeNull();
+    expect(rows()[0]).toHaveTextContent("verifier: 'cover bolts'");
+  });
+});

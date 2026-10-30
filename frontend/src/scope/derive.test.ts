@@ -49,6 +49,15 @@ describe("U6 summaryFrom equals the server summary (recorded from the mock proje
     const s = summaryFrom(new Set([un, det]), meta, d, 0.85, "per_topic");
     expect(s).toMatchObject({ docs: 1, articles_per_topic: 2, pages: 1, blocks: 2 });
   });
+  it("counts a grouped document whose scores are pending (absent from the block index) in docs and pages", () => {
+    const d = makeDocs();
+    const un = bid("alpha", 4, 2);
+    const det = bid("alpha", 4, 1);
+    const s = summaryFrom(new Set([un, det]), new Map(), d, 0.85, "per_topic");
+    // blocks, docs, pages and articles follow the selection; figures and the review load need scores
+    expect(s).toMatchObject({ docs: 1, articles_per_document: 1, articles_per_topic: 2, pages: 1, blocks: 2, figures: 0 });
+    expect(s.review_load.queued).toBe(0);
+  });
 });
 
 describe("U7 smartToggle", () => {

@@ -2,6 +2,7 @@ import { useRef } from "react";
 import { useRerun, useUploadSources } from "../api/queries";
 import type { JobInfo, ProjectStatus, SourceInfo } from "../api/schema";
 import Hint from "../onboarding/Hint";
+import { STAGE_WORDS, stepCount } from "../shell/jobStep";
 
 /** The stages Scope is responsible for. `clean` and `score2` run when the scope is confirmed, so on
  *  this screen they are legitimately missing after an upload and are not "open" here. */
@@ -22,9 +23,15 @@ export function openScopeStage(s: SourceInfo): { node: string; state: string } |
 export function sourceChip(s: SourceInfo, jobs: readonly JobInfo[]): { text: string; tone: "ok" | "busy" | "bad" } {
   const failed = s.nodes.find((n) => n.state === "failed");
   if (failed) return { text: `Failed: ${failed.node}`, tone: "bad" };
-  const busy = jobs.some((j) => jobCovers(j, s.slug));
   const open = openScopeStage(s);
-  if (busy) return { text: `Processing ${(open ?? s.nodes.find((n) => n.state !== "fresh"))?.node ?? jobs.find((j) => jobCovers(j, s.slug))?.node ?? ""}`.trim(), tone: "busy" };
+  // the step a running job is on for this manual, with the worker's own count when it reports one (design 07 4.1)
+  const here = jobs.find((j) => j.status === "running" && j.doc === s.slug && !!j.node && j.node in STAGE_WORDS);
+  if (here?.node) {
+    const count = stepCount(here);
+    return { text: `${STAGE_WORDS[here.node]}${count ? `, ${count}` : ""}`, tone: "busy" };
+  }
+  // a queued or running job will get to it: say it waits, not that something is happening to it now
+  if (jobs.some((j) => jobCovers(j, s.slug)) && open) return { text: "Waiting its turn", tone: "busy" };
   // Nothing is running: say so. "Processing" with no job would leave a CLI user waiting forever.
   if (open) return { text: `${open.state === "missing" ? "Not run yet" : "Needs a run"}: ${open.node}`, tone: "busy" };
   return { text: "Ready", tone: "ok" };

@@ -303,7 +303,7 @@ export default function ScopeScreen() {
   const jobsList = jobs.data ?? [];
 
   return (
-    <main className="flex flex-col gap-6 px-4 pb-28 pt-5 wide:px-8 wide:pb-10 wide:pt-6" data-testid="scope-screen">
+    <main className="flex flex-col gap-6 px-4 pb-32 pt-5 wide:px-8 wide:pb-10 wide:pt-6" data-testid="scope-screen">
       <h2 className="text-xl font-semibold tracking-[-0.01em] text-ink">Choose what goes into your knowledge base</h2>
       {welcome && guide ? (
         <WelcomeBand facts={welcome} onDismiss={guide.hide} />
@@ -315,9 +315,15 @@ export default function ScopeScreen() {
           {guide.saveError}
         </p>
       ) : null}
-      <div className="grid grid-cols-1 gap-x-8 gap-y-6 xl:grid-cols-[minmax(0,1fr)_21rem]">
-        <div className="flex min-w-0 flex-col gap-6">
-          <div className="flex flex-col gap-3" aria-label="Sources panel" role="group">
+      {/* fluid layout (design 13 section 9.4): one column, then Topics beside the summary from `wide`, then Sources in
+          their own column from `tri` (the wrapper below becomes `contents`, so its two panes are the grid's items) */}
+      <div className="grid grid-cols-1 gap-x-8 gap-y-6 wide:grid-cols-[minmax(0,1fr)_var(--scope-aside-w)] tri:grid-cols-[var(--sources-w)_minmax(0,1fr)_var(--scope-aside-w)]">
+        <div className="flex min-w-0 flex-col gap-6 tri:contents">
+          <div
+            className="flex min-w-0 flex-col gap-3 tri:sticky tri:top-[calc(var(--jobs-bar,0px)+1.5rem)] tri:self-start"
+            aria-label="Sources panel"
+            role="group"
+          >
             <Notice error={status.error} retry={() => void status.refetch()} testid="status-error">
               Processing status is unavailable.
             </Notice>
@@ -380,6 +386,8 @@ export default function ScopeScreen() {
                   stale={eng.pending > 0}
                   filenames={filenames}
                   ungrouped={ungrouped}
+                  selected={eng.ids}
+                  known={eng.data?.selection.known_docs}
                   onCursor={setCursor}
                   onToggle={toggleRow}
                   onSelectOnly={selectOnly}
@@ -407,17 +415,29 @@ export default function ScopeScreen() {
 
         {/* sticky beside the long list, and never taller than the window: it scrolls on its own so every control stays reachable */}
         <aside
-          className="flex flex-col gap-5 xl:sticky xl:top-6 xl:-m-1 xl:max-h-[calc(100dvh-3rem)] xl:self-start xl:overflow-y-auto xl:p-1"
+          className="flex min-w-0 flex-col gap-5 wide:sticky wide:top-[calc(var(--jobs-bar,0px)+1.5rem)] wide:-m-1 wide:max-h-[calc(100dvh-3rem-var(--jobs-bar,0px))] wide:self-start wide:overflow-y-auto wide:p-1"
           aria-label="Summary and models"
         >
           <div className="flex flex-col gap-5 rounded-2xl border border-line bg-raised p-5 shadow-lift">
             {summary ? <SplitModeControl split={split} summary={summary} view={view} onChange={changeSplit} /> : null}
             {summary ? <SelectionSummary summary={summary} processing={ungrouped.length} /> : null}
-            {/* below the wide breakpoint the rail is a bottom sheet: the primary action is pinned just above it */}
+            {/* below the wide breakpoint the rail is a bottom sheet: the primary action is pinned just above it, with the
+                selection's numbers, so they are on screen at every size (design 13 section 9.4) */}
             <div
               data-testid="confirm-dock"
               className="max-wide:fixed max-wide:inset-x-0 max-wide:bottom-[var(--guide-sheet,0px)] max-wide:z-20 max-wide:border-t max-wide:border-line max-wide:bg-raised max-wide:px-4 max-wide:py-2"
             >
+              {summary ? (
+                <p className="mb-1.5 text-xs text-muted wide:hidden" data-testid="dock-counts">
+                  <span className="font-bold tabular-nums text-ink" data-testid="dock-blocks">
+                    {summary.blocks}
+                  </span>{" "}
+                  {summary.blocks === 1 ? "block" : "blocks"} · estimated review{" "}
+                  <span className="font-bold tabular-nums text-ink" data-testid="dock-queued">
+                    {summary.review_load.queued}
+                  </span>
+                </p>
+              ) : null}
               <ConfirmButton blocks={summary?.blocks ?? 0} processing={processing} busy={confirm.isPending} onConfirm={() => void onConfirm()} />
             </div>
             {summary ? (

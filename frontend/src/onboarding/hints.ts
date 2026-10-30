@@ -68,7 +68,8 @@ export const SIGNAL_HINTS: Record<SignalName, string> = {
   figure_resolution: "Whether the figure image has enough resolution.",
   figure_attach_rule: "How strong the rule is that matched the figure to this article.",
   has_numeric_spec: "Blocks with numbers, units or part numbers are always reviewed by a person.",
-  llm_verifier: "How closely a separate verifier model's reading agrees.",
+  llm_verifier:
+    "A second model pointed at a change cleanup made as a possible change of fact, number or step. Compare the raw and clean text of that change with the page.",
 };
 
 export const signalHint = (name: string): string | null => (name in SIGNAL_HINTS ? SIGNAL_HINTS[name as SignalName] : null);

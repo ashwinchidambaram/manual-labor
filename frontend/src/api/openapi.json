@@ -57,6 +57,12 @@
       "AgentItemView": {
         "additionalProperties": false,
         "properties": {
+          "attempts": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Attempts",
+            "type": "integer"
+          },
           "flag": {
             "$ref": "#/components/schemas/Flag"
           },
@@ -651,6 +657,50 @@
         ],
         "title": "BlockStatus",
         "type": "string"
+      },
+      "BlockTitle": {
+        "additionalProperties": false,
+        "description": "Where a block is, to name it outside the queue (Export blockers): the fields a queue card\ntitles itself from.",
+        "properties": {
+          "block_id": {
+            "pattern": "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$",
+            "title": "Block Id",
+            "type": "string"
+          },
+          "doc_id": {
+            "maxLength": 48,
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "title": "Doc Id",
+            "type": "string"
+          },
+          "page": {
+            "minimum": 1.0,
+            "title": "Page",
+            "type": "integer"
+          },
+          "section_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section Title"
+          },
+          "type": {
+            "$ref": "#/components/schemas/BlockType"
+          }
+        },
+        "required": [
+          "block_id",
+          "doc_id",
+          "page",
+          "type"
+        ],
+        "title": "BlockTitle",
+        "type": "object"
       },
       "BlockType": {
         "enum": [
@@ -1899,8 +1949,46 @@
         "title": "EvidenceSource",
         "type": "string"
       },
+      "ExportFlagBlocker": {
+        "additionalProperties": false,
+        "description": "An open flag in scope that no override covers. A block override never covers it; only\nan override naming the flag (or a blanket one) does (design 11 P3, section 14).",
+        "properties": {
+          "block_id": {
+            "pattern": "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$",
+            "title": "Block Id",
+            "type": "string"
+          },
+          "category": {
+            "$ref": "#/components/schemas/FlagCategory"
+          },
+          "flag_id": {
+            "pattern": "^flag-\\d{6}$",
+            "title": "Flag Id",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "required": [
+          "flag_id",
+          "block_id",
+          "category"
+        ],
+        "title": "ExportFlagBlocker",
+        "type": "object"
+      },
       "ExportReviewSummary": {
         "additionalProperties": false,
+        "description": "The blocks of one export (design 11 section 14). Every exported block (assigned to an\narticle in the manifest) is in exactly one bucket: ``blocks == auto_approved + approved +\nedited + overrides``; an override-covered block counts only as an override. ``left_out``\ncounts the other parsed blocks by their manifest reason (``header_footer``,\n``not_selected``, ``empty``, ``rejected``): ``total_blocks == blocks + sum(left_out)``.\n``numbers_verified`` is the manifest's ``numbers_verified_blocks`` count, a cross-cut.",
         "properties": {
           "approved": {
             "minimum": 0.0,
@@ -1912,10 +2000,22 @@
             "title": "Auto Approved",
             "type": "integer"
           },
+          "blocks": {
+            "minimum": 0.0,
+            "title": "Blocks",
+            "type": "integer"
+          },
           "edited": {
             "minimum": 0.0,
             "title": "Edited",
             "type": "integer"
+          },
+          "left_out": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Left Out",
+            "type": "object"
           },
           "numbers_verified": {
             "minimum": 0.0,
@@ -1926,21 +2026,80 @@
             "minimum": 0.0,
             "title": "Overrides",
             "type": "integer"
+          },
+          "total_blocks": {
+            "minimum": 0.0,
+            "title": "Total Blocks",
+            "type": "integer"
           }
         },
         "required": [
+          "blocks",
           "auto_approved",
           "approved",
           "edited",
           "overrides",
-          "numbers_verified"
+          "numbers_verified",
+          "total_blocks"
         ],
         "title": "ExportReviewSummary",
         "type": "object"
       },
+      "ExportScopeCounts": {
+        "additionalProperties": false,
+        "description": "Every in-scope body block of the ready documents (the Verify scope: page headers and\nfooters excluded) in exactly one bucket (design 11 section 14): ``in_scope ==\nauto_approved + approved + edited + rejected + overridden + blocking``. A block that is\nqueued, flagged or carries an open flag is ``overridden`` when an active override covers it,\nelse ``blocking``; every other block is counted by its review status.",
+        "properties": {
+          "approved": {
+            "minimum": 0.0,
+            "title": "Approved",
+            "type": "integer"
+          },
+          "auto_approved": {
+            "minimum": 0.0,
+            "title": "Auto Approved",
+            "type": "integer"
+          },
+          "blocking": {
+            "minimum": 0.0,
+            "title": "Blocking",
+            "type": "integer"
+          },
+          "edited": {
+            "minimum": 0.0,
+            "title": "Edited",
+            "type": "integer"
+          },
+          "in_scope": {
+            "minimum": 0.0,
+            "title": "In Scope",
+            "type": "integer"
+          },
+          "overridden": {
+            "minimum": 0.0,
+            "title": "Overridden",
+            "type": "integer"
+          },
+          "rejected": {
+            "minimum": 0.0,
+            "title": "Rejected",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "in_scope",
+          "auto_approved",
+          "approved",
+          "edited",
+          "rejected",
+          "overridden",
+          "blocking"
+        ],
+        "title": "ExportScopeCounts",
+        "type": "object"
+      },
       "ExportStatus": {
         "additionalProperties": false,
-        "description": "`unlocked` is the raw gate (no open flag, no queued in-scope block); `blockers` are the\nblocks an active override does not cover: an export is possible iff `blockers` is empty.",
+        "description": "`unlocked` is the raw gate (no open flag, no queued in-scope block); `blockers` are the\nfirst blocks (reading order, at most 20) an active override does not cover: an export is\npossible iff `blockers` is empty. `flag_blockers` lists every uncovered open flag (no cap);\n`counts` partitions the scope (None from a store that is not a project store).",
         "properties": {
           "blockers": {
             "items": {
@@ -1948,6 +2107,23 @@
               "type": "string"
             },
             "title": "Blockers",
+            "type": "array"
+          },
+          "counts": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExportScopeCounts"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "flag_blockers": {
+            "items": {
+              "$ref": "#/components/schemas/ExportFlagBlocker"
+            },
+            "title": "Flag Blockers",
             "type": "array"
           },
           "open_flags": {
@@ -3235,6 +3411,7 @@
       },
       "JobInfo": {
         "additionalProperties": false,
+        "description": "One background job (design 07 section 4). While it runs, ``node``/``doc`` name the unit it\nis on (after the last unit: the last one finished) and ``step_done`` of ``step_total``\n``step_unit``s is that unit's own count of pages, blocks or topics done; all three are None\nwhen the unit has reported no count (it has no estimate). ``progress`` is\n``(units_done + step_done/step_total) / units_total``, monotonic. ``files`` are the file\nnames an ``ingest_run`` job was given (empty for other kinds).",
         "properties": {
           "created_at": {
             "format": "date-time",
@@ -3262,6 +3439,13 @@
               }
             ],
             "title": "Error"
+          },
+          "files": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Files",
+            "type": "array"
           },
           "finished_at": {
             "anyOf": [
@@ -3362,6 +3546,46 @@
             ],
             "title": "Status",
             "type": "string"
+          },
+          "step_done": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step Done"
+          },
+          "step_total": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step Total"
+          },
+          "step_unit": {
+            "anyOf": [
+              {
+                "enum": [
+                  "page",
+                  "block",
+                  "topic"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step Unit"
           },
           "units_done": {
             "default": 0,
@@ -5519,6 +5743,22 @@
             },
             "title": "Block Ids",
             "type": "array"
+          },
+          "known_docs": {
+            "anyOf": [
+              {
+                "items": {
+                  "maxLength": 48,
+                  "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Known Docs"
           }
         },
         "required": [
@@ -9467,6 +9707,58 @@
           }
         },
         "summary": "Get Queue",
+        "tags": [
+          "verify"
+        ]
+      }
+    },
+    "/api/verify/titles": {
+      "get": {
+        "description": "Document, page, type and section heading of each named block, in the order asked, once\neach. Unknown ids and documents not scored yet are left out. Read-only.",
+        "operationId": "get_titles",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "ids",
+            "required": true,
+            "schema": {
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 200,
+              "minItems": 1,
+              "title": "Ids",
+              "type": "array"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/BlockTitle"
+                  },
+                  "title": "Response Get Titles",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Titles",
         "tags": [
           "verify"
         ]

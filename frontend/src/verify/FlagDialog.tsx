@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { FlagCategory } from "../api/schema";
 import { useHotkeys } from "../hooks/useHotkeys";
-import { FLAG_CATEGORIES, FOCUS } from "./labels";
+import { FLAG_CATEGORIES, FLAG_RESOLUTION, FOCUS } from "./labels";
 
 interface Props {
   onSubmit: (category: FlagCategory, note: string | null) => void;
@@ -72,8 +72,7 @@ export default function FlagDialog({ onSubmit, onCancel }: Props) {
       >
         <h2 className="text-lg font-semibold">Flag this block</h2>
         <p className="text-sm text-muted" data-testid="flag-next">
-          It goes to the Agent screen, where a model proposes a fix for you to accept or reject. This flag locks the export until it is resolved on
-          the Agent screen.
+          It goes to the Agent screen, where a model proposes a fix for you to accept or reject. {FLAG_RESOLUTION}
         </p>
         <div ref={group} role="radiogroup" aria-label="Category" tabIndex={0} className={`flex flex-wrap gap-2 rounded p-1 ${FOCUS}`}>
           {FLAG_CATEGORIES.map((c, i) => (

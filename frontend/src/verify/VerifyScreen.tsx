@@ -1,10 +1,11 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ApiError, client, unwrap } from "../api/client";
-import { trackJob, useExportStatus, useSources } from "../api/queries";
+import { trackJob, useActiveJobs, useExportStatus, useSources } from "../api/queries";
 import type { FigureRailItem, FlagCategory, PageRef } from "../api/schema";
 import { useHotkeys } from "../hooks/useHotkeys";
 import { useNextStep } from "../shell/nextStep";
+import { useMediaQuery, VAST_QUERY } from "../shell/useMediaQuery";
 import { useToast } from "../shell/Toast";
 import { Keycap } from "../onboarding/Copy";
 import { keyLabel } from "../onboarding/guide";
@@ -15,12 +16,16 @@ import ActionBar from "./ActionBar";
 import CropEditor from "./CropEditor";
 import ExtractedPane, { diffOps, type EditState } from "./ExtractedPane";
 import FigureRail from "./FigureRail";
+import FlagNotice from "../agent/FlagNotice";
 import FlagDialog from "./FlagDialog";
 import { validCrop, type BBox } from "./geometry";
 import { cardTitle, FOCUS } from "./labels";
 import Queue from "./Queue";
 import SourcePane from "./SourcePane";
 import StatusStrip from "./StatusStrip";
+import { isPipelineJob, isReadingJob } from "../shell/jobStep";
+import { beingScored, scoringJob, scoringWords } from "./scoringWork";
+import { useReviewChangeNote } from "./reviewChange";
 import { blockKey, fetchBlock, useVerifyState } from "./useVerifyState";
 
 interface CropMode {
@@ -259,6 +264,18 @@ export default function VerifyScreen() {
   const currentItem = state.items.find((i) => i.block_id === currentId) ?? (state.pinned?.block_id === currentId ? state.pinned : null);
   const sources = useSources();
   const docTitles = useMemo(() => new Map((sources.data ?? []).map((x) => [x.slug, x.filename])), [sources.data]);
+  // scoring still queued or running (server truth: the active jobs), so an empty list never reads "All caught up"
+  const activeJobs = useActiveJobs();
+  const jobs = activeJobs.data ?? [];
+  const work = scoringJob(jobs);
+  const busyFor = beingScored(jobs);
+  // only a job that scores re-scores a stale document; one that only reads manuals puts nothing in this list
+  const rescoring = beingScored(jobs.filter((j) => !isReadingJob(j)));
+  const pipeline = jobs.filter(isPipelineJob);
+  const reading = pipeline.length > 0 && pipeline.every(isReadingJob);
+  const scoring = work ? scoringWords(work, (slug) => docTitles.get(slug) ?? slug) : null;
+  // the reducer's counts are placeholders until a snapshot is applied: they are not "the counts before the job"
+  const change = useReviewChangeNote(state.loaded ? state.counts : null);
   const docTitle = currentItem ? ((sources.data ?? []).find((x) => x.slug === currentItem.doc_id)?.filename ?? null) : null;
   const title = currentItem ? cardTitle(currentItem.section_title, docTitle, currentItem.page, currentItem.type) : null;
   const ownDetail = detail && detail.block.id === currentId ? detail : undefined;
@@ -266,6 +283,15 @@ export default function VerifyScreen() {
   const marks = useMemo(() => pageMarks(ownDetail?.block ?? null, ownDetail?.why ?? []), [ownDetail]);
   const showStrip = !zoom && !crop && !!ownDetail && !!ownDetail.page.render_url && ownDetail.page.width > 0 && (ownDetail.block.bbox ?? []).length === 4;
   const big = zoom || !!crop;
+  // fluid layout (design 13 section 9): from `vast` the whole page has its own column, except while zoomed or cropping
+  const vast = useMediaQuery(VAST_QUERY);
+  const pageInColumn = vast && !big && !!sourcePage?.render_url;
+  // the strip and the locator share the band; from `split` they sit in the text's and the evidence's columns
+  const bandGrid = showStrip && !big;
+  const aspect = sourcePage && sourcePage.width > 0 && sourcePage.height > 0 ? sourcePage.width / sourcePage.height : 0.77;
+  // the strip frame's rendered height: the locator beside it is sized from it, so the band is as tall as the block needs
+  const [stripFrame, setStripFrame] = useState(0);
+  const locatorH = stripFrame > 0 ? `${stripFrame}px` : "var(--strip-max)";
   const at = state.items.findIndex((i) => i.block_id === currentId);
   const cropState = useMemo(
     () => (crop && crop.box ? { box: crop.box, onChange: (b: BBox) => setCrop((c) => (c ? { ...c, box: b } : c)) } : null),
@@ -294,6 +320,9 @@ export default function VerifyScreen() {
         onView={v.setView}
         onSort={v.setSort}
         saveState={saveState}
+        change={change}
+        busy={busyFor}
+        rescoring={rescoring}
       />
       {v.queueQ.isError ? (
         <div role="alert" className="flex shrink-0 items-center gap-2 bg-fail-wash px-4 py-2 text-sm text-ink wide:px-7" data-testid="queue-error">
@@ -307,7 +336,11 @@ export default function VerifyScreen() {
         </div>
       ) : null}
       {/* one row that fills the frame: the queue and the work area scroll inside it, never the frame */}
-      <div className="flex min-h-0 flex-1 flex-col wide:grid wide:grid-cols-[20rem_minmax(0,1fr)] wide:grid-rows-[minmax(0,1fr)]">
+      <div
+        className={`flex min-h-0 flex-1 flex-col wide:grid wide:grid-rows-[minmax(0,1fr)] ${
+          pageInColumn ? "wide:grid-cols-[var(--queue-w)_minmax(0,1fr)_var(--page-col-w)]" : "wide:grid-cols-[var(--queue-w)_minmax(0,1fr)]"
+        }`}
+      >
         <Queue
           items={state.items}
           total={state.total}
@@ -323,14 +356,27 @@ export default function VerifyScreen() {
           threshold={v.T}
           gate={exportGate.data}
           docTitles={docTitles}
+          scoring={scoring}
+          busyFor={busyFor}
+          reading={reading}
+          rescoring={rescoring}
         />
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <div
             data-testid="page-band"
-            className={`flex shrink-0 gap-4 border-b border-line bg-sunk px-4 py-3 short:py-2 wide:gap-5 wide:px-7 ${big ? "flex-col" : "items-start"}`}
+            className={`flex shrink-0 gap-4 border-b border-line bg-sunk px-4 py-3 short:py-2 wide:gap-5 wide:px-7 ${
+              big ? "flex-col" : bandGrid ? "items-start split:grid split:grid-cols-[minmax(0,1fr)_var(--evidence-w)] split:gap-0 split:px-0 split:py-0" : "items-start"
+            }`}
           >
-            {showStrip && ownDetail ? <PageStrip page={ownDetail.page} bbox={ownDetail.block.bbox as number[]} marks={marks} pageNo={ownDetail.page.page} /> : null}
-            <div className={big || !showStrip ? "flex min-w-0 flex-1 flex-col gap-2" : "hidden w-[8.5rem] shrink-0 flex-col gap-1.5 wide:flex"}>
+            {showStrip && ownDetail ? <PageStrip page={ownDetail.page} bbox={ownDetail.block.bbox as number[]} marks={marks} pageNo={ownDetail.page.page} onFrameHeight={setStripFrame} /> : null}
+            <div
+              className={
+                big || !showStrip
+                  ? "flex min-w-0 flex-1 flex-col gap-2"
+                  : "hidden w-max max-w-[var(--locator-max)] shrink-0 flex-col gap-1.5 wide:flex split:w-auto split:max-w-none split:self-stretch split:border-l split:border-line split:px-5 split:py-3 short:split:py-2"
+              }
+              data-testid="page-locator"
+            >
               <p className="flex items-baseline justify-between gap-2 text-2xs font-semibold uppercase tracking-[0.07em] text-muted">
                 <span>{sourcePage ? `Page ${sourcePage.page}` : "Page"}</span>
                 {big && !crop ? (
@@ -339,14 +385,21 @@ export default function VerifyScreen() {
                   </span>
                 ) : null}
               </p>
-              {sourcePage ? (
-                <SourcePane page={sourcePage} detail={detail ?? null} currentId={currentId} zoom={zoom} onJump={(id) => void v.jumpTo(id)} crop={cropState} />
+              {pageInColumn ? (
+                <p className="text-xs text-muted">The whole page is on the right.</p>
+              ) : sourcePage ? (
+                // beside the strip, the small locator is never the band's tallest part: as wide as the strip frame's height
+                // allows for this page's shape, and never wider than its cell (design 13 section 9.3). One parent in every mode, so
+                // Z never remounts the page (focus on a block's outline survives it).
+                <div style={bandGrid ? { width: `max(var(--locator-min), min(var(--locator-max), calc((${locatorH} - 1.25rem) * ${aspect.toFixed(4)})))` } : undefined}>
+                  <SourcePane page={sourcePage} detail={detail ?? null} currentId={currentId} zoom={zoom} onJump={(id) => void v.jumpTo(id)} crop={cropState} />
+                </div>
               ) : (
                 <section role="region" aria-label="Source page" className="text-sm text-muted">
                   No block selected
                 </section>
               )}
-              {!big && sourcePage?.render_url ? (
+              {!big && !pageInColumn && sourcePage?.render_url ? (
                 <p className="flex flex-wrap items-center gap-1 text-2xs text-muted">
                   <Keycap>{keyLabel("vZoom")}</Keycap> whole page
                 </p>
@@ -367,6 +420,7 @@ export default function VerifyScreen() {
               ) : null}
             </div>
           </div>
+          {ownDetail ? <FlagNotice detail={ownDetail} /> : null}
           <ExtractedPane
             detail={detail}
             loading={detailQ.isLoading && currentId !== null}
@@ -382,6 +436,16 @@ export default function VerifyScreen() {
             aside={<FigureRail detail={detail} enqueue={v.writes.enqueue} onCrop={(it) => void openCrop(it)} />}
           />
         </div>
+        {pageInColumn && sourcePage ? (
+          // from `vast`: the whole page, fit to its own column, the current block outlined (design 13 section 9.2)
+          <div data-testid="page-column" className="flex min-h-0 min-w-0 flex-col gap-2 overflow-auto border-l border-line bg-sunk px-5 py-3">
+            <p className="text-2xs font-semibold uppercase tracking-[0.07em] text-muted">Page {sourcePage.page}</p>
+            <SourcePane page={sourcePage} detail={detail ?? null} currentId={currentId} zoom={false} onJump={(id) => void v.jumpTo(id)} crop={null} />
+            <p className="flex flex-wrap items-center gap-1 text-2xs text-muted">
+              <Keycap>{keyLabel("vZoom")}</Keycap> zoom the page
+            </p>
+          </div>
+        ) : null}
       </div>
       <ActionBar
         hasCurrent={currentId !== null}

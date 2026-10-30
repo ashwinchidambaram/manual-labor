@@ -488,7 +488,9 @@ test("UX7 Export locked: reason text, counts match the queue, override needs a r
   await page.getByTestId("override-submit").click();
   await expect(page.getByTestId("overrides")).toContainText(reason);
   await expect(page.getByTestId("overrides")).toContainText("recorded in manifest.json");
-  expect(posted.map((p) => p.target_id)).toEqual(st.blockers ?? []);
+  // a flagged blocker is left out of the batch: a block override never covers a flag (design 11 section 14)
+  const flaggedIds = new Set((st.flag_blockers ?? []).map((f) => f.block_id));
+  expect(posted.map((p) => p.target_id)).toEqual((st.blockers ?? []).filter((b) => !flaggedIds.has(b)));
   expect(posted.every((p) => p.reason === reason && p.flag_id == null && typeof p.target_id === "string")).toBe(true);
   expect(new Set(posted.map((p) => p.request_id)).size).toBe(posted.length);
   await page.unroute("**/api/export/override");

@@ -1,4 +1,4 @@
-import { useQueries } from "@tanstack/react-query";
+import { keepPreviousData, useQueries, useQuery } from "@tanstack/react-query";
 import { client, unwrap } from "../api/client";
 import { useSources } from "../api/queries";
 import type { BlockDetail } from "../api/schema";
@@ -18,30 +18,30 @@ export interface BlockTitles {
 }
 
 /**
- * Human titles for blocks named elsewhere (Export blockers), from the review queue's own fields: the section heading,
- * else the document, else the page (design 13 section 2.8.3). Ids stay on screen beside them. One read per document
- * with `doc` set, so the result never depends on the reviewer's sort or document filter. Read-only and best effort:
- * a document whose queue cannot be read leaves its blocks untitled.
+ * Human titles for blocks named elsewhere (Export blockers), from the fields a queue card titles itself with: the
+ * section heading, else the document, else the page (design 13 section 2.8.3). Ids stay on screen beside them. One
+ * read of exactly these ids (`/api/verify/titles`), never a document's whole queue (review F12), and independent of
+ * the reviewer's sort or document filter. Read-only and best effort: an id the server cannot place stays untitled.
  */
-export function useBlockTitles(enabled = true): BlockTitles {
+export function useBlockTitles(ids: readonly string[]): BlockTitles {
   const sources = useSources();
-  const slugs = (sources.data ?? []).map((s) => s.slug);
-  const qs = useQueries({
-    queries: slugs.map((slug) => ({
-      queryKey: ["verify", "titles", slug],
-      queryFn: async () =>
-        unwrap(await client.GET("/api/verify/queue", { params: { query: { limit: 2000, view_threshold: 1, sort: "by_page", doc: slug } } })),
-      enabled,
-      staleTime: 30_000,
-      retry: false,
-    })),
+  const enabled = ids.length > 0;
+  const q = useQuery({
+    queryKey: ["verify", "titles", ids.join(" ")],
+    queryFn: async () => unwrap(await client.GET("/api/verify/titles", { params: { query: { ids: [...ids] } } })),
+    enabled,
+    staleTime: 30_000,
+    retry: false,
+    // every override write changes the ids: the titles already read stay on screen while the new read is out
+    placeholderData: keepPreviousData,
   });
   const names = new Map((sources.data ?? []).map((s) => [s.slug, s.filename]));
   const titles = new Map<string, BlockTitle>();
-  for (const q of qs)
-    for (const it of q.data?.items ?? [])
-      titles.set(it.block_id, { title: cardTitle(it.section_title, names.get(it.doc_id), it.page, it.type), page: it.page, doc: names.get(it.doc_id) ?? it.doc_id });
-  const ready = !enabled || (sources.data !== undefined && qs.every((q) => q.isSuccess || q.isError));
+  for (const it of q.data ?? [])
+    titles.set(it.block_id, { title: cardTitle(it.section_title, names.get(it.doc_id), it.page, it.type), page: it.page, doc: names.get(it.doc_id) ?? it.doc_id });
+  // ready: this read settled, or the earlier one already titled every id listed now (the list does not flash)
+  const settled = (q.isSuccess && !q.isPlaceholderData) || q.isError;
+  const ready = !enabled || (sources.data !== undefined && (settled || ids.every((id) => titles.has(id))));
   return { titles, ready };
 }
 

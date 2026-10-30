@@ -26,13 +26,15 @@ interface Props {
   threshold: number | null;
   /** the document's display name, the title fallback when no heading precedes the block */
   docTitle?: string | null;
+  /** a job is re-scoring this card's document now; a stale document with none says "scores out of date" */
+  rescoring?: boolean;
 }
 
 /**
  * A queue card (design 13 section 2.8.3): a human title (section heading, else document, else page), the first line of
  * the text in the manual's typeface, the reasons with the specific word named, then the id and score as support.
  */
-function QueueCardImpl({ item, isCurrent, pos, size, focusTick, wantFocus, focusBlocked, onSelect, height, offset, pinned, criticalReasons, threshold, docTitle }: Props) {
+function QueueCardImpl({ item, isCurrent, pos, size, focusTick, wantFocus, focusBlocked, onSelect, height, offset, pinned, criticalReasons, threshold, docTitle, rescoring = false }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   // primitives in, stable style out: the object identity must not defeat memo()
   const style = useMemo<React.CSSProperties>(
@@ -88,7 +90,7 @@ function QueueCardImpl({ item, isCurrent, pos, size, focusTick, wantFocus, focus
       <p className="truncate text-xs text-needs-ink">
         {item.status !== "queued" ? <span className="rounded font-semibold text-done-ink">{STATUS_LABEL[item.status] ?? item.status}</span> : null}
         {stale || chips.status.length ? <span className="rounded font-semibold">{STALE_NAME}</span> : null}
-        {item.stale_doc ? <span className="rounded font-semibold">re-scoring</span> : null}
+        {item.stale_doc ? <span className="rounded font-semibold">{rescoring ? "re-scoring" : "scores out of date"}</span> : null}
         {chips.reasons.map((c, i) => (
           <span key={c.name}>
             {i > 0 || item.status !== "queued" || stale || chips.status.length || item.stale_doc ? (

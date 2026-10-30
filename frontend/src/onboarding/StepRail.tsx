@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef } from "react";
-import { useSources } from "../api/queries";
+import { useActiveJobs, useSources } from "../api/queries";
+import { isPipelineJob, isReadingJob } from "../shell/jobStep";
 import type { ExportStatus } from "../api/schema";
 import { defaultNextStep, usePublishedNextStep } from "../shell/nextStep";
 import Copy, { Keycap } from "./Copy";
@@ -27,6 +28,11 @@ export default function StepRail({ path, status, mock }: { path: string; status:
   const next = published ?? defaultNextStep(step.id, status);
   const sources = useSources();
   const scanned = (sources.data ?? []).some((s) => s.kind === "scanned_pdf");
+  // a job reading or scoring manuals is queued or running: Verify and Export wait for it (server truth, not a guess)
+  const active = useActiveJobs();
+  const pipeline = (active.data ?? []).filter(isPipelineJob);
+  const scoring = pipeline.length > 0;
+  const reading = scoring && pipeline.every(isReadingJob);
 
   const ref = useRef<HTMLElement>(null);
   useLayoutEffect(() => {
@@ -81,7 +87,7 @@ export default function StepRail({ path, status, mock }: { path: string; status:
           </dl>
         ) : null}
       </section>
-      <StepNav path={path} status={status} />
+      <StepNav path={path} status={status} live={{ scoring, reading }} />
       {mock || (scanned && step.id === "verify") ? (
         <div className="mt-auto hidden flex-col gap-1.5 wide:flex">
           {mock ? (

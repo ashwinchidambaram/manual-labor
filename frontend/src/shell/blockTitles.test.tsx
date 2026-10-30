@@ -15,22 +15,33 @@ describe("blockTitles", () => {
     expect(placeTitle({ doc_id: "scanned", page: 9, type: "paragraph" }, "scanned.pdf")).toBe("scanned.pdf, page 9, paragraph");
     expect(placeTitle({ doc_id: "scanned", page: 9, type: "caption" }, null)).toBe("Page 9, caption");
   });
-  it("useBlockTitles reads the queue sorted by page, so titles never depend on the reviewer's sort", async () => {
+  it("useBlockTitles reads only the ids it is given, in one request, never a document's whole queue", async () => {
     installFake();
     const seen: string[] = [];
     server.use(
       http.get("*/api/verify/queue", ({ request }) => {
-        seen.push(new URL(request.url).search);
-        return HttpResponse.json({ items: [makeQueueItem(1, { doc_id: "alpha", section_title: "2 Safety" })], total: 1, docs: [], counts: {}, cursor: {} });
+        seen.push(`queue ${new URL(request.url).search}`);
+        return HttpResponse.json({ items: [], total: 0, docs: [], counts: {}, cursor: {} });
+      }),
+      http.get("*/api/verify/titles", ({ request }) => {
+        seen.push(`titles ${new URL(request.url).searchParams.getAll("ids").join(",")}`);
+        return HttpResponse.json([{ block_id: "b-alpha-p001-01", doc_id: "alpha", page: 1, type: "paragraph", section_title: "2 Safety" }]);
       }),
     );
-    const { result } = renderHook(() => useBlockTitles(true), { wrapper });
+    const { result } = renderHook(() => useBlockTitles(["b-alpha-p001-01", "b-alpha-p004-02"]), { wrapper });
     await waitFor(() => expect(result.current.titles.size).toBe(1));
-    expect(seen[0]).toContain("sort=by_page");
-    expect(seen[0]).toContain("view_threshold=1");
-    expect(seen[0]).toContain("doc=alpha"); // one read per document: the cursor's document filter never applies
-    expect([...result.current.titles.values()][0]).toEqual({ title: "2 Safety", page: 1, doc: "alpha.pdf" });
+    expect(seen).toEqual(["titles b-alpha-p001-01,b-alpha-p004-02"]);
+    expect(result.current.titles.get("b-alpha-p001-01")).toEqual({ title: "2 Safety", page: 1, doc: "alpha.pdf" });
     await waitFor(() => expect(result.current.ready).toBe(true));
+  });
+  it("useBlockTitles with no ids asks nothing and is ready", async () => {
+    installFake();
+    const seen: string[] = [];
+    server.use(http.get("*/api/verify/titles", () => (seen.push("titles"), HttpResponse.json([]))));
+    const { result } = renderHook(() => useBlockTitles([]), { wrapper });
+    expect(result.current.ready).toBe(true);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(seen).toEqual([]);
   });
   it("useFlagTitles titles each flagged block from its own detail", async () => {
     installFake();

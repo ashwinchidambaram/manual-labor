@@ -242,7 +242,10 @@ export function buildBlockIndex(rows: readonly ScopeBlocks[]): Map<string, Block
   return m;
 }
 
-/** Mirrors manuallabor.grouping.selection.scope_summary (design 3.2). */
+/** Mirrors manuallabor.grouping.selection.scope_summary (design 3.2). `docs`, `pages` and the
+ * article counts follow the selected ids and the groups, like `blocks`; only `figures` and the
+ * review load read the block index, so a grouped document whose scores are pending (absent from
+ * the index) still counts as in scope. */
 export function summaryFrom(
   ids: ReadonlySet<string>,
   blockIndex: ReadonlyMap<string, BlockMeta>,
@@ -256,21 +259,27 @@ export function summaryFrom(
   let queued = 0;
   let numeric = 0;
   const pages = new Set<string>();
+  const byDoc = new Map<string, string[]>();
+  for (const id of ids) {
+    const p = parseBlockId(id);
+    if (!p) continue;
+    const list = byDoc.get(p.slug);
+    if (list) list.push(id);
+    else byDoc.set(p.slug, [id]);
+  }
   for (const d of docs) {
-    let picked = 0;
-    for (const id of ids) {
+    const mine = byDoc.get(d.doc_id);
+    if (!mine) continue;
+    for (const id of mine) {
+      pages.add(`${d.doc_id}:${parseBlockId(id)!.page}`);
       const m = blockIndex.get(id);
-      if (!m || m.doc !== d.doc_id) continue;
-      picked++;
+      if (!m) continue;
       if (m.figure) figures++;
-      const p = parseBlockId(id);
-      if (p) pages.add(`${d.doc_id}:${p.page}`);
       if (m.queued) {
         queued++;
         if (m.numeric) numeric++;
       }
     }
-    if (!picked) continue;
     docCount++;
     perTopic += d.groups.topics.filter((t) => t.block_ids.some((b) => ids.has(b))).length;
   }

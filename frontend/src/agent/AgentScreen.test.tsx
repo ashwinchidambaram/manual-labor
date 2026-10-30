@@ -104,7 +104,8 @@ describe("U10 AgentScreen", () => {
     );
     const { user } = renderApp("/agent");
     await user.click(await screen.findByTestId("agent-run"));
-    expect(await screen.findByText(/Agent pass not started: a pass is already running/)).toHaveAttribute("role", "alert");
+    // the alert region is mounted with the screen and its text changes (an inserted alert is often not announced)
+    expect((await screen.findByText(/Agent pass not started: a pass is already running/)).closest("[role=alert]")).toBe(screen.getByTestId("agent-run-alert"));
     await user.click(within(await screen.findByTestId("agent-flag")).getByRole("link", { name: /Open b-doc-p001-01 in Verify/ }));
     expect(await screen.findByText(/Could not open b-doc-p001-01 in Verify: store locked/)).toHaveAttribute("role", "alert");
   });

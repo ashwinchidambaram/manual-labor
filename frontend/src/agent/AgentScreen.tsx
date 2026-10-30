@@ -1,4 +1,4 @@
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ApiError, client, unwrap } from "../api/client";
@@ -8,6 +8,8 @@ import Copy from "../onboarding/Copy";
 import { useFlagTitles, type BlockTitle } from "../shell/blockTitles";
 import { openInVerify } from "../shell/openInVerify";
 import { FLAG_CATEGORIES } from "../verify/labels";
+import { jobWords } from "../shell/JobsBar";
+import { stuck, triedText } from "./outcome";
 
 const FOCUS = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus";
 const LINK = `font-medium text-act-ink underline underline-offset-2 hover:text-act-hover ${FOCUS}`;
@@ -21,6 +23,7 @@ const isBlock = (id: string): boolean => id.startsWith("b-");
 
 function Target({ id }: { id: string }) {
   const nav = useNavigate();
+  const qc = useQueryClient();
   const [error, setError] = useState<string | null>(null);
   if (!isBlock(id)) return <span className="font-mono text-xs">{id}</span>;
   return (
@@ -31,7 +34,7 @@ function Target({ id }: { id: string }) {
         onClick={(e) => {
           e.preventDefault();
           setError(null);
-          openInVerify(id)
+          openInVerify(id, qc)
             .then(() => nav("/verify"))
             .catch((err: unknown) => setError(`Could not open ${id} in Verify: ${errText(err)}`));
         }}
@@ -48,27 +51,38 @@ function Target({ id }: { id: string }) {
   );
 }
 
-/**
- * How often the agent has tried this flag. The server's `round` is the round the next pass will run (proposals so far
- * plus one), so a fresh flag is round 1 and has not been tried.
- */
-export function triedText(it: Pick<AgentItemView, "round" | "last_outcome" | "pending_proposal_id">): string {
-  const tried = Math.max(0, it.round - 1);
-  if (tried === 0 && !it.pending_proposal_id) return "not tried yet";
-  const times = tried <= 1 ? "once" : `${tried} times`;
-  return `tried ${times}${it.last_outcome ? `, last: ${it.last_outcome}` : ""}`;
+export { triedText } from "./outcome";
+
+/** The agent pass this screen started, once it has ended: the "started" sentence is never left standing after it. */
+function useRunOutcome(jobId: string | null): { text: string; failed: boolean } | null {
+  const q = useQuery({
+    queryKey: ["jobs", "one", jobId],
+    queryFn: async () => unwrap(await client.GET("/api/jobs/{job_id}", { params: { path: { job_id: jobId! } } })),
+    enabled: jobId !== null,
+    refetchInterval: (x) => (x.state.data && !["queued", "running"].includes(x.state.data.status) ? false : 1000),
+    retry: false,
+  });
+  const j = q.data;
+  if (!j || ["queued", "running"].includes(j.status)) return null;
+  const what = jobWords(j).what;
+  if (j.status === "done") return { text: `${what} finished. Each flag below says how it went.`, failed: false };
+  return { text: `${what} ${j.status === "failed" ? "ended with an error" : `was ${j.status}`}${j.error ? `: ${j.error}` : ""}. Each flag below says what happened and what you can do.`, failed: true };
 }
 
 function FlagsSection({ flags, items, error, titles }: { flags: Flag[] | undefined; items: Map<string, AgentItemView>; error: unknown; titles: Map<string, BlockTitle> }) {
   const qc = useQueryClient();
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ text: string; failed: boolean } | null>(null);
+  const [jobId, setJobId] = useState<string | null>(null);
+  const job = useRunOutcome(jobId);
   const run = async (): Promise<void> => {
     setBusy(true);
     setMsg(null);
+    setJobId(null);
     try {
       const job = unwrap(await client.POST("/api/agent/run", { body: { request_id: crypto.randomUUID() } }));
       trackJob(qc, job);
+      setJobId(job.id);
       setMsg({ text: "Agent pass started. Proposals appear below as each item finishes; you can keep reviewing meanwhile.", failed: false });
     } catch (e) {
       setMsg({ text: `Agent pass not started: ${errText(e)}`, failed: true });
@@ -76,6 +90,7 @@ function FlagsSection({ flags, items, error, titles }: { flags: Flag[] | undefin
       setBusy(false);
     }
   };
+  const shown = job ?? msg;
   const n = flags?.length ?? 0;
   // a disabled Run button points at the sentence that says why
   const why = error ? "agent-flags-error" : flags && n === 0 ? "agent-empty" : !flags ? "agent-flags-loading" : undefined;
@@ -89,11 +104,24 @@ function FlagsSection({ flags, items, error, titles }: { flags: Flag[] | undefin
           {busy ? "Starting..." : n ? `Run agent pass on ${plural(n, "flag")}` : "Run agent pass"}
         </button>
       </div>
-      {msg ? (
-        <p role={msg.failed ? "alert" : "status"} className={`text-sm ${msg.failed ? "text-fail" : "text-muted"}`}>
-          {msg.text}
-        </p>
-      ) : null}
+      {/* Both live regions are mounted with the section and only their text changes, so "started" and how the pass
+          ended are announced (a status node inserted together with its text often is not). */}
+      <div className={shown ? "space-y-1" : "!mt-0"}>
+        <div role="status" data-testid="agent-run-status">
+          {shown && !shown.failed ? (
+            <p className="text-sm text-muted" data-testid={job ? "agent-run-outcome" : undefined}>
+              {shown.text}
+            </p>
+          ) : null}
+        </div>
+        <div role="alert" data-testid="agent-run-alert">
+          {shown?.failed ? (
+            <p className="text-sm text-fail" data-testid={job ? "agent-run-outcome" : undefined}>
+              {shown.text}
+            </p>
+          ) : null}
+        </div>
+      </div>
       {error ? (
         <p role="alert" id="agent-flags-error" className="text-sm text-fail">
           Could not list the open flags: {errText(error)}
@@ -119,11 +147,15 @@ function FlagsSection({ flags, items, error, titles }: { flags: Flag[] | undefin
                 <span className="font-medium text-ink">{CATEGORY.get(f.category) ?? f.category}</span>
                 <Target id={f.target_id} />
                 {f.note ? <q className="text-muted">{f.note}</q> : null}
-                <span className="ml-auto text-xs text-muted">
+                <span className="ml-auto text-xs text-muted" data-testid="agent-flag-tried">
                   {it ? triedText(it) : null}
                   {it?.pending_proposal_id ? " · proposal waiting" : ""}
                 </span>
-                {it?.last_detail ? <span className="basis-full text-xs text-muted">{it.last_detail}</span> : null}
+                {it && stuck(it) ? (
+                  <span className="basis-full text-xs text-needs-ink" data-testid="agent-flag-next">
+                    <Copy text="Run the agent pass again, or open the block in Verify: Approve ({vApprove}) or Edit ({vEdit}) there resolves the flag." />
+                  </span>
+                ) : null}
               </li>
             );
           })}

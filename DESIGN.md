@@ -129,7 +129,7 @@ This system rejects what PRODUCT.md names: consumer onboarding carousels and con
 - Four status hues, one meaning each, always paired with a word or icon.
 - Two voices in type: the app's system sans, the manual's Atkinson Hyperlegible.
 - A sentence before a score; a human title before an identifier; identifiers kept, smaller, in mono.
-- Fixed-height Verify frame on wide screens with independently scrolling panes; flowing pages everywhere else.
+- Fluid layout: every column is a `clamp()` of the window width, the page strip and panes follow the window height, and the evidence sits beside the text from 1340 px, Scope takes three columns from 1800 px, and Verify gains a page column from 2400 px; short (600 px) and low (820 px) windows fold the secondary bands. The rule set, with the sizes it is verified at (720x450 to 2560x1440, 150 and 200 percent zoom), is `docs/design/13-ui-craft.md` section 9.
 
 ## 2. Colors
 

@@ -23,7 +23,7 @@ const summary: ExportSummary = {
   figures: 3,
   pages_covered: 12,
   docs: 2,
-  review: { approved: 20, auto_approved: 40, edited: 4, numbers_verified: 6, overrides: 0 },
+  review: { blocks: 64, approved: 20, auto_approved: 40, edited: 4, numbers_verified: 6, overrides: 0, total_blocks: 64, left_out: {} },
   warnings: [],
   zip_bytes: 20480,
   zip_sha256: "ab".repeat(32),
@@ -175,6 +175,26 @@ describe("U10 ExportScreen", () => {
     for (const g of groups) expect(g).toHaveTextContent(new RegExp(`\\d+ of these ${BLOCKER_LIMIT}`));
     expect(screen.getByTestId("reason-queued")).toHaveTextContent("30 blocks");
   });
+  it("groups the blockers by the section the titles lookup names, asking only for the listed ids", async () => {
+    const ids = ["b-doc-p001-01", "b-doc-p001-02", "b-doc-p003-01"];
+    installFake({ exportStatus: locked({ queued: 3, open_flags: 0, blockers: ids }) });
+    const asked: string[][] = [];
+    server.use(
+      http.get("*/api/verify/titles", ({ request }) => {
+        asked.push(new URL(request.url).searchParams.getAll("ids"));
+        const row = (block_id: string, page: number, section_title: string) => ({ block_id, doc_id: "doc", page, type: "paragraph", section_title });
+        return HttpResponse.json([row(ids[0], 1, "2 Safety"), row(ids[1], 1, "2 Safety"), row(ids[2], 3, "3 Install")]);
+      }),
+    );
+    renderApp("/export");
+    const groups = await within(await screen.findByTestId("blocker-list")).findAllByRole("listitem");
+    await waitFor(() => expect(groups[0]).toHaveTextContent("2 Safety"));
+    const items = within(screen.getByTestId("blocker-list")).getAllByRole("listitem");
+    expect(items).toHaveLength(2);
+    expect(items[0]).toHaveTextContent("2 blocks");
+    expect(items[1]).toHaveTextContent("3 Install");
+    expect(asked).toEqual([ids]);
+  });
   it("a complete list counts each group in blocks", async () => {
     installFake({ exportStatus: locked({ queued: 3, open_flags: 2 }) });
     renderApp("/export");
@@ -229,5 +249,115 @@ describe("U10 step indicator states", () => {
     for (const n of ["Scope", "Verify", "Agent", "Export"]) expect(within(nav).getByRole("link", { name: n })).toBeInTheDocument();
     await waitFor(() => expect(within(nav).getByTestId("step-short-export")).toHaveTextContent("locked: 2 open flags"));
     expect(within(nav).getByRole("link", { name: "Export" })).toHaveAccessibleDescription("Step 4 of 4. Locked: 2 open flags, 3 to review.");
+  });
+});
+
+// Browser-run findings of 2026-10-30 (design 11 section 14): a batch of block overrides never includes a flagged block,
+// every count reconciles on screen, and after an export the result is on top.
+describe("U10b export: flags need their own decision, counts reconcile, the last export on top", () => {
+  const counts = { in_scope: 160, auto_approved: 51, approved: 7, edited: 1, rejected: 0, overridden: 80, blocking: 21 };
+  const flagged = { flag_id: "flag-000001", block_id: "b-doc-p001-02", category: "wrong_text" as const, note: "digit unclear" };
+  const doneSummary: ExportSummary = {
+    ...summary,
+    articles: 20,
+    review: { blocks: 160, auto_approved: 51, approved: 7, edited: 1, overrides: 101, numbers_verified: 7, total_blocks: 184, left_out: { header_footer: 24 } },
+  };
+
+  it("a batch leaves a flagged block out and says so; the flag gets its own override", async () => {
+    const f = installFake({
+      exportStatus: locked({ open_flags: 1, queued: 2, blockers: ["b-doc-p001-01", "b-doc-p001-02", "b-doc-p001-03"], flag_blockers: [flagged], counts }),
+    });
+    const bodies: { reason: string; target_id?: string | null; flag_id?: string | null }[] = [];
+    server.use(
+      http.post("*/api/export/override", async ({ request }) => {
+        const b = (await request.json()) as (typeof bodies)[number];
+        bodies.push(b);
+        return HttpResponse.json(f.exportStatus);
+      }),
+    );
+    const { user } = renderApp("/export");
+    const form = await screen.findByTestId("override-form");
+    expect(within(form).getByTestId("override-submit")).toHaveTextContent("Record 2 overrides");
+    expect(form).toHaveTextContent("1 flagged block left out");
+    await user.type(within(form).getByTestId("override-reason"), "pilot");
+    await user.click(within(form).getByTestId("override-submit"));
+    await waitFor(() => expect(bodies).toHaveLength(2));
+    expect(bodies.map((b) => b.target_id)).toEqual(["b-doc-p001-01", "b-doc-p001-03"]);
+
+    const flags = screen.getByTestId("flag-overrides");
+    const item = within(flags).getByTestId("flag-override");
+    expect(item).toHaveTextContent("b-doc-p001-02");
+    expect(item).toHaveTextContent("Wrong text");
+    expect(item).toHaveTextContent("digit unclear");
+    // named by its block: every flag's button has its own name (review 2 L2)
+    const btn = within(item).getByRole("button", { name: "Export b-doc-p001-02 despite its flag" });
+    await user.click(btn);
+    expect(within(item).getByRole("alert")).toHaveTextContent("Please write why");
+    expect(bodies).toHaveLength(2);
+    await user.type(within(item).getByRole("textbox"), "checked on paper");
+    await user.click(btn);
+    await waitFor(() => expect(bodies).toHaveLength(3));
+    expect(bodies[2]).toMatchObject({ flag_id: "flag-000001", target_id: null, reason: "checked on paper" });
+  });
+
+  it("the locked view reconciles the scope: every block in exactly one count", async () => {
+    installFake({ exportStatus: locked({ open_flags: 1, queued: 20, flag_blockers: [flagged], counts }) });
+    renderApp("/export");
+    const line = await screen.findByTestId("export-reconcile");
+    expect(line).toHaveTextContent("160 blocks in scope = 51 auto-approved + 7 approved by you + 1 edited by you + 80 overridden + 21 still blocking");
+  });
+
+  it("after an export that spent its overrides: the last export is on top, the new lock below it", async () => {
+    installFake({ exportStatus: locked({ open_flags: 1, queued: 100, summary: doneSummary, counts: { ...counts, overridden: 0, blocking: 101 } }) });
+    renderApp("/export");
+    const top = await screen.findByTestId("export-summary");
+    const lock = screen.getByTestId("export-locked");
+    expect(top.compareDocumentPosition(lock) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(top).getByTestId("export-download")).toHaveAttribute("href", "/api/export/download");
+    expect(within(top).getByTestId("summary-reconcile")).toHaveTextContent(
+      "160 blocks exported = 51 auto-approved + 7 approved by you + 1 edited by you + 101 overridden",
+    );
+    expect(within(top).getByTestId("summary-left-out")).toHaveTextContent("184 parsed blocks = 160 exported + 24 left out (24 page headers and footers)");
+    expect(within(lock).getByRole("heading", { name: "A new export is locked" })).toBeInTheDocument();
+    expect(lock).toHaveTextContent("used up its 101 overrides");
+  });
+
+  it("after an export with nothing blocking: the last export on top, then Export again", async () => {
+    installFake({ exportStatus: { ...locked({ blockers: [], open_flags: 0, queued: 0 }), unlocked: true, summary: doneSummary } });
+    renderApp("/export");
+    const top = await screen.findByTestId("export-summary");
+    const ready = screen.getByTestId("export-ready");
+    expect(top.compareDocumentPosition(ready) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(ready).getByRole("heading", { name: /Ready to export again/ })).toBeInTheDocument();
+    expect(screen.queryByTestId("export-locked")).toBeNull();
+  });
+
+  it("clicking Export: when the job is done the result is on top with its download, the spent lock below", async () => {
+    const f = installFake({ exportStatus: { ...locked({ blockers: [], open_flags: 0, queued: 0, counts: { ...counts, overridden: 101, blocking: 0 } }), unlocked: false } });
+    server.use(
+      http.post("*/api/export", () => {
+        // the server after the export: the summary is recorded and the overrides are spent (design 11 P3)
+        f.exportStatus = locked({ open_flags: 1, queued: 100, summary: doneSummary, counts: { ...counts, overridden: 0, blocking: 101 } });
+        return HttpResponse.json(makeJob({ id: "exp2", kind: "export", status: "queued" }), { status: 202 });
+      }),
+    );
+    f.jobById = { exp2: makeJob({ id: "exp2", kind: "export", status: "done" }) };
+    const { user } = renderApp("/export");
+    expect(await screen.findByText(/Overrides cover every remaining block/)).toBeInTheDocument();
+    await user.click(screen.getByTestId("export-start"));
+    const top = await screen.findByTestId("export-summary");
+    expect(within(top).getByTestId("export-fresh")).toHaveTextContent("Export finished");
+    // announced through the screen's live region, which was mounted before the export (review 2 L1)
+    expect(screen.getByTestId("export-live")).toHaveTextContent("Export finished. Download the zip below.");
+    const lock = await screen.findByTestId("export-locked");
+    expect(top.compareDocumentPosition(lock) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(lock).getByRole("heading", { name: "A new export is locked" })).toBeInTheDocument();
+  });
+
+  it("before any export: the gate is on top and no summary is shown", async () => {
+    installFake({ exportStatus: locked({ counts }) });
+    renderApp("/export");
+    expect(await screen.findByRole("heading", { name: "Export is locked" })).toBeInTheDocument();
+    expect(screen.queryByTestId("export-summary")).toBeNull();
   });
 });

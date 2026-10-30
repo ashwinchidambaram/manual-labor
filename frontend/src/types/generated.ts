@@ -934,6 +934,7 @@ export interface Selection {
   active_view: 'structure' | 'topic';
   article_split: 'per_topic' | 'per_document';
   block_ids: string[];
+  known_docs: string[] | null;
 }
 /**
  * This interface was referenced by `_All`'s JSON-Schema

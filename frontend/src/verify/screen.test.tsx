@@ -22,7 +22,10 @@ describe("VC1 StatusStrip", () => {
     expect(slider.max).toBe("1");
     expect(screen.getByTestId("view-copy")).toHaveTextContent("Only blocks under the 0.85 threshold");
     const chips = screen.getAllByTestId("doc-chip").map((c) => c.textContent);
-    expect(chips).toEqual(["late: preparing (score)", "redo: re-scoring"]);
+    // no job is queued or running: a pending document is not being prepared, it is not scored yet, and a stale one is
+    // not being re-scored (CLAUDE.md "Claiming work is happening"); both point at Scope
+    expect(chips).toEqual(["late: not scored yet", "redo: scores out of date"]);
+    expect(screen.getByRole("link", { name: "Score them on Scope" })).toHaveAttribute("href", "/scope");
   });
 
   it("[ and ] step the view filter and send one debounced cursor PUT with all four fields", async () => {
@@ -133,7 +136,7 @@ describe("VC2 Queue", () => {
     expect(card(vid(4))).toHaveAttribute("aria-selected", "true");
   });
 
-  it("shows status chips for changed-since-approval and re-scoring, and the pinned card", async () => {
+  it("shows status chips for changed-since-approval and a stale document, and the pinned card", async () => {
     await mountVerify(
       3,
       (f) => {
@@ -151,7 +154,8 @@ describe("VC2 Queue", () => {
     expect(pinned).toHaveAttribute("aria-selected", "true");
     expect(within(pinned).getByText("approved")).toBeInTheDocument();
     expect(within(card(vid(1))).getByText("changed since approval")).toBeInTheDocument();
-    expect(within(card(vid(2))).getByText("re-scoring")).toBeInTheDocument();
+    // no job re-scores the document: its scores are out of date, nothing claims work (review 2 M3)
+    expect(within(card(vid(2))).getByText("scores out of date")).toBeInTheDocument();
     expect(within(card(vid(3))).getByText("numeric spec")).toBeInTheDocument();
   });
 
@@ -163,10 +167,17 @@ describe("VC2 Queue", () => {
         f.counts = counts({ flagged_open: 2 });
       },
     ).catch(() => undefined);
+    // no job runs: the pending document is "not scored yet" (first-use report C9), never "All caught up"
+    expect(await screen.findByTestId("queue-empty")).toHaveTextContent("1 document is not scored yet");
+    expect(screen.getByRole("link", { name: "Go to Agent" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Go to Scope" })).toBeInTheDocument();
+    expect(screen.getByTestId("queue-footer")).toHaveTextContent("1 document not scored yet");
+  });
+  it("with every document ready, the empty list is caught up and offers Export", async () => {
+    await mountVerify(0, (f) => (f.counts = counts({ flagged_open: 2 }))).catch(() => undefined);
     expect(await screen.findByTestId("queue-empty")).toHaveTextContent("All caught up");
     expect(screen.getByRole("link", { name: "Go to Agent" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Go to Export" })).toBeInTheDocument();
-    expect(screen.getByTestId("queue-footer")).toHaveTextContent("1 document still preparing");
   });
 });
 

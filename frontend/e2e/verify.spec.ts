@@ -219,6 +219,11 @@ async function articleBlocks(request: APIRequestContext): Promise<Map<string, st
 }
 
 test("VE3 figure re-attach via the keyboard picker persists, then detach (gate)", async ({ page, request }) => {
+  // waits for background jobs: a re-attach is one attach plus one detach per previous article (FigureRail `attach`),
+  // each its own score2 job for the document, then the detach is one more; four worker processes one after another.
+  // The default 30 s test budget cut waitJobsIdle's own 180 s budget short under load (full run beside a pytest run:
+  // timeout with 3 jobs still queued or running), so the test gets the budget its waits already assume (as T10 does)
+  test.setTimeout(240_000);
   const byArticle = await articleBlocks(request);
   const figs = await api(request).get<DocFigure[]>("/api/docs/figures/figures");
   let target: { b: string; block: string; f: DocFigure } | null = null;
@@ -471,8 +476,9 @@ test("VE10 documents still preparing", async ({ page, request }) => {
     await route.fulfill({ response: resp, json });
   });
   await page.goto("/verify");
-  await expect(page.getByTestId("doc-chip").first()).toContainText("preparing");
-  await expect(page.getByTestId("queue-footer")).toContainText("still preparing");
+  // no job is running: a pending document is "not scored yet", nothing claims work (CLAUDE.md)
+  await expect(page.getByTestId("doc-chip").first()).toContainText("not scored yet");
+  await expect(page.getByTestId("queue-footer")).toContainText("not scored yet");
   await expect(card(page, Q[0].block_id)).toBeFocused();
   await key(page, "ArrowDown");
   await expect(card(page, Q[1].block_id)).toBeFocused();
@@ -514,6 +520,7 @@ test("VE11 a confirmed edit contains exactly the text the server flagged (locked
 });
 
 test("VE12 a figure attached, then the screen left while the job runs, shows in the rail on return (no reload)", async ({ page, request }) => {
+  test.setTimeout(240_000); // waits for the attach jobs and the cleanup detach job (see VE3)
   const byArticle = await articleBlocks(request);
   const figs = await api(request).get<DocFigure[]>("/api/docs/figures/figures");
   let target: { b: string; block: string; f: DocFigure } | null = null;
@@ -550,8 +557,12 @@ test("VE12 a figure attached, then the screen left while the job runs, shows in 
   await expect(item).toBeVisible();
   await expect(item.getByTestId("rail-rule")).toHaveText("human");
   await expect(item.getByTestId("rail-pending")).toHaveCount(0);
-  // clean up: detach again so later runs start from the seeded attachments
+  // clean up: detach again so later runs start from the seeded attachments. Wait for the server's answer before
+  // waiting for idle: `x` only queues the POST, and a detach that lands after waitJobsIdle enqueued its job into the next
+  // test (Z1 on CI loaded with "Scoring your selection" running, and the job bar moved its text under the action bar)
   await item.focus();
+  const detached = page.waitForResponse((r) => r.url().includes(`/api/figures/${f.figure_id}/detach`) && r.request().method() === "POST");
   await key(page, "x");
+  expect((await detached).ok(), "the cleanup detach was accepted").toBe(true);
   await waitJobsIdle(request);
 });

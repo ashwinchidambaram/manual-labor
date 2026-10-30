@@ -2,8 +2,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, client, unwrap } from "../api/client";
-import { useProject } from "../api/queries";
+import { qk, useProject } from "../api/queries";
 import type { BlockDetail, EditConflict, FlagCategory, PageBlock, QueueItem, QueuePage, QueueSort, ReviewActionOut } from "../api/schema";
+import { verifyNavEpoch } from "../shell/openInVerify";
 import { useToast } from "../shell/Toast";
 import { cmpItems, initialState, queueReducer, type ActKind, type QueueEvent, type QueueState } from "./queueReducer";
 import { cardExcerpt, weakestFromDetail } from "./labels";
@@ -107,15 +108,17 @@ export function useVerifyState() {
 
   const queueQ = useQuery({
     queryKey: ["verify", "queue", applied] as const,
-    queryFn: async (): Promise<QueuePage & { writesSeen: number }> => {
+    queryFn: async (): Promise<QueuePage & { writesSeen: number; navSeen: number }> => {
       // the writes settled before this request left: if more settle while it is out, its answer may predate them
       const writesSeen = writes.settled.current;
+      // likewise cursor writes from other screens ("open in Verify"): a snapshot cached before one is not applied
+      const navSeen = verifyNavEpoch();
       const page = unwrap(
         await client.GET("/api/verify/queue", {
           params: { query: { limit: PAGE_LIMIT, ...(applied ? { sort: applied.sort, ...(applied.view !== null ? { view_threshold: applied.view } : {}) } : {}) } },
         }),
       );
-      return { ...page, writesSeen };
+      return { ...page, writesSeen, navSeen };
     },
     staleTime: Infinity,
     refetchInterval: (q) => (q.state.data?.docs.some((d) => d.state === "pending") ? 3000 : false),
@@ -124,7 +127,7 @@ export function useVerifyState() {
   // Apply server snapshots only while no write is in flight (the acks are authoritative until then), and only a
   // snapshot that left after the last write settled: an older one lists an approved block as queued and current, and
   // applying it would take the reviewer back to the block they just approved. It is fetched again instead.
-  const stash = useRef<(QueuePage & { writesSeen: number }) | null>(null);
+  const stash = useRef<(QueuePage & { writesSeen: number; navSeen: number }) | null>(null);
   const refetchQueue = queueQ.refetch;
   const writesPending = useRef(0);
   writesPending.current = writes.pending;
@@ -140,14 +143,14 @@ export function useVerifyState() {
     const d = queueQ.data;
     if (!d) return;
     if (writesPending.current > 0) stash.current = d;
-    else if (d.writesSeen !== writes.settled.current) void refetchQueue();
+    else if (d.writesSeen !== writes.settled.current || d.navSeen !== verifyNavEpoch()) void refetchQueue();
     else apply(d);
   }, [queueQ.data, apply, writes.settled, refetchQueue]);
   useEffect(() => {
     if (writes.pending === 0 && stash.current) {
       const d = stash.current;
       stash.current = null;
-      if (d.writesSeen !== writes.settled.current) void refetchQueue();
+      if (d.writesSeen !== writes.settled.current || d.navSeen !== verifyNavEpoch()) void refetchQueue();
       else apply(d);
     }
   }, [writes.pending, apply, writes.settled, refetchQueue]);
@@ -348,6 +351,8 @@ export function useVerifyState() {
           if (!optimistic) dispatch({ type: "act", kind, blockId: id, rid });
           dispatch({ type: "ack", rid, out });
           requestFocus();
+          // the step rail reads the export gate: a saved decision changes it (first-use report C10)
+          void qc.invalidateQueries({ queryKey: qk.exportStatus });
           if (id) {
             void qc.invalidateQueries({ queryKey: blockKey(id) });
             if (doc && out.block_status)

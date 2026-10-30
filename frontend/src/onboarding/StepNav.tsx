@@ -18,13 +18,26 @@ export interface StepState {
   short: string | null;
   /** the full sentence for screen readers */
   long: string;
-  /** the step's server condition holds (only what the export gate can say: nothing left to review, export built) */
+  /** the step's server condition holds (only what the server can say: nothing left to review, export built) */
   done: boolean;
 }
 
-/** Step states from the export gate (the only source of these counts); nothing is shown that the API did not say. */
-export function stepStates(path: string, st: ExportStatus | undefined): Record<StepId, StepState> {
+/** What the server says beyond the export gate: a job that reads or scores manuals is queued or running. */
+export interface LiveState {
+  scoring: boolean;
+  /** every active pipeline job only reads manuals (an upload, a re-parse): say "reading", not "scoring" */
+  reading?: boolean;
+}
+
+/**
+ * Step states from server truth (first-use report C10): the export gate (`queued`, `blockers`, `open_flags`, its scope
+ * `counts`, the last `summary`) and the active jobs. Nothing is shown that the API did not say, and no two states
+ * contradict: while scoring runs Verify and Export wait for it; Verify is done only with blocks in scope and none
+ * waiting; Export is never done (checkmark) while it is locked, and is not "ready" with nothing in scope.
+ */
+export function stepStates(path: string, st: ExportStatus | undefined, live: LiveState = { scoring: false }): Record<StepId, StepState> {
   const out = {} as Record<StepId, StepState>;
+  const inScope = st?.counts ? st.counts.in_scope : null; // null: an older server without scope counts
   STEPS.forEach((s, i) => {
     const here = path.startsWith(s.to);
     let short: string | null = null;
@@ -32,18 +45,30 @@ export function stepStates(path: string, st: ExportStatus | undefined): Record<S
     let done = false;
     if (st) {
       const blockers = st.blockers ?? [];
-      if (s.id === "verify" && (st.queued ?? 0) > 0) short = long = `${st.queued ?? 0} to review`;
-      if (s.id === "verify" && (st.queued ?? 0) === 0 && blockers.length === 0) done = true;
+      const queued = st.queued ?? 0;
+      const nothing = inScope === 0;
+      if (s.id === "verify") {
+        if (live.scoring) short = long = live.reading ? "reading manuals" : "scoring in progress";
+        else if (queued > 0) short = long = `${queued} to review`;
+        else if (!nothing && blockers.length === 0) done = true;
+      }
       if (s.id === "agent" && st.open_flags > 0) short = long = plural(st.open_flags, "open flag");
       if (s.id === "export") {
-        const why = [st.open_flags > 0 ? plural(st.open_flags, "open flag") : "", (st.queued ?? 0) > 0 ? `${st.queued ?? 0} to review` : ""].filter(Boolean);
-        if (blockers.length > 0) {
+        const why = [st.open_flags > 0 ? plural(st.open_flags, "open flag") : "", queued > 0 ? `${queued} to review` : ""].filter(Boolean);
+        if (live.scoring) {
+          short = live.reading ? "after reading" : "after scoring";
+          long = `waits for ${live.reading ? "reading" : "scoring"} to finish`;
+        } else if (blockers.length > 0) {
           short = `locked: ${why[0] ?? plural(blockers.length, "blocker")}`;
           long = `locked: ${why.length ? why.join(", ") : plural(blockers.length, "blocking block")}`;
+        } else if (nothing) {
+          short = long = "nothing to export yet";
+        } else if (st.summary) {
+          short = long = "exported";
+          done = true;
         } else {
           short = long = st.unlocked ? "ready" : "ready with an override";
         }
-        done = !!st.summary;
       }
     }
     out[s.id] = {
@@ -62,15 +87,15 @@ const FOCUS = "focus-visible:outline-none focus-visible:ring-2 focus-visible:rin
  * on wide screens, a row in the bottom sheet below that. Link names stay "Scope", "Verify"...; state goes in a
  * description, and every state is a word as well as a colour.
  */
-export default function StepNav({ path, status }: { path: string; status: ExportStatus | undefined }) {
-  const states = stepStates(path, status);
+export default function StepNav({ path, status, live }: { path: string; status: ExportStatus | undefined; live?: LiveState }) {
+  const states = stepStates(path, status, live);
   return (
     <nav aria-label="Screens">
       <ol className="flex gap-1 wide:flex-col wide:gap-0">
         {STEPS.map((s, i) => {
           const st = states[s.id];
           const here = st.short === "here";
-          const locked = s.id === "export" && !!status && (status.blockers ?? []).length > 0 && !here;
+          const locked = s.id === "export" && !!status && (status.blockers ?? []).length > 0 && !here && !live?.scoring;
           const last = i === STEPS.length - 1;
           return (
             <li key={s.to} className="relative min-w-0 flex-1 wide:flex-none">

@@ -1,7 +1,9 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import type { DocReadiness, QueueSort, ReviewCounts } from "../api/schema";
 import Hint from "../onboarding/Hint";
 import { MISMATCH, reconcileReview, reviewMismatchDetail, reviewReconcileText } from "../onboarding/reconcile";
+import { STAGE_WORDS } from "../shell/jobStep";
 import { FOCUS } from "./labels";
 import { normalizeView, sliderCopy } from "./sliderCopy";
 
@@ -26,6 +28,12 @@ export interface StatusStripProps {
   onView: (v: number | null) => void;
   onSort: (s: QueueSort) => void;
   saveState: string;
+  /** why the review estimate moved when a job finished ("2 more blocks queued after scoring finished"), or null */
+  change?: string | null;
+  /** a queued or running job will prepare this document; a pending document no job covers is "not scored yet" */
+  busy?: (doc: string) => boolean;
+  /** a job re-scores this document now (not a reading job); a stale document with none is "scores out of date" */
+  rescoring?: (doc: string) => boolean;
 }
 
 function Stat({ id, label, value, partial = false, swatch }: { id: string; label: string; value: number; partial?: boolean; swatch: string }) {
@@ -83,8 +91,25 @@ export default function StatusStrip(p: StatusStripProps) {
     : [];
   let at = 0;
   const yours = done + c.queued + c.flagged_open + c.rejected;
+  // Work is claimed only while a job does it (CLAUDE.md "Claiming work is happening"): a pending document no job covers
+  // is "not scored yet", a stale one no job re-scores is "scores out of date", and both point at Scope.
+  const chips = p.docs
+    .filter((d) => d.state === "pending" || d.stale)
+    .map((d) => {
+      const working = d.state === "pending" ? !!p.busy?.(d.doc_id) : !!p.rescoring?.(d.doc_id);
+      const text =
+        d.state === "pending"
+          ? working
+            ? `${d.doc_id}: preparing${d.waiting_for ? ` (${(STAGE_WORDS[d.waiting_for] ?? d.waiting_for).toLowerCase()})` : ""}`
+            : `${d.doc_id}: not scored yet`
+          : working
+            ? `${d.doc_id}: re-scoring`
+            : `${d.doc_id}: scores out of date`;
+      return { doc: d.doc_id, text, working };
+    });
+  const idle = chips.filter((x) => !x.working).length;
   return (
-    <section aria-label="Review status" className="flex shrink-0 flex-col gap-2 border-b border-line bg-raised px-4 py-3 short:gap-1.5 short:py-2 wide:px-7">
+    <section aria-label="Review status" className="flex shrink-0 flex-col gap-2 border-b border-line bg-raised px-4 py-3 low:gap-1.5 low:py-2 wide:px-7">
       <div className="flex items-center gap-3">
         <div
           role="img"
@@ -93,7 +118,7 @@ export default function StatusStrip(p: StatusStripProps) {
               ? `${done} of ${yours} checked by you, ${c.auto_approved} cleared by the checks, ${c.queued} waiting for you, ${flagWords}, ${c.in_scope} in scope`
               : `Progress not drawn: the review counts do not add up to the ${c.in_scope} in scope`
           }
-          className="relative h-3 min-w-0 flex-1 overflow-hidden rounded-full bg-line-soft shadow-[inset_0_0_0_1px_var(--line)]"
+          className="relative h-3 min-w-0 flex-1 overflow-hidden rounded-full bg-line-soft shadow-[inset_0_0_0_1px_var(--line)] short:min-w-[5rem]"
           data-testid="review-bar"
           data-reconciled={rec.ok ? "true" : "false"}
         >
@@ -103,9 +128,16 @@ export default function StatusStrip(p: StatusStripProps) {
             return <Segment key={s.key} start={start} size={s.n / total} className={s.cls} />;
           })}
         </div>
-        <p className="hidden shrink-0 whitespace-nowrap text-sm text-muted short:block" data-testid="review-summary">
+        {/* on a short window the totals note joins this one line (cut to fit, whole in its title and under the details) */}
+        <p className="hidden min-w-0 truncate whitespace-nowrap text-sm text-muted short:block" data-testid="review-summary" title={p.change ?? undefined}>
           <span className="font-bold tabular-nums text-ink">{done}</span> of <span className="tabular-nums">{yours}</span> checked by you
           {p.saveState !== "Saved" ? <span className={p.saveState === "Not saved" ? "font-semibold text-fail" : ""}> · {p.saveState}</span> : null}
+          {p.change ? (
+            <span aria-hidden="true" className="text-needs-ink">
+              {" "}
+              · {p.change}
+            </span>
+          ) : null}
         </p>
         <button
           type="button"
@@ -212,14 +244,30 @@ export default function StatusStrip(p: StatusStripProps) {
             {MISMATCH(reviewMismatchDetail(rec))}
           </p>
         )}
-        {p.docs
-          .filter((d) => d.state === "pending" || d.stale)
-          .map((d) => (
-            <span key={d.doc_id} data-testid="doc-chip" className="mr-2 mt-1 inline-block rounded-full bg-needs-wash px-2 py-px text-2xs font-semibold text-needs-ink">
-              {d.state === "pending" ? `${d.doc_id}: preparing${d.waiting_for ? ` (${d.waiting_for})` : ""}` : `${d.doc_id}: re-scoring`}
-            </span>
-          ))}
+        {chips.map((c) => (
+          <span key={c.doc} data-testid="doc-chip" className="mr-2 mt-1 inline-block rounded-full bg-needs-wash px-2 py-px text-2xs font-semibold text-needs-ink">
+            {c.text}
+          </span>
+        ))}
+        {idle ? (
+          <Link
+            to="/scope"
+            className={`mt-1 inline-block text-2xs font-medium text-act-ink underline underline-offset-2 hover:text-act-hover ${FOCUS}`}
+          >
+            {idle === 1 ? "Score it on Scope" : "Score them on Scope"}
+          </Link>
+        ) : null}
       </div>
+      {/* Mounted with the strip and only its text changes, so a moved total is announced (a status node inserted together
+          with its text often is not). The visible note below repeats it, and folds into the summary line when short. */}
+      <p role="status" className="sr-only" data-testid="review-change-live">
+        {p.change ?? ""}
+      </p>
+      {p.change ? (
+        <p aria-hidden="true" className={`text-xs text-needs-ink ${details ? "" : "short:hidden"}`} data-testid="review-change">
+          {p.change}
+        </p>
+      ) : null}
     </section>
   );
 }

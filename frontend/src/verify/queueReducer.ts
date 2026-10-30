@@ -16,11 +16,13 @@ export interface QueueState {
   docs: DocReadiness[];
   inflight: number;
   /** state before each unacknowledged action, oldest first */
-  snapshots: { rid: string; before: Omit<QueueState, "snapshots" | "seen" | "notice"> }[];
+  snapshots: { rid: string; before: Omit<QueueState, "snapshots" | "seen" | "notice" | "loaded"> }[];
   /** every item ever listed, so `back` can pin a block that already left the queue */
   seen: Record<string, QueueItem>;
   /** short message for the live region */
   notice: string | null;
+  /** a server snapshot has been applied: until then `counts` are placeholders, not the server's (review 2 M5) */
+  loaded: boolean;
 }
 
 export const EMPTY_COUNTS: ReviewCounts = { pending: 0, auto_approved: 0, approved: 0, edited: 0, flagged_open: 0, skipped: 0, in_scope: 0, queued: 0, rejected: 0 };
@@ -38,6 +40,7 @@ export const initialState: QueueState = {
   snapshots: [],
   seen: {},
   notice: null,
+  loaded: false,
 };
 
 export type QueueEvent =
@@ -106,7 +109,7 @@ export function queueReducer(s: QueueState, e: QueueEvent): QueueState {
         : [...s.items, ...e.items.filter((n) => !s.items.some((o) => o.block_id === n.block_id))];
       const seen = remember(s.seen, items);
       const wanted = e.replace ? (e.cursor.current_block_id ?? s.currentId) : s.currentId;
-      let next: QueueState = { ...s, items, total: e.total, counts: e.counts, docs: e.docs, cursor: e.cursor, seen };
+      let next: QueueState = { ...s, items, total: e.total, counts: e.counts, docs: e.docs, cursor: e.cursor, seen, loaded: true };
       // a current block that is not listed (approved earlier, then `back`) is kept: the screen fetches and pins it
       next = withCurrent(next, wanted ?? items[0]?.block_id ?? null);
       return next;

@@ -20,9 +20,24 @@ const DIFFER_HATCH = "repeating-linear-gradient(45deg, color-mix(in srgb, var(--
 /**
  * The page, magnified to the current block (design 13 F5, owner decision D2): the block's lines at reading size,
  * directly above the extracted text, so a "±" on the page sits over the "+" in the text. Not interactive and not the
- * accessible page (that is the "Source page" region beside it); the whole page is one key away (Z).
+ * accessible page (that is the "Source page" region beside it); the whole page is one key away (Z). Its height is
+ * `--strip-max` (src/index.css): a function of the window's height that gives back the job bar and, on a short window,
+ * the flag notice (design 13 sections 8.3 and 9.3). From `split` it sits in the text's column, exactly above the text.
  */
-export default function PageStrip({ page, bbox, marks, pageNo }: { page: PageRef; bbox: number[]; marks: PageMarks; pageNo: number }) {
+export default function PageStrip({
+  page,
+  bbox,
+  marks,
+  pageNo,
+  onFrameHeight,
+}: {
+  page: PageRef;
+  bbox: number[];
+  marks: PageMarks;
+  pageNo: number;
+  /** the strip frame's rendered height (CSS px): the whole-page locator beside it is never taller (design 13 section 9.3) */
+  onFrameHeight?: (px: number) => void;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const [w, setW] = useState(0);
   // only a strip taller than its frame (a long table) scrolls; only then is it a tab stop, so keyboard users can pan it
@@ -30,12 +45,16 @@ export default function PageStrip({ page, bbox, marks, pageNo }: { page: PageRef
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const measure = (): void => setW(el.getBoundingClientRect().width);
+    const measure = (): void => {
+      const r = el.getBoundingClientRect();
+      setW(r.width);
+      onFrameHeight?.(Math.round(r.height));
+    };
     measure();
     const ro = typeof ResizeObserver === "function" ? new ResizeObserver(measure) : null;
     ro?.observe(el);
     return () => ro?.disconnect();
-  }, []);
+  }, [onFrameHeight]);
   const [rx0, ry0, rx1, ry1] = stripRegion(bbox, page);
   // fit the block's width to the strip, never past MAX_PAGE_PX for the whole page
   const scale = w > 0 ? Math.min(w / Math.max(1, rx1 - rx0), MAX_PAGE_PX / page.width) : 0;
@@ -54,7 +73,7 @@ export default function PageStrip({ page, bbox, marks, pageNo }: { page: PageRef
   }, [height, w]);
   const legend = [marks.boxes.length || marks.whole ? "shaded" : null, marks.weakest ? "dashed" : null].filter(Boolean);
   return (
-    <figure className="m-0 flex min-w-0 flex-1 flex-col gap-2 short:gap-1" data-testid="page-strip">
+    <figure className="m-0 flex min-w-0 flex-1 flex-col gap-2 short:gap-1 split:px-7 split:py-3 short:split:py-2" data-testid="page-strip">
       <figcaption className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <span className="text-2xs font-semibold uppercase tracking-[0.07em] text-muted">
           The page, at this block<span className="wide:hidden"> · page {pageNo}</span>
@@ -83,7 +102,7 @@ export default function PageStrip({ page, bbox, marks, pageNo }: { page: PageRef
         tabIndex={scrollable ? 0 : undefined}
         role={scrollable ? "group" : undefined}
         aria-label={scrollable ? "The page, magnified to this block" : undefined}
-        className="max-h-[min(34vh,17rem)] overflow-auto rounded-xl border border-line bg-page shadow-lift focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus short:max-h-[5.5rem]"
+        className="max-h-[var(--strip-max)] overflow-auto rounded-xl border border-line bg-page shadow-lift focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
       >
         {scale > 0 ? (
           <div role="img" aria-label={`Page ${pageNo}, magnified to this block`} className="relative overflow-hidden" style={{ height }}>

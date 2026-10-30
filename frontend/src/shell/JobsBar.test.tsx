@@ -35,25 +35,25 @@ describe("JobsBar: what now after a failed job (design 12 section 2.6)", () => {
 });
 
 describe("JobsBar: a running job in words (review M13 P2-11)", () => {
-  it("a scoring run reads as a sentence with 'N of M steps' and a named Cancel; never 0/0", async () => {
+  it("a scoring run reads as a sentence with 'Step N of M' and a named Cancel; never 0/0", async () => {
     const f = installFake();
     f.jobPolls = [[makeJob({ id: "r1", kind: "run", plan: { to: "score2" }, units_done: 0, units_total: 0, progress: 0 })]];
     renderApp("/export");
     const row = await screen.findByTestId("job-row", undefined, { timeout: 5000 });
     expect(row).toHaveTextContent("Scoring your selection");
-    expect(row).toHaveTextContent("starting");
+    expect(row).toHaveTextContent("Starting");
     expect(row).not.toHaveTextContent("0/0");
     expect(within(row).getByRole("button", { name: "Cancel scoring" })).toBeInTheDocument();
   }, 15000);
-  it("progress is 'N of M steps'; an unknown kind falls back to its name", async () => {
+  it("progress names the step 'Step N of M' (the one running); an unknown kind falls back to its name", async () => {
     const f = installFake();
     f.jobPolls = [[makeJob({ id: "r2", kind: "run", plan: { to: "score2" }, units_done: 2, units_total: 5 }), makeJob({ id: "x1", kind: "reindex", plan: {}, units_done: 0, units_total: 3 })]];
     renderApp("/export");
     const rows = await screen.findAllByTestId("job-row", undefined, { timeout: 5000 });
     await waitFor(() => expect(screen.getAllByTestId("job-row")).toHaveLength(2));
-    expect(rows[0]).toHaveTextContent("2 of 5 steps");
+    expect(rows[0]).toHaveTextContent("Step 3 of 5: Grouping alpha.pdf into topics");
     const other = screen.getAllByTestId("job-row")[1];
     expect(other).toHaveTextContent("reindex");
-    expect(other).toHaveTextContent("0 of 3 steps");
+    expect(other).toHaveTextContent("Step 1 of 3");
   }, 15000);
 });

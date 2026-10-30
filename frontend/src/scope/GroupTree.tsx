@@ -4,6 +4,7 @@ import type { DocGroups, GroupCoverage, View } from "../api/schema";
 import { useHotkeys } from "../hooks/useHotkeys";
 import { MISMATCH, docMismatchDetail, docReconcileText, reconcileDoc, type DocReconcile } from "../onboarding/reconcile";
 import { lowCohesion, rowFraction, type CheckState, type Row } from "./derive";
+import Copy from "../onboarding/Copy";
 import GroupRow from "./GroupRow";
 
 export interface GroupTreeProps {
@@ -17,6 +18,11 @@ export interface GroupTreeProps {
   stale: boolean;
   filenames: Map<string, string>;
   ungrouped: string[];
+  /** the selection: a manual with none of its blocks selected says so in its heading (design 08 section 10) */
+  selected?: ReadonlySet<string>;
+  /** `Selection.known_docs`: a grouped document missing from it is new and enters selected on the server; until the
+   * selection refetch lands it must not flash "Not in your selection" */
+  known?: readonly string[] | null;
   onCursor: (id: string | null) => void;
   onToggle: (id: string) => void;
   onSelectOnly: (id: string) => void;
@@ -112,6 +118,18 @@ export default function GroupTree(p: GroupTreeProps) {
     return seen;
   }, [p.rows]);
   const noticeDocs = new Map(p.docs.map((d) => [d.doc_id, d]));
+  const sel = p.selected;
+  const known = p.known;
+  const notSelected = useMemo(() => {
+    const m = new Map<string, number>();
+    if (!sel) return m;
+    for (const d of p.docs) {
+      if (known && !known.includes(d.doc_id)) continue;
+      const ids = d.groups.structure.flatMap((g) => g.block_ids);
+      if (ids.length && !ids.some((b) => sel.has(b))) m.set(d.doc_id, ids.length);
+    }
+    return m;
+  }, [p.docs, sel, known]);
   const out: JSX.Element[] = [];
   let lastDoc = "";
   for (const r of p.rows) {
@@ -140,6 +158,11 @@ export default function GroupTree(p: GroupTreeProps) {
             </span>
           ) : null}
           </span>
+          {notSelected.has(r.docId) ? (
+            <span role="note" className="text-sm font-semibold text-needs-ink" data-testid="doc-not-selected">
+              <Copy text={`Not in your selection: ${notSelected.get(r.docId)} blocks. {selectWholeDoc} on one of its rows adds the whole manual.`} />
+            </span>
+          ) : null}
           {rec ? (
             rec.ok ? (
               <span className="text-xs tabular-nums text-muted [&_b]:font-semibold [&_b]:text-ink" data-testid="doc-reconcile">

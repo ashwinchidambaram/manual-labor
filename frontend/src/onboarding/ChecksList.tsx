@@ -135,7 +135,7 @@ const QUEUED_BECAUSE: Record<string, string> = {
   reading_order_risk: "the reading order may be wrong",
   table_consistency: "the table's rows and columns do not line up",
   garbage_ratio: "the text has broken characters",
-  llm_verifier: "the verifier model read it differently",
+  llm_verifier: "a second model pointed at a change cleanup made",
   has_numeric_spec: "it contains numbers, units or part numbers",
 };
 

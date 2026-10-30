@@ -28,11 +28,20 @@ interface Props {
   gate?: ExportStatus;
   /** document slug -> file name, the card title fallback */
   docTitles?: ReadonlyMap<string, string>;
+  /** scoring still queued or running, in words (from the active jobs); null when no pipeline job is active */
+  scoring?: string | null;
+  /** the active pipeline jobs only read manuals (an upload): nothing they do puts a block in this list */
+  reading?: boolean;
+  /** a job re-scores this document now (not a reading job): only then is a stale document "re-scoring" */
+  rescoring?: (doc: string) => boolean;
+  /** a queued or running job will prepare this document */
+  busyFor?: (doc: string) => boolean;
 }
 
 const NO_TITLES: ReadonlyMap<string, string> = new Map();
+const NOBODY = (): boolean => false;
 
-export default function Queue({ items, total, pinned, currentId, docs, counts, focusTick, wantFocus, focusBlocked, onSelect, onNearEnd, threshold, gate, docTitles = NO_TITLES }: Props) {
+export default function Queue({ items, total, pinned, currentId, docs, counts, focusTick, wantFocus, focusBlocked, onSelect, onNearEnd, threshold, gate, docTitles = NO_TITLES, scoring = null, busyFor = NOBODY, reading = false, rescoring = NOBODY }: Props) {
   const scroller = useRef<HTMLDivElement>(null);
   const idx = items.findIndex((i) => i.block_id === currentId);
   const v = useVirtualizer({
@@ -57,25 +66,31 @@ export default function Queue({ items, total, pinned, currentId, docs, counts, f
     if (idx >= 0 && idx > items.length - 50) onNearEnd();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idx, items.length]);
-  const preparing = docs.filter((d) => d.state === "pending").length;
+  const pendingDocs = docs.filter((d) => d.state === "pending");
+  const preparing = pendingDocs.length;
+  const scoringN = pendingDocs.filter((d) => busyFor(d.doc_id)).length;
+  const unscoredN = preparing - scoringN;
   const empty = items.length === 0 && !pinned;
+  // Work is only claimed while a job is queued or running (CLAUDE.md "Claiming work is happening"): with one, the
+  // empty list is "scoring in progress"; without one, a pending document is "not scored yet", never "preparing".
+  const busy = scoring !== null;
   // nothing confirmed yet: no block in scope, nothing flagged, no document still being prepared
-  const unconfirmed = empty && counts.in_scope === 0 && counts.flagged_open === 0 && preparing === 0;
+  const unconfirmed = empty && !busy && counts.in_scope === 0 && counts.flagged_open === 0 && preparing === 0;
   const LINK = "font-medium text-act-ink underline underline-offset-2 hover:text-act-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus";
   const at = idx >= 0 ? idx + 1 : null;
-  // the folded queue (short, narrow window) still names the current block, as its card would
+  // the folded queue (low, narrow window) still names the current block, as its card would
   const cur = idx >= 0 ? items[idx] : pinned && pinned.block_id === currentId ? pinned : null;
   const curTitle = cur ? cardTitle(cur.section_title, docTitles.get(cur.doc_id), cur.page, cur.type) : null;
   return (
     <div className="group/queue flex min-h-0 flex-col border-b border-line bg-paper wide:h-full wide:border-b-0 wide:border-r" data-zone="queue">
-      {/* On a short, narrow window the open card folds away and this line stands for it: Up and Down still browse, and the
-          focus ring the hidden card holds is drawn here instead. */}
-      <p className="flex shrink-0 items-center justify-between gap-2 border-b border-line-soft px-4 py-2 text-xs text-muted short-narrow:group-focus-within/queue:bg-act-wash short-narrow:group-focus-within/queue:shadow-[inset_3px_0_0_0_var(--act)] short-narrow:group-has-[:focus-visible]/queue:ring-2 short-narrow:group-has-[:focus-visible]/queue:ring-inset short-narrow:group-has-[:focus-visible]/queue:ring-focus">
+      {/* On a low or short, narrow window (design 13 section 9.3) the open card folds away and this line stands for it:
+          Up and Down still browse, and the focus ring the hidden card holds is drawn here instead. */}
+      <p className="flex shrink-0 items-center justify-between gap-2 border-b border-line-soft px-4 py-2 text-xs text-muted low-narrow:group-focus-within/queue:bg-act-wash low-narrow:group-focus-within/queue:shadow-[inset_3px_0_0_0_var(--act)] low-narrow:group-has-[:focus-visible]/queue:ring-2 low-narrow:group-has-[:focus-visible]/queue:ring-inset low-narrow:group-has-[:focus-visible]/queue:ring-focus">
         <span className="min-w-0 truncate">
           {at !== null ? (
             <>
               Block <span className="font-semibold tabular-nums text-ink">{at}</span> of <span className="tabular-nums">{total}</span> in this list
-              {curTitle ? <span className="hidden font-semibold text-ink short-narrow:inline"> · {curTitle}</span> : null}
+              {curTitle ? <span className="hidden font-semibold text-ink low-narrow:inline"> · {curTitle}</span> : null}
             </>
           ) : (
             <>
@@ -93,7 +108,7 @@ export default function Queue({ items, total, pinned, currentId, docs, counts, f
         role="listbox"
         aria-label="Review queue"
         aria-orientation="vertical"
-        className="h-[6.25rem] min-h-0 overflow-auto short-narrow:sr-only wide:h-auto wide:flex-1"
+        className="h-[6.25rem] min-h-0 overflow-auto low-narrow:sr-only wide:h-auto wide:flex-1"
         data-testid="queue"
       >
         {pinned ? (
@@ -110,6 +125,7 @@ export default function Queue({ items, total, pinned, currentId, docs, counts, f
             height={ROW}
             threshold={threshold}
             docTitle={docTitles.get(pinned.doc_id) ?? null}
+            rescoring={rescoring(pinned.doc_id)}
           />
         ) : null}
         <div style={{ height: v.getTotalSize(), position: "relative" }}>
@@ -130,12 +146,42 @@ export default function Queue({ items, total, pinned, currentId, docs, counts, f
                 offset={row.start - (pinned ? ROW : 0)}
                 threshold={threshold}
                 docTitle={docTitles.get(it.doc_id) ?? null}
+                rescoring={rescoring(it.doc_id)}
               />
             );
           })}
         </div>
       </div>
-      {unconfirmed ? (
+      {empty && busy ? (
+        <div data-testid="queue-empty" data-variant={reading ? "reading" : "scoring"} className="space-y-1.5 px-4 py-5 text-sm">
+          <p className="text-base font-semibold text-ink">{reading ? "Reading in progress" : "Scoring in progress"}</p>
+          <p className="tabular-nums text-ink" data-testid="queue-scoring-count">
+            {scoring}
+          </p>
+          <p className="text-muted">
+            {reading
+              ? "Reading puts no block in this list: blocks come here after scoring. Confirm your scope on the Scope screen once reading finishes. Nothing is waiting for you yet."
+              : "Blocks come here as each document finishes scoring. Nothing is waiting for you yet."}
+          </p>
+        </div>
+      ) : empty && unscoredN > 0 && !unconfirmed ? (
+        <div data-testid="queue-empty" data-variant="not-scored" className="space-y-1.5 px-4 py-5 text-sm">
+          <p className="text-base font-semibold text-ink">
+            {unscoredN} document{unscoredN === 1 ? " is" : "s are"} not scored yet
+          </p>
+          <p className="text-muted">Their blocks come here after scoring. Start it from the Scope screen.</p>
+          <p className="flex gap-3">
+            <Link className={LINK} to="/scope">
+              Go to Scope
+            </Link>
+            {counts.flagged_open > 0 ? (
+              <Link className={LINK} to="/agent">
+                Go to Agent
+              </Link>
+            ) : null}
+          </p>
+        </div>
+      ) : unconfirmed ? (
         <div data-testid="queue-empty" data-variant="unconfirmed" className="space-y-1.5 px-4 py-5 text-sm">
           <p className="text-base font-semibold text-ink">Nothing to review yet</p>
           <p className="text-muted">
@@ -150,7 +196,16 @@ export default function Queue({ items, total, pinned, currentId, docs, counts, f
       ) : null}
       {preparing > 0 ? (
         <p data-testid="queue-footer" className="shrink-0 border-t border-line-soft bg-needs-wash px-4 py-2 text-xs text-needs-ink">
-          {preparing} document{preparing === 1 ? "" : "s"} still preparing; their blocks appear here when ready. You can start now.
+          {[
+            scoringN > 0
+              ? reading
+                ? `${scoringN} document${scoringN === 1 ? "" : "s"} being read; their blocks appear here after scoring.`
+                : `${scoringN} document${scoringN === 1 ? "" : "s"} still being scored; their blocks appear here when ready.${empty ? "" : " You can start now."}`
+              : "",
+            unscoredN > 0 ? `${unscoredN} document${unscoredN === 1 ? "" : "s"} not scored yet; their blocks appear here after scoring.` : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
         </p>
       ) : null}
     </div>

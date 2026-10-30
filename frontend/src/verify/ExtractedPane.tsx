@@ -65,8 +65,10 @@ const STATUS_TONE: Record<string, string> = {
 };
 
 /**
- * The block's text and the evidence about it (region "Extracted text"). From the `roomy` breakpoint the text and the
- * evidence sit side by side and scroll on their own; below it they stack in one scrolling column.
+ * The block's text and the evidence about it (region "Extracted text"). From the `split` breakpoint the text and the
+ * evidence sit side by side (the evidence `--evidence-w` wide) and scroll on their own; below it they stack in one
+ * scrolling column. On a low window the header moves under the text, so the text sits right under the page strip:
+ * title and ids above it, the Text/Diff toggle and the provenance line below it (design 13 section 9.3).
  */
 export default function ExtractedPane({ detail, loading, error, view, onView, edit, onEditText, onConfirmConflict, onKeepEditing, threshold, title, aside }: Props) {
   const area = useRef<HTMLTextAreaElement | null>(null);
@@ -134,17 +136,18 @@ export default function ExtractedPane({ detail, loading, error, view, onView, ed
     <section
       role="region"
       aria-label="Extracted text"
-      className="min-h-0 flex-1 wide:overflow-auto roomy:grid roomy:grid-cols-[minmax(0,1fr)_23rem] roomy:overflow-hidden"
+      className="min-h-0 flex-1 wide:overflow-auto split:grid split:grid-cols-[minmax(0,1fr)_var(--evidence-w)] split:overflow-hidden"
       data-zone="extracted"
       data-testid="extracted-pane"
     >
-      <div className="flex min-w-0 flex-col gap-3 px-4 pb-6 pt-3 wide:gap-4 wide:px-7 wide:pt-5 roomy:overflow-auto">
-        <header className="flex flex-col gap-1">
-          <p className="text-xs text-muted" data-testid="provenance">
+      {/* height variants are stacked under `wide:` where they override a `wide:` value (screens are emitted last) */}
+      <div className="flex min-w-0 flex-col gap-3 px-4 pb-6 pt-3 low:gap-2.5 short:gap-2 short:pt-2 wide:gap-4 wide:px-7 wide:pt-5 wide:low:gap-2.5 wide:low:pt-3 wide:short:gap-2 wide:short:pt-2 split:overflow-auto">
+        <header className="flex flex-col gap-1 low:contents">
+          <p className="text-xs text-muted low:order-2" data-testid="provenance">
             {provenance.join(" · ")}
           </p>
           {/* below `wide` the current queue card right above already carries the title */}
-          <h3 className="text-xl font-semibold tracking-[-0.01em] text-ink max-wide:sr-only">{title ?? `Page ${b.page}, ${b.type}`}</h3>
+          <h3 className="text-xl font-semibold tracking-[-0.01em] text-ink max-wide:sr-only low:text-lg">{title ?? `Page ${b.page}, ${b.type}`}</h3>
           <p className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <span className="font-mono text-xs text-muted" data-testid="block-id">
               {b.id}
@@ -177,8 +180,8 @@ export default function ExtractedPane({ detail, loading, error, view, onView, ed
             ))}
           </p>
         </header>
-        {/* below `wide` the passage comes straight after the id line, so it sits right under the page strip */}
-        <div className="flex flex-wrap items-center justify-between gap-2 max-wide:order-1">
+        {/* below `wide`, and on a low window, the passage comes straight after the id line, right under the page strip */}
+        <div className="flex flex-wrap items-center justify-between gap-2 max-wide:order-1 low:order-1">
           <Hint id="textDiff" within>
             <span className="inline-flex rounded-xl bg-sunk p-[3px] ring-1 ring-inset ring-line-soft" role="group" aria-label="Original vs cleaned">
               <button
@@ -257,18 +260,18 @@ export default function ExtractedPane({ detail, loading, error, view, onView, ed
             </p>
           </div>
         ) : view === "diff" && ops ? (
-          <div className="manual-text max-w-[62ch] text-read text-ink">
+          <div className="manual-text max-w-[62ch] text-[length:var(--read-size)] leading-[1.7] text-ink">
             <DiffView ops={ops} />
           </div>
         ) : (
-          <p className="manual-text max-w-[62ch] whitespace-pre-wrap break-words text-[1.125rem] leading-[1.7] text-ink" data-testid="block-text">
+          <p className="manual-text max-w-[62ch] whitespace-pre-wrap break-words text-[length:var(--read-size)] leading-[1.7] text-ink" data-testid="block-text">
             <Marked text={display} ranges={numericRanges(display)} />
           </p>
         )}
         {!isFigure && b.clean_text === null && view === "diff" ? <p className="text-sm text-muted">No cleanup yet; text is raw</p> : null}
       </div>
 
-      <div className="flex min-w-0 flex-col gap-6 border-line px-4 pb-8 pt-5 wide:px-7 roomy:overflow-auto roomy:border-l roomy:bg-paper roomy:px-5" data-testid="evidence">
+      <div className="flex min-w-0 flex-col gap-6 border-line px-4 pb-8 pt-5 wide:px-7 split:overflow-auto split:border-l split:bg-paper split:px-5" data-testid="evidence">
         <WhyList
           why={detail.why ?? []}
           autoApproved={b.status === "auto_approved" ? { confidence: b.confidence ?? null, threshold } : null}

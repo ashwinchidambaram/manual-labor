@@ -35,7 +35,7 @@ export const SIGNAL_HUMAN: Record<string, { held: string; passed: string }> = {
   figure_method: { held: "Figure cut from the page image", passed: "Figure taken from the file itself" },
   figure_resolution: { held: "Low-resolution figure", passed: "Figure resolution is enough" },
   figure_attach_rule: { held: "Unsure this figure belongs here", passed: "The figure's place is certain" },
-  llm_verifier: { held: "A second model reads it differently", passed: "A second model reads it the same" },
+  llm_verifier: { held: "A second model pointed at a change cleanup made", passed: "A second model found no change to question" },
   has_numeric_spec: { held: "Has numbers, so a person always checks it", passed: "Has numbers, so a person always checks it" },
 };
 export const human = (name: string, held: boolean): string => SIGNAL_HUMAN[name]?.[held ? "held" : "passed"] ?? label(name);
@@ -86,6 +86,15 @@ type Missing = Exclude<FlagCategory, (typeof FLAG_ORDER)[number]>;
 const _allCategoriesOrdered: Missing extends never ? true : never = true;
 void _allCategoriesOrdered;
 export const FLAG_CATEGORIES: { id: FlagCategory; label: string }[] = FLAG_ORDER.map((id) => ({ id, label: FLAG_LABEL[id] }));
+
+/**
+ * How a flag is resolved, in one sentence used by the flag dialog, the Verify flag notice and the Export screen (design 09
+ * section 10). True to the server: an approve or edit resolves a block's open flags (state/review.py), so does an
+ * accepted or edited agent proposal (agent/service.py); the export gate covers a flag only with an override that names
+ * it or a blanket override (export/gate.py `_covers_flag`), and the blanket one is recorded only by the CLI.
+ */
+export const FLAG_RESOLUTION =
+  "A flag locks the export until you approve or edit the block in Verify, accept the agent's fix on the Agent screen, or record an override that names the flag on the Export screen (a blanket labor export --override also covers it). An override of the block alone never covers a flag.";
 
 export const FOCUS = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus";
 

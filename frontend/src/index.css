@@ -100,6 +100,35 @@
 
     --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
     color-scheme: light;
+
+    /* Fluid layout (design 13 section 9): column widths are functions of the window width, the page strip's height a
+       function of its height. The breakpoints that arrange them are the screens in tailwind.config.js. */
+    --queue-w: clamp(14rem, 18vw, 24rem);
+    --evidence-w: clamp(16rem, 19vw, 28rem);
+    --page-col-w: clamp(24rem, 22vw, 38rem);
+    --scope-aside-w: clamp(18rem, 24vw, 24rem);
+    --sources-w: clamp(17rem, 16vw, 24rem);
+    --export-side-w: clamp(20rem, 30vw, 36rem);
+    /* the manual's text: 18px up to 1920 wide, 21px at 2560; the rem floor keeps browser zoom and font settings working */
+    --read-size: clamp(1.125rem, 0.5625rem + 0.46875vw, 1.3125rem);
+    /* the page strip gives back the job bar's height; on a short window also the flag notice's (section 8.3) */
+    --strip-max: max(4.5rem, calc(min(24rem, 50dvh - 12rem) - var(--jobs-bar, 0px)));
+    /* the whole-page locator beside the strip: never wider than the max, never taller than the strip unless that would
+       make it smaller than the min (a page you can still click blocks on) */
+    --locator-max: 8.5rem;
+    --locator-min: 6rem;
+  }
+  @media (max-height: 600px) {
+    :root {
+      --strip-max: max(2.5rem, calc(5.5rem - var(--jobs-bar, 0px) - var(--flag-notice, 0px)));
+      --locator-min: 3.5rem;
+    }
+  }
+  @media (min-width: 1340px) {
+    :root {
+      /* from `split` the locator has the whole band cell above the evidence column */
+      --locator-max: calc(var(--evidence-w) - 2.5rem);
+    }
   }
 
   html {

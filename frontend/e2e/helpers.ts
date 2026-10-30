@@ -1,4 +1,5 @@
 import { expect, type APIRequestContext, type Page } from "@playwright/test";
+import os from "node:os";
 
 // Types come from the generated OpenAPI aliases, never hand-written copies.
 import type { DocGroups, Group, SelectionOut } from "../src/api/schema";
@@ -82,3 +83,16 @@ export function api(request: APIRequestContext) {
     },
   };
 }
+
+/**
+ * A latency budget measured from the browser (key or click to the server's answer) while work runs beside it. Budgets
+ * are set on the 10-core reference Mac and hold unchanged on any machine with 4 or more cores. Below that (GitHub's
+ * 2-vCPU ubuntu runner) the browser, the Playwright driver, the dev server, the API and the job worker share two
+ * cores, and the browser's own scheduling is part of every measurement, so the budget is doubled. Why not 1x: the
+ * server-side approve ack under a re-parse is now a median 55 to 106 ms, but its tail reached 683 ms on the Mac under
+ * external load, and the client adds its own time on a shared core; a 2-core run cannot promise 500 ms. The cost:
+ * on 2 cores this check only catches acks over 1 s (the pre-fix CI acks, 175 to 878 ms, would have passed it), so the
+ * 4-core-plus runs remain the real 500 ms check. Design 09 section 12 has the measurements.
+ */
+export const LATENCY_SCALE = os.cpus().length < 4 ? 2 : 1;
+export const latencyBudget = (ms: number): number => ms * LATENCY_SCALE;

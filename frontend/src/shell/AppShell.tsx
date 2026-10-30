@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { useExportStatus, useProject } from "../api/queries";
+import { useActiveJobs, useExportStatus, useProject } from "../api/queries";
 import { useHotkeys } from "../hooks/useHotkeys";
 import Hint from "../onboarding/Hint";
 import StepRail from "../onboarding/StepRail";
@@ -34,6 +34,20 @@ export default function AppShell() {
     setSeenPath(loc.pathname);
     void refetchStatus();
   }, [loc.pathname, seenPath, refetchStatus]);
+  // a new screen opens at its top: on a flowing page (below `wide`, at 200% zoom) the window would otherwise keep the last
+  // screen's scroll, and Verify opened from a scrolled Agent list would start below its page strip (design 13 section 9.3)
+  useLayoutEffect(() => {
+    if (window.scrollY > 0) window.scrollTo(0, 0);
+  }, [loc.pathname]);
+  // ...and the server's progress: each finished step of a running job can make a document ready (first-use report C10)
+  const active = useActiveJobs();
+  const jobsKey = (active.data ?? []).map((j) => `${j.id}:${j.status}:${j.units_done}`).join("|");
+  const [seenJobs, setSeenJobs] = useState(jobsKey);
+  useEffect(() => {
+    if (jobsKey === seenJobs) return;
+    setSeenJobs(jobsKey);
+    void refetchStatus();
+  }, [jobsKey, seenJobs, refetchStatus]);
   useHotkeys({
     help: () => setHelp((h) => !h),
     goScope: () => nav("/scope"),

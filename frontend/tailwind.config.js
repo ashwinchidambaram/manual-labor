@@ -5,15 +5,20 @@ const v = (name) => `var(--${name})`;
 export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
-    // in ascending order, so a wider breakpoint always wins: `wide` is where the step rail docks on the left
+    // in ascending order, so a wider breakpoint always wins: `wide` is where the step rail docks on the left. The fluid
+    // layout's thresholds (design 13 section 9.2): `split` evidence beside the text, `tri` Scope's three columns, `vast`
+    // Verify's whole-page column. Column widths are clamp() tokens in src/index.css.
     screens: {
       sm: "640px",
       md: "768px",
       lg: "1024px",
       wide: "1100px",
       xl: "1280px",
+      split: "1340px",
       roomy: "1400px",
       "2xl": "1536px",
+      tri: "1800px",
+      vast: "2400px",
     },
     extend: {
       colors: {
@@ -57,7 +62,11 @@ export default {
   plugins: [
     // A short window (a laptop at 200% zoom is about 720x450): Verify keeps the page strip and the text on screen
     // together by folding the status block, the open queue card and the step sheet to one line each.
+    // A low window (700 to 820 tall: the common laptop heights, and 150% zoom on 1080p): the Verify pane header moves
+    // under the text and the narrow queue folds (design 13 section 9.3). Registered before `short`, so `short` wins below 600.
     ({ addVariant }) => {
+      addVariant("low", "@media (max-height: 820px)");
+      addVariant("low-narrow", "@media (max-height: 820px) and (max-width: 1099.98px)");
       addVariant("short", "@media (max-height: 600px)");
       addVariant("short-narrow", "@media (max-height: 600px) and (max-width: 1099.98px)");
     },

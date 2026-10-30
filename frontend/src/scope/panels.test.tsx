@@ -159,7 +159,7 @@ describe("C9 JobsBar", () => {
     const bar = await screen.findByTestId("jobs-bar");
     const prog = within(bar).getByRole("progressbar", { hidden: true }) as HTMLProgressElement;
     expect(prog.value).toBe(0.5);
-    expect(bar).toHaveTextContent("1 of 2 steps");
+    expect(bar).toHaveTextContent("Step 2 of 2: Grouping alpha.pdf into topics");
     await waitFor(() => expect(screen.queryByTestId("jobs-bar")).toBeNull(), { timeout: 5000 });
     const polls = f.requests.length;
     expect(polls).toBe(3);

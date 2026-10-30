@@ -195,7 +195,7 @@ export function useSelectionEngine(): SelectionEngine {
           };
         out = {
           ...out,
-          selection: { block_ids: ids, article_split: next.split, active_view: next.view },
+          selection: { ...out.selection, block_ids: ids, article_split: next.split, active_view: next.view },
           summary,
         };
         queue.current.push(op);

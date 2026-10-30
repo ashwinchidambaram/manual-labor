@@ -946,6 +946,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/verify/titles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Titles
+         * @description Document, page, type and section heading of each named block, in the order asked, once
+         *     each. Unknown ids and documents not scored yet are left out. Read-only.
+         */
+        get: operations["get_titles"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -980,6 +1001,11 @@ export interface components {
         };
         /** AgentItemView */
         AgentItemView: {
+            /**
+             * Attempts
+             * @default 0
+             */
+            attempts: number;
             flag: components["schemas"]["Flag"];
             /** Last Detail */
             last_detail?: string | null;
@@ -1161,6 +1187,22 @@ export interface components {
          * @enum {string}
          */
         BlockStatus: "auto_approved" | "queued" | "approved" | "edited" | "flagged" | "rejected";
+        /**
+         * BlockTitle
+         * @description Where a block is, to name it outside the queue (Export blockers): the fields a queue card
+         *     titles itself from.
+         */
+        BlockTitle: {
+            /** Block Id */
+            block_id: string;
+            /** Doc Id */
+            doc_id: string;
+            /** Page */
+            page: number;
+            /** Section Title */
+            section_title?: string | null;
+            type: components["schemas"]["BlockType"];
+        };
         /**
          * BlockType
          * @enum {string}
@@ -1593,27 +1635,86 @@ export interface components {
          * @enum {string}
          */
         EvidenceSource: "pymupdf" | "docling" | "ocr" | "ocr_alt" | "docx" | "vision" | "note" | "candidate";
-        /** ExportReviewSummary */
+        /**
+         * ExportFlagBlocker
+         * @description An open flag in scope that no override covers. A block override never covers it; only
+         *     an override naming the flag (or a blanket one) does (design 11 P3, section 14).
+         */
+        ExportFlagBlocker: {
+            /** Block Id */
+            block_id: string;
+            category: components["schemas"]["FlagCategory"];
+            /** Flag Id */
+            flag_id: string;
+            /** Note */
+            note?: string | null;
+        };
+        /**
+         * ExportReviewSummary
+         * @description The blocks of one export (design 11 section 14). Every exported block (assigned to an
+         *     article in the manifest) is in exactly one bucket: ``blocks == auto_approved + approved +
+         *     edited + overrides``; an override-covered block counts only as an override. ``left_out``
+         *     counts the other parsed blocks by their manifest reason (``header_footer``,
+         *     ``not_selected``, ``empty``, ``rejected``): ``total_blocks == blocks + sum(left_out)``.
+         *     ``numbers_verified`` is the manifest's ``numbers_verified_blocks`` count, a cross-cut.
+         */
         ExportReviewSummary: {
             /** Approved */
             approved: number;
             /** Auto Approved */
             auto_approved: number;
+            /** Blocks */
+            blocks: number;
             /** Edited */
             edited: number;
+            /** Left Out */
+            left_out?: {
+                [key: string]: number;
+            };
             /** Numbers Verified */
             numbers_verified: number;
             /** Overrides */
             overrides: number;
+            /** Total Blocks */
+            total_blocks: number;
+        };
+        /**
+         * ExportScopeCounts
+         * @description Every in-scope body block of the ready documents (the Verify scope: page headers and
+         *     footers excluded) in exactly one bucket (design 11 section 14): ``in_scope ==
+         *     auto_approved + approved + edited + rejected + overridden + blocking``. A block that is
+         *     queued, flagged or carries an open flag is ``overridden`` when an active override covers it,
+         *     else ``blocking``; every other block is counted by its review status.
+         */
+        ExportScopeCounts: {
+            /** Approved */
+            approved: number;
+            /** Auto Approved */
+            auto_approved: number;
+            /** Blocking */
+            blocking: number;
+            /** Edited */
+            edited: number;
+            /** In Scope */
+            in_scope: number;
+            /** Overridden */
+            overridden: number;
+            /** Rejected */
+            rejected: number;
         };
         /**
          * ExportStatus
          * @description `unlocked` is the raw gate (no open flag, no queued in-scope block); `blockers` are the
-         *     blocks an active override does not cover: an export is possible iff `blockers` is empty.
+         *     first blocks (reading order, at most 20) an active override does not cover: an export is
+         *     possible iff `blockers` is empty. `flag_blockers` lists every uncovered open flag (no cap);
+         *     `counts` partitions the scope (None from a store that is not a project store).
          */
         ExportStatus: {
             /** Blockers */
             blockers?: string[];
+            counts?: components["schemas"]["ExportScopeCounts"] | null;
+            /** Flag Blockers */
+            flag_blockers?: components["schemas"]["ExportFlagBlocker"][];
             /** Open Flags */
             open_flags: number;
             /** Overrides */
@@ -2010,7 +2111,15 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
-        /** JobInfo */
+        /**
+         * JobInfo
+         * @description One background job (design 07 section 4). While it runs, ``node``/``doc`` name the unit it
+         *     is on (after the last unit: the last one finished) and ``step_done`` of ``step_total``
+         *     ``step_unit``s is that unit's own count of pages, blocks or topics done; all three are None
+         *     when the unit has reported no count (it has no estimate). ``progress`` is
+         *     ``(units_done + step_done/step_total) / units_total``, monotonic. ``files`` are the file
+         *     names an ``ingest_run`` job was given (empty for other kinds).
+         */
         JobInfo: {
             /**
              * Created At
@@ -2021,6 +2130,8 @@ export interface components {
             doc?: string | null;
             /** Error */
             error?: string | null;
+            /** Files */
+            files?: string[];
             /** Finished At */
             finished_at?: string | null;
             /** Id */
@@ -2051,6 +2162,12 @@ export interface components {
              * @enum {string}
              */
             status: "queued" | "running" | "done" | "failed" | "cancelled" | "interrupted";
+            /** Step Done */
+            step_done?: number | null;
+            /** Step Total */
+            step_total?: number | null;
+            /** Step Unit */
+            step_unit?: ("page" | "block" | "topic") | null;
             /**
              * Units Done
              * @default 0
@@ -2824,6 +2941,8 @@ export interface components {
             article_split: components["schemas"]["ArticleSplit"];
             /** Block Ids */
             block_ids: string[];
+            /** Known Docs */
+            known_docs?: string[] | null;
         };
         /** SelectionOp */
         SelectionOp: {
@@ -5198,6 +5317,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["QueuePage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_titles: {
+        parameters: {
+            query: {
+                ids: string[];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BlockTitle"][];
                 };
             };
             /** @description Validation Error */

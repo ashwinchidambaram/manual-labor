@@ -35,6 +35,39 @@ export function whyOutcome(w: WhyItem, faithfulnessPassed: boolean | null | unde
   return "passed";
 }
 
+/**
+ * The verifier's evidence, read back from its detail: `verifier quoted "<span>"; raw "<raw>" -> clean "<clean>"`, each
+ * part a JSON string literal (manuallabor/scoring/verifier.py `evidence_detail`). Null for any other detail, such as
+ * one scored before the evidence rule.
+ */
+export function verifierEvidence(detail: string | null | undefined): { span: string; raw: string; clean: string } | null {
+  if (!detail || !detail.startsWith("verifier quoted ")) return null;
+  const lits = detail.match(/"(?:[^"\\]|\\.)*"/g);
+  if (!lits || lits.length !== 3) return null;
+  try {
+    const [span, raw, clean] = lits.map((l) => JSON.parse(l) as unknown);
+    if (typeof span !== "string" || typeof raw !== "string" || typeof clean !== "string") return null;
+    return { span, raw, clean };
+  } catch {
+    return null;
+  }
+}
+
+/** The change a verifier flag points at: cleanup's raw and clean text of it, then the span the verifier quoted. */
+function VerifierEvidence({ ev }: { ev: { span: string; raw: string; clean: string } }) {
+  const side = (t: string) => (t ? t : <em className="text-muted">nothing</em>);
+  return (
+    <dl data-testid="verifier-evidence" aria-label="The change the verifier points at" className="mt-2.5 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+      <dt className="pt-0.5 text-2xs font-medium text-muted">Raw</dt>
+      <dd className="manual-text text-sm leading-relaxed text-ink">{side(ev.raw)}</dd>
+      <dt className="pt-0.5 text-2xs font-medium text-muted">Clean</dt>
+      <dd className="manual-text text-sm leading-relaxed text-ink">{side(ev.clean)}</dd>
+      <dt className="pt-0.5 text-2xs font-medium text-muted">Verifier quoted</dt>
+      <dd className="manual-text text-sm leading-relaxed text-muted">“{ev.span}”</dd>
+    </dl>
+  );
+}
+
 /** The lines where two readings differ, as two labelled lines in the manual's typeface (design 13 F4). */
 function Readings({ pair, lines, testId }: { pair: ReadingPair; lines: LinePair[]; testId: string }) {
   if (!lines.length)
@@ -202,6 +235,7 @@ export default function WhyList({ why, autoApproved, parserTexts = {}, faithfuln
           if (pairKey) shownPairs.add(pairKey);
           const weak = w.name === "ocr_min" ? weakestFromDetail(w.detail) : null;
           const heading = failed ? human(w.name, true) : w.name === "faithfulness" ? faithHeldSentence(w.detail) : null;
+          const evidence = w.name === "llm_verifier" ? verifierEvidence(w.detail) : null;
           return (
             <li
               key={w.name}
@@ -229,6 +263,7 @@ export default function WhyList({ why, autoApproved, parserTexts = {}, faithfuln
                 {weak ? <p className="mt-1 text-sm text-muted">Check every character of it against the page.</p> : null}
                 {!weak && !heading && signalHint(w.name) && !showReadings ? <p className="mt-1 text-sm text-muted">{signalHint(w.name)}</p> : null}
                 {showReadings && pair ? <Readings pair={pair} lines={lines} testId={firstReadings ? "parser-compare" : "parser-compare-more"} /> : null}
+                {evidence ? <VerifierEvidence ev={evidence} /> : null}
                 <Tech w={w} outcome={outcome} />
               </div>
             </li>

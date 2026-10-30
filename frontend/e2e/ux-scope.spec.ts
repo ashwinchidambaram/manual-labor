@@ -2,7 +2,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { clearSelection, getGroups, putOp, resetSelection, row, stat, waitForTree, waitSettled, type Group } from "./helpers";
+import { clearSelection, getGroups, latencyBudget, putOp, resetSelection, row, stat, waitForTree, waitSettled, type Group } from "./helpers";
 
 const OUT = "e2e/artifacts/ux-scope";
 mkdirSync(OUT, { recursive: true });
@@ -49,7 +49,7 @@ test("1 sources list: parse status, OCR warning on scanned only", async ({ page 
   await expect(page.getByTestId("source-row")).toHaveCount(src.length);
   for (const s of src) {
     const r = page.locator(`[data-testid=source-row][data-slug="${s.slug}"]`);
-    await expect(r.getByTestId("source-chip")).toHaveText(/Ready|Processing|Failed|Needs a run|Not run yet/);
+    await expect(r.getByTestId("source-chip")).toHaveText(/Ready|Adding the file|Reading|Finding figures|Scoring|Grouping into topics|Cleaning up text|Waiting its turn|Failed|Needs a run|Not run yet/);
   }
   for (const s of scanned) {
     const r = page.locator(`[data-testid=source-row][data-slug="${s.slug}"]`);
@@ -444,8 +444,8 @@ test("12 job progress shown; UI interactive while a job runs", async ({ page }) 
   await waitForTree(page);
   await expect(page.getByTestId("jobs-bar")).toBeVisible();
   await expect(page.locator("progress")).toHaveAttribute("value", "0.4");
-  // review M13 P2-11: progress reads "2 of 5 steps", never "2/5"
-  await expect(page.getByTestId("job-row")).toContainText("2 of 5 steps");
+  // review M13 P2-11 and first-use report D: progress names the step running, "Step 3 of 5: ...", never "2/5"
+  await expect(page.getByTestId("job-row")).toContainText("Step 3 of 5: Scoring the cleaned text of clean");
   const groups = await getGroups(page.request);
   const t = groups[0].groups.topics.find((x) => !x.is_unassigned)!;
   const resp = page.waitForResponse((r) => r.url().includes("/api/scope/selection") && r.request().method() === "PUT");
@@ -456,7 +456,8 @@ test("12 job progress shown; UI interactive while a job runs", async ({ page }) 
   const simMs = Date.now() - t0;
   await shot(page, "12a-simulated-job");
   console.log(`UX12 simulated job: click->server PUT done ${simMs} ms`);
-  expect(simMs).toBeLessThan(500 + 150);
+  // 500 ms plus the 150 ms selection debounce; the 500 is doubled below 4 cores (latencyBudget: why)
+  expect(simMs).toBeLessThan(latencyBudget(500) + 150);
   until = 0;
 
   // (b) real job on the server: PUT latency while it runs.
@@ -477,7 +478,7 @@ test("12 job progress shown; UI interactive while a job runs", async ({ page }) 
   }
   console.log(`UX12 real job: PUTs during run=${ran} latencies=${lat.join(",")}`);
   report("12-real-job", { ran, lat });
-  if (ran > 0) expect(Math.max(...lat)).toBeLessThan(500);
+  if (ran > 0) expect(Math.max(...lat)).toBeLessThan(latencyBudget(500)); // doubled below 4 cores (latencyBudget)
   // Wait for the job to finish so later tests see a settled project.
   for (let i = 0; i < 120; i++) {
     const st = (await (await page.request.get(`/api/jobs/${job.id}`)).json()) as { status: string };

@@ -40,7 +40,7 @@ export default function ActionBar(p: Props) {
     <div
       role="toolbar"
       aria-label="Review actions"
-      className="sticky bottom-[var(--guide-sheet,0px)] z-20 flex shrink-0 flex-wrap items-center gap-2 border-t border-line bg-raised px-4 py-2 short:py-1.5 wide:static wide:px-7 wide:py-2.5"
+      className="sticky bottom-[var(--guide-sheet,0px)] z-20 flex shrink-0 flex-wrap items-center gap-2 border-t border-line bg-raised px-4 py-2 short:py-1.5 wide:static wide:flex-nowrap wide:px-7 wide:py-2.5"
     >
       <Hint id="approve">
         <button
@@ -58,9 +58,14 @@ export default function ActionBar(p: Props) {
       {btn("Flag", "F", p.onFlag, !p.hasCurrent, "act-flag", "flag")}
       {btn("Skip", "J", p.onSkip, !p.hasCurrent, "act-skip", "skip")}
       {btn("Back", "K", p.onBack, false, "act-back", "back")}
-      <span className="ml-auto flex items-center gap-3 text-xs text-muted">
+      {/* one line from `wide` (design 13 section 9.3): the position joins it from `xl`, cut to fit, whole in its title;
+          below that the queue's header says where you are */}
+      <span className="ml-auto flex min-w-0 items-center gap-3 text-xs text-muted">
         {p.position ? (
-          <span className="hidden tabular-nums lg:inline">
+          <span
+            className="hidden min-w-0 truncate tabular-nums xl:inline"
+            title={`${p.position} · ${p.saveState === "Not saved" ? "not saved: your last action did not reach the server" : "saved after every action"}`}
+          >
             {p.position}
             {/* a promise the screen can only make while saves are going through */}
             {p.saveState === "Not saved" ? (
@@ -70,7 +75,7 @@ export default function ActionBar(p: Props) {
             )}
           </span>
         ) : null}
-        <button type="button" onClick={p.onHelp} className={`hidden min-h-[2rem] rounded-lg px-2 text-xs font-medium text-muted hover:bg-sunk hover:text-ink wide:inline-block ${FOCUS}`}>
+        <button type="button" onClick={p.onHelp} className={`hidden min-h-[2rem] shrink-0 whitespace-nowrap rounded-lg px-2 text-xs font-medium text-muted hover:bg-sunk hover:text-ink wide:inline-block ${FOCUS}`}>
           <kbd className="font-mono font-bold">?</kbd> Help
         </button>
       </span>

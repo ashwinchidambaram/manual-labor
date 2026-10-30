@@ -13,6 +13,13 @@ test.beforeEach(async ({ request }) => {
   await resetSelection(request);
 });
 
+// A route handler that is inside `route.fetch()` when its test ends fails with "route.fetch: Test ended" (E4 once on
+// CI: the Scope screen refetched /api/scope/groups as the test finished). Detach every handler before the page closes
+// and drop whatever one was still doing, so no handler outlives its test.
+test.afterEach(async ({ page }) => {
+  await page.unrouteAll({ behavior: "ignoreErrors" });
+});
+
 test.describe("E0 built dist", () => {
   test.use({ baseURL: "http://127.0.0.1:8766" });
   test("labor serve serves dist, with SPA fallback on reload", async ({ page }) => {
@@ -262,11 +269,14 @@ test("E9 sources panel, scanned badge and OCR warning", async ({ page, request }
     await expect(r).toContainText(s.filename);
     await expect(r).toContainText(`${s.pages} page`);
     // The confirm job of E3 may leave `clean` stale after later selection changes: mirror the rule.
-    // Only Scope's own stages count (clean/score2 run on Confirm); "Processing" only while a job runs,
-    // otherwise the chip says the stage has not run.
+    // Only Scope's own stages count (clean/score2 run on Confirm); a step is named only while a job runs on it
+    // ("Waiting its turn" while one will), otherwise the chip says the stage has not run.
     const scopeStages = new Set(["ingest", "parse", "figures", "score", "group"]);
     const open = s.nodes.find((n) => scopeStages.has(n.node) && n.state !== "fresh");
-    await expect(r.getByTestId("source-chip")).toHaveText(open ? new RegExp(`^(Processing|Needs a run:|Not run yet:) ${open.node}$`) : /^(Ready|Processing \w*)$/);
+    const doing = "(Adding the file|Reading|Finding figures|Scoring|Grouping into topics|Cleaning up text|Scoring the cleaned text)(, .+)?";
+    await expect(r.getByTestId("source-chip")).toHaveText(
+      open ? new RegExp(`^(${doing}|Waiting its turn|(Needs a run|Not run yet): ${open.node})$`) : new RegExp(`^(Ready|${doing})$`),
+    );
     if (s.kind === "scanned_pdf") await expect(r.getByTestId("scanned-badge")).toBeVisible();
     if (s.ocr_warning) await expect(r.getByTestId("ocr-warning")).toContainText(s.ocr_warning);
   }

@@ -45,6 +45,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     trust: [
       "Under each document a line adds up its blocks: blocks found = blocks in topics + blocks not placed in a topic + page headers and footers, which are left out.",
       "Choosing topics never changes the text. It only decides which blocks are reviewed and exported.",
+      "While manuals are read or scored, the bar at the top names the step and the manual, and counts pages, blocks or topics where the step counts them. A step that does not count says working, no estimate: the bar only moves when the work does.",
     ],
   },
   {
@@ -64,6 +65,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     trust: [
       "Why this needs you lists what held the block, with the evidence: the two readings line by line, the least certain word. Checks that found nothing wrong are marked Passed, and a check that has not run says so; it is never shown as passed.",
       "The progress bar and the line under it add up: in scope = to review + auto-approved + done + flagged + rejected. The server counts each part separately, and a mismatch is shown as a warning.",
+      "While scoring runs, an empty list says Scoring in progress with how many blocks are scored, never All caught up. When scoring finishes and the totals move, the line under the bar says by how many and why.",
     ],
   },
   {
