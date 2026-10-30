@@ -370,5 +370,6 @@
         "1990"
       ]
     }
-  ]
+  ],
+  "verification": "Verified 2026-10-29: digit tokens of every block compared against the PDF text layer inside the block's box (exact source); box corrections recorded in tests/fixtures/real/README.md."
 }

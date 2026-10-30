@@ -363,5 +363,6 @@
         "2"
       ]
     }
-  ]
+  ],
+  "verification": "Verified 2026-10-29: digit tokens of every block compared against an independent blind transcription (Opus, 300 DPI crops, no access to this file) and against the archive.org OCR text layer of the source scan; disagreements resolved by eye and recorded in tests/fixtures/real/README.md. The user spot-checked the first blocks by eye."
 }
