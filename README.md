@@ -171,3 +171,7 @@ Contracts are code. Change a Pydantic model in `manuallabor/contracts/`, then re
 - [docs/design/](docs/design/): one design document per module, with the decisions and their reasons.
 - [docs/PROGRESS.md](docs/PROGRESS.md) and [docs/ACCEPTANCE.md](docs/ACCEPTANCE.md): the gate each module passed, with the command output that proved it.
 - [PRODUCT.md](PRODUCT.md) and [DESIGN.md](DESIGN.md): the product principles and the design system the UI follows.
+
+## License
+
+MIT. See [LICENSE](LICENSE). The bundled Atkinson Hyperlegible font is under the SIL Open Font License (see `frontend/src/assets`).
