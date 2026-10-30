@@ -29,7 +29,7 @@ Inputs: SPEC §5 (signals, faithfulness, calibration), §7.1 to §7.4; CLAUDE.md
 | O5 | Hidden vs visible | **Visible first.** Anything a first-timer needs to decide (what the slider does, why a block is queued, what a check means, what export refuses) is inline text. Hints only add the hotkey and a longer definition | Coordinator brief: do not hide decision-critical meaning behind hover |
 | O6 | Non-focusable chips | Not made focusable (that would add tab stops and break roving focus and the ux-scope / VE8 tab walks). Their meaning is reachable by keyboard through the inline WhyList / ChecksList and the Help **Glossary** (generated from the same `hints.ts`) | Keyboard parity without changing focus order |
 | O7 | Step indicator | Enhance the existing `<nav aria-label="Screens">` links: visible step number + state ("done", "here", "next", "locked: 2 flags"). Links keep `aria-label="Scope"` etc.; state in `aria-describedby` | One nav, no duplicate link names (F6) |
-| O8 | Persistence | `GET/PUT /api/ui/guide` over `meta['ui.guide_seen_version']`; fallback localStorage (§3) | Per project, survives browsers, not an action |
+| O8 | Persistence | `GET/PUT /api/ui/guide` over `meta['ui.guide_seen']`; fallback localStorage (§3) | Per project, survives browsers, not an action |
 | O9 | Content source | `src/onboarding/guide.ts` (steps, guarantees) and `src/onboarding/hints.ts` (control id → meaning, optional `HotkeyId`). `docs/USER_GUIDE.md` is generated from these plus `hotkeys.ts` | One source; drift is a failing test |
 | O10 | Styling | Existing Tailwind tokens (slate neutrals, blue-600 focus ring, amber warnings, red violations). No new colors, no icons library | Consistency with modules 8/9 |
 
@@ -53,7 +53,7 @@ Step content, in the order the user meets it (copy drafts; final copy reviewed i
 `GUARANTEES` ("How it works", shown in the guide and Help, stated plainly): (1) Parsing, IDs, scoring, the faithfulness check and assembly are deterministic code; the same file gives the same result. (2) Cleanup may only join hyphenated lines, fix whitespace, remove headers/footers, normalise bullets and fix reading order; any other change to characters or numbers fails the faithfulness check and the block is queued with the diff. (3) Confidence comes from disagreement between independent sources (two parsers, text layer vs OCR, a separate verifier); no model rates its own output. (4) Every model output is validated before you see it. (5) Learning from your edits is visible per block ("Why did this change?") and can be disabled per rule or reset. (6) Counts reconcile on every screen, so you can see nothing was dropped.
 
 ### 2.2 `GuidePanel`
-Props: `{ step: GuideStep; onPrev; onNext; onHide; index; total }`. Contents: step title, one-paragraph *what*, a numbered *do* list with `<kbd>` keys, a "Why you can trust this" sub-list, and footer buttons **Previous / Next / Hide guide**. Next on the last card says "Done". Hide → `PUT seen_version=GUIDE_VERSION`. If `document.activeElement` was inside the panel when it hides, focus moves to the header Help button (stable, outside the review focus machinery); otherwise focus is not touched. The panel follows the route: arriving on `/verify` shows the Verify card unless the user paged manually in the last 5 s.
+Props: `{ step: GuideStep; onPrev; onNext; onHide; index; total }`. Contents: step title, one-paragraph *what*, a numbered *do* list with `<kbd>` keys, a "Why you can trust this" sub-list, and footer buttons **Previous / Next / Hide guide**. Next on the last card says "Done". Hide → `PUT {seen: true}`. If `document.activeElement` was inside the panel when it hides, focus moves to the header Help button (stable, outside the review focus machinery); otherwise focus is not touched. The panel follows the route: arriving on `/verify` shows the Verify card unless the user paged manually in the last 5 s.
 
 ### 2.3 Help dialog changes (`shell/Help.tsx`)
 Accessible name becomes "Help" (one vitest locator in `tree.test.tsx` updated). `role="tablist"`: **Guide** (all four steps + How it works + "Show guide panel") and **Keyboard shortcuts** (today's content, unchanged rendering) and **Glossary** (every entry of `hints.ts`). Left/Right switch tabs (local keys, added to `LOCAL_KEYS` so Help documents them). Focus trap, `Esc`/`?` close and focus restore are unchanged. Opening `?` from Verify shows the Guide tab scrolled to the Verify step.
@@ -91,11 +91,11 @@ Both keep a "Back to Scope" link for the existing App.test.
 
 ## 3. Data flow and persistence
 
-`GuideState { seen_version: int | null }` (Pydantic in `manuallabor/api/models.py`; OpenAPI + generated types regenerated). `GET /api/ui/guide` reads `meta['ui.guide_seen_version']`; `PUT /api/ui/guide {seen_version: int | null}` writes it (null = show again). Not an action: no `actions` row, not in decisions export, calibration or the zip. The API test fakes implement the same two methods in memory.
+`GuideState { seen: bool, seen_at: str | null, version: int }` (Pydantic in `manuallabor/api/models.py`; OpenAPI + generated types regenerated). `version` is the server's `GUIDE_VERSION`. `GET /api/ui/guide` reads `meta['ui.guide_seen']`, a JSON value `{"version": int, "seen_at": ts}`: `seen = (stored version == GUIDE_VERSION)`, `seen_at` = the stored timestamp (null when unseen), so a `GUIDE_VERSION` bump makes `seen` false and shows the guide once more. `PUT /api/ui/guide {seen: bool}`: true stores `{"version": GUIDE_VERSION, "seen_at": now}`; false clears the key (stored as the empty string, read as unseen). Not an action: no `actions` row, not in decisions export, calibration or the zip. The API test fakes implement `meta`/`set_meta`/`tx`/`now` in memory.
 
-`useGuideState()` (Query key `['guide']`, `staleTime: Infinity`): `open = data.seen_version == null || data.seen_version < GUIDE_VERSION`. Fallback when the GET fails (non-404 error or the endpoint is missing on an older server): localStorage key `manuallabor.guide.v{GUIDE_VERSION}.{project.root}`, read and written in try/catch; if storage throws, the panel shows once per page load and Hide holds for the session. Documented in USER_GUIDE.md ("Reset the guide": Help → Guide → "Show guide panel", or `PUT /api/ui/guide {"seen_version": null}`).
+`useGuideState()` (Query key `['guide']`, `staleTime: Infinity`): `open = !data.seen`. Fallback when the GET fails (non-404 error or the endpoint is missing on an older server): localStorage key `manuallabor.guide.v{GUIDE_VERSION}.{project.root}`, read and written in try/catch; if storage throws, the panel shows once per page load and Hide holds for the session. Documented in USER_GUIDE.md ("Reset the guide": Help → Guide → "Show guide panel", or `PUT /api/ui/guide {"seen": false}`).
 
-e2e: new `e2e/global-setup.ts` PUTs `seen_version = GUIDE_VERSION` on 8765 and 8766 before any spec, so the 55 existing tests run with the panel hidden. `onboarding.spec.ts` sets it to null in `beforeEach` and restores it in `afterAll`.
+e2e: new `e2e/global-setup.ts` PUTs `{seen: true}` on 8765 and 8766 before any spec, so the 55 existing tests run with the panel hidden. `onboarding.spec.ts` sets it to null in `beforeEach` and restores it in `afterAll`.
 
 ## 4. Focus and keyboard invariants (the contract this module must not break)
 1. No onboarding code calls `focus()` except: Help's existing open/restore; Hide when focus was inside the panel (→ Help button).
@@ -107,7 +107,7 @@ e2e: new `e2e/global-setup.ts` PUTs `seen_version = GUIDE_VERSION` on 8765 and 8
 
 ## 5. Edge cases
 - Guide open while the user starts typing in the editor: the panel stays; nothing moves focus. Step change on route change does not re-render the editor.
-- Two tabs: the second sees `seen_version` on next refetch (window focus); hiding in one tab is not pushed live (acceptable).
+- Two tabs: the second sees `seen` on next refetch (window focus); hiding in one tab is not pushed live (acceptable).
 - Narrow screens (< 1024 px): panel becomes a bottom sheet (max 40vh, scrollable), still non-modal.
 - Scanned project: guide Verify card mentions "Scanned pages: text comes from OCR, so more blocks are queued"; ChecksList shows `ocr_min`.
 - DOCX blocks: provenance says "Word document, no page image"; ChecksList omits text-layer-vs-OCR.

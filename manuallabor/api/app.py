@@ -21,6 +21,7 @@ from manuallabor.api.routers import (
     project,
     scope,
     sources,
+    ui,
     verify,
 )
 from manuallabor.state.interfaces import AppServices
@@ -53,7 +54,7 @@ def create_app(
     app.state.ctx = ctx
     app.state.hooks = hooks or Hooks()
     install_handlers(app)
-    for r in (project, sources, scope, verify, figures, jobs, learning, agent, export):
+    for r in (project, sources, scope, verify, figures, jobs, learning, agent, export, ui):
         app.include_router(r.router)
     _mount_frontend(app, static_dir, dev)
     return app

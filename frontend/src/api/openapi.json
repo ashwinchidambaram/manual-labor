@@ -3174,6 +3174,52 @@
         "title": "GroupsFile",
         "type": "object"
       },
+      "GuideState": {
+        "additionalProperties": false,
+        "description": "Per-project onboarding-guide flag (UI state, not a review action; design 12 section 3).",
+        "properties": {
+          "seen": {
+            "title": "Seen",
+            "type": "boolean"
+          },
+          "seen_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seen At"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "seen",
+          "seen_at",
+          "version"
+        ],
+        "title": "GuideState",
+        "type": "object"
+      },
+      "GuideStateIn": {
+        "additionalProperties": false,
+        "properties": {
+          "seen": {
+            "title": "Seen",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "seen"
+        ],
+        "title": "GuideStateIn",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -9033,6 +9079,86 @@
         "summary": "Get Status",
         "tags": [
           "project"
+        ]
+      }
+    },
+    "/api/ui/guide": {
+      "get": {
+        "operationId": "get_guide",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuideState"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Get Guide",
+        "tags": [
+          "ui"
+        ]
+      },
+      "put": {
+        "operationId": "put_guide",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GuideStateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuideState"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Put Guide",
+        "tags": [
+          "ui"
         ]
       }
     },

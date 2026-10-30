@@ -89,6 +89,18 @@ class ThresholdOut(ContractModel):
     job: JobInfo
 
 
+class GuideStateIn(ContractModel):
+    seen: bool
+
+
+class GuideState(ContractModel):
+    """Per-project onboarding-guide flag (UI state, not a review action; design 12 section 3)."""
+
+    seen: bool
+    seen_at: str | None
+    version: int
+
+
 class SourceInfo(ContractModel):
     slug: DocSlug
     filename: str

@@ -10,6 +10,7 @@ from __future__ import annotations
 import threading
 import time
 from collections.abc import Iterator, Sequence
+from contextlib import AbstractContextManager, nullcontext
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -140,6 +141,19 @@ class FakeStore:
     def __init__(self, st: FakeState) -> None:
         self.st = st
         self.closed = False
+        self.meta_rows: dict[str, str] = {}
+
+    def meta(self, key: str) -> str | None:
+        return self.meta_rows.get(key)
+
+    def set_meta(self, key: str, value: str) -> None:
+        self.meta_rows[key] = value
+
+    def tx(self) -> AbstractContextManager[None]:
+        return nullcontext()
+
+    def now(self) -> str:
+        return "2026-10-29T00:00:00Z"
 
     def iter_actions(self) -> Iterator[ActionRecord]:
         return iter(list(self.st.actions))

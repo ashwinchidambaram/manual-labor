@@ -851,6 +851,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ui/guide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Guide */
+        get: operations["get_guide"];
+        /** Put Guide */
+        put: operations["put_guide"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/verify/actions": {
         parameters: {
             query?: never;
@@ -1969,6 +1987,23 @@ export interface components {
             topics: components["schemas"]["Group"][];
             /** Unassigned */
             unassigned: components["schemas"]["UnassignedEntry"][];
+        };
+        /**
+         * GuideState
+         * @description Per-project onboarding-guide flag (UI state, not a review action; design 12 section 3).
+         */
+        GuideState: {
+            /** Seen */
+            seen: boolean;
+            /** Seen At */
+            seen_at: string | null;
+            /** Version */
+            version: number;
+        };
+        /** GuideStateIn */
+        GuideStateIn: {
+            /** Seen */
+            seen: boolean;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -4903,6 +4938,77 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProjectStatus"];
+                };
+            };
+        };
+    };
+    get_guide: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GuideState"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    put_guide: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GuideStateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GuideState"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };

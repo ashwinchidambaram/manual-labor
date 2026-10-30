@@ -41,6 +41,8 @@ CASES: dict[tuple[str, str], tuple[str, dict[str, Any], int]] = {
         {"json": {"value": 0.9, "reason": "slider"}},
         200,
     ),
+    ("GET", "/api/ui/guide"): ("/api/ui/guide", {}, 200),
+    ("PUT", "/api/ui/guide"): ("/api/ui/guide", {"json": {"seen": True}}, 200),
     ("GET", "/api/sources"): ("/api/sources", {}, 200),
     ("POST", "/api/sources"): (
         "/api/sources",
@@ -166,6 +168,7 @@ ROUTER_MODULES = [
     "learning",
     "agent",
     "export",
+    "ui",
 ]
 
 
