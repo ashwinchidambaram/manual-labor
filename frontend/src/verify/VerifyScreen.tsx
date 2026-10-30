@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ApiError, client, unwrap } from "../api/client";
-import { trackJob } from "../api/queries";
+import { trackJob, useExportStatus } from "../api/queries";
 import type { FigureRailItem, FlagCategory, PageRef } from "../api/schema";
 import { useHotkeys } from "../hooks/useHotkeys";
 import { useToast } from "../shell/Toast";
@@ -29,6 +29,13 @@ export default function VerifyScreen() {
   const toast = useToast();
   const v = useVerifyState();
   const { state } = v;
+  // the empty queue offers "Next: export" only when the gate is open: read it again whenever the list empties
+  const exportGate = useExportStatus();
+  const listEmpty = state.items.length === 0 && !state.pinned;
+  const refetchGate = exportGate.refetch;
+  useEffect(() => {
+    if (listEmpty) void refetchGate();
+  }, [listEmpty, refetchGate]);
   const [view, setView] = useState<"text" | "diff">("text");
   const [zoom, setZoom] = useState(false);
   const [edit, setEdit] = useState<EditState | null>(null);
@@ -136,14 +143,22 @@ export default function VerifyScreen() {
   const submitFlag = useCallback(
     async (category: FlagCategory, note: string | null) => {
       setFlagOpen(false);
-      const target = detail?.block.type === "figure" && (category === "bad_crop" || category === "missing_figure") ? detail.block.figure_id : null;
       const id = state.currentId;
-      const res = v.act("flag", { flag: { category, note, target_id: target ?? null } });
+      // a crop or missing-figure flag on a figure block targets the figure (design 09 O6). The figure id is only in
+      // the block's detail: if the flag is raised before it arrived, load it first instead of flagging the block.
+      let d = detail && detail.block.id === id ? detail : undefined;
+      const item = state.items.find((i) => i.block_id === id) ?? (state.pinned?.block_id === id ? state.pinned : null);
+      const figureCategory = category === "bad_crop" || category === "missing_figure";
+      if (!d && id && figureCategory && item?.type === "figure")
+        d = await qc.fetchQuery({ queryKey: blockKey(id), queryFn: () => fetchBlock(id), staleTime: Infinity }).catch(() => undefined);
+      const target = d?.block.type === "figure" && figureCategory ? d.block.figure_id : null;
+      const res = v.act("flag", { flag: { category, note, target_id: target ?? null }, expectId: id });
       v.requestFocus();
       const r = await res;
       if (r.ok) announce(`Flagged ${id}. Next: ${r.out.next?.block_id ?? "none"}`);
+      else if (r.error instanceof Error && r.error.message.endsWith("no longer the current block")) toast.error(`Flag not sent: ${r.error.message}`);
     },
-    [detail, state.currentId, v, announce],
+    [detail, state.currentId, state.items, state.pinned, qc, v, announce, toast],
   );
 
   const openCrop = useCallback(
@@ -278,6 +293,8 @@ export default function VerifyScreen() {
             focusBlocked={v.focusBlocked}
             onSelect={v.browse}
             onNearEnd={() => void v.loadMore()}
+            threshold={v.T}
+            gate={exportGate.data}
           />
         </div>
         <div className="order-3 flex min-h-0 flex-col lg:order-none">

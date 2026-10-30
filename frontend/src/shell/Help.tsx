@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { HOTKEYS, LOCAL_KEYS, SCOPE_TITLES, displayKey, type HotkeyScope } from "../hotkeys";
-import Copy from "../onboarding/Copy";
+import { HOTKEYS, LOCAL_KEYS, SCOPE_TITLES, type HotkeyScope } from "../hotkeys";
+import Copy, { Keycap } from "../onboarding/Copy";
 import { GLOSSARY } from "../onboarding/glossary";
-import { GUARANTEES, GUIDE_STEPS, keyLabel, type StepId } from "../onboarding/guide";
+import { GUARANTEES, GUIDE_STEPS, keyLabel, keycap, type StepId } from "../onboarding/guide";
 
 const FOCUS = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600";
 const TABS = [
@@ -11,6 +11,19 @@ const TABS = [
   { id: "glossary", label: "Glossary" },
 ] as const;
 type Tab = (typeof TABS)[number]["id"];
+
+function Keys({ keys, mod = false }: { keys: readonly string[]; mod?: boolean }) {
+  return (
+    <>
+      {keys.map((k, i) => (
+        <span key={k}>
+          {i > 0 ? <span className="text-slate-500"> / </span> : null}
+          <Keycap>{`${mod ? "Ctrl/Cmd+" : ""}${keycap(k)}`}</Keycap>
+        </span>
+      ))}
+    </>
+  );
+}
 
 /**
  * Help: the getting-started guide, the keyboard shortcuts (rendered from the same HOTKEYS map the handlers use) and
@@ -102,8 +115,8 @@ export default function Help({ onClose, step = "scope", onShowGuide }: { onClose
             </button>
           ))}
         </div>
-        <div className="min-h-0 flex-1 overflow-auto px-4 py-3">
-          <section role="tabpanel" id="help-panel-guide" aria-labelledby="help-tab-guide" hidden={tab !== "guide"} data-testid="help-guide">
+        <div className="flex min-h-0 flex-1 flex-col">
+          <section role="tabpanel" id="help-panel-guide" aria-labelledby="help-tab-guide" hidden={tab !== "guide"} tabIndex={0} data-testid="help-guide" className={`min-h-0 flex-1 overflow-auto px-4 py-3 ${FOCUS} focus-visible:ring-inset`}>
             {onShowGuide ? (
               <p className="mb-3 flex flex-wrap items-center gap-2 text-sm text-slate-700">
                 The same steps can stay docked beside the screen while you work.
@@ -139,14 +152,16 @@ export default function Help({ onClose, step = "scope", onShowGuide }: { onClose
               ))}
             </dl>
           </section>
-          <section role="tabpanel" id="help-panel-keys" aria-labelledby="help-tab-keys" hidden={tab !== "keys"} data-testid="help-keys">
+          <section role="tabpanel" id="help-panel-keys" aria-labelledby="help-tab-keys" hidden={tab !== "keys"} tabIndex={0} data-testid="help-keys" className={`min-h-0 flex-1 overflow-auto px-4 py-3 ${FOCUS} focus-visible:ring-inset`}>
             {scopes.map(({ scope, rows }) => (
               <section key={scope} className="mb-3">
                 <h3 className="text-sm font-semibold text-slate-700">{SCOPE_TITLES[scope]}</h3>
                 <dl className="grid grid-cols-[9rem_1fr] gap-x-2 text-sm">
                   {rows.map((h) => (
                     <div key={h.label} className="contents" data-testid="hotkey-row">
-                      <dt className="font-mono">{h.keys.map(displayKey).join(" / ")}</dt>
+                      <dt>
+                        <Keys keys={h.keys} mod={!!h.mod} />
+                      </dt>
                       <dd>
                         {h.label}
                         {h.when ? <span className="text-slate-500"> ({h.when})</span> : null}
@@ -161,7 +176,9 @@ export default function Help({ onClose, step = "scope", onShowGuide }: { onClose
               <dl className="grid grid-cols-[9rem_1fr] gap-x-2 text-sm">
                 {LOCAL_KEYS.map((k) => (
                   <div key={k.widget} className="contents">
-                    <dt className="font-mono">{k.keys.map(displayKey).join(" / ")}</dt>
+                    <dt>
+                      <Keys keys={k.keys} />
+                    </dt>
                     <dd>
                       {k.widget}: {k.label}
                     </dd>
@@ -170,14 +187,16 @@ export default function Help({ onClose, step = "scope", onShowGuide }: { onClose
               </dl>
             </section>
           </section>
-          <section role="tabpanel" id="help-panel-glossary" aria-labelledby="help-tab-glossary" hidden={tab !== "glossary"} data-testid="help-glossary">
+          <section role="tabpanel" id="help-panel-glossary" aria-labelledby="help-tab-glossary" hidden={tab !== "glossary"} tabIndex={0} data-testid="help-glossary" className={`min-h-0 flex-1 overflow-auto px-4 py-3 ${FOCUS} focus-visible:ring-inset`}>
             <dl className="space-y-2 text-sm">
               {GLOSSARY.map((g) => (
                 <div key={g.id} data-testid="glossary-entry">
                   <dt className="font-medium text-slate-900">
                     {g.term}
                     {g.hotkey ? (
-                      <kbd className="ml-2 rounded border border-slate-300 bg-slate-50 px-1 font-mono text-xs font-normal">{keyLabel(g.hotkey)}</kbd>
+                      <span className="ml-2 font-normal">
+                        <Keycap>{keyLabel(g.hotkey)}</Keycap>
+                      </span>
                     ) : null}
                   </dt>
                   <dd className="text-slate-700">{g.text}</dd>

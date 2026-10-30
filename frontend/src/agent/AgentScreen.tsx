@@ -18,61 +18,74 @@ const isBlock = (id: string): boolean => id.startsWith("b-");
 
 function Target({ id }: { id: string }) {
   const nav = useNavigate();
+  const [error, setError] = useState<string | null>(null);
   if (!isBlock(id)) return <span className="font-mono text-xs">{id}</span>;
   return (
-    <a
-      href="/verify"
-      aria-label={`Open ${id} in Verify`}
-      onClick={(e) => {
-        e.preventDefault();
-        void openInVerify(id).then(() => nav("/verify"));
-      }}
-      className={`font-mono text-xs ${LINK}`}
-    >
-      {id}
-    </a>
+    <>
+      <a
+        href="/verify"
+        aria-label={`Open ${id} in Verify`}
+        onClick={(e) => {
+          e.preventDefault();
+          setError(null);
+          openInVerify(id)
+            .then(() => nav("/verify"))
+            .catch((err: unknown) => setError(`Could not open ${id} in Verify: ${errText(err)}`));
+        }}
+        className={`font-mono text-xs ${LINK}`}
+      >
+        {id}
+      </a>
+      {error ? (
+        <span role="alert" className="basis-full text-xs text-red-800">
+          {error}
+        </span>
+      ) : null}
+    </>
   );
 }
 
 function FlagsSection({ flags, items, error }: { flags: Flag[] | undefined; items: Map<string, AgentItemView>; error: unknown }) {
   const qc = useQueryClient();
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
+  const [msg, setMsg] = useState<{ text: string; failed: boolean } | null>(null);
   const run = async (): Promise<void> => {
     setBusy(true);
     setMsg(null);
     try {
       const job = unwrap(await client.POST("/api/agent/run", { body: { request_id: crypto.randomUUID() } }));
       trackJob(qc, job);
-      setMsg("Agent pass started. Proposals appear below as each item finishes; you can keep reviewing meanwhile.");
+      setMsg({ text: "Agent pass started. Proposals appear below as each item finishes; you can keep reviewing meanwhile.", failed: false });
     } catch (e) {
-      setMsg(`Agent pass not started: ${errText(e)}`);
+      setMsg({ text: `Agent pass not started: ${errText(e)}`, failed: true });
     } finally {
       setBusy(false);
     }
   };
   const n = flags?.length ?? 0;
+  // a disabled Run button points at the sentence that says why
+  const why = error ? "agent-flags-error" : flags && n === 0 ? "agent-empty" : !flags ? "agent-flags-loading" : undefined;
   return (
     <section aria-labelledby="flags-title" className="space-y-2" data-testid="agent-flags">
       <div className="flex flex-wrap items-center gap-3">
         <h3 id="flags-title" className="text-base font-semibold text-slate-950">
           Open flags <span className="font-normal tabular-nums text-slate-600">{flags ? n : ""}</span>
         </h3>
-        <button type="button" onClick={() => void run()} disabled={busy || n === 0} data-testid="agent-run" className={`ml-auto rounded bg-slate-900 px-3 py-1 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-400 ${FOCUS} focus-visible:ring-offset-2`}>
+        <button type="button" onClick={() => void run()} disabled={busy || n === 0} aria-describedby={n === 0 ? why : undefined} data-testid="agent-run" className={`ml-auto rounded bg-slate-900 px-3 py-1 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-400 ${FOCUS} focus-visible:ring-offset-2`}>
           {busy ? "Starting..." : n ? `Run agent pass on ${plural(n, "flag")}` : "Run agent pass"}
         </button>
       </div>
       {msg ? (
-        <p role="status" className="text-sm text-slate-700">
-          {msg}
+        <p role={msg.failed ? "alert" : "status"} className={`text-sm ${msg.failed ? "text-red-800" : "text-slate-700"}`}>
+          {msg.text}
         </p>
       ) : null}
       {error ? (
-        <p role="alert" className="text-sm text-red-800">
+        <p role="alert" id="agent-flags-error" className="text-sm text-red-800">
           Could not list the open flags: {errText(error)}
         </p>
       ) : flags && n === 0 ? (
-        <p className="text-sm text-slate-700" data-testid="agent-empty">
+        <p className="text-sm text-slate-700" id="agent-empty" data-testid="agent-empty">
           <Copy text="No open flags. Flag a block in Verify ({vFlag}) when its text, figure, grouping or table is wrong." />
         </p>
       ) : flags ? (
@@ -94,7 +107,7 @@ function FlagsSection({ flags, items, error }: { flags: Flag[] | undefined; item
           })}
         </ul>
       ) : (
-        <div aria-busy="true" className="h-16 animate-pulse rounded bg-slate-200" />
+        <div aria-busy="true" id="agent-flags-loading" aria-label="Loading the open flags" className="h-16 animate-pulse rounded bg-slate-200" />
       )}
     </section>
   );
@@ -130,6 +143,13 @@ function ProposalItem({ p }: { p: Proposal }) {
       unwrap(await client.POST("/api/agent/proposals/{proposal_id}/edit", { ...path, body: { text, confirm_content_change: confirm, request_id: crypto.randomUUID() } })),
     );
   const failed = (p.rechecks ?? []).filter((r) => !r.passed).length;
+  // the export trusts what a person accepts: a proposal the checks did not clear is edited or rejected, never accepted
+  const acceptOff =
+    failed > 0
+      ? `Accept is off: ${plural(failed, "re-check")} failed. Edit the proposal or reject it.`
+      : (p.rechecks ?? []).length === 0
+        ? "Accept is off: no re-check was reported for this proposal. Edit it or reject it."
+        : null;
   return (
     <li className="space-y-2 px-3 py-3" data-testid="proposal" data-proposal-id={p.id}>
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-sm">
@@ -218,10 +238,15 @@ function ProposalItem({ p }: { p: Proposal }) {
           {error}
         </p>
       ) : null}
+      {mode === "idle" && acceptOff ? (
+        <p id={`accept-off-${p.id}`} className="text-xs text-slate-700" data-testid="accept-off">
+          {acceptOff}
+        </p>
+      ) : null}
       <div className="flex flex-wrap gap-2">
         {mode === "idle" ? (
           <>
-            <button type="button" disabled={busy} onClick={() => void accept()} className={BTN}>
+            <button type="button" disabled={busy || acceptOff !== null} aria-describedby={acceptOff ? `accept-off-${p.id}` : undefined} onClick={() => void accept()} className={BTN}>
               Accept
             </button>
             {p.kind === "text" ? (
@@ -337,8 +362,8 @@ export default function AgentScreen() {
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div>
           <h2 className="text-xl font-semibold">Agent</h2>
-          <p className="mt-1 max-w-prose text-sm text-slate-700">
-            Flags can be handed to a model, one fresh call per item. Every proposal is re-checked by the same deterministic checks before you see it; failed checks are shown, not hidden.
+          <p className="mt-1 max-w-prose text-sm text-slate-700" data-testid="agent-definition">
+            An agent pass sends each open flag to a model, one fresh call per item: the flagged block is handed to a model with what you flagged, and it proposes a fix. Every proposal is re-checked by the same deterministic checks before you see it; failed checks are shown, not hidden.
           </p>
         </div>
         <Link className={`text-sm ${LINK}`} to="/scope">
@@ -363,7 +388,9 @@ export default function AgentScreen() {
         ) : (
           <div aria-busy="true" className="h-16 animate-pulse rounded bg-slate-200" />
         )}
-        <p className="text-xs text-slate-600">A rejected proposal sends its block back to the Verify queue with what was tried.</p>
+        <p className="text-xs text-slate-600" data-testid="reject-note">
+          Rejecting a proposal leaves its flag open: the item stays on this screen for the next agent pass, with what was tried and your reason, and the export stays locked until the flag is resolved.
+        </p>
       </section>
       <section aria-labelledby="calibration-title" className="space-y-2">
         <h3 id="calibration-title" className="text-base font-semibold text-slate-950">

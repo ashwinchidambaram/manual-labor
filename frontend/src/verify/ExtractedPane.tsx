@@ -7,7 +7,7 @@ import { signalHint } from "../onboarding/hints";
 import DiffView, { Marked } from "./DiffView";
 import EditConflictPanel from "./EditConflictPanel";
 import { numericRanges } from "./diffSegments";
-import { FOCUS, STATUS_LABEL } from "./labels";
+import { FOCUS, SCORE_TITLE, STATUS_LABEL, scoreText } from "./labels";
 import LearningChip from "./LearningChip";
 import ParserCompare from "./ParserCompare";
 import { reasonChips } from "./reasons";
@@ -108,8 +108,8 @@ export default function ExtractedPane({ detail, loading, error, view, onView, ed
           {b.id}
         </span>
         <span className="text-xs text-slate-600">{b.type}</span>
-        <span className="text-xs tabular-nums text-slate-700" data-testid="block-confidence">
-          {b.confidence === null || b.confidence === undefined ? "n/a" : b.confidence.toFixed(2)}
+        <span className="text-xs tabular-nums text-slate-700" data-testid="block-confidence" title={SCORE_TITLE}>
+          {scoreText(b.confidence, threshold)}
         </span>
         <Hint id="statusChip">
           <span className="rounded bg-slate-200 px-1.5 text-xs" data-testid="block-status">
@@ -235,7 +235,7 @@ export default function ExtractedPane({ detail, loading, error, view, onView, ed
         why={detail.why ?? []}
         autoApproved={b.status === "auto_approved" ? { confidence: b.confidence ?? null, threshold } : null}
       />
-      <ChecksList block={b} figure={fig ?? null} />
+      <ChecksList block={b} figure={fig ?? null} why={detail.why ?? []} />
       <ParserCompare texts={detail.parser_texts ?? {}} block={b} />
       <LearningChip learning={detail.learning ?? { provenance: "baseline", learned_rules: [], few_shot: [] }} slug={b.doc_id} />
     </section>

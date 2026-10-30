@@ -44,7 +44,12 @@ export function makeQueuePage(n: number, over: Partial<QueuePage> = {}): QueuePa
 
 export const ready = (id: string): DocReadiness => ({ doc_id: id, state: "ready", stale: false, waiting_for: null });
 export const cursor = (over: Partial<Cursor> = {}): Cursor => ({ sort: "worst_first", view_threshold: null, doc_filter: null, current_block_id: null, trail: [], ...over });
-export const counts = (over: Partial<ReviewCounts> = {}): ReviewCounts => ({ pending: 0, auto_approved: 0, approved: 0, edited: 0, flagged_open: 0, skipped: 0, in_scope: 0, ...over });
+/** Fixture counts. Unless a test sets `queued`, the fake server's buckets are consistent: queued fills in_scope. */
+export const counts = (over: Partial<ReviewCounts> = {}): ReviewCounts => {
+  const c = { pending: 0, auto_approved: 0, approved: 0, edited: 0, flagged_open: 0, skipped: 0, in_scope: 0, rejected: 0, ...over };
+  const queued = over.queued ?? Math.max(0, c.in_scope - c.auto_approved - c.approved - c.edited - c.flagged_open - c.rejected);
+  return { ...c, queued };
+};
 
 export const op = (o: DiffOp["op"], allowed: boolean, raw: string, clean: string): DiffOp => ({
   op: o,

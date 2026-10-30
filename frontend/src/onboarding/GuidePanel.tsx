@@ -15,13 +15,15 @@ export interface GuidePanelProps {
   onHide: () => void;
   /** project facts that change what the guide says */
   notes?: string[];
+  /** the last Hide was not saved on the server */
+  error?: string | null;
 }
 
 /**
  * The docked, non-modal getting-started panel (design 12 O1, O2). It never calls focus() and sits outside every
  * `data-zone`, so the screen's focus rules and hotkeys work exactly as without it.
  */
-const GuidePanel = forwardRef<HTMLElement, GuidePanelProps>(function GuidePanel({ step, index, total, onPrev, onNext, onHide, notes = [] }, ref) {
+const GuidePanel = forwardRef<HTMLElement, GuidePanelProps>(function GuidePanel({ step, index, total, onPrev, onNext, onHide, notes = [], error = null }, ref) {
   const last = index === total - 1;
   return (
     <aside
@@ -42,6 +44,11 @@ const GuidePanel = forwardRef<HTMLElement, GuidePanelProps>(function GuidePanel(
           Hide guide
         </button>
       </div>
+      {error ? (
+        <p role="alert" className="mx-4 mt-2 rounded border border-red-300 bg-red-50 px-2 py-1 text-xs text-red-900">
+          {error}
+        </p>
+      ) : null}
       {/* scrollable, so keyboard users can reach it (it holds no control of its own) */}
       <div tabIndex={0} role="region" aria-label="Guide text" className={`min-h-0 flex-1 overflow-y-auto px-4 py-3 ${FOCUS} focus-visible:ring-inset focus-visible:ring-offset-0`}>
         <h2 className="text-base font-semibold leading-snug text-slate-950" data-testid="guide-title">
@@ -49,7 +56,7 @@ const GuidePanel = forwardRef<HTMLElement, GuidePanelProps>(function GuidePanel(
         </h2>
         <p className="mt-1.5 text-sm leading-relaxed text-slate-700">{step.what}</p>
         {notes.map((n) => (
-          <p key={n} role="note" className="mt-2 rounded border border-amber-300 bg-amber-50 px-2 py-1 text-xs text-amber-950">
+          <p key={n} role="note" className="mt-2 rounded border border-slate-300 bg-slate-50 px-2 py-1 text-xs text-slate-800">
             {n}
           </p>
         ))}

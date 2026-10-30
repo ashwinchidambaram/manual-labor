@@ -8,6 +8,8 @@ import { useJobWatch } from "../hooks/useJobsPolling";
 import Hint from "../onboarding/Hint";
 import { openInVerify } from "../shell/openInVerify";
 
+/** The server lists at most this many blockers (manuallabor/export/types.py BLOCKER_LIMIT). */
+export const BLOCKER_LIMIT = 20;
 const FOCUS = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600";
 const LINK = `text-blue-700 underline underline-offset-2 hover:text-blue-900 ${FOCUS}`;
 const plural = (n: number, w: string): string => `${n} ${w}${n === 1 ? "" : "s"}`;
@@ -79,8 +81,8 @@ function Locked({ st }: { st: ExportStatus }) {
         <div>
           <h4 className="text-sm font-semibold text-slate-800">
             Blocking blocks{" "}
-            <span className="font-normal text-slate-600">
-              ({blockers.length < queued + st.open_flags ? `first ${blockers.length} listed by the server` : plural(blockers.length, "block")})
+            <span className="font-normal text-slate-600" data-testid="blocker-count">
+              ({blockers.length >= BLOCKER_LIMIT ? `first ${blockers.length} listed by the server` : plural(blockers.length, "block")})
             </span>
           </h4>
           <ul className="mt-1 flex flex-wrap gap-1.5" data-testid="blocker-list">
@@ -113,11 +115,16 @@ function Locked({ st }: { st: ExportStatus }) {
   );
 }
 
-function OverrideForm({ onDone }: { onDone: (st: ExportStatus) => void }) {
+/**
+ * Export anyway: one override per listed blocker (review M12 #6). A blanket override (no target) would also cover
+ * blocks and flags that start blocking later, until the next export; per-blocker overrides cover exactly what the
+ * reader saw. Request ids are stable per form and blocker, so a retry after a partial failure records nothing twice.
+ */
+function OverrideForm({ blockers, onDone }: { blockers: string[]; onDone: (st: ExportStatus) => void }) {
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [rid] = useState(() => crypto.randomUUID());
+  const [rid, setRid] = useState(() => crypto.randomUUID());
   const submit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
     if (!reason.trim()) {
@@ -126,22 +133,34 @@ function OverrideForm({ onDone }: { onDone: (st: ExportStatus) => void }) {
     }
     setBusy(true);
     setError(null);
+    const targets = [...blockers];
+    let last: ExportStatus | null = null;
+    let done = 0;
     try {
-      onDone(unwrap(await client.POST("/api/export/override", { body: { reason: reason.trim(), request_id: rid } })));
+      for (const id of targets) {
+        last = unwrap(await client.POST("/api/export/override", { body: { reason: reason.trim(), target_id: id, flag_id: null, request_id: `${rid}:${id}` } }));
+        done++;
+      }
       setReason("");
+      setRid(crypto.randomUUID());
     } catch (err) {
-      setError(`Override not recorded: ${errText(err)}`);
+      setError(
+        `Override not recorded for ${targets[done]}: ${errText(err)}. ${done} of ${targets.length} recorded; Record overrides again to retry the rest.`,
+      );
     } finally {
+      if (last) onDone(last);
       setBusy(false);
     }
   };
+  const n = blockers.length;
   return (
     <form onSubmit={(e) => void submit(e)} className="space-y-2 rounded border border-slate-300 bg-white p-3" data-testid="override-form" aria-labelledby="override-title">
       <h3 id="override-title" className="text-sm font-semibold text-slate-900">
         Export anyway
       </h3>
       <p className="max-w-prose text-sm text-slate-700">
-        An override exports the blocking blocks with their machine-cleaned text, unreviewed. Each one is listed in manifest.json with your reason.
+        Records one override for each of the {plural(n, "block")} listed above, with your reason. Each is exported unreviewed, with its machine-cleaned text, and listed in manifest.json. A block or flag that starts blocking later is not covered.
+        {n >= BLOCKER_LIMIT ? ` The server lists at most ${BLOCKER_LIMIT} at a time; record again for the next ones.` : ""}
       </p>
       <label htmlFor="override-reason" className="block text-sm font-medium text-slate-800">
         Reason <span className="font-normal text-slate-600">(required)</span>
@@ -163,8 +182,8 @@ function OverrideForm({ onDone }: { onDone: (st: ExportStatus) => void }) {
           {error}
         </p>
       ) : null}
-      <button type="submit" disabled={busy} data-testid="override-submit" className={`rounded border border-slate-500 bg-white px-3 py-1 text-sm hover:bg-slate-100 disabled:opacity-50 ${FOCUS}`}>
-        {busy ? "Recording..." : "Record override"}
+      <button type="submit" disabled={busy || n === 0} data-testid="override-submit" className={`rounded border border-slate-500 bg-white px-3 py-1 text-sm hover:bg-slate-100 disabled:opacity-50 ${FOCUS}`}>
+        {busy ? "Recording..." : n === 1 ? "Record override" : `Record ${n} overrides`}
       </button>
     </form>
   );
@@ -180,7 +199,7 @@ function Overrides({ list }: { list: Override[] }) {
       <ul className="mt-1 space-y-1 text-sm">
         {list.map((o, i) => (
           <li key={`${o.at}-${i}`} className="text-slate-800">
-            <span className="text-slate-600">{fmtTime(o.at)}</span> · {o.target_id ? <span className="font-mono text-xs">{o.target_id}</span> : "every blocking block"}:{" "}
+            <span className="text-slate-600">{fmtTime(o.at)}</span> · {o.target_id ? <span className="font-mono text-xs">{o.target_id}</span> : "every block blocking the next export, including any that start blocking later"}:{" "}
             <q>{o.reason}</q>
           </li>
         ))}
@@ -291,6 +310,7 @@ export default function ExportScreen() {
             <>
               <Locked st={st} />
               <OverrideForm
+                blockers={st.blockers ?? []}
                 onDone={(next) => {
                   qc.setQueryData(qk.exportStatus, next);
                   invalidateReviewCounts(qc);

@@ -75,7 +75,7 @@ export default function AppShell() {
               <Outlet />
             </ErrorBoundary>
           </div>
-          {guide.open ? <GuideDock path={loc.pathname} mock={!!project.data?.mock} onHide={guide.hide} /> : null}
+          {guide.open ? <GuideDock path={loc.pathname} mock={!!project.data?.mock} onHide={guide.hide} saveError={guide.saveError} /> : null}
         </div>
         {help ? (
           <Help

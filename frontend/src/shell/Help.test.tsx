@@ -57,6 +57,27 @@ describe("U8 Help", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(help).toHaveFocus();
   });
+  it("each tab panel is a keyboard stop (so it can be scrolled), and the trap still cycles through it", async () => {
+    installFake();
+    const { user } = renderApp("/export");
+    await screen.findByTestId("export-screen");
+    await user.keyboard("?");
+    const dlg = screen.getByRole("dialog", { name: "Help" });
+    for (const [tab, id] of [["Guide", "help-guide"], ["Keyboard shortcuts", "help-keys"], ["Glossary", "help-glossary"]] as const) {
+      await user.click(within(dlg).getByRole("tab", { name: tab }));
+      const panel = within(dlg).getByTestId(id);
+      expect(panel).toHaveAttribute("tabindex", "0");
+      const close = within(dlg).getByRole("button", { name: "Close" });
+      close.focus();
+      const visited: Element[] = [];
+      for (let i = 0; i < 8 && !visited.includes(document.activeElement!); i++) {
+        visited.push(document.activeElement!);
+        await user.tab();
+      }
+      expect(visited, tab).toContain(panel);
+      expect(document.activeElement, `${tab}: Tab wraps back to Close`).toBe(close);
+    }
+  });
   it("Show guide panel closes Help and docks the panel without taking focus", async () => {
     const f = installFake();
     const { user } = renderApp("/export");

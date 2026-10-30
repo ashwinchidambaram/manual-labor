@@ -55,21 +55,49 @@ describe("U5 Hint", () => {
     await new Promise((r) => setTimeout(r, 450));
     expect(screen.queryByRole("tooltip")).toBeNull();
   });
-  it("Esc hides it without preventing the app's own Esc handling, and focus stays put", async () => {
+  it("Esc with a tooltip open closes only the tooltip: the app's own Esc handlers do not see it, focus stays put", async () => {
     const user = userEvent.setup();
     render(<Harness />);
-    let prevented: boolean | null = null;
-    const spy = (e: KeyboardEvent): void => {
-      if (e.key === "Escape") prevented = e.defaultPrevented;
+    const appEsc: string[] = [];
+    const onDoc = (e: KeyboardEvent): void => {
+      if (e.key === "Escape") appEsc.push("document");
     };
-    document.addEventListener("keydown", spy);
+    document.addEventListener("keydown", onDoc);
     await user.tab();
     await user.tab();
     await screen.findByRole("tooltip");
     await user.keyboard("{Escape}");
     await waitFor(() => expect(screen.queryByRole("tooltip")).toBeNull());
-    expect(prevented).toBe(false);
+    expect(appEsc).toEqual([]);
     expect(screen.getByRole("button", { name: "Go" })).toHaveFocus();
+    // with no tooltip open, Esc reaches the app exactly as before, not prevented
+    let prevented: boolean | null = null;
+    const spy = (e: KeyboardEvent): void => {
+      if (e.key === "Escape") prevented = e.defaultPrevented;
+    };
+    document.addEventListener("keydown", spy);
+    await user.keyboard("{Escape}");
+    expect(appEsc).toEqual(["document"]);
+    expect(prevented).toBe(false);
+    document.removeEventListener("keydown", onDoc);
     document.removeEventListener("keydown", spy);
+  });
+  it("a click on the trigger cancels a pending hover tooltip, so a later Esc belongs to whatever the click opened", async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+    const go = screen.getByRole("button", { name: "Go" });
+    await user.hover(go);
+    await user.click(go);
+    await new Promise((r) => setTimeout(r, 450));
+    expect(screen.queryByRole("tooltip")).toBeNull();
+  });
+  it("focus the app moves itself after Enter or Esc (a dialog returning focus) shows no tooltip", async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+    screen.getByRole("button", { name: "before" }).focus();
+    await user.keyboard("{Enter}");
+    screen.getByRole("button", { name: "Go" }).focus();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.queryByRole("tooltip")).toBeNull();
   });
 });

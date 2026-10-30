@@ -17,4 +17,17 @@ describe("U3 docs/USER_GUIDE.md", () => {
     const rows = shortcuts.split("\n").filter((l) => l.startsWith("| ") && !l.startsWith("| Keys"));
     expect(rows).toHaveLength(Object.values(HOTKEYS).length);
   });
+  it("every key in the prose comes from HOTKEYS, including the Help key in Reset the guide", () => {
+    const h = HOTKEYS.help as { keys: string[] };
+    const saved = h.keys;
+    h.keys = ["f1"];
+    try {
+      const md = renderUserGuide();
+      const reset = md.slice(md.indexOf("## Reset the guide"));
+      expect(reset).toContain("open Help (`f1`)");
+      expect(reset).not.toContain("`?`");
+    } finally {
+      h.keys = saved;
+    }
+  });
 });

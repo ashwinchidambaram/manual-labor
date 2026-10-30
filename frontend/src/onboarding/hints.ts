@@ -63,7 +63,7 @@ export const SIGNAL_HINTS: Record<SignalName, string> = {
   reading_order_risk: "How safe the reading order is; columns and wrapped text lower it.",
   table_consistency: "Whether the table's rows and columns line up consistently.",
   garbage_ratio: "How free the text is of broken characters or a wrong encoding.",
-  faithfulness: "Whether cleanup kept the text, changing only spacing, hyphenation, headers or reading order.",
+  faithfulness: "Whether cleanup kept the text, making only the allowed changes: whitespace, hyphenation, headers and footers, reading order, character forms, table layout and bullets.",
   figure_method: "How the figure was extracted; a crop of the page image scores lower than a native image.",
   figure_resolution: "Whether the figure image has enough resolution.",
   figure_attach_rule: "How strong the rule is that matched the figure to this article.",

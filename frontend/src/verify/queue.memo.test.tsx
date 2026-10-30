@@ -21,7 +21,7 @@ describe("QueueCard memo", () => {
     const c = counts();
     const ui = (pinned: typeof items[number] | null) => (
       <MemoryRouter>
-        <Queue items={items} total={8} pinned={pinned} currentId={items[0].block_id} docs={docs} counts={c} focusTick={0} wantFocus={wantFocus} onSelect={noop} onNearEnd={noop} />
+        <Queue items={items} total={8} pinned={pinned} currentId={items[0].block_id} docs={docs} counts={c} focusTick={0} wantFocus={wantFocus} onSelect={noop} onNearEnd={noop} threshold={0.85} />
       </MemoryRouter>
     );
     const r = render(ui(null));

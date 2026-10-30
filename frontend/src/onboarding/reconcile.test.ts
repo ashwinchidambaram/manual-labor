@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { DocGroups, ScopeBlockRow } from "../api/schema";
 import { bid as fbid, makeDocs } from "../test/fixtures";
 import { counts } from "../test/verifyFake";
-import { docMismatchDetail, docReconcileText, reconcileDoc, reconcileReview, reviewReconcileText } from "./reconcile";
+import { docMismatchDetail, docReconcileText, reconcileDoc, reconcileReview, reviewMismatchDetail, reviewReconcileText } from "./reconcile";
 
 const row = (id: string, type: ScopeBlockRow["type"] = "paragraph"): ScopeBlockRow => ({ id, type, status: "queued", numeric: false });
 const bid = (p: number, n: number) => fbid("alpha", p, n);
@@ -42,13 +42,20 @@ describe("U4 reconcile", () => {
     expect(r.view).toBe("sections");
     expect(r).toMatchObject({ inGroups: 7, unassigned: 0, ok: true });
   });
-  it("review identity counts skipped inside to-review and ignores view-filter additions in pending", () => {
-    const c = counts({ in_scope: 300, auto_approved: 200, approved: 40, edited: 10, flagged_open: 10, skipped: 3, pending: 75 });
+  it("review line: to review is the server's independent queued count, rejected is its own bucket", () => {
+    const c = counts({ in_scope: 300, queued: 38, auto_approved: 200, approved: 40, edited: 10, flagged_open: 10, rejected: 2, skipped: 3, pending: 75 });
     const r = reconcileReview(c);
-    expect(r).toMatchObject({ queued: 40, done: 50, ok: true, skipped: 3 });
-    expect(reviewReconcileText(r)).toBe("In scope 300 = 40 to review + 200 auto-approved + 50 done + 10 flagged");
+    expect(r).toMatchObject({ queued: 38, done: 50, rejected: 2, ok: true, skipped: 3, sum: 300 });
+    expect(reviewReconcileText(r)).toBe("In scope 300 = 38 to review + 200 auto-approved + 50 done + 10 flagged + 2 rejected");
   });
-  it("a negative to-review count is not ok", () => {
-    expect(reconcileReview(counts({ in_scope: 5, auto_approved: 4, approved: 2 })).ok).toBe(false);
+  it("to review is never derived by subtraction: a server queued count that disagrees fails the identity", () => {
+    // in_scope - others would give 40; the server says 41, so the parts add up to 301
+    const r = reconcileReview(counts({ in_scope: 300, queued: 41, auto_approved: 200, approved: 40, edited: 10, flagged_open: 10, rejected: 0 }));
+    expect(r.queued).toBe(41);
+    expect(r.ok).toBe(false);
+    expect(reviewMismatchDetail(r)).toBe("in scope 300, but to review 41 + auto-approved 200 + done 50 + flagged 10 + rejected 0 = 301");
+  });
+  it("parts that add up to less than in scope also fail", () => {
+    expect(reconcileReview(counts({ in_scope: 5, queued: 1, auto_approved: 2, rejected: 0 })).ok).toBe(false);
   });
 });

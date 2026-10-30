@@ -23,6 +23,12 @@ describe("U6 GuidePanel", () => {
     await panel();
     expect(document.activeElement).toBe(document.body);
   });
+  it("a mock project shows the mock-models mode as a mode, with where to set real models", async () => {
+    installFake({ guide: unseen });
+    renderApp("/export");
+    const p = await panel();
+    expect(within(p).getByRole("note")).toHaveTextContent("Mock models are on: model output is placeholder text; real models are set in Scope → Models.");
+  });
   it("stays hidden when the server says it was seen", async () => {
     installFake();
     renderApp("/scope");

@@ -45,3 +45,16 @@ void _allCategoriesOrdered;
 export const FLAG_CATEGORIES: { id: FlagCategory; label: string }[] = FLAG_ORDER.map((id) => ({ id, label: FLAG_LABEL[id] }));
 
 export const FOCUS = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600";
+
+/**
+ * A block's score with what it is judged against (PRODUCT.md: never a bare confidence number). The number is the
+ * scorer's combined confidence; the threshold is the auto-approve line from the project config.
+ */
+export function scoreText(conf: number | null | undefined, threshold: number): string {
+  if (conf === null || conf === undefined) return "score n/a · not scored yet";
+  const v = conf.toFixed(2);
+  const t = threshold.toFixed(2);
+  const cmp = conf < threshold ? (v === t ? "just below" : "below") : "at or above";
+  return `score ${v} · ${cmp} ${t}`;
+}
+export const SCORE_TITLE = "Combined confidence from the checks, 0 to 1. Blocks below the threshold are reviewed by a person; blocks with numbers are always reviewed.";

@@ -69,9 +69,11 @@ test("OB2 Hide persists on the server: reload shows no panel", async ({ page, re
   const g = await api(request).get<GuideState>("/api/ui/guide");
   expect(g.version).toBe(1);
   expect(g.seen_at).toBeTruthy();
+  // wait for the app's own guide GET to answer, not for a fixed time
+  const guideGet = page.waitForResponse((r) => new URL(r.url()).pathname === "/api/ui/guide" && r.request().method() === "GET");
   await page.reload();
+  expect((await guideGet).ok()).toBe(true);
   await waitForTree(page);
-  await page.waitForTimeout(300);
   await expect(panel(page)).toHaveCount(0);
 });
 
@@ -210,11 +212,12 @@ test("OB8 reconciliation lines equal the API numbers on Scope and Verify", async
   const c = q.counts;
   await page.goto("/verify");
   await expect(currentCard(page)).toBeFocused();
-  const done = c.approved + c.edited;
-  const toReview = c.in_scope - c.auto_approved - done - c.flagged_open;
+  // every term is the API's own field (to review = `queued`, never in_scope minus the others)
+  expect(c.queued + c.auto_approved + c.approved + c.edited + c.flagged_open + c.rejected, "the API's buckets add up").toBe(c.in_scope);
   await expect(page.getByTestId("reconcile-review")).toContainText(
-    `In scope ${c.in_scope} = ${toReview} to review + ${c.auto_approved} auto-approved + ${done} done + ${c.flagged_open} flagged`,
+    `In scope ${c.in_scope} = ${c.queued} to review + ${c.auto_approved} auto-approved + ${c.approved + c.edited} done + ${c.flagged_open} flagged + ${c.rejected} rejected`,
   );
+  await expect(page.getByTestId("reconcile-mismatch")).toHaveCount(0);
 });
 
 test("OB9 Export locked view lists the API's blockers; a blocker link opens that block in Verify", async ({ page, request }) => {

@@ -14,10 +14,10 @@ Every block you select becomes text in an article. Suggested topics and Document
 
 What to do:
 
-1. Move through the list with `j` and `k`. `Space` selects or clears a row; `a` selects everything.
-2. `t` switches views. Low cohesion means a topic mixes subjects: check it in Document structure.
+1. Move through the list with `J` and `K`. `Space` selects or clears a row; `A` selects every block.
+2. `T` switches views. Low cohesion means a topic mixes subjects: check it in Document structure.
 3. Unassigned holds the blocks no topic claimed. They are listed here, never dropped.
-4. Estimated review is how many selected blocks will need a person. `g` confirms: scoring starts and Verify opens at once.
+4. Estimated review is how many selected blocks will need a person. `G` confirms: scoring starts and Verify opens at once.
 
 Why you can trust this:
 
@@ -32,28 +32,29 @@ The queue lists only the blocks the machine is unsure about, worst first, and ea
 
 What to do:
 
-1. `a` approves. On a block with numbers it also records that you checked the numbers.
-2. `e` edits and `Ctrl/Cmd+Enter` saves. `f` flags the block with a category. `j` skips, `k` goes back.
-3. `t` shows every change cleanup made against the raw parse.
+1. `A` approves. On a block with numbers it also records that you checked the numbers.
+2. `E` edits and `Ctrl/Cmd+Enter` saves. `F` flags the block with a category. `J` skips, `K` goes back.
+3. `T` shows every change cleanup made against the raw parse.
 4. The slider only shows auto-approved blocks for a second look. It never changes their status.
-5. Figures: `g` focuses the figure rail. Attach a figure re-attaches, `x` detaches, `c` adjusts the crop.
+5. Figures: `G` focuses the figure rail. Attach a figure re-attaches, `X` detaches, `C` adjusts the crop.
 
 Why you can trust this:
 
 - Checks on this block lists each deterministic check and its result. A check that has not run says so; it is never shown as passed.
-- The status line adds up: in scope = to review + auto-approved + done + flagged.
+- The status line adds up: in scope = to review + auto-approved + done + flagged + rejected. The server counts each part separately, and a mismatch is shown as a warning.
 
 ### 3. Hand flagged blocks to a model
 
 Screen: /agent (key `3`)
 
-Flags you raised can be handed to a model, one fresh call per item. Every proposal is re-checked by the same deterministic checks, and failed checks are shown, not hidden.
+An agent pass sends each open flag to a model, one fresh call per item, and lists what the model proposes. Every proposal is re-checked by the same deterministic checks, and failed checks are shown, not hidden.
 
 What to do:
 
 1. Run the agent pass for the open flags. You can keep reviewing while it runs.
-2. Accept, edit or reject each proposal. A rejected item goes back to the queue with what was tried.
-3. Calibration shows how often you edited blocks at each confidence level and suggests a threshold. It never changes the threshold for you.
+2. Accept, edit or reject each proposal. Accept is only offered when every re-check passed.
+3. Rejecting a proposal leaves its flag open: the item stays on this screen for the next agent pass with what was tried and your reason, and the export stays locked until the flag is resolved.
+4. Calibration shows how often you edited blocks at each confidence level and suggests a threshold. It never changes the threshold for you.
 
 Why you can trust this:
 
@@ -77,12 +78,12 @@ Why you can trust this:
 
 ## How it works
 
-- **The same file gives the same result.** Parsing, IDs, scoring, the faithfulness check and assembly are deterministic code.
-- **Cleanup cannot rewrite your text.** It may only join hyphenated lines, fix whitespace, remove headers and footers, normalise bullets and fix reading order. Any other change to characters or numbers fails the faithfulness check, and the block is queued with the diff.
-- **Confidence comes from disagreement, not from a model's opinion of itself.** Two parsers, the text layer against OCR, and a separate verifier are compared. No model rates its own output.
-- **Every model output is validated before you see it.** Proposals and cleanups go through the same deterministic checks as everything else.
+- **Parsing and checking are code, not a model.** Parsing, IDs, scoring, the faithfulness check and assembly are deterministic code. Model calls (cleanup, topic names, figure descriptions, the agent and the optional verifier) run at temperature 0 and are cached by their input, so a re-run reuses the same answers while the cache is kept.
+- **Cleanup cannot rewrite your text.** Cleanup may only change whitespace, join words hyphenated across a line break, remove known headers and footers, fix reading order where the layout gives evidence, turn ligatures, Unicode variants and soft hyphens into plain text, rebuild table layout without changing any cell, and normalise list bullets. Where the PDF text layer and OCR read a number differently by a look-alike character (0 and O, 1 and l) and the other reading confirms it, the number chosen between text layer and OCR is recorded, not failed. Any other change to characters or numbers fails the faithfulness check, and the block is queued with the diff.
+- **Confidence comes from disagreement, not from a model's opinion of itself.** Two parsers, the PDF text layer against OCR, and a separate verifier model when one is configured are compared. No model rates its own output.
+- **Model text is checked before you see it.** Cleaned text and agent proposals go through the same deterministic checks as everything else. Figure descriptions are only checked against their schema, not against the image.
 - **Learning from your edits is visible.** Each block shows which learned rules touched it (Why did this change?), and each rule can be disabled or reset.
-- **Nothing is dropped silently.** Counts reconcile on every screen, and every block ends up in an article or in the unassigned list.
+- **Nothing is dropped silently.** On Scope, each document's line adds up its parsed blocks; on Verify, the status line adds up the blocks in scope. Every block ends up in an article or in the unassigned list.
 
 ## Keyboard shortcuts
 
@@ -102,26 +103,26 @@ Every key below comes from the single hotkey map (frontend/src/hotkeys.ts). Keys
 
 | Keys | Action |
 |---|---|
-| `t` | Switch between topics and document structure |
+| `T` | Switch between topics and document structure |
 | `Esc` | Focus the group list |
-| `o` | Focus the sources list |
-| `m` | Focus the model panel (again: back to the list) |
-| `u` | Focus the selection summary |
-| `s` | Cycle article split: per topic / per document |
-| `a` | Select every block |
-| `n` | Clear the selection |
-| `g` | Confirm scope and go to Verify |
+| `O` | Focus the sources list |
+| `M` | Focus the model panel (again: back to the list) |
+| `U` | Focus the selection summary |
+| `S` | Cycle article split: per topic / per document |
+| `A` | Select every block |
+| `N` | Clear the selection |
+| `G` | Confirm scope and go to Verify |
 
 ### Inside the group list
 
 | Keys | Action |
 |---|---|
-| `j` / `Down` | Next row |
-| `k` / `Up` | Previous row |
+| `J` / `Down` | Next row |
+| `K` / `Up` | Previous row |
 | `Home` | First row |
 | `End` | Last row |
-| `Right` / `l` | Expand, or go to the first child (structure view) |
-| `Left` / `h` | Collapse, or go to the parent (structure view) |
+| `Right` / `L` | Expand, or go to the first child (structure view) |
+| `Left` / `H` | Collapse, or go to the parent (structure view) |
 | `Space` | Toggle the row (partial selects the rest) |
 | `Enter` | Select only this row |
 | `Shift+A` | Select the whole document of this row |
@@ -130,18 +131,18 @@ Every key below comes from the single hotkey map (frontend/src/hotkeys.ts). Keys
 
 | Keys | Action |
 |---|---|
-| `a` | Approve the current block |
-| `e` | Edit the current block (Ctrl or Cmd + Enter saves) |
-| `f` | Flag the current block |
-| `j` | Skip the current block |
-| `k` | Go back to the previous block |
-| `t` | Switch between text and diff against raw |
-| `s` | Focus the current block on the source page |
-| `g` | Focus the figure rail |
+| `A` | Approve the current block |
+| `E` | Edit the current block (Ctrl or Cmd + Enter saves) |
+| `F` | Flag the current block |
+| `J` | Skip the current block |
+| `K` | Go back to the previous block |
+| `T` | Switch between text and diff against raw |
+| `S` | Focus the current block on the source page |
+| `G` | Focus the figure rail |
 | `/` | Cycle the queue sort |
 | `[` | Review fewer auto-approved blocks (view filter down) |
 | `]` | Review more auto-approved blocks (view filter up) |
-| `z` | Zoom the source page |
+| `Z` | Zoom the source page |
 | `Esc` | Cancel the edit or mode, else back to the queue |
 
 ### Verify: queue
@@ -167,8 +168,8 @@ Every key below comes from the single hotkey map (frontend/src/hotkeys.ts). Keys
 |---|---|
 | `Down` | Next figure |
 | `Up` | Previous figure |
-| `x` | Detach the focused figure from this article |
-| `c` | Adjust the crop of the focused figure |
+| `X` | Detach the focused figure from this article |
+| `C` | Adjust the crop of the focused figure |
 
 ### Verify: editing
 
@@ -203,21 +204,21 @@ Every key below comes from the single hotkey map (frontend/src/hotkeys.ts). Keys
 - **Agent (step 3)** (`3`): Hand flagged blocks to a model and review its proposals.
 - **Export (step 4)** (`4`): Build the knowledge base zip once nothing is left to review.
 - **Help** (`?`): Getting-started guide, keyboard shortcuts and this glossary.
-- **Grouping view** (`t`): Two views of the same blocks. Switching never changes what is selected.
-- **Article split** (`s`): Whether articles follow topics or whole documents. It changes the article count, not the selected blocks.
-- **Select all** (`a`): Select every block of every document.
-- **Clear selection** (`n`): Clear the whole selection. Asks twice so it cannot happen by accident.
-- **Confirm scope** (`g`): Saves the selection, starts scoring and opens Verify. Review can start as soon as the first document is scored.
+- **Grouping view** (`T`): Two views of the same blocks. Switching never changes what is selected.
+- **Article split** (`S`): Whether articles follow topics or whole documents. It changes the article count, not the selected blocks.
+- **Select all** (`A`): Select every block of every document.
+- **Clear selection** (`N`): Clear the whole selection. Asks twice so it cannot happen by accident.
+- **Confirm scope** (`G`): Saves the selection, starts scoring and opens Verify. Review can start as soon as the first document is scored.
 - **Add documents**: Add PDF or DOCX files. Parsing runs in the background while you keep working.
 - **Model tier**: Use this tier's models for every task. Stages that depend on the models are marked to re-run.
 - **Review filter** (`]`): Also lists auto-approved blocks below this confidence for a second look. Their status does not change.
 - **Queue order** (`/`): Worst first, by page, or figures only.
-- **Original vs cleaned** (`t`): The diff shows every change cleanup made to the raw parse. Grey changes are allowed normalisation.
-- **Approve** (`a`): Accept the text as shown. On a block with numbers this records that you checked them.
-- **Edit** (`e`): Correct the text. Your edit is checked too: a change to content or numbers asks you to confirm.
-- **Flag** (`f`): Mark the block as wrong: text, figure, grouping, crop or table. Open flags lock the export.
-- **Skip** (`j`): Leave the block queued and move on.
-- **Back** (`k`): Return to the previous block.
+- **Original vs cleaned** (`T`): The diff shows every change cleanup made to the raw parse. Grey changes are allowed normalisation.
+- **Approve** (`A`): Accept the text as shown. On a block with numbers this records that you checked them.
+- **Edit** (`E`): Correct the text. Your edit is checked too: a change to content or numbers asks you to confirm.
+- **Flag** (`F`): Mark the block as wrong: text, figure, grouping, crop or table. Open flags lock the export.
+- **Skip** (`J`): Leave the block queued and move on.
+- **Back** (`K`): Return to the previous block.
 - **Attach a figure**: Pick a figure from this document and attach it to the current article.
 - **Export**: Builds the zip from accepted text and records the build in the action log.
 - **Override reason**: Why you are exporting with blocks not yet reviewed. It is written into manifest.json.
@@ -236,7 +237,7 @@ Every key below comes from the single hotkey map (frontend/src/hotkeys.ts). Keys
 - **Signal: reading order**: How safe the reading order is; columns and wrapped text lower it.
 - **Signal: table shape**: Whether the table's rows and columns line up consistently.
 - **Signal: garbled text**: How free the text is of broken characters or a wrong encoding.
-- **Signal: cleanup changed content**: Whether cleanup kept the text, changing only spacing, hyphenation, headers or reading order.
+- **Signal: cleanup changed content**: Whether cleanup kept the text, making only the allowed changes: whitespace, hyphenation, headers and footers, reading order, character forms, table layout and bullets.
 - **Signal: figure crop**: How the figure was extracted; a crop of the page image scores lower than a native image.
 - **Signal: low-res figure**: Whether the figure image has enough resolution.
 - **Signal: weak figure match**: How strong the rule is that matched the figure to this article.

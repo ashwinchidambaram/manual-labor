@@ -1,6 +1,6 @@
 import type { DocReadiness, QueueSort, ReviewCounts } from "../api/schema";
 import Hint from "../onboarding/Hint";
-import { MISMATCH, reconcileReview, reviewReconcileText } from "../onboarding/reconcile";
+import { MISMATCH, reconcileReview, reviewMismatchDetail, reviewReconcileText } from "../onboarding/reconcile";
 import { FOCUS } from "./labels";
 import { normalizeView, sliderCopy } from "./sliderCopy";
 
@@ -104,7 +104,7 @@ export default function StatusStrip(p: StatusStripProps) {
         </p>
       ) : (
         <p role="note" className="basis-full rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-950" data-testid="reconcile-mismatch">
-          {MISMATCH(`in scope ${rec.inScope}, but ${rec.auto} auto-approved + ${rec.done} done + ${rec.flagged} flagged is more`)}
+          {MISMATCH(reviewMismatchDetail(rec))}
         </p>
       )}
       {p.docs

@@ -2,7 +2,7 @@ import { memo, useLayoutEffect, useMemo, useRef } from "react";
 import type { QueueItem } from "../api/schema";
 import Hint from "../onboarding/Hint";
 import { signalHint } from "../onboarding/hints";
-import { FOCUS, STALE_NAME, STATUS_LABEL } from "./labels";
+import { FOCUS, SCORE_TITLE, STALE_NAME, STATUS_LABEL, scoreText } from "./labels";
 import { reasonChips, reasonsFromQueueItem } from "./reasons";
 
 const TONE: Record<string, string> = {
@@ -29,9 +29,11 @@ interface Props {
   offset?: number;
   pinned?: boolean;
   criticalReasons?: number;
+  /** the auto-approve threshold the score is judged against */
+  threshold: number;
 }
 
-function QueueCardImpl({ item, isCurrent, pos, size, focusTick, wantFocus, focusBlocked, onSelect, height, offset, pinned, criticalReasons }: Props) {
+function QueueCardImpl({ item, isCurrent, pos, size, focusTick, wantFocus, focusBlocked, onSelect, height, offset, pinned, criticalReasons, threshold }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   // primitives in, stable style out: the object identity must not defeat memo()
   const style = useMemo<React.CSSProperties>(
@@ -69,7 +71,9 @@ function QueueCardImpl({ item, isCurrent, pos, size, focusTick, wantFocus, focus
         <span className="truncate font-mono text-xs">{item.block_id}</span>
         <span className="text-xs text-slate-600">p.{item.page}</span>
         <span className="text-xs text-slate-600">{item.type}</span>
-        <span className="ml-auto text-xs tabular-nums">{item.confidence === null || item.confidence === undefined ? "n/a" : item.confidence.toFixed(2)}</span>
+        <span className="ml-auto shrink-0 text-xs tabular-nums" data-testid="queue-score" title={SCORE_TITLE}>
+          {scoreText(item.confidence, threshold)}
+        </span>
       </div>
       <div className="flex flex-wrap items-center gap-1">
         {item.status !== "queued" ? (

@@ -57,24 +57,34 @@ export function docMismatchDetail(r: DocReconcile): string {
 
 export interface ReviewReconcile {
   inScope: number;
-  /** waiting for a person: in scope minus every other state */
+  /** waiting for a person: the server's own `queued` count, never derived from the others */
   queued: number;
   auto: number;
   done: number;
   flagged: number;
+  rejected: number;
   skipped: number;
+  /** the independently counted buckets added up */
+  sum: number;
   ok: boolean;
 }
 
-/** in_scope = queued + auto-approved + approved + edited + flagged (skipped is a subset of queued/auto). */
+/**
+ * in_scope = queued + auto-approved + approved + edited + flagged + rejected, every term an independent server count
+ * (skipped is a view inside queued/auto, pending depends on the view filter). The identity can fail, and then says so.
+ */
 export function reconcileReview(c: ReviewCounts): ReviewReconcile {
   const done = c.approved + c.edited;
-  const queued = c.in_scope - c.auto_approved - done - c.flagged_open;
-  return { inScope: c.in_scope, queued, auto: c.auto_approved, done, flagged: c.flagged_open, skipped: c.skipped, ok: queued >= 0 };
+  const sum = c.queued + c.auto_approved + done + c.flagged_open + c.rejected;
+  return { inScope: c.in_scope, queued: c.queued, auto: c.auto_approved, done, flagged: c.flagged_open, rejected: c.rejected, skipped: c.skipped, sum, ok: sum === c.in_scope };
 }
 
 export function reviewReconcileText(r: ReviewReconcile): string {
-  return `In scope ${r.inScope} = ${r.queued} to review + ${r.auto} auto-approved + ${r.done} done + ${r.flagged} flagged`;
+  return `In scope ${r.inScope} = ${r.queued} to review + ${r.auto} auto-approved + ${r.done} done + ${r.flagged} flagged + ${r.rejected} rejected`;
+}
+
+export function reviewMismatchDetail(r: ReviewReconcile): string {
+  return `in scope ${r.inScope}, but to review ${r.queued} + auto-approved ${r.auto} + done ${r.done} + flagged ${r.flagged} + rejected ${r.rejected} = ${r.sum}`;
 }
 
 export const MISMATCH = (detail: string): string => `Counts do not add up (${detail}). Nothing was changed; please report this.`;

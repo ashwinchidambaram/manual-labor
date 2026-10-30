@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
-import { client, unwrap } from "../api/client";
+import { ApiError, client, unwrap } from "../api/client";
 import type { GuideState } from "../api/schema";
 import { GUIDE_VERSION } from "./guide";
 
@@ -29,6 +29,8 @@ export interface GuideControl {
   open: boolean;
   /** where the flag lives right now */
   source: "server" | "storage" | "session" | "loading";
+  /** the server refused to store the last change: shown in the panel, never swallowed */
+  saveError: string | null;
   hide: () => void;
   show: () => void;
 }
@@ -47,6 +49,7 @@ export function useGuideState(root: string | undefined): GuideControl {
   });
   // session-only state: storage threw, or a PUT failed after the GET worked
   const [session, setSession] = useState<boolean | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [, bump] = useState(0);
   const key = storageKey(root);
 
@@ -57,15 +60,25 @@ export function useGuideState(root: string | undefined): GuideControl {
       try {
         const out = unwrap(await client.PUT("/api/ui/guide", { body: { seen } }));
         qc.setQueryData(guideKey, out);
-      } catch {
-        if (!writeStorage(key, seen)) setSession(!seen);
+        setSaveError(null);
+      } catch (e) {
+        // not saved: put the panel back the way the server has it and say so; a second Hide is session-only
+        if (prev) qc.setQueryData<GuideState>(guideKey, prev);
+        const detail = e instanceof ApiError ? e.detail : e instanceof Error ? e.message : String(e);
+        if (seen) setSaveError(`Hiding the guide was not saved: ${detail}. Hide guide again to hide it until you reload; it opens again next time.`);
+        else setSession(true);
       }
     },
-    [qc, key],
+    [qc],
   );
 
   const set = useCallback(
     (seen: boolean) => {
+      if (saveError !== null) {
+        setSaveError(null);
+        setSession(!seen);
+        return;
+      }
       if (q.isError) {
         if (writeStorage(key, seen)) bump((n) => n + 1);
         else setSession(!seen);
@@ -73,16 +86,17 @@ export function useGuideState(root: string | undefined): GuideControl {
       }
       void put(seen);
     },
-    [q.isError, key, put],
+    [q.isError, key, put, saveError],
   );
 
-  if (session !== null) return { open: session, source: "session", hide: () => set(true), show: () => set(false) };
+  const ctl = (open: boolean, source: GuideControl["source"]): GuideControl => ({ open, source, saveError, hide: () => set(true), show: () => set(false) });
+  if (session !== null) return ctl(session, "session");
   if (q.isError) {
-    if (root === undefined) return { open: false, source: "loading", hide: () => set(true), show: () => set(false) };
+    if (root === undefined) return ctl(false, "loading");
     const stored = readStorage(key);
-    if (stored === null) return { open: true, source: "session", hide: () => set(true), show: () => set(false) };
-    return { open: !stored, source: "storage", hide: () => set(true), show: () => set(false) };
+    if (stored === null) return ctl(true, "session");
+    return ctl(!stored, "storage");
   }
-  if (!q.data) return { open: false, source: "loading", hide: () => set(true), show: () => set(false) };
-  return { open: !q.data.seen, source: "server", hide: () => set(true), show: () => set(false) };
+  if (!q.data) return ctl(false, "loading");
+  return ctl(!q.data.seen, "server");
 }

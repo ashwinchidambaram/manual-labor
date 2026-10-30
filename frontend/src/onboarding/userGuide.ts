@@ -1,12 +1,12 @@
 // docs/USER_GUIDE.md, generated from the guide text, the hint registry and HOTKEYS (design 12 section 6).
 // `npm run gen-guide` writes it; userGuide.test.ts fails when the committed file drifts from this output.
-import { HOTKEYS, LOCAL_KEYS, SCOPE_TITLES, displayKey, type HotkeyScope } from "../hotkeys";
+import { HOTKEYS, LOCAL_KEYS, SCOPE_TITLES, type HotkeyScope } from "../hotkeys";
 import { GLOSSARY } from "./glossary";
-import { GUARANTEES, GUIDE_STEPS, copyText, keyLabel } from "./guide";
+import { GUARANTEES, GUIDE_STEPS, copyText, keyLabel, keycap } from "./guide";
 
 const code = (s: string): string => `\`${s}\``;
 const cell = (s: string): string => s.replace(/\|/g, "\\|");
-const keys = (ks: string[]): string => ks.map((k) => code(displayKey(k))).join(" / ");
+const keys = (ks: string[]): string => ks.map((k) => code(keycap(k))).join(" / ");
 
 export const USER_GUIDE_HEADER = "Generated from frontend/src; edit there";
 
@@ -50,7 +50,7 @@ export function renderUserGuide(): string {
   out.push("");
   out.push("## Reset the guide", "");
   out.push(
-    "The getting-started panel opens once per project and stays hidden after Hide guide. To see it again, open Help (`?`), stay on the Guide tab and choose Show guide panel. From a script: `PUT /api/ui/guide` with the body `{\"seen\": false}`. If the server cannot store the flag, the browser keeps it in localStorage instead.",
+    `The getting-started panel opens once per project and stays hidden after Hide guide. To see it again, open Help (${code(keyLabel("help"))}), stay on the Guide tab and choose Show guide panel. From a script: \`PUT /api/ui/guide\` with the body \`{"seen": false}\`. If the server cannot store the flag, the browser keeps it in localStorage instead.`,
     "",
   );
   return out.join("\n");

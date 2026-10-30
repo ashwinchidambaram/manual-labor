@@ -2,7 +2,8 @@ import { screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { makeProject } from "../test/fixtures";
 import { renderApp } from "../test/render";
-import { installFake } from "../test/server";
+import { http, HttpResponse } from "msw";
+import { installFake, server } from "../test/server";
 import { storageKey } from "./useGuideState";
 
 const panel = () => screen.queryByRole("complementary", { name: "Getting started" });
@@ -51,6 +52,20 @@ describe("U7 useGuideState", () => {
     installFake({ guide: null });
     const { user } = renderApp("/export");
     await waitFor(() => expect(panel()).not.toBeNull());
+    await user.click(within(panel()!).getByTestId("guide-hide"));
+    await waitFor(() => expect(panel()).toBeNull());
+  });
+  it("a failing PUT keeps the panel open and says so; Hide again hides it for this page load only", async () => {
+    installFake({ guide: { seen: false, seen_at: null, version: 1 } });
+    let puts = 0;
+    server.use(http.put("*/api/ui/guide", () => (puts++, HttpResponse.json({ detail: "disk full", code: "internal" }, { status: 500 }))));
+    const { user } = renderApp("/export");
+    await waitFor(() => expect(panel()).not.toBeNull());
+    await user.click(within(panel()!).getByTestId("guide-hide"));
+    await waitFor(() => expect(puts).toBe(1));
+    const alert = await within(panel()!).findByRole("alert");
+    expect(alert).toHaveTextContent("Hiding the guide was not saved: disk full.");
+    expect(alert).toHaveTextContent("Hide guide again to hide it until you reload");
     await user.click(within(panel()!).getByTestId("guide-hide"));
     await waitFor(() => expect(panel()).toBeNull());
   });

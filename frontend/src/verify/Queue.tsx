@@ -1,7 +1,8 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
-import type { DocReadiness, QueueItem, ReviewCounts } from "../api/schema";
+import type { DocReadiness, ExportStatus, QueueItem, ReviewCounts } from "../api/schema";
+import { Keycap } from "../onboarding/Copy";
 import { keyLabel } from "../onboarding/guide";
 import QueueCard from "./QueueCard";
 
@@ -19,9 +20,12 @@ interface Props {
   focusBlocked?: React.MutableRefObject<boolean>;
   onSelect: (id: string) => void;
   onNearEnd: () => void;
+  threshold: number;
+  /** the export gate; "Next: export" is only offered when it is open */
+  gate?: ExportStatus;
 }
 
-export default function Queue({ items, total, pinned, currentId, docs, counts, focusTick, wantFocus, focusBlocked, onSelect, onNearEnd }: Props) {
+export default function Queue({ items, total, pinned, currentId, docs, counts, focusTick, wantFocus, focusBlocked, onSelect, onNearEnd, threshold, gate }: Props) {
   const scroller = useRef<HTMLDivElement>(null);
   const v = useVirtualizer({
     count: items.length,
@@ -64,6 +68,7 @@ export default function Queue({ items, total, pinned, currentId, docs, counts, f
             focusBlocked={focusBlocked}
             onSelect={onSelect}
             height={ROW}
+            threshold={threshold}
           />
         ) : null}
         <div style={{ height: v.getTotalSize(), position: "relative" }}>
@@ -82,6 +87,7 @@ export default function Queue({ items, total, pinned, currentId, docs, counts, f
                 onSelect={onSelect}
                 height={ROW}
                 offset={row.start - (pinned ? ROW : 0)}
+                threshold={threshold}
               />
             );
           })}
@@ -91,41 +97,61 @@ export default function Queue({ items, total, pinned, currentId, docs, counts, f
         <div data-testid="queue-empty" data-variant="unconfirmed" className="space-y-1 p-3 text-sm">
           <p className="font-medium">Nothing to review yet</p>
           <p className="text-slate-700">
-            Confirm your scope on the Scope screen (<kbd className="rounded border border-slate-300 px-1 font-mono text-xs">{keyLabel("goScope")}</kbd>, then{" "}
-            <kbd className="rounded border border-slate-300 px-1 font-mono text-xs">{keyLabel("confirm")}</kbd>).
+            Confirm your scope on the Scope screen (<Keycap>{keyLabel("goScope")}</Keycap>, then <Keycap>{keyLabel("confirm")}</Keycap>).
           </p>
           <Link className={LINK} to="/scope">
             Go to Scope
           </Link>
         </div>
       ) : empty ? (
-        <div data-testid="queue-empty" data-variant="caught-up" className="space-y-1 p-3 text-sm">
-          <p className="font-medium">All caught up</p>
-          <p className="text-slate-700" data-testid="queue-empty-counts">
-            {counts.approved + counts.edited} reviewed, {counts.auto_approved} auto-approved, {counts.flagged_open} flagged.
-          </p>
-          <p className="text-slate-700">
-            {counts.flagged_open > 0
-              ? `Next: hand the ${counts.flagged_open} flagged block${counts.flagged_open === 1 ? "" : "s"} to the Agent, or export with an override.`
-              : "Next: export the knowledge base."}
-          </p>
-          <p className="flex gap-3">
-            {counts.flagged_open > 0 ? (
-              <Link className={LINK} to="/agent">
-                Go to Agent
-              </Link>
-            ) : null}
-            <Link className={LINK} to="/export">
-              Go to Export
-            </Link>
-          </p>
-        </div>
+        <EmptyNext counts={counts} gate={gate} link={LINK} />
       ) : null}
       {preparing > 0 ? (
         <p data-testid="queue-footer" className="border-t border-slate-200 px-2 py-1 text-xs text-slate-700">
           {preparing} document{preparing === 1 ? "" : "s"} still preparing; their blocks appear here when ready. You can start now.
         </p>
       ) : null}
+    </div>
+  );
+}
+
+const plural = (n: number, w: string): string => `${n} ${w}${n === 1 ? "" : "s"}`;
+
+/** The empty queue: what was done, and the next step only when it is really open (review M12 #14). */
+function EmptyNext({ counts, gate, link }: { counts: ReviewCounts; gate: ExportStatus | undefined; link: string }) {
+  const waiting = gate?.queued ?? counts.queued;
+  const flagged = gate?.open_flags ?? counts.flagged_open;
+  const open = !!gate && (gate.blockers ?? []).length === 0;
+  const next = !gate
+    ? null
+    : open
+      ? "Next: export the knowledge base."
+      : flagged > 0 && waiting === 0
+        ? `Next: hand the ${plural(flagged, "flagged block")} to the Agent, or export with an override.`
+        : `Export is still locked: ${plural(waiting, "block")} in scope still ${waiting === 1 ? "needs" : "need"} review and ${waiting === 1 ? "is" : "are"} not in this list.${
+            flagged > 0 ? ` ${plural(flagged, "open flag")} also ${flagged === 1 ? "blocks" : "block"} it.` : ""
+          } Check the sort and document filter, or see the Export screen for the list.`;
+  return (
+    <div data-testid="queue-empty" data-variant="caught-up" className="space-y-1 p-3 text-sm">
+      <p className="font-medium">{waiting > 0 ? "Nothing in this list" : "All caught up"}</p>
+      <p className="text-slate-700" data-testid="queue-empty-counts">
+        {counts.approved + counts.edited} reviewed, {counts.auto_approved} auto-approved, {counts.flagged_open} flagged.
+      </p>
+      {next ? (
+        <p className="text-slate-700" data-testid="queue-next">
+          {next}
+        </p>
+      ) : null}
+      <p className="flex gap-3">
+        {flagged > 0 || counts.flagged_open > 0 ? (
+          <Link className={link} to="/agent">
+            Go to Agent
+          </Link>
+        ) : null}
+        <Link className={link} to="/export">
+          Go to Export
+        </Link>
+      </p>
     </div>
   );
 }

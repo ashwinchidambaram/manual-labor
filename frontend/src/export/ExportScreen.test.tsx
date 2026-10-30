@@ -3,6 +3,7 @@ import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
 import type { ExportStatus, ExportSummary } from "../api/schema";
 import { stepStates } from "../onboarding/StepNav";
+import { BLOCKER_LIMIT } from "./ExportScreen";
 import { makeJob } from "../test/fixtures";
 import { renderApp } from "../test/render";
 import { installFake, server } from "../test/server";
@@ -57,27 +58,72 @@ describe("U10 ExportScreen", () => {
     await waitFor(() => expect(router.state.location.pathname).toBe("/verify"));
     expect(puts[0]).toMatchObject({ current_block_id: "b-doc-p001-02", sort: "by_page" });
   });
-  it("an override needs a reason and posts it; the answer replaces the status", async () => {
+  it("an override needs a reason and records one override per listed blocker, never a blanket one", async () => {
     const f = installFake({ exportStatus: locked() });
-    const bodies: { reason: string }[] = [];
+    const bodies: { reason: string; target_id?: string | null; flag_id?: string | null; request_id?: string }[] = [];
     server.use(
       http.post("*/api/export/override", async ({ request }) => {
-        bodies.push((await request.json()) as { reason: string });
-        f.exportStatus = locked({ blockers: [], overrides: [{ reason: "vendor deadline", at: "2026-10-29T10:00:00Z", target_id: null, flag_id: null }] });
+        const b = (await request.json()) as (typeof bodies)[number];
+        bodies.push(b);
+        const st = f.exportStatus;
+        f.exportStatus = locked({
+          blockers: (st.blockers ?? []).filter((x) => x !== b.target_id),
+          overrides: [...(st.overrides ?? []), { reason: b.reason, at: "2026-10-29T10:00:00Z", target_id: b.target_id ?? null, flag_id: null }],
+        });
         return HttpResponse.json(f.exportStatus);
       }),
     );
     const { user } = renderApp("/export");
     await screen.findByTestId("export-locked");
+    expect(screen.getByTestId("override-form")).toHaveTextContent("one override for each of the 2 blocks listed above");
+    expect(screen.getByTestId("override-form")).toHaveTextContent("A block or flag that starts blocking later is not covered");
     await user.click(screen.getByTestId("override-submit"));
     expect(screen.getByRole("alert")).toHaveTextContent("Please write why");
     expect(bodies).toEqual([]);
     await user.type(screen.getByTestId("override-reason"), "vendor deadline");
     await user.click(screen.getByTestId("override-submit"));
-    await waitFor(() => expect(bodies[0]).toMatchObject({ reason: "vendor deadline" }));
+    await waitFor(() => expect(bodies).toHaveLength(2));
+    expect(bodies.map((b) => b.target_id)).toEqual(["b-doc-p001-01", "b-doc-p001-02"]);
+    expect(bodies.every((b) => b.reason === "vendor deadline" && b.flag_id == null)).toBe(true);
+    expect(new Set(bodies.map((b) => b.request_id)).size).toBe(2);
     expect(await screen.findByTestId("overrides")).toHaveTextContent("vendor deadline");
+    expect(screen.getByTestId("overrides")).toHaveTextContent("b-doc-p001-01");
+    expect(screen.getByTestId("overrides")).not.toHaveTextContent("every block blocking");
     expect(screen.getByTestId("overrides")).toHaveTextContent("recorded in manifest.json");
     expect(screen.getByTestId("export-ready")).toHaveTextContent("Overrides cover every remaining block");
+  });
+  it("a retry after a failed override resends the same request ids, so nothing is recorded twice", async () => {
+    installFake({ exportStatus: locked() });
+    const ids: string[] = [];
+    let n = 0;
+    server.use(
+      http.post("*/api/export/override", async ({ request }) => {
+        const b = (await request.json()) as { target_id: string; request_id: string };
+        ids.push(`${b.target_id} ${b.request_id}`);
+        n++;
+        if (n === 2) return HttpResponse.json({ detail: "store busy", code: "internal" }, { status: 500 });
+        return HttpResponse.json(locked());
+      }),
+    );
+    const { user } = renderApp("/export");
+    await screen.findByTestId("export-locked");
+    await user.type(screen.getByTestId("override-reason"), "deadline");
+    await user.click(screen.getByTestId("override-submit"));
+    expect(await screen.findByText(/Override not recorded for b-doc-p001-02: store busy/)).toBeInTheDocument();
+    await user.click(screen.getByTestId("override-submit"));
+    await waitFor(() => expect(ids).toHaveLength(4));
+    expect(ids[2]).toBe(ids[0]);
+    expect(ids[3]).toBe(ids[1]);
+  });
+  it("'first N listed' appears only when the server's list is at its limit", async () => {
+    installFake({ exportStatus: locked({ queued: 3, open_flags: 2 }) });
+    const r = renderApp("/export");
+    expect(await screen.findByTestId("blocker-count")).toHaveTextContent("(2 blocks)");
+    r.unmount();
+    const many = Array.from({ length: BLOCKER_LIMIT }, (_, i) => `b-doc-p${String(i + 1).padStart(3, "0")}-01`);
+    installFake({ exportStatus: locked({ queued: 30, open_flags: 0, blockers: many }) });
+    renderApp("/export");
+    expect(await screen.findByTestId("blocker-count")).toHaveTextContent(`(first ${BLOCKER_LIMIT} listed by the server)`);
   });
   it("unlocked: Export starts a job; a 409 renders the locked view from the refusal body", async () => {
     installFake();

@@ -25,6 +25,8 @@ import SelectionSummary from "./SelectionSummary";
 import SourcesList, { UploadButton } from "./SourcesList";
 import SplitModeControl from "./SplitModeControl";
 import ViewToggle from "./ViewToggle";
+import { Keycap } from "../onboarding/Copy";
+import { keyLabel } from "../onboarding/guide";
 import Hint from "../onboarding/Hint";
 
 const VIEW_NAME: Record<View, string> = { topic: "Suggested topics", structure: "Document structure" };
@@ -281,7 +283,10 @@ export default function ScopeScreen() {
   const jobsList = jobs.data ?? [];
 
   return (
-    <main className="grid grid-cols-1 gap-4 p-4 lg:grid-cols-[18rem_minmax(0,1fr)_20rem]" data-testid="scope-screen">
+    <main
+      className="grid grid-cols-1 gap-4 p-4 lg:grid-cols-[18rem_minmax(0,1fr)_20rem] group-data-[guide=open]/shell:max-xl:pb-28"
+      data-testid="scope-screen"
+    >
       <aside className="flex flex-col gap-4" aria-label="Sources panel">
         <Notice error={status.error} retry={() => void status.refetch()} testid="status-error">
           Processing status is unavailable.
@@ -304,7 +309,7 @@ export default function ScopeScreen() {
         <div className="flex flex-wrap items-center gap-3">
           <ViewToggle view={view} onChange={changeView} />
           <span className="text-xs text-slate-600">
-            Press <kbd className="rounded border px-1">?</kbd> for the guide and keyboard shortcuts
+            Press <Keycap>{keyLabel("help")}</Keycap> for the guide and keyboard shortcuts
           </span>
         </div>
         <Notice error={jobs.error} retry={() => void jobs.refetch()} testid="jobs-error">
@@ -387,12 +392,18 @@ export default function ScopeScreen() {
             </Hint>
           </div>
         ) : null}
-        <ConfirmButton
-          blocks={summary?.blocks ?? 0}
-          processing={processing}
-          busy={confirm.isPending}
-          onConfirm={() => void onConfirm()}
-        />
+        {/* while the guide is a bottom sheet, the primary action is pinned just above it so the sheet never covers it */}
+        <div
+          data-testid="confirm-dock"
+          className="group-data-[guide=open]/shell:max-xl:fixed group-data-[guide=open]/shell:max-xl:inset-x-0 group-data-[guide=open]/shell:max-xl:bottom-[var(--guide-sheet,0px)] group-data-[guide=open]/shell:max-xl:z-20 group-data-[guide=open]/shell:max-xl:border-t group-data-[guide=open]/shell:max-xl:border-slate-300 group-data-[guide=open]/shell:max-xl:bg-white group-data-[guide=open]/shell:max-xl:px-4 group-data-[guide=open]/shell:max-xl:py-2"
+        >
+          <ConfirmButton
+            blocks={summary?.blocks ?? 0}
+            processing={processing}
+            busy={confirm.isPending}
+            onConfirm={() => void onConfirm()}
+          />
+        </div>
         <Panel error={models.error} retry={() => void models.refetch()} testid="models-error">
           {models.data ? <ModelPanel data={models.data} /> : <div aria-busy="true" className="h-24 animate-pulse rounded bg-slate-200" />}
         </Panel>

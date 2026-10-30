@@ -8,6 +8,15 @@ export const GUIDE_VERSION = 1;
 
 export type StepId = "scope" | "verify" | "agent" | "export";
 
+/**
+ * Exactly what the faithfulness check allows (manuallabor/scoring/faithfulness.py, allowed edits AE1 to AE7), in
+ * plain words. ChecksList, the guide and the glossary all quote these, so the claim is made in one place.
+ */
+export const CLEANUP_ALLOWED =
+  "Cleanup may only change whitespace, join words hyphenated across a line break, remove known headers and footers, fix reading order where the layout gives evidence, turn ligatures, Unicode variants and soft hyphens into plain text, rebuild table layout without changing any cell, and normalise list bullets.";
+export const NUMBER_CHOICE =
+  "Where the PDF text layer and OCR read a number differently by a look-alike character (0 and O, 1 and l) and the other reading confirms it, the number chosen between text layer and OCR is recorded, not failed.";
+
 export interface GuideStep {
   id: StepId;
   route: string;
@@ -27,7 +36,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     what:
       "Every block you select becomes text in an article. Suggested topics and Document structure are two views of the same blocks: switching views never changes the selection, and each view shows how much of a group is selected.",
     do: [
-      "Move through the list with {moveDown} and {moveUp}. {toggleRow} selects or clears a row; {selectAll} selects everything.",
+      "Move through the list with {moveDown} and {moveUp}. {toggleRow} selects or clears a row; {selectAll} selects every block.",
       "{toggleView} switches views. Low cohesion means a topic mixes subjects: check it in Document structure.",
       "Unassigned holds the blocks no topic claimed. They are listed here, never dropped.",
       "Estimated review is how many selected blocks will need a person. {confirm} confirms: scoring starts and Verify opens at once.",
@@ -54,7 +63,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     keys: ["vApprove", "vEdit", "vSaveEdit", "vFlag", "vSkip", "vBack", "vToggleDiff", "vFocusRail", "vRailDetach", "vRailCrop"],
     trust: [
       "Checks on this block lists each deterministic check and its result. A check that has not run says so; it is never shown as passed.",
-      "The status line adds up: in scope = to review + auto-approved + done + flagged.",
+      "The status line adds up: in scope = to review + auto-approved + done + flagged + rejected. The server counts each part separately, and a mismatch is shown as a warning.",
     ],
   },
   {
@@ -62,10 +71,11 @@ export const GUIDE_STEPS: GuideStep[] = [
     route: "/agent",
     title: "Hand flagged blocks to a model",
     what:
-      "Flags you raised can be handed to a model, one fresh call per item. Every proposal is re-checked by the same deterministic checks, and failed checks are shown, not hidden.",
+      "An agent pass sends each open flag to a model, one fresh call per item, and lists what the model proposes. Every proposal is re-checked by the same deterministic checks, and failed checks are shown, not hidden.",
     do: [
       "Run the agent pass for the open flags. You can keep reviewing while it runs.",
-      "Accept, edit or reject each proposal. A rejected item goes back to the queue with what was tried.",
+      "Accept, edit or reject each proposal. Accept is only offered when every re-check passed.",
+      "Rejecting a proposal leaves its flag open: the item stays on this screen for the next agent pass with what was tried and your reason, and the export stays locked until the flag is resolved.",
       "Calibration shows how often you edited blocks at each confidence level and suggests a threshold. It never changes the threshold for you.",
     ],
     keys: [],
@@ -89,20 +99,20 @@ export const GUIDE_STEPS: GuideStep[] = [
 
 export const GUARANTEES: { claim: string; how: string }[] = [
   {
-    claim: "The same file gives the same result.",
-    how: "Parsing, IDs, scoring, the faithfulness check and assembly are deterministic code.",
+    claim: "Parsing and checking are code, not a model.",
+    how: "Parsing, IDs, scoring, the faithfulness check and assembly are deterministic code. Model calls (cleanup, topic names, figure descriptions, the agent and the optional verifier) run at temperature 0 and are cached by their input, so a re-run reuses the same answers while the cache is kept.",
   },
   {
     claim: "Cleanup cannot rewrite your text.",
-    how: "It may only join hyphenated lines, fix whitespace, remove headers and footers, normalise bullets and fix reading order. Any other change to characters or numbers fails the faithfulness check, and the block is queued with the diff.",
+    how: `${CLEANUP_ALLOWED} ${NUMBER_CHOICE} Any other change to characters or numbers fails the faithfulness check, and the block is queued with the diff.`,
   },
   {
     claim: "Confidence comes from disagreement, not from a model's opinion of itself.",
-    how: "Two parsers, the text layer against OCR, and a separate verifier are compared. No model rates its own output.",
+    how: "Two parsers, the PDF text layer against OCR, and a separate verifier model when one is configured are compared. No model rates its own output.",
   },
   {
-    claim: "Every model output is validated before you see it.",
-    how: "Proposals and cleanups go through the same deterministic checks as everything else.",
+    claim: "Model text is checked before you see it.",
+    how: "Cleaned text and agent proposals go through the same deterministic checks as everything else. Figure descriptions are only checked against their schema, not against the image.",
   },
   {
     claim: "Learning from your edits is visible.",
@@ -110,14 +120,20 @@ export const GUARANTEES: { claim: string; how: string }[] = [
   },
   {
     claim: "Nothing is dropped silently.",
-    how: "Counts reconcile on every screen, and every block ends up in an article or in the unassigned list.",
+    how: "On Scope, each document's line adds up its parsed blocks; on Verify, the status line adds up the blocks in scope. Every block ends up in an article or in the unassigned list.",
   },
 ];
 
-/** The display form of a hotkey: its first key, with the Ctrl/Cmd prefix for modifier entries. */
+/** A key as printed on a keycap: single letters upper case (as on the keyboard and the Verify toolbar). */
+export function keycap(k: string): string {
+  const d = displayKey(k);
+  return /^[a-z]$/.test(d) ? d.toUpperCase() : d;
+}
+
+/** The display form of a hotkey: its first key as a keycap, with the Ctrl/Cmd prefix for modifier entries. */
 export function keyLabel(id: HotkeyId): string {
   const h = HOTKEYS[id];
-  return `${h.mod ? "Ctrl/Cmd+" : ""}${displayKey(h.keys[0])}`;
+  return `${h.mod ? "Ctrl/Cmd+" : ""}${keycap(h.keys[0])}`;
 }
 
 export type CopyPart = { text: string } | { key: HotkeyId };

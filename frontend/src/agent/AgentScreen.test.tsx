@@ -53,8 +53,14 @@ describe("U10 AgentScreen", () => {
   it("empty: no open flags tells you how to make one, and the run button is disabled", async () => {
     installFake();
     renderApp("/agent");
-    expect(await screen.findByTestId("agent-empty")).toHaveTextContent("No open flags. Flag a block in Verify (f)");
-    expect(screen.getByTestId("agent-run")).toBeDisabled();
+    expect(await screen.findByTestId("agent-empty")).toHaveTextContent("No open flags. Flag a block in Verify (F)");
+    const run = screen.getByTestId("agent-run");
+    expect(run).toBeDisabled();
+    expect(run).toHaveAccessibleDescription(/No open flags/);
+    // what an agent pass is, in one sentence, before the button
+    const def = screen.getByTestId("agent-definition");
+    expect(def).toHaveTextContent(/^An agent pass sends each open flag to a model/);
+    expect(def.compareDocumentPosition(run) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(await screen.findByTestId("calibration-unavailable")).toHaveTextContent("not available");
     expect(screen.getByRole("link", { name: "Back to Scope" })).toBeInTheDocument();
   });
@@ -74,8 +80,35 @@ describe("U10 AgentScreen", () => {
     expect(within(p).getByText("36 N·m").tagName).toBe("S");
     expect(p).toHaveTextContent("(not found in this source)");
   });
-  it("accept and reject post to the existing endpoints", async () => {
+  it("Accept is disabled with the reason when a re-check failed or none was reported", async () => {
+    installFake({ flags: [flag], proposals: [proposal(), proposal({ id: "prop-000002", rechecks: [] })] });
+    renderApp("/agent");
+    const [failed, none] = await screen.findAllByTestId("proposal");
+    expect(within(failed).getByRole("button", { name: "Accept" })).toBeDisabled();
+    expect(within(failed).getByRole("button", { name: "Accept" })).toHaveAccessibleDescription("Accept is off: 1 re-check failed. Edit the proposal or reject it.");
+    expect(within(none).getByRole("button", { name: "Accept" })).toHaveAccessibleDescription("Accept is off: no re-check was reported for this proposal. Edit it or reject it.");
+  });
+  it("a rejected proposal is described honestly: the flag stays open and the item waits for the next pass", async () => {
     installFake({ flags: [flag], proposals: [proposal()] });
+    renderApp("/agent");
+    const note = await screen.findByTestId("reject-note");
+    expect(note).toHaveTextContent("Rejecting a proposal leaves its flag open");
+    expect(note).not.toHaveTextContent(/back to the Verify queue/);
+  });
+  it("a failed start and a failed jump to Verify are alerts", async () => {
+    installFake({ flags: [flag], proposals: [proposal()] });
+    server.use(
+      http.post("*/api/agent/run", () => HttpResponse.json({ detail: "a pass is already running", code: "busy" }, { status: 409 })),
+      http.get("*/api/verify/cursor", () => HttpResponse.json({ detail: "store locked", code: "internal" }, { status: 500 })),
+    );
+    const { user } = renderApp("/agent");
+    await user.click(await screen.findByTestId("agent-run"));
+    expect(await screen.findByText(/Agent pass not started: a pass is already running/)).toHaveAttribute("role", "alert");
+    await user.click(within(await screen.findByTestId("agent-flag")).getByRole("link", { name: /Open b-doc-p001-01 in Verify/ }));
+    expect(await screen.findByText(/Could not open b-doc-p001-01 in Verify: store locked/)).toHaveAttribute("role", "alert");
+  });
+  it("accept and reject post to the existing endpoints", async () => {
+    installFake({ flags: [flag], proposals: [proposal({ rechecks: [{ check: "faithfulness", passed: true, detail: null }] })] });
     const calls: string[] = [];
     server.use(
       http.post("*/api/agent/proposals/:id/accept", ({ params }) => (calls.push(`accept ${String(params.id)}`), HttpResponse.json(proposal({ status: "accepted" })))),

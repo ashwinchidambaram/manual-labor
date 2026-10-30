@@ -1,21 +1,33 @@
 import { cloneElement, useCallback, useEffect, useId, useRef, useState, type FocusEvent, type MouseEvent, type ReactElement } from "react";
 import { createPortal } from "react-dom";
+import { Keycap } from "./Copy";
 import { keyLabel } from "./guide";
 import { HINTS, type HintId } from "./hints";
 
 // Pointer vs keyboard modality: a focus that follows a click is not a keyboard focus, whatever the browser says.
+// Only navigation keys count: focus the app moves itself after Enter or Esc (a dialog returning focus to its opener)
+// shows no tooltip, so the next Esc still belongs to the screen.
+const NAV_KEYS = new Set(["Tab", "Shift", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End", "PageUp", "PageDown"]);
 let pointerFocus = false;
+let navKey = false;
 if (typeof document !== "undefined") {
   const pointer = (): void => {
     pointerFocus = true;
   };
   document.addEventListener("pointerdown", pointer, true);
   document.addEventListener("mousedown", pointer, true);
-  document.addEventListener("keydown", () => (pointerFocus = false), true);
+  document.addEventListener(
+    "keydown",
+    (e) => {
+      pointerFocus = false;
+      navKey = NAV_KEYS.has(e.key);
+    },
+    true,
+  );
 }
 
 function keyboardFocus(el: Element): boolean {
-  if (pointerFocus) return false;
+  if (pointerFocus || !navKey) return false;
   try {
     return el.matches(":focus-visible");
   } catch {
@@ -41,7 +53,8 @@ interface Pos {
 /**
  * A tooltip for one trigger (design 12 O4). It never takes focus and registers no hotkey: it opens on hover (after
  * 400 ms) and on keyboard focus, lives in a portal only while open (so it never adds text to the trigger), sets
- * `aria-describedby` only while open, and hides on Esc through a passive listener that leaves the event to the app.
+ * `aria-describedby` only while open. Esc while it is open closes only the tooltip (consumed in the capture phase);
+ * with no tooltip open nothing listens, so Esc reaches the app unchanged. A click on the trigger hides it.
  * `within`: the trigger is a group (a radiogroup); focus on any control inside it shows the hint.
  */
 export default function Hint({ id, children, text, within = false }: { id: HintId; children: ReactElement; text?: string; within?: boolean }) {
@@ -72,7 +85,16 @@ export default function Hint({ id, children, text, within = false }: { id: HintI
   useEffect(() => {
     if (!pos) return;
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key === "Escape") hide();
+      if (e.key !== "Escape") return;
+      // Esc belongs to the open tooltip: it closes only the tooltip, so an open editor or panel keeps its state.
+      // A tooltip left over on a control behind an open dialog is hidden without taking the dialog's Esc.
+      const modal = document.querySelector("[aria-modal='true']");
+      const behindModal = !!modal && !!anchor.current && !modal.contains(anchor.current);
+      if (!behindModal) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      hide();
     };
     // a scroll (often the browser bringing the focused trigger into view) moves the bubble with it; it hides only
     // once the trigger has left the viewport
@@ -83,10 +105,11 @@ export default function Hint({ id, children, text, within = false }: { id: HintI
       if (r.bottom < 0 || r.top > (window.innerHeight || 768)) hide();
       else show(el);
     };
-    document.addEventListener("keydown", onKey, { capture: true, passive: true });
+    // capture on window: runs before every document/React handler, and only while this tooltip is open
+    window.addEventListener("keydown", onKey, { capture: true });
     window.addEventListener("scroll", onScroll, { capture: true, passive: true });
     return () => {
-      document.removeEventListener("keydown", onKey, { capture: true });
+      window.removeEventListener("keydown", onKey, { capture: true });
       window.removeEventListener("scroll", onScroll, { capture: true });
     };
   }, [pos, hide, show]);
@@ -117,6 +140,11 @@ export default function Hint({ id, children, text, within = false }: { id: HintI
       const self = e.target === e.currentTarget;
       if ((self || within) && keyboardFocus(e.target)) show(e.currentTarget);
     },
+    onMouseDown: (e: MouseEvent) => {
+      call("onMouseDown", e);
+      // a click acts on the control: a pending or open hover tooltip goes, so a later Esc belongs to what it opened
+      hide();
+    },
     onBlur: (e: FocusEvent) => {
       call("onBlur", e);
       if (within && e.relatedTarget instanceof Node && e.currentTarget.contains(e.relatedTarget)) return;
@@ -140,7 +168,7 @@ export default function Hint({ id, children, text, within = false }: { id: HintI
               {text ?? entry.text}
               {key ? (
                 <span className="ml-1.5 whitespace-nowrap text-slate-300">
-                  Key <kbd className="rounded border border-slate-600 px-1 font-mono text-[0.7rem] text-slate-50">{key}</kbd>
+                  Key <Keycap dark>{key}</Keycap>
                 </span>
               ) : null}
             </div>,

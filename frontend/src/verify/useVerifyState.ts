@@ -43,6 +43,8 @@ export interface ActOpts {
   text?: string;
   confirm?: boolean;
   flag?: { category: FlagCategory; note: string | null; target_id?: string | null };
+  /** act only if this is still the current block (an await happened between the decision and the act) */
+  expectId?: string | null;
 }
 export type ActResult = { ok: true; out: ReviewActionOut } | { ok: false; error: unknown; conflict?: EditConflict };
 
@@ -276,6 +278,7 @@ export function useVerifyState() {
       const s = ref.current;
       const id = kind === "back" ? null : s.currentId;
       if (kind !== "back" && !id) return Promise.resolve({ ok: false, error: new Error("no current block") });
+      if (opts.expectId !== undefined && opts.expectId !== id) return Promise.resolve({ ok: false, error: new Error(`${opts.expectId} is no longer the current block`) });
       const rid = crypto.randomUUID();
       const optimistic = kind !== "edit";
       if (optimistic) dispatch({ type: "act", kind, blockId: id, rid });

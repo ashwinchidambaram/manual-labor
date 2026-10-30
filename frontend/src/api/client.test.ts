@@ -7,7 +7,7 @@ describe('api client types', () => {
     const page: components['schemas']['QueuePage'] = {
       items: [],
       total: 0,
-      counts: { pending: 0, auto_approved: 0, approved: 0, edited: 0, flagged_open: 0, skipped: 0, in_scope: 0 },
+      counts: { pending: 0, auto_approved: 0, approved: 0, edited: 0, flagged_open: 0, skipped: 0, in_scope: 0, queued: 0, rejected: 0 },
       docs: [],
       cursor: { sort: 'worst_first', view_threshold: null, doc_filter: null, current_block_id: null, trail: [] },
     };

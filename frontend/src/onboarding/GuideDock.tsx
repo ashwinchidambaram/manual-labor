@@ -10,7 +10,7 @@ const SHEET_VAR = "--guide-sheet";
  * manually in the last 5 s. Below the xl breakpoint the panel is a bottom sheet; its height is published as a CSS
  * variable so the page can pad for it and the Verify action bar stays above it.
  */
-export default function GuideDock({ path, mock, onHide }: { path: string; mock: boolean; onHide: () => void }) {
+export default function GuideDock({ path, mock, onHide, saveError = null }: { path: string; mock: boolean; onHide: () => void; saveError?: string | null }) {
   const [index, setIndex] = useState(() => stepForPath(path));
   const pagedAt = useRef(0);
   useEffect(() => {
@@ -20,7 +20,7 @@ export default function GuideDock({ path, mock, onHide }: { path: string; mock: 
   const scanned = (sources.data ?? []).some((s) => s.kind === "scanned_pdf");
   const step = GUIDE_STEPS[index];
   const notes = [
-    ...(mock ? ["Mock models: model results in this project are placeholders."] : []),
+    ...(mock ? ["Mock models are on: model output is placeholder text; real models are set in Scope → Models."] : []),
     ...(step.id === "verify" && scanned ? ["Scanned pages: their text comes from OCR, so more of their blocks are queued."] : []),
   ];
 
@@ -53,5 +53,5 @@ export default function GuideDock({ path, mock, onHide }: { path: string; mock: 
     if (ref.current?.contains(document.activeElement)) document.querySelector<HTMLElement>("[data-help-button]")?.focus();
     onHide();
   };
-  return <GuidePanel ref={ref} step={step} index={index} total={GUIDE_STEPS.length} onPrev={() => page(-1)} onNext={() => page(1)} onHide={hide} notes={notes} />;
+  return <GuidePanel ref={ref} step={step} index={index} total={GUIDE_STEPS.length} onPrev={() => page(-1)} onNext={() => page(1)} onHide={hide} notes={notes} error={saveError} />;
 }
