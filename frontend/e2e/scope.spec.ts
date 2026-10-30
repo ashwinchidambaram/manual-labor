@@ -73,20 +73,24 @@ test("E2 counts update live, before the server answers", async ({ page, request 
   await page.goto("/scope");
   await waitForTree(page);
   await expect(page.getByTestId("sum-blocks")).toHaveText("0");
+  // Hold the PUT until the test releases it, so the assertion below cannot race the wall clock:
+  // the count must show while the PUT is still unanswered, however slow the machine is.
   let putAnswered = false;
+  let releasePut!: () => void;
+  const putHeld = new Promise<void>((r) => (releasePut = r));
   await page.route("**/api/scope/selection", async (route) => {
-    if (route.request().method() === "PUT") await new Promise((r) => setTimeout(r, 800));
+    if (route.request().method() === "PUT") await putHeld;
     await route.continue();
     if (route.request().method() === "PUT") putAnswered = true;
   });
   const groups = await getGroups(request);
   const topic = groups[0].groups.topics.find((t) => !t.is_unassigned)!;
   await row(page, topic.id).click();
-  // No wall-clock race: the count must show while the (held) PUT has not been answered.
   await expect(page.getByTestId("sum-blocks")).toHaveText(String(topic.block_count));
   expect(putAnswered).toBe(false);
   expect(await stat(page, "sum-pages")).toBeGreaterThan(0);
   await expect(page.locator("[data-testid=coverage-chip][data-stale=true]").first()).toBeVisible();
+  releasePut();
   await waitSettled(page);
   const server = await (await request.get("/api/scope/summary")).json();
   expect(await stat(page, "sum-blocks")).toBe(server.blocks);
