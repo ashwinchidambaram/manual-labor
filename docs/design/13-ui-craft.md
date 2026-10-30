@@ -386,3 +386,21 @@ Answer these and the brief is confirmed.
 - D7 Test assertion changes listed in §5 accepted; test ids survive where the brief says they do.
 - D8 Fonts bundled locally (offline product, SPEC AC8); no runtime Google Fonts.
 - Shape gate: the owner approved this brief in a separate response ("B + A's warmth", server fields, Atkinson Hyperlegible, full welcome band). Image step skipped: no native image generation in this harness; the HTML mocks are the north star.
+
+## 8. Build notes (2026-10-30, recorded by the owner's agent after inspecting the build)
+
+What was built: commit 474e06b (craft) on top of ee6c9ed (server fields). Screens inspected live at 1440, 1024 and 720 wide and at 720x450 (200 percent zoom); screenshots in the session scratchpad.
+
+Deviations from §2, each with the reason:
+
+- **Queue reason labels keep their old words** ("parsers disagree", "weak OCR word", "numeric spec"): `ux-verify.spec.ts` T3 asserts them and T3 is not in §5. The card now names the uncertain word next to the label, which is the translation §2.8 asked for.
+- **The scorer's raw detail string stays visible** as a muted secondary line under each readable check: T5 reads each list item's `innerText` and asserts the detail verbatim, so a collapsed disclosure would fail. The readable sentence is primary; the raw line is last and small.
+- **The override form and the Models panel stay expanded**: tests focus controls inside them.
+- **The Export step reads "locked: N to review" before the first decision**: §5 keeps that string, and the export status carries no decision count to switch on.
+- **Quiet milestones (§2.8.5) are not built**: a per-document "fully reviewed" line needs a per-document queued count in `/api/verify/queue` `docs[]` (today: state, stale, waiting_for) and a per-article one needs article counts; both are additive server fields and are left as a follow-up. The empty-queue state keeps its reconciled counts line and the next-step link.
+- **One focus call added**: "Start with step 1" in the welcome band moves focus into the group list. This amends design 12 §4 rule 1 (focus calls only for Help and Hide): a button whose whole purpose is "go to step 1" may move focus when the person presses it. "I have used this before" behaves as Hide did. Nothing moves focus on its own.
+- **Bundle**: 496 kB of JavaScript (Vite warns above 500 kB); Atkinson Hyperlegible adds 72 kB of woff2, bundled under `frontend/src/assets` with its SIL OFL licence.
+
+Defect found during the build's e2e runs and fixed at the cause (edd799c): the page strip and the source pane fetch the same page PNG together, and `render_page_png` wrote both renders to one `<out>.tmp`, so the second `os.replace` raised `FileNotFoundError`. Each call now writes its own temp file; `tests/parse/test_render_race.py` reproduced it 5 of 6 runs before the fix.
+
+The craft build's "approves did not advance" observation (UX2, T13) did not reproduce: UX2 passed 3 of 3 alone and T13 passed with focus landing in 6 to 18 ms, both with the machine at load 13 to 17 from an unrelated render. The earlier failures were 5 s expect timeouts under load 7 to 12, the same tests that failed in module 12's loaded run.
