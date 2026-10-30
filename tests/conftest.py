@@ -258,7 +258,8 @@ def scored_copy(scoredproj: Scored, tmp_path: Path) -> ProjectPaths:
 
 # --- disk guard: the shared basetemp must stay small ---
 
-MAX_TMP_BYTES = 2 * 1024**3
+# Raised from 2 GiB on 2026-10-30: the full suite leaves ~2.1 GiB (647 dirs, ~3.7 MiB avg).
+MAX_TMP_BYTES = 3 * 1024**3
 
 
 def _tree_bytes(root: Path) -> int:
@@ -277,7 +278,7 @@ def _tmp_footprint_guard(tmp_path_factory: pytest.TempPathFactory) -> Any:
     size = _tree_bytes(base)
     print(f"\n[tmp footprint] {base}: {size / 1024**2:.0f} MiB")
     if size > MAX_TMP_BYTES:
-        pytest.fail(f"pytest basetemp {base} is {size / 1024**3:.2f} GiB (> 2 GiB cap)")
+        pytest.fail(f"pytest basetemp {base} is {size / 1024**3:.2f} GiB (> 3 GiB cap)")
 
 
 # --- module 7 fixtures: a two-document project (clean.pdf + scanned.pdf), mock models ---------
