@@ -63,6 +63,20 @@ export function useSelectionEngine(): SelectionEngine {
     if (selQ.data && pendingRef.current === 0) serverOut.current = selQ.data;
   }, [selQ.data]);
 
+  // A click made before the block index loaded could only carry the server's old counts in its
+  // optimistic summary. Recount once the index is here, so the counts go live without waiting for
+  // the server's answer (which may be slow, or held).
+  useEffect(() => {
+    if (!blockIdx || pendingRef.current === 0) return;
+    const cur = qc.getQueryData<SelectionOut>(qk.selection);
+    if (!cur) return;
+    const ids = new Set(cur.selection.block_ids) as ReadonlySet<string>;
+    qc.setQueryData(qk.selection, {
+      ...cur,
+      summary: summaryFrom(ids, blockIdx, live.current.docs, cur.summary.review_load.threshold, cur.selection.article_split),
+    });
+  }, [blockIdx, qc]);
+
   const run = useCallback(async () => {
     let last: SelectionOut | undefined;
     try {

@@ -262,8 +262,11 @@ test("E9 sources panel, scanned badge and OCR warning", async ({ page, request }
     await expect(r).toContainText(s.filename);
     await expect(r).toContainText(`${s.pages} page`);
     // The confirm job of E3 may leave `clean` stale after later selection changes: mirror the rule.
-    const open = s.nodes.find((n) => n.state !== "fresh");
-    await expect(r.getByTestId("source-chip")).toHaveText(open ? `Processing ${open.node}` : "Ready");
+    // Only Scope's own stages count (clean/score2 run on Confirm); "Processing" only while a job runs,
+    // otherwise the chip says the stage has not run.
+    const scopeStages = new Set(["ingest", "parse", "figures", "score", "group"]);
+    const open = s.nodes.find((n) => scopeStages.has(n.node) && n.state !== "fresh");
+    await expect(r.getByTestId("source-chip")).toHaveText(open ? new RegExp(`^(Processing|Needs a run:|Not run yet:) ${open.node}$`) : /^(Ready|Processing \w*)$/);
     if (s.kind === "scanned_pdf") await expect(r.getByTestId("scanned-badge")).toBeVisible();
     if (s.ocr_warning) await expect(r.getByTestId("ocr-warning")).toContainText(s.ocr_warning);
   }

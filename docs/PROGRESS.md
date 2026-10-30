@@ -406,3 +406,35 @@ labor check: all checks passed
 ```
 
 Follow-ups (additive server fields, not started): per-section blocker counts on `/api/export/status`; per-document queued counts in `/api/verify/queue` `docs[]` for quiet milestones. The server-ack latency while a re-parse job runs sits at 450–540 ms against T13's soft 500 ms budget under external load; not changed.
+
+## Final pass — documentation, fresh-clone install, review fixes — PASSED 2026-10-30
+
+Scope: README.md (people), CLAUDE.md (agents), docs/ARCHITECTURE.md (code map) written and then checked by a fresh Opus reviewer against the code (about 150 claims verified; 13 wrong statements and 6 would-fail commands found and fixed). A fresh clone of the pushed repo followed README Install literally: `uv sync`, `npm ci && npm run build`, `labor check` (all checks passed), `labor serve` answering on a scratch project. Four defects found on the way, each fixed failing-test-first and re-reviewed by a second fresh Opus agent (whose findings were fixed in turn):
+
+- Scope live counts: a click made before the block index loaded kept the server's old count until the PUT answered (Playwright E2 failed under load). `useSelectionEngine` recounts when the index arrives while writes are pending. `src/scope/liveCounts.test.tsx`.
+- CLI-ingested projects dead-ended in the UI: "Processing parse" with no job and no button. Scope now says "Not run yet: X" with a Run button; "Processing" only while a job's plan covers the manual; `clean`/`score2` (Confirm's stages) never produce a button. `src/scope/sourcesRun.test.tsx`; C1 and two e2e chip assertions updated to the rule. Design 08 §9.
+- Docling models: the documented `docling-tools models download` writes to docling's cache, which `models_cached()` never checked. `artifacts_path()` accepts it when both model repos are present (a partial folder must not hide a working hub cache). `tests/parse/test_docling_models.py` (6). Design 01 §14.
+- `.coverage` untracked and ignored before the repo goes public.
+
+```
+$ uv run pytest -o addopts="-m 'not slow' --basetemp=.pytest_tmp_final" -q     # on 0f4484c, before the fixes
+1669 passed, 73 skipped, 3 deselected, 28 warnings in 1513.40s (0:25:13)
+$ uv run pytest tests/parse/test_docling_models.py -q                          # after the fixes
+6 passed
+$ uv run ruff check manuallabor/ tests/ && uv run ruff format --check manuallabor/ tests/ && uv run mypy manuallabor/parse/pdf_docling.py
+All checks passed! / 377 files already formatted / Success: no issues found
+$ uv run labor schemas export --check && uv run labor openapi export --check
+schemas up to date / openapi up to date
+$ uv run labor check ./tests/fixtures/project-a && uv run labor check --live ./tests/fixtures/project-a
+labor check: all checks passed (both)
+$ cd frontend && npm run typecheck && npx vitest run
+tsc clean
+ Test Files  46 passed (46)
+      Tests  372 passed (372)
+$ npx playwright test                                                          # after the fixes; e2e project rebuilt (84 s)
+84 passed, 1 skipped (opt-in reader's pass), 1 failed: T13's soft "server ack < 500 ms while a re-parse job runs"
+   measured 700–1735 ms with an unrelated process pinned at 100% CPU for 8 h (load average 10); hard budgets passed.
+   Not a code change in this pass: the Docling discovery functions are called only from the parse stage.
+$ fresh clone of origin/main at 0f4484c: uv sync, npm ci && npm run build, labor check, labor serve
+labor check: all checks passed / root 200 / GET /api/project 200
+```

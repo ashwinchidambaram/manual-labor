@@ -49,7 +49,7 @@ test("1 sources list: parse status, OCR warning on scanned only", async ({ page 
   await expect(page.getByTestId("source-row")).toHaveCount(src.length);
   for (const s of src) {
     const r = page.locator(`[data-testid=source-row][data-slug="${s.slug}"]`);
-    await expect(r.getByTestId("source-chip")).toHaveText(/Ready|Processing|Failed/);
+    await expect(r.getByTestId("source-chip")).toHaveText(/Ready|Processing|Failed|Needs a run|Not run yet/);
   }
   for (const s of scanned) {
     const r = page.locator(`[data-testid=source-row][data-slug="${s.slug}"]`);

@@ -3,12 +3,30 @@ import { useRerun, useUploadSources } from "../api/queries";
 import type { JobInfo, ProjectStatus, SourceInfo } from "../api/schema";
 import Hint from "../onboarding/Hint";
 
+/** The stages Scope is responsible for. `clean` and `score2` run when the scope is confirmed, so on
+ *  this screen they are legitimately missing after an upload and are not "open" here. */
+export const SCOPE_STAGES: ReadonlySet<string> = new Set(["ingest", "parse", "figures", "score", "group"]);
+
+/** Whether a queued or running job will touch this manual. `JobInfo.doc` is only the document of
+ *  the last progress event (null while queued), so the plan's document list is what counts. */
+export function jobCovers(j: JobInfo, slug: string): boolean {
+  const docs = (j.plan as { docs?: unknown } | undefined)?.docs;
+  if (Array.isArray(docs) && docs.length) return docs.includes(slug);
+  return true; // no document filter: a project-wide plan
+}
+
+export function openScopeStage(s: SourceInfo): { node: string; state: string } | undefined {
+  return s.nodes.find((n) => SCOPE_STAGES.has(n.node) && (n.state === "stale" || n.state === "missing"));
+}
+
 export function sourceChip(s: SourceInfo, jobs: readonly JobInfo[]): { text: string; tone: "ok" | "busy" | "bad" } {
   const failed = s.nodes.find((n) => n.state === "failed");
   if (failed) return { text: `Failed: ${failed.node}`, tone: "bad" };
-  const busy = jobs.some((j) => j.doc === s.slug);
-  const open = s.nodes.find((n) => n.state === "stale" || n.state === "missing");
-  if (open || busy) return { text: `Processing ${(open ?? s.nodes.find((n) => n.state !== "fresh"))?.node ?? jobs.find((j) => j.doc === s.slug)?.node ?? ""}`.trim(), tone: "busy" };
+  const busy = jobs.some((j) => jobCovers(j, s.slug));
+  const open = openScopeStage(s);
+  if (busy) return { text: `Processing ${(open ?? s.nodes.find((n) => n.state !== "fresh"))?.node ?? jobs.find((j) => jobCovers(j, s.slug))?.node ?? ""}`.trim(), tone: "busy" };
+  // Nothing is running: say so. "Processing" with no job would leave a CLI user waiting forever.
+  if (open) return { text: `${open.state === "missing" ? "Not run yet" : "Needs a run"}: ${open.node}`, tone: "busy" };
   return { text: "Ready", tone: "ok" };
 }
 
@@ -71,7 +89,10 @@ export default function SourcesList({
   onGoTo: (slug: string) => void;
 }) {
   const rerun = useRerun();
-  const needsRerun = sources.some((s) => s.nodes.some((n) => n.state === "stale" || n.state === "failed"));
+  // The button posts a plan up to `group`, so only Scope's stages can make it appear (§9 of design 08).
+  const needsRerun = sources.some((s) => s.nodes.some((n) => SCOPE_STAGES.has(n.node) && (n.state === "stale" || n.state === "failed")));
+  // Ingested from the CLI and never run: the stages are "missing" and no job exists. Offer to run it.
+  const neverRun = jobs.length === 0 && sources.some((s) => openScopeStage(s)?.state === "missing");
   const onKeyDown = (e: React.KeyboardEvent<HTMLUListElement>): void => {
     if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
     const items = Array.from(e.currentTarget.querySelectorAll<HTMLElement>("button[data-source]"));
@@ -136,14 +157,14 @@ export default function SourcesList({
           </li>
         ))}
       </ul>
-      {needsRerun ? (
+      {needsRerun || neverRun ? (
         <button
           type="button"
           onClick={() => rerun.mutate()}
           disabled={jobs.length > 0}
           className={`mt-2 min-h-[2.25rem] rounded-lg border border-line bg-raised px-3 text-sm font-medium hover:bg-sunk disabled:opacity-50 ${FOCUS}`}
         >
-          Re-run
+          {needsRerun ? "Re-run" : "Run"}
         </button>
       ) : null}
     </section>

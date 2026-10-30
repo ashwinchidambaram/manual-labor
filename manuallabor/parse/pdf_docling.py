@@ -36,9 +36,36 @@ def hf_cache_dir() -> Path:
     return Path.home() / ".cache" / "huggingface" / "hub"
 
 
+def docling_cache_dir() -> Path:
+    """Docling's own cache directory: where `docling-tools models download` writes `models/`."""
+    try:
+        from docling.datamodel.settings import settings
+    except Exception:  # docling not importable: fall back to its documented default
+        return Path.home() / ".cache" / "docling"
+    return Path(settings.cache_dir)
+
+
+def docling_artifacts_dir() -> Path | None:
+    """`<docling cache>/models` when it holds both model repos this parser needs.
+
+    The folder alone is not enough: docling creates it before downloading, and OCR models
+    download into it on first use. Under an artifacts path docling never falls back to the
+    hub cache, so a partial folder must not win over a complete hub cache.
+    """
+    local = docling_cache_dir() / "models"
+    names = [r.removeprefix("models--") for r in MODEL_REPOS]
+    return local if all((local / n).is_dir() for n in names) else None
+
+
 def artifacts_path() -> Path | None:
+    """The explicit artifacts directory, else the one `docling-tools models download` filled.
+
+    None means "let docling resolve the Hugging Face hub cache itself".
+    """
     p = os.environ.get("MANUALLABOR_DOCLING_ARTIFACTS")
-    return Path(p) if p else None
+    if p:
+        return Path(p)
+    return docling_artifacts_dir()
 
 
 def models_cached() -> bool:

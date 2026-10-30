@@ -11,7 +11,7 @@ sources/*.pdf|docx
 docs/<slug>/document.json
    │  parse (PyMuPDF + Docling + OCR, merged)   manuallabor/parse/
    ▼
-docs/<slug>/blocks.json  ──── never modified again
+docs/<slug>/blocks.json  ──── rewritten only by a re-parse
    │  figures                     manuallabor/figures/
    │  score                       manuallabor/scoring/      → scores.json (overlay)
    │  group                       manuallabor/grouping/     → groups.json
@@ -34,7 +34,7 @@ The stage order and the per-stage output files are declared once, in `manuallabo
 | `manuallabor/contracts/` | Pydantic models for every data shape in SPEC §6: `Block`, `Document`, `FigureRecord`, `Group`, `Decision`, `Flag`, `Proposal`, `Manifest`, `ProjectConfig`, probe and LLM records, 21 enums | `block.py`, `config.py`, `enums.py` |
 | `manuallabor/project.py` | `ProjectPaths` and `DocPaths`: the only place file locations are defined | `ProjectPaths` |
 | `manuallabor/ingest.py` | Copies sources, assigns slugs, writes `document.json` with the source sha256 | |
-| `manuallabor/parse/` | `pdf_pymupdf.py`, `pdf_docling.py`, `docx.py`, `ocr.py`, `layout.py` (headers, footers, columns), `merge.py` (reconciles the two parsers into blocks with stable IDs), `render.py` (page PNGs) | `merge.py` |
+| `manuallabor/parse/` | `pdf_pymupdf.py`, `pdf_docling.py` (models from `MANUALLABOR_DOCLING_ARTIFACTS`, else docling's own cache, else the HF hub cache; never downloads), `docx.py`, `ocr.py`, `headers.py` (headers and footers), `layout.py` (reading order, columns), `merge.py` (reconciles the two parsers into blocks with stable IDs), `render.py` (page PNGs) | `merge.py` |
 | `manuallabor/figures/` | Native image extraction, vector-to-PNG, page crops as last resort, phash dedupe, caption pairing | `pipeline.py` |
 | `manuallabor/scoring/` | One module per signal, `combine.py`, `faithfulness.py`, `pipeline.py` | `pipeline.py`, `combine.py` |
 | `manuallabor/grouping/` | Structure view from headings; topic view from embeddings and clustering; model-named topics; cohesion | `pipeline.py` |
@@ -46,12 +46,12 @@ The stage order and the per-stage output files are declared once, in `manuallabo
 | `manuallabor/calibration/` | Threshold suggestion from recorded decisions | |
 | `manuallabor/export/` | Assemble the staging tree, write articles and sidecars, zip deterministically, validate | `assemble.py`, `validate.py` |
 | `manuallabor/api/` | FastAPI app, routers, static UI serving, OpenAPI export | `app.py`, `routers/` |
-| `manuallabor/cli.py` | Typer app, every `labor` command | |
+| `manuallabor/cli.py`, `cli_serve.py`, `cli_agent.py` | Typer app. `serve` and `openapi` live in `cli_serve.py`; `agent` and `calibration` in `cli_agent.py` | |
 | `manuallabor/check.py` | `labor check`: the end-to-end smoke on a temp copy | |
 
 ## 3. The project on disk
 
-`ProjectPaths` in `manuallabor/project.py` resolves every path below. Do not build paths anywhere else.
+`ProjectPaths` in `manuallabor/project.py` resolves the paths below, except `.llm_cache/` and `probe.json`, which older code builds by hand. Add new paths to `ProjectPaths`.
 
 | Path | Holds |
 |---|---|
@@ -86,7 +86,7 @@ Inside `docs/<slug>/`: `document.json`, `blocks.json`, `scores.json`, `score_his
 
 **Running.** `executor.py` turns "everything not fresh up to `--to`" into a plan and runs it node by node, updating `stages.json` after each. `inline.py` runs plans in-process for `labor run` and `labor check`. Under `labor serve`, `runner.py` (`JobRunner`) is the only writer of the `jobs` table; it spawns `python -m manuallabor.jobs.worker <root> <job>`, which takes `.labor.worker.lock`, reads the plan file and streams NDJSON progress to `logs/jobs/`. The worker has no DB access. On restart the runner adopts a live worker or marks a dead one `interrupted` and re-enqueues its plan. SIGTERM to the worker is a cancel request.
 
-**Two rules that follow from this.** First, a job's start-up cleaner removes stray `*.tmp` files under `docs/`; anything written outside the worker lock (API page renders) must use another suffix, which is why `render_tmp_path` writes `.part`. Second, any new stage output file must be registered in `graph.py` or it will never be considered missing or stale.
+**Two rules that follow from this.** First, a job's start-up cleaner removes stray `*.tmp` files under `docs/`, `figures/` and `learning/`; anything written outside the worker lock (API page renders) must use another suffix, which is why `render_tmp_path` writes `.part`. Second, any new stage output file must be registered in `graph.py` or it will never be considered missing or stale.
 
 ## 5. Contracts and generated files
 
@@ -120,7 +120,7 @@ Signals live one per module in `manuallabor/scoring/`, named by `SignalName` in 
 | `has_numeric_spec` | A rule, not a score: the block is always queued and the signal is excluded from the combiner |
 | `llm_verifier` | Optional second-reader model; the config validator rejects one that equals the cleanup model |
 
-`combine.py`: `min(critical) × geometric_mean(soft)`, clamped to [0, 1], rounded to 6 places, missing signals omitted. Critical: `faithfulness` and `figure_method` always; `parser_agreement` and `textlayer_vs_ocr` when the block has a numeric spec or the value is below 0.8; `ocr_min` with a numeric spec. Learned rules (`learned.py`) can only queue a block or lower its confidence.
+`combine.py`: `min(critical) × geometric_mean(soft)`, clamped to [0, 1], rounded to 6 places, missing signals omitted. Each signal's producer decides whether its value is critical: `faithfulness` and `figure_method` always; `parser_agreement` and `textlayer_vs_ocr` when the block has a numeric spec or the value is below 0.8; `ocr_min` with a numeric spec; `table_consistency` when the cells disagree with the raw text. Learned rules (`learned.py`) can only queue a block or lower its confidence.
 
 `faithfulness.py` allows exactly the edits AE1 to AE7 from design 03: whitespace, de-hyphenation, header and footer removal, bullet normalisation, glyph identity and NFC, table reconstruction, and reordering backed by another reading. Values: fail 0.0; pass after an evidence-backed reorder `FAITH_REORDER_VALUE` 0.9; cleanup candidate rejected and the deterministic result kept `FAITH_FALLBACK_VALUE` 0.5 (both in `scoring/types.py`). The UI treats anything that passed as passed and shows the value as a secondary line.
 
@@ -128,7 +128,7 @@ Signals live one per module in `manuallabor/scoring/`, named by `SignalName` in 
 
 ## 7. Providers
 
-`providers/base.py` defines the `Provider` protocol (`chat`, `vision`, `embed`, `cache_namespace`) and `BaseProvider`, which adds caching, logging and output validation around every backend. `ProviderSet.get(task)` picks the model for a task from `ProjectConfig.models`. Backends in `registry.py`: `ollama`, `anthropic`, `openai`, `openai_compatible`, `vllm`, `llamacpp` (all via LiteLLM in `litellm_provider.py`) and `mock` (deterministic, used by tests and `--mock`).
+`providers/base.py` defines the `Provider` protocol (`chat`, `vision`, `embed`, `cache_namespace`) and `BaseProvider`, which adds caching, logging and output validation around every backend. `ProviderSet.get(task)` picks the model for a task from `ProjectConfig.models`. Backends in `registry.py`: `ollama`, `anthropic`, `openai`, `openai_compatible`, `vllm`, `llamacpp` (all via LiteLLM in `litellm_provider.py`). `mock` (deterministic, used by tests and `--mock`) is registered in `base.py` under `DEFAULT_FACTORIES`.
 
 Cache key: sha256 of canonical JSON `{namespace, task, kind, inputs}`, stored under `.llm_cache/`. Every call appends an `LLMCallLog` (`contracts/llm.py`) to `llm_calls.jsonl`. `offline.py` blocks all sockets except the Ollama host when `MANUALLABOR_OFFLINE=1`; the acceptance script uses it as a negative control.
 
@@ -140,13 +140,13 @@ Routers in `manuallabor/api/routers/`, mounted in `api/app.py`:
 
 | Prefix | Routes |
 |---|---|
-| `/api` project | `project`, `status`, `probe` (GET, POST), `config/threshold` |
-| `/api` sources | `sources` (GET, POST), `docs/{slug}/source`, `docs/{slug}/pages/{page}/blocks`, `docs/{slug}/figures` |
+| `/api` project | `project`, `status`, `probe` (GET, POST), `config/threshold`, `config/apply-tier` |
+| `/api` sources | `sources` (GET, POST), `docs/{slug}/source`, `docs/{slug}/pages/{page}.png`, `docs/{slug}/pages/{page}/blocks`, `docs/{slug}/figures` |
 | `/api/scope` | `groups`, `blocks`, `selection` (GET, PUT), `summary`, `regroup`, `models`, `confirm` |
-| `/api` verify | `verify/queue`, `verify/cursor` (GET, PUT), `verify/blocks/{id}`, `flags`, `flags/{id}/resolve` |
+| `/api` verify | `verify/queue`, `verify/cursor` (GET, PUT), `verify/blocks/{id}`, `verify/actions` (POST: approve, edit, flag, skip), `flags`, `flags/{id}/resolve` |
 | `/api` figures | `articles/{id}/figures`, `figures/{fid}/image`, `attach`, `detach`, `bbox` |
 | `/api/jobs` | create, list, get, `{id}/log`, `{id}/cancel` |
-| `/api/learning` | settings, snapshots, activate, rollback, reset, disable item, publish |
+| `/api/learning` | settings (GET, PUT), snapshots, activate, rollback, reset, disable item, publish; `decisions/export` |
 | `/api` agent | `agent/run`, `agent/items`, `agent/proposals` (accept, edit, reject), `accept-all-passing`, `calibration`, `calibration/apply` |
 | `/api/export` | `status`, POST `` (start an export job), `override`, `download` |
 | `/api/ui` | `guide` (first-run state) |
@@ -181,7 +181,7 @@ Design rules the components follow are in `DESIGN.md` (colour meaning: terracott
 
 ## 10. Tests
 
-`tests/` mirrors the packages: `agent`, `api`, `calibration`, `check`, `cleanup`, `contracts`, `export`, `figures`, `grouping`, `jobs`, `parse`, `providers` (with the shared `contract/` suite every backend must pass), `scoring`, `state`, plus `test_cli.py` and `test_ids.py`.
+`tests/` mirrors the packages: `agent`, `api`, `calibration`, `check`, `cleanup`, `contracts`, `export`, `figures`, `fixtures_gen`, `grouping`, `jobs`, `parse`, `providers` (with the shared `contract/` suite every backend must pass), `scoring`, `state`, plus `test_cli.py` and `test_ids.py`.
 
 Markers (`pyproject.toml`): `slow` is deselected by default (`addopts` includes `-m 'not slow'` and a `--basetemp`); `live` needs `MANUALLABOR_LIVE=1`; `acc1`, `acc2`, `acc3`, `acc5` tag acceptance runs. Docling-dependent tests skip when its models are not cached unless `MANUALLABOR_REQUIRE_DOCLING=1`.
 
@@ -193,5 +193,5 @@ Fixtures are generated, not hand-drawn: `clean.pdf` (born-digital, Figure 3 plac
 
 - `docs/design/00` to `11`: one design per pipeline module, including the alternatives rejected.
 - `docs/design/03-scoring.md`: the allowed-edit list AE1 to AE7 and the critical-signal rule.
-- `docs/design/12-onboarding.md`, `13-ui-craft.md`: the UI decisions (D1 to D8, D1a) and the only assertion changes the redesign was allowed to make.
+- `docs/design/12-onboarding.md` (guide, hints, trust evidence) and `13-ui-craft.md` (the redesign: decisions D1 to D8 and D1a, and the only assertion changes it was allowed to make).
 - `docs/PROGRESS.md`: every gate, with pasted output. `docs/ACCEPTANCE.md`: the SPEC §11 checklist with evidence.

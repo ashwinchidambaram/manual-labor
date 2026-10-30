@@ -11,7 +11,7 @@ Every module in the build order below is complete, gated and recorded in `docs/P
 Open follow-ups the owner has not decided on (do not start them unasked):
 
 - Additive server fields: per-section blocker counts on `/api/export/status` and per-document queued counts in `/api/verify/queue` `docs[]`, for quiet milestones in the UI.
-- The agent task's default local model (`llama3.2:1b`) cannot follow the proposal schema; `labor probe --apply medium` or the api tier fixes it per project.
+- The agent task's default local model (`llama3.2:1b`) cannot follow the proposal schema. Per project, set `models.agent` to a 7B-class model or an API model (`labor probe --apply medium` is refused on a 16 GB machine without `--force`, and `--apply` resets `models.agent` unless `--keep-overrides`). A better default is still undecided.
 - Parsed-fixture caching to shorten the full pytest run (15 to 19 minutes) and Playwright (about 6 minutes).
 
 ## Invariants (never trade these away)
@@ -50,7 +50,8 @@ npm run typecheck && npm test -- --run                 # tsc, vitest
 npm run gen-types && npm run gen-api && npm run gen-guide   # after a contract, route or guide-text change
 npm run check-types-fresh && npm run check-api-fresh   # drift checks
 npm run build                                          # dist served by `labor serve`
-npm run e2e                                            # Playwright; builds the fixture project on first run
+npx playwright install chromium                        # once per machine
+npm run e2e                                            # Playwright; builds the fixture project on first run; needs ports 5173, 8765, 8766
 ```
 
 Codegen order after a contract change: `uv run labor schemas export`, `uv run labor openapi export`, then `npm run gen-types` and `npm run gen-api`. After editing `frontend/src/onboarding/*.ts` or `hotkeys.ts`, run `npm run gen-guide`; a vitest fails while `docs/USER_GUIDE.md` is stale.
@@ -58,7 +59,8 @@ Codegen order after a contract change: `uv run labor schemas export`, `uv run la
 Run the app on a scratch copy, never on a fixture:
 
 ```
-rm -rf build/demo-project && cp -R frontend/e2e/.cache/project build/demo-project
+bash scripts/e2e-project.sh                            # builds frontend/e2e/.cache/project (cached; e2e does this too)
+mkdir -p build && rm -rf build/demo-project && cp -R frontend/e2e/.cache/project build/demo-project
 uv run labor serve build/demo-project --mock --port 8780
 curl -X PUT localhost:8780/api/ui/guide -H 'content-type: application/json' -d '{"seen":false}'   # first-run state
 ```
@@ -83,8 +85,10 @@ curl -X PUT localhost:8780/api/ui/guide -H 'content-type: application/json' -d '
 
 ## Things that are easy to get wrong
 
-- **Writing a path by hand.** Every project path comes from `ProjectPaths` / `DocPaths` in `manuallabor/project.py`. A new stage output must also be registered in `manuallabor/jobs/graph.py` or it will never be seen as missing or stale.
-- **Temp files under `docs/`.** A job's start-up cleaner deletes stray `*.tmp` there. Writers outside the worker lock (API page renders) use `.part`, one unique name per call. A temp-file fix has two halves: the writer's unique name and every cleaner whose glob could match it.
+- **Writing a path by hand.** Project paths come from `ProjectPaths` / `DocPaths` in `manuallabor/project.py`; add new ones there (two older exceptions remain, `.llm_cache/` and `probe.json`). A new stage output must also be registered in `manuallabor/jobs/graph.py` or it will never be seen as missing or stale.
+- **Temp files under `docs/`, `figures/` or `learning/`.** A job's start-up cleaner deletes stray `*.tmp` in all three. Writers outside the worker lock (API page renders) use `.part`, one unique name per call. A temp-file fix has two halves: the writer's unique name and every cleaner whose glob could match it.
+- **Counting before the data is there.** The Scope summary is recomputed on the client from the block index; a click that lands before the index loads is recounted when it arrives (`useSelectionEngine`). Keep that effect when touching the engine.
+- **Claiming work is happening.** "Processing" is only shown while a job runs. A stage that has never run says "Not run yet" with a Run button (a CLI-ingested project arrives like that).
 - **Applying a stale queue snapshot after a write.** The Verify queue discards any response that started before the latest settled write (`useVerifyWrites` / `useVerifyState`). Keep that when touching the queue or approve path.
 - **Treating `faithfulness` below 1.0 as failed.** 0.9 is a pass via evidence-backed reorder and 0.5 is "cleanup candidate rejected, deterministic result kept". Failed is `passed == false`.
 - **Blocking the UI on model calls.** All model work is a background job with progress; the review queue stays usable while later blocks are still scoring.
