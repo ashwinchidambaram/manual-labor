@@ -2572,6 +2572,11 @@ export interface components {
             /** Doc Id */
             doc_id: string;
             /**
+             * Excerpt
+             * @default
+             */
+            excerpt: string;
+            /**
              * Has Numeric Spec
              * @default false
              */
@@ -2580,6 +2585,8 @@ export interface components {
             page: number;
             /** Reasons */
             reasons?: string[];
+            /** Section Title */
+            section_title?: string | null;
             /**
              * Stale Doc
              * @default false
@@ -2587,6 +2594,8 @@ export interface components {
             stale_doc: boolean;
             status: components["schemas"]["BlockStatus"];
             type: components["schemas"]["BlockType"];
+            /** Weakest Word */
+            weakest_word?: string | null;
         };
         /** QueuePage */
         QueuePage: {

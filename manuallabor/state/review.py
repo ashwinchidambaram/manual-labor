@@ -27,6 +27,7 @@ from manuallabor.contracts.proposal import Proposal
 from manuallabor.project import ProjectPaths
 from manuallabor.scoring.faithfulness import check_faithfulness_ex
 from manuallabor.scoring.pipeline import faith_kwargs
+from manuallabor.state.card import card_excerpt, section_titles, weakest_word
 from manuallabor.state.data import ProjectData
 from manuallabor.state.errors import (
     EditConflictError,
@@ -254,6 +255,14 @@ class _Entry:
     item: QueueItem
 
 
+@dataclass(frozen=True)
+class _CardContext:
+    """Per-document inputs of the queue card fields."""
+
+    titles: Mapping[str, str | None]
+    captions: Mapping[str, str]
+
+
 @dataclass
 class _Scan:
     pending: list[_Entry]
@@ -320,8 +329,17 @@ class ReviewService:
                 )
         return LearningUse(provenance=prov)
 
-    def _item(self, ov: Block, r: Derived) -> QueueItem:
+    def _card_context(
+        self, slug: str, derived: Sequence[tuple[Block, Block, Derived]]
+    ) -> _CardContext:
+        return _CardContext(
+            titles=section_titles(ov for _m, ov, _r in derived),
+            captions=self.data.figure_captions(slug),
+        )
+
+    def _item(self, ov: Block, r: Derived, card: _CardContext) -> QueueItem:
         why = why_items(ov, r.stale_reason, LearningUse())
+        caption = card.captions.get(ov.figure_id) if ov.figure_id is not None else None
         return QueueItem(
             block_id=ov.id,
             doc_id=ov.doc_id,
@@ -332,6 +350,9 @@ class ReviewService:
             has_numeric_spec=ov.has_numeric_spec,
             reasons=_reasons(why),
             stale_doc=False,
+            section_title=card.titles.get(ov.id),
+            excerpt=card_excerpt(ov, caption),
+            weakest_word=weakest_word(ov),
         )
 
     @staticmethod
@@ -356,7 +377,9 @@ class ReviewService:
         entries: list[_Entry] = []
         for slug in self._ready_docs(doc):
             scope = self.data.scope_ids(slug, selected)
-            for _machine, ov, r in self._derive_doc(slug):
+            derived = self._derive_doc(slug)
+            card = self._card_context(slug, derived)
+            for _machine, ov, r in derived:
                 if ov.id not in scope or ov.type in (BlockType.header, BlockType.footer):
                     continue
                 counts.in_scope += 1
@@ -385,7 +408,7 @@ class ReviewService:
                     continue
                 if sort == QueueSort.figures_only and ov.type != BlockType.figure:
                     continue
-                item = self._item(ov, r)
+                item = self._item(ov, r, card)
                 entries.append(
                     _Entry(
                         self._key(
@@ -918,8 +941,9 @@ class ReviewService:
         status: BlockStatus | None = None
         if current is not None:
             try:
-                _slug, _m, ov, r = self._find(current)
-                item, status = self._item(ov, r), ov.status
+                slug, _m, ov, r = self._find(current)
+                card = self._card_context(slug, self._derive_doc(slug))
+                item, status = self._item(ov, r, card), ov.status
             except NotFound:
                 item = None
         with self.store.tx():

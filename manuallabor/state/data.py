@@ -16,6 +16,7 @@ from manuallabor.contracts.enums import BlockType
 from manuallabor.contracts.group import GroupsFile
 from manuallabor.contracts.io import read_json, read_json_list
 from manuallabor.contracts.selection import Selection
+from manuallabor.figures.types import FigureReport
 from manuallabor.grouping.selection import default_selection, normalize_to, selectable_ids
 from manuallabor.parse.types import PageLayout
 from manuallabor.project import ProjectPaths
@@ -112,6 +113,22 @@ class ProjectData:
         return self._cached(  # type: ignore[no-any-return]
             "attach", slug, sig(dp.attach), lambda: read_json(dp.attach, AttachFile)
         )
+
+    def figure_captions(self, slug: str) -> dict[str, str]:
+        """figure id -> caption_original from figures_report.json (non-empty captions only)."""
+        dp = self.paths.doc(slug)
+
+        def make() -> dict[str, str]:
+            if not dp.figure_report.is_file():
+                return {}
+            report = read_json(dp.figure_report, FigureReport)
+            return {
+                str(f.figure_id): f.caption_original
+                for f in report.figures
+                if f.caption_original and f.caption_original.strip()
+            }
+
+        return self._cached("captions", slug, sig(dp.figure_report), make)  # type: ignore[no-any-return]
 
     def contexts(self, slug: str) -> dict[str, BlockContext]:
         dp = self.paths.doc(slug)

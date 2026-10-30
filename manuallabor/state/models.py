@@ -189,6 +189,11 @@ class QueueItem(ContractModel):
     has_numeric_spec: bool = False
     reasons: list[str] = Field(default_factory=list, max_length=3)
     stale_doc: bool = False
+    # card fields (design 13 section 2.8.3), deterministic rules in manuallabor.state.card;
+    # defaults keep recorded action outcomes (which embed a QueueItem) valid
+    section_title: str | None = None
+    excerpt: str = ""
+    weakest_word: str | None = None
 
 
 class ReviewCounts(ContractModel):

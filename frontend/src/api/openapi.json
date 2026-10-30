@@ -4840,6 +4840,11 @@
             "title": "Doc Id",
             "type": "string"
           },
+          "excerpt": {
+            "default": "",
+            "title": "Excerpt",
+            "type": "string"
+          },
           "has_numeric_spec": {
             "default": false,
             "title": "Has Numeric Spec",
@@ -4857,6 +4862,17 @@
             "title": "Reasons",
             "type": "array"
           },
+          "section_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section Title"
+          },
           "stale_doc": {
             "default": false,
             "title": "Stale Doc",
@@ -4867,6 +4883,17 @@
           },
           "type": {
             "$ref": "#/components/schemas/BlockType"
+          },
+          "weakest_word": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weakest Word"
           }
         },
         "required": [
