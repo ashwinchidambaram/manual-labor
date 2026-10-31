@@ -17,6 +17,8 @@ const scope = (over: Partial<NonNullable<ExportStatus["counts"]>> = {}): NonNull
   rejected: 0,
   overridden: 0,
   blocking: 0,
+  to_review: 0,
+  flagged: 0,
   ...over,
 });
 const gate = (over: Partial<ExportStatus> = {}): ExportStatus => ({
@@ -58,17 +60,36 @@ describe("stepStates from server truth", () => {
   });
   it("Verify is done only when blocks are in scope and none waits", () => {
     expect(stepStates("/scope", gate()).verify.done).toBe(true);
-    expect(stepStates("/scope", gate({ queued: 2, unlocked: false, blockers: ["b-doc-p001-01"] })).verify).toMatchObject({ short: "2 to review", done: false });
+    const two = scope({ approved: 4, blocking: 2, to_review: 2 });
+    expect(stepStates("/scope", gate({ queued: 2, unlocked: false, blockers: ["b-doc-p001-01"], counts: two })).verify).toMatchObject({ short: "2 to review", done: false });
+  });
+});
+
+describe("overridden blocks are not 'to review' (design 11 section 17)", () => {
+  it("only overridden blocks left: Verify says so and is not done; Export is ready with an override", () => {
+    const c = scope({ approved: 1, overridden: 5 });
+    const s = stepStates("/scope", gate({ unlocked: false, queued: 5, counts: c }));
+    expect(s.verify).toMatchObject({ short: "5 overridden", done: false });
+    expect(s.verify.long).toBe("Step 2 of 4. 5 overridden, not reviewed.");
+    expect(s.export.short).toBe("ready with an override");
+  });
+  it("an overridden flag does not lock the export; the Agent still lists it as open", () => {
+    const c = scope({ approved: 0, overridden: 5, blocking: 1, to_review: 1 });
+    const s = stepStates("/scope", gate({ unlocked: false, queued: 5, open_flags: 1, flag_blockers: [], blockers: ["b-doc-p001-09"], counts: c }));
+    expect(s.export.long).toBe("Step 4 of 4. Locked: 1 to review.");
+    expect(s.agent.short).toBe("1 open flag");
+    expect(s.verify.short).toBe("1 to review");
   });
 });
 
 describe("the rail follows the server without a reload", () => {
   it("re-reads the export gate after a Verify decision is saved", async () => {
-    const { f, scope: fake, r } = await mountVerify(3, undefined, { exportStatus: gate({ queued: 3, unlocked: false, blockers: ["b-doc-p001-01"] }) });
+    const three = scope({ approved: 3, blocking: 3, to_review: 3 });
+    const { f, scope: fake, r } = await mountVerify(3, undefined, { exportStatus: gate({ queued: 3, unlocked: false, blockers: ["b-doc-p001-01"], counts: three }) });
     const nav = screen.getByRole("navigation", { name: "Screens" });
     // on Verify the Verify step reads "here"; the Export step carries the count
     await waitFor(() => expect(within(nav).getByTestId("step-short-export")).toHaveTextContent("locked: 3 to review"));
-    fake.exportStatus = gate({ queued: 2, unlocked: false, blockers: ["b-doc-p001-02"] });
+    fake.exportStatus = gate({ queued: 2, unlocked: false, blockers: ["b-doc-p001-02"], counts: scope({ approved: 4, blocking: 2, to_review: 2 }) });
     await r.user.keyboard("a");
     await waitFor(() => expect(f.actions).toHaveLength(1));
     await waitFor(() => expect(within(nav).getByTestId("step-short-export")).toHaveTextContent("locked: 2 to review"));

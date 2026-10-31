@@ -14,7 +14,9 @@ __all__ = ["COUNT_KEYS", "Gate", "export_gate"]
 
 BLOCKING = (BlockStatus.queued, BlockStatus.flagged)
 HF = (BlockType.header, BlockType.footer)
-# the buckets of `Gate.counts`; every in-scope body block is in exactly one of the last six
+# the buckets of `Gate.counts`: every in-scope body block is in exactly one of auto_approved,
+# approved, edited, rejected, overridden, to_review and flagged; `blocking` is to_review + flagged
+# (design 11 sections 14 and 17)
 COUNT_KEYS = (
     "in_scope",
     "auto_approved",
@@ -23,6 +25,8 @@ COUNT_KEYS = (
     "rejected",
     "overridden",
     "blocking",
+    "to_review",
+    "flagged",
 )
 
 
@@ -114,7 +118,13 @@ def export_gate(
     counts["in_scope"] = len(in_scope)
     for b in in_scope:
         if b in raw:
-            counts["overridden" if b in covered else "blocking"] += 1
+            if b in covered:
+                counts["overridden"] += 1
+            else:
+                counts["blocking"] += 1
+                # held by a flag no override covers, else waiting for a person's review
+                held = b in uncovered_flags or status[b] == BlockStatus.flagged
+                counts["flagged" if held else "to_review"] += 1
         else:
             counts[status[b].value] += 1
     return Gate(

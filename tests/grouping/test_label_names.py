@@ -85,6 +85,84 @@ def test_same_section_and_pages_fall_back_to_a_part_number() -> None:
     ]
 
 
+def test_a_leading_section_number_does_not_distinguish_a_title() -> None:
+    """Dana's second run (design 04 section 3.4.2): "Connector Data" and "5. Connector Data"
+    were shown and exported side by side as two names for one topic."""
+    out = finalize_topic_names(
+        [
+            _in("c01", "Connector Data", "2", [2, 5]),
+            _in("c02", "4. Service Intervals", "4", [4]),
+            _in("c03", "5. Connector Data", "5", [5]),
+        ]
+    )
+    assert out == {
+        "c01": ("Connector Data", "connector-data"),
+        "c02": ("4. Service Intervals", "4-service-intervals"),
+        "c03": ("Connector Data (section 5)", "connector-data-section-5"),
+    }
+
+
+def test_two_numbered_titles_alike_but_for_the_number() -> None:
+    out = finalize_topic_names(
+        [
+            _in("c01", "5. connector data", "5", [5]),
+            _in("c02", "6.1 Connector Data", "6.1", [6]),
+            _in("c03", "6.2. Connector data", "6.1", [6]),
+        ]
+    )
+    assert out["c01"] == ("5. Connector Data", "5-connector-data")
+    assert out["c02"] == ("Connector Data (section 6.1)", "connector-data-section-6-1")
+    # same section and page as c02: the part number tells it apart
+    assert out["c03"] == ("Connector data (part 3)", "connector-data-part-3")
+
+
+def test_a_numbered_title_alone_is_kept_and_numbers_inside_words_are_not_stripped() -> None:
+    out = finalize_topic_names(
+        [
+            _in("c01", "X200 Belt Path", "1", [1]),
+            _in("c02", "4WD Drive", "2", [2]),
+            _in("c03", "12 Volt Supply", "3", [3]),
+            _in("c04", "Volt Supply", "4", [4]),
+            _in("c05", "Belt Path", "5", [5]),
+        ]
+    )
+    assert out["c01"] == ("X200 Belt Path", "x200-belt-path")
+    assert out["c02"] == ("4WD Drive", "4wd-drive")
+    # a section number has a dot ("5.", "5.1"): "12 Volt Supply" is not "Volt Supply"
+    assert out["c03"] == ("12 Volt Supply", "12-volt-supply")
+    assert out["c04"] == ("Volt Supply", "volt-supply")
+    # "X200 " is not a section number: "Belt Path" is a different title
+    assert out["c05"] == ("Belt Path", "belt-path")
+
+
+def test_a_measurement_is_not_a_section_number() -> None:
+    """Review of the change: "2.5 Inch Drive Bay" and "3.5 Inch Drive Bay" are different
+    topics; a dotted number without a trailing dot is a section number only when it is the
+    topic's own section."""
+    out = finalize_topic_names(
+        [
+            _in("c01", "2.5 Inch Drive Bay", "4", [5]),
+            _in("c02", "3.5 Inch Drive Bay", "4", [6]),
+            _in("c03", "1.5 Litre Engine", "2", [2]),
+            _in("c04", "2.0 Litre Engine", "2", [2]),
+            _in("c05", "3.1 Belt Path", "3.1", [3]),
+            _in("c06", "Belt Path", "4", [4]),
+        ]
+    )
+    assert out["c01"] == ("2.5 Inch Drive Bay", "2-5-inch-drive-bay")
+    assert out["c02"] == ("3.5 Inch Drive Bay", "3-5-inch-drive-bay")
+    assert out["c03"] == ("1.5 Litre Engine", "1-5-litre-engine")
+    assert out["c04"] == ("2.0 Litre Engine", "2-0-litre-engine")
+    # "3.1 " is c05's own section: "Belt Path" is the same title, told apart by its section
+    assert out["c05"] == ("3.1 Belt Path", "3-1-belt-path")
+    assert out["c06"] == ("Belt Path (section 4)", "belt-path-section-4")
+    # a measurement whose whole part happens to be the section number is still a measurement
+    out = finalize_topic_names(
+        [_in("c01", "2.5 Inch Drive Bay", "2", [2]), _in("c02", "3.5 Inch Drive Bay", "3", [3])]
+    )
+    assert out["c02"] == ("3.5 Inch Drive Bay", "3-5-inch-drive-bay")
+
+
 def test_slug_follows_the_shown_title_not_the_model_slug() -> None:
     # the model said slug "belt-path-3-1-harness-3-2-4-drive-train" for the title "Belt Path";
     # the slug is made from the title alone, so a model slug never reaches the input
@@ -106,6 +184,8 @@ def test_names_are_unique_valid_and_deterministic() -> None:
                 ("———", None, [6]),
                 ("A" * 120, "1", [7]),
                 ("a" * 120, "1", [8]),
+                ("3. Overview", "3", [9]),
+                ("3.1 overview", "3", [9]),
             ]
         )
     ]
@@ -126,6 +206,10 @@ def test_names_are_unique_valid_and_deterministic() -> None:
     assert a["c08"][0].endswith("(page 8)") and a["c08"][1].endswith(
         "-page-8"
     )  # same section as c07
+    # a leading section number does not tell titles apart (design 04 section 3.4.2)
+    assert a["c09"] == ("Overview (section 3)", "overview-section-3")
+    # "3.1" below section "3" may be a measurement: kept, and no longer alike "Overview"
+    assert a["c10"] == ("3.1 Overview", "3-1-overview")
 
 
 def _same_name(_messages: Sequence[Message]) -> str:

@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import type { DocReadiness, ExportStatus, QueueItem, ReviewCounts } from "../api/schema";
 import { Keycap } from "../onboarding/Copy";
 import { keyLabel } from "../onboarding/guide";
+import { blockingFlagsOf, scopeTerms, toReviewOf } from "../shell/scopeTerms";
 import { cardTitle } from "./labels";
 import QueueCard from "./QueueCard";
 
@@ -216,13 +217,16 @@ const plural = (n: number, w: string): string => `${n} ${w}${n === 1 ? "" : "s"}
 
 /** The empty queue: what was done, and the next step only when it is really open (review M12 #14). */
 function EmptyNext({ counts, gate, link }: { counts: ReviewCounts; gate: ExportStatus | undefined; link: string }) {
-  const waiting = gate?.queued ?? counts.queued;
-  const flagged = gate?.open_flags ?? counts.flagged_open;
+  // the gate's partition (design 11 section 17): an overridden block does not wait for review, a covered flag does not block
+  const waiting = gate ? toReviewOf(gate) : counts.queued;
+  // blocks held by a flag, not flags: a block with two flags is one block to hand over
+  const flagged = gate ? (gate.flag_blockers ? new Set(gate.flag_blockers.map((f) => f.block_id)).size : blockingFlagsOf(gate)) : counts.flagged_open;
+  const overridden = scopeTerms(gate)?.overridden ?? 0;
   const open = !!gate && (gate.blockers ?? []).length === 0;
   const next = !gate
     ? null
     : open
-      ? "Next: export the knowledge base."
+      ? `Next: export the knowledge base.${overridden > 0 ? ` ${plural(overridden, "overridden block")} will go out unreviewed, as recorded.` : ""}`
       : flagged > 0 && waiting === 0
         ? `Next: hand the ${plural(flagged, "flagged block")} to the Agent, or export with an override.`
         : `Export is still locked: ${plural(waiting, "block")} in scope still ${waiting === 1 ? "needs" : "need"} review and ${waiting === 1 ? "is" : "are"} not in this list.${

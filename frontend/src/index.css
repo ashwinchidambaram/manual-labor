@@ -170,6 +170,11 @@
   .hatch-cleared {
     background-image: repeating-linear-gradient(-45deg, var(--done-wash) 0 5px, var(--hatch-done) 5px 10px);
   }
+  /* vertical bars for overridden blocks: exported unreviewed, neither cleared nor waiting (never colour alone) */
+  .hatch-overridden {
+    background-image: repeating-linear-gradient(90deg, var(--line-strong) 0 2px, transparent 2px 5px);
+    background-color: var(--sunk);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

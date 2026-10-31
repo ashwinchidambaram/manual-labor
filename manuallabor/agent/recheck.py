@@ -56,6 +56,7 @@ from manuallabor.parse.types import ParserOutput
 from manuallabor.project import ProjectPaths
 from manuallabor.scoring.faithfulness import (
     _TOKEN_PUNCT,
+    TableCoverage,
     check_faithfulness_ex,
     numeric_tokens,
     ocr_confusable,
@@ -88,6 +89,28 @@ def _r(check: str, passed: bool, detail: str | None = None) -> RecheckResult:
     return RecheckResult(
         check=check, passed=passed, detail=None if detail is None else detail[:300]
     )
+
+
+# The notes are read by a reviewer on the Agent screen (design 09 section 14): readers by name,
+# never by key, and what a failed check found in a reviewer's words.
+_READER_WORDS: Final[dict[str, str]] = {
+    "pymupdf": "the PDF text layer",
+    "docling": "the layout parser",
+    "ocr": "OCR",
+    "ocr_alt": "the second OCR",
+    "docx": "the Word file",
+    "vision": "the page image",
+}
+_VIOLATION_WORDS: Final[dict[str, str]] = {
+    "insertion": "added text",
+    "deletion": "dropped text",
+    "numeric_mismatch": "a changed number",
+    "reorder": "moved text",
+}
+
+
+def _readers(keys: Sequence[str]) -> str:
+    return ", ".join(_READER_WORDS.get(k, k) for k in keys)
 
 
 def _clip(s: str, n: int = 24) -> str:
@@ -132,8 +155,10 @@ def check_changed_text(text: str, current: str) -> RecheckResult:
 def check_evidence(evidence: Sequence[EvidenceRef]) -> RecheckResult:
     ok = [e for e in evidence if e.verified]
     if not ok:
-        return _r("evidence", False, f"0 of {len(evidence)} quoted spans occur in their source")
-    return _r("evidence", True, f"{len(ok)} of {len(evidence)} verified")
+        return _r("evidence", False, f"0 of {len(evidence)} quoted passages found in their source")
+    return _r(
+        "evidence", True, f"{len(ok)} of {len(evidence)} quoted passages found in their source"
+    )
 
 
 def _intervals(violations: Sequence[FaithfulnessViolation], n: int) -> list[tuple[int, int]]:
@@ -157,7 +182,7 @@ def attested_faithfulness(
     reader, taken as the raw text, has no violation (that reader says the same thing)."""
     base = check_faithfulness_ex(block.raw_text, text, **faith_kwargs(block, ctx, variants))
     if base.result.passed:
-        return _r("faithfulness", True, "§5.2 normalization only")
+        return _r("faithfulness", True, "only the allowed clean-up edits")
     n = len(text)
     indep = sorted(k for k in block.raw_text_by_parser if k != block.raw_source)
     bad: dict[str, list[tuple[int, int]]] = {}
@@ -173,12 +198,17 @@ def attested_faithfulness(
         who = next((k for k in indep if not any(_touch(span, b) for b in bad[k])), None)
         shown = _clip(v.clean or v.raw)
         if who is None:
-            failed.append(f"{shown!r} ({v.kind.value})")
+            failed.append(f"{shown!r} ({_VIOLATION_WORDS.get(v.kind.value, v.kind.value)})")
         else:
-            parts.append(f"{shown!r}←{who}")
+            parts.append(f"{shown!r} shown by {_readers([who])}")
     if failed:
-        return _r("faithfulness", False, "unattested: " + "; ".join(failed))
-    return _r("faithfulness", True, f"strict: {len(viol)} violations; " + ", ".join(parts))
+        return _r("faithfulness", False, "not in the manual: " + "; ".join(failed))
+    changes = "1 change" if len(viol) == 1 else f"{len(viol)} changes"
+    return _r(
+        "faithfulness",
+        True,
+        f"{changes} beyond clean-up, each shown by another reading: " + "; ".join(parts),
+    )
 
 
 def _norm_tok(t: str) -> str:
@@ -205,7 +235,7 @@ def numeric_attested(
     changed numbers (`10 ... 25` -> `25 ... 10`)."""
     tr, tp = _numtoks(raw), _numtoks(text)
     if tp == tr:
-        return _r("numeric_attested", True, "numbers unchanged")
+        return _r("numeric_attested", True, "no number changed")
     indep = {k: _numtoks(v) for k, v in sorted(readers.items()) if k != raw_source}
     vnum: list[str] | None = None
     if vision is not None and vision.outcome == "ok":
@@ -223,7 +253,7 @@ def numeric_attested(
                     who.append("vision")
                 ok = (len(who) >= 1 and ocr_confusable(old, new)) or len(who) >= 2
                 ok_all = ok_all and ok
-                notes.append(f"{old}→{new} [{', '.join(who) or 'no attester'}]")
+                notes.append(f"{old} → {new}: {_shown_by(who)}")
             continue
         need = 2 if has_numeric_spec else 1
         who = [k for k, tk in indep.items() if tk == tp]
@@ -232,10 +262,26 @@ def numeric_attested(
         ok = len(who) >= need
         ok_all = ok_all and ok
         notes.append(
-            f"{' '.join(tr[i1:i2]) or '(none)'}→{' '.join(tp[j1:j2]) or '(none)'} "
-            f"[{', '.join(who) or 'no attester'}; need {need}]"
+            f"{' '.join(tr[i1:i2]) or 'nothing'} → {' '.join(tp[j1:j2]) or 'nothing'}: "
+            f"{_shown_by(who)}; {need} needed"
         )
     return _r("numeric_attested", ok_all, "; ".join(notes))
+
+
+def _coverage_words(cov: TableCoverage) -> str:
+    """`TableCoverage` in a reviewer's words (its own `detail()` is the scorer's)."""
+    parts: list[str] = []
+    if cov.missing:
+        parts.append(f"{sum(cov.missing.values())} words of the page are missing from the cells")
+    if cov.extra:
+        parts.append(f"{sum(cov.extra.values())} words in the cells are not on the page")
+    if cov.raw_rows is not None and cov.cell_rows != cov.raw_rows:
+        parts.append(f"{cov.cell_rows} rows against {cov.raw_rows} on the page")
+    return "; ".join(parts) or "the cells hold all the text of the page"
+
+
+def _shown_by(who: Sequence[str]) -> str:
+    return f"shown by {_readers(who)}" if who else "no other reading of the page shows it"
 
 
 def numbers_changed(raw: str, text: str) -> bool:
@@ -263,18 +309,24 @@ def check_token_whitespace(
     unattested = sorted(t for t in new if t not in seen)
     if unattested:
         return _r(
-            "token_whitespace", False, "new token(s) no reader shows: " + ", ".join(unattested[:3])
+            "token_whitespace",
+            False,
+            "new words no other reading shows: " + ", ".join(unattested[:3]),
         )
-    return _r("token_whitespace", True, "differing tokens occur in an independent reader")
+    return _r("token_whitespace", True, "the changed words appear in another reading")
 
 
 def check_garbage(raw: str, text: str) -> RecheckResult:
     a, b = garbage_ratio(raw, is_table=False), garbage_ratio(text, is_table=False)
     if a is None or b is None:
-        return _r("garbage_ratio", True, "no tokens")
+        return _r("garbage_ratio", True, "no words to check")
     if b.value >= a.value:
-        return _r("garbage_ratio", True, f"{a.value:g} → {b.value:g}")
-    return _r("garbage_ratio", False, f"worse: {a.value:g} → {b.value:g}")
+        return _r("garbage_ratio", True, "no more garbled characters than before")
+    return _r(
+        "garbage_ratio",
+        False,
+        f"more garbled characters than before (clean share {a.value:g} → {b.value:g})",
+    )
 
 
 def check_parser_agreement(
@@ -283,7 +335,7 @@ def check_parser_agreement(
     """The fix moves toward the other readers, never away from them."""
     others = [v for k, v in sorted(readers.items()) if k != raw_source and v.strip()]
     if not others:
-        return _r("parser_agreement", True, "no independent reader")
+        return _r("parser_agreement", True, "no other reading to compare with")
 
     def best(t: str) -> float:
         tk = cmp_tokens(t)
@@ -291,9 +343,13 @@ def check_parser_agreement(
 
     before, after = best(raw), best(text)
     if after >= before:
-        return _r("parser_agreement", True, f"{before:g} → {after:g}")
+        return _r(
+            "parser_agreement",
+            True,
+            f"as close to the other readings as before ({before:g} → {after:g})",
+        )
     return _r(
-        "parser_agreement", False, f"moves away from the other readers: {before:g} → {after:g}"
+        "parser_agreement", False, f"further from the other readings ({before:g} → {after:g})"
     )
 
 
@@ -374,11 +430,11 @@ def check_table_coverage(
 ) -> RecheckResult:
     cov = table_coverage(raw, cells)
     if cov.ok:
-        return _r("table_coverage", True, cov.detail())
+        return _r("table_coverage", True, _coverage_words(cov))
     for k, v in sorted(readers.items()):
         if k != raw_source and table_coverage(v, cells).ok:
-            return _r("table_coverage", True, f"cells cover the {k} reader's text")
-    return _r("table_coverage", False, cov.detail())
+            return _r("table_coverage", True, f"the cells hold all the text {_readers([k])} reads")
+    return _r("table_coverage", False, _coverage_words(cov))
 
 
 def _ragged_all(t: TableData) -> int:
@@ -400,7 +456,8 @@ def check_table_consistency(block: Block, td: TableData) -> RecheckResult:
     if cur is None and block.table is not None:
         cur = table_consistency(block.table, block.raw_text).value
     if ragged:
-        return _r("table_consistency", False, f"{ragged} ragged row(s)")
+        rows = "1 row has" if ragged == 1 else f"{ragged} rows have"
+        return _r("table_consistency", False, f"{rows} a different number of cells (ragged)")
     if cur is not None and new.value < cur:
         return _r("table_consistency", False, f"{cur:g} → {new.value:g}")
     return _r("table_consistency", True, f"{cur if cur is not None else '-'} → {new.value:g}")
@@ -470,18 +527,18 @@ def _position_failures(
                 continue
             old = base_cell or ""
             shown = "?" if base_cell is None else repr(_clip(old, 16))
-            at = f"({r},{c}) {shown}→{_clip(new, 16)!r}"
+            at = f"row {r + 1}, column {c + 1}: {shown} → {_clip(new, 16)!r}"
             who = sorted(k for k, g in others.items() if g[r][c] == new)
             if not who:
-                where = "raw column unknown; " if base_cell is None else ""
-                bad.append(f"{at} [{where}no structured reader shows it there]")
+                where = "the page's column is unknown; " if base_cell is None else ""
+                bad.append(f"{at} ({where}no other reading of the table shows it there)")
                 continue
             cell_readers = {raw_source: old, **{k: g[r][c] for k, g in others.items()}}
             n = numeric_attested(old, cell_readers, raw_source, new, None, has_numeric_spec)
             if not n.passed:
-                bad.append(f"{at} [{n.detail}]")
+                bad.append(f"{at} ({n.detail})")
                 continue
-            changed.append(f"{at} [{', '.join(who)}]")
+            changed.append(f"{at} (shown by {_readers(who)})")
     return bad, changed
 
 
@@ -507,14 +564,18 @@ def check_table_position(
         bases.append(("parsed table", [list[str | None](r) for r in _table_grid(block.table)]))
     tg = _text_grid(block.raw_text)
     if tg and all(tg != g for _n, g in bases):
-        bases.append(("raw rows", tg))
+        bases.append(("rows of the page text", tg))
     same = [(n, g) for n, g in bases if _shape(g) == shape]
     if not same:
-        have = ", ".join(f"{n} {a}x{b}" for n, (a, b) in ((n, _shape(g)) for n, g in bases))
+        have = ", ".join(
+            f"the {n} has {a} rows × {b} columns"
+            for n, (a, b) in ((n, _shape(g)) for n, g in bases)
+        )
         return _r(
             "table_position",
             False,
-            f"{shape[0]}x{shape[1]} cells match no raw shape ({have or 'no raw table'})",
+            f"{shape[0]} rows × {shape[1]} columns match no table on the page "
+            f"({have or 'no table was read from the page'})",
         )
     others = {
         k: g
@@ -526,11 +587,11 @@ def check_table_position(
         bad, changed = _position_failures(grid, prop, others, raw_source, has_numeric_spec)
         if not bad:
             what = f"; changed: {'; '.join(changed)}" if changed else ""
-            return _r("table_position", True, f"cells match the {name} by position{what}")
+            return _r("table_position", True, f"every cell sits where the {name} has it{what}")
         if best is None or len(bad) < len(best[1]):
             best = (name, bad, changed)
     assert best is not None
-    return _r("table_position", False, f"vs the {best[0]}: " + "; ".join(best[1][:4]))
+    return _r("table_position", False, f"against the {best[0]}: " + "; ".join(best[1][:4]))
 
 
 @lru_cache(maxsize=8)
@@ -689,7 +750,7 @@ def check_attach_target(
         return _r("attach_target", False, "figure and article belong to different documents")
     ff = figure_facts(paths, data, figure_id)
     if ff is None or ff.record is None:
-        return _r("attach_target", False, "the figure has no sidecar (extraction failed)")
+        return _r("attach_target", False, "the figure could not be cut out of the page")
     img = paths.figure_dir(fslug) / (ff.record.svg or ff.record.file)
     alt = paths.figure_dir(fslug) / ff.record.file
     if not img.is_file() and not alt.is_file():
@@ -719,7 +780,7 @@ def check_attach_evidence(
     if num is not None:
         for b in members:
             if any(r.number == num for r in find_refs(b.raw_text, chaptered)):
-                return _r("attach_evidence", True, f"caption_ref: {b.id} cites figure {num}")
+                return _r("attach_evidence", True, f"the article cites figure {num} ({b.id})")
     if caption:
         cap = caption_content(caption)
         if len(cap) >= MATCH_MIN_TOKENS:
@@ -729,12 +790,14 @@ def check_attach_evidence(
                     return _r(
                         "attach_evidence",
                         True,
-                        f"caption_match: {b.id} shares {sorted(common)[:4]}",
+                        f"the article shares the caption's words {sorted(common)[:4]} ({b.id})",
                     )
     pages = {b.page for b in members}
     if any(abs(p - ff.block.page) <= 1 for p in pages):
         return _r(
-            "attach_evidence", True, f"proximity: figure page {ff.block.page} within article pages"
+            "attach_evidence",
+            True,
+            f"the figure (page {ff.block.page}) is next to the article's pages",
         )
     return _r("attach_evidence", False, "no caption reference, caption match or nearby page")
 
@@ -781,7 +844,7 @@ def check_regroup_similarity(
 ) -> RecheckResult:
     gf = data.groups(slug)
     if gf is None or emb is None:
-        return _r("regroup_similarity", False, "embeddings are unavailable")
+        return _r("regroup_similarity", False, "the topic model is not available")
     vec = emb.vec(block_id)
     cur = topic_of(gf, block_id)
     target = next((t for t in gf.topics if t.slug == to), None)
@@ -792,7 +855,8 @@ def check_regroup_similarity(
         return _r("regroup_similarity", False, "a topic has no embedded block")
     s_cur, s_new = cosine(vec, c_cur), cosine(vec, c_new)
     ok = s_new >= s_cur
-    return _r("regroup_similarity", ok, f"target {s_new:.3f} vs current {s_cur:.3f}")
+    words = f"likeness to the new topic {s_new:.2f}, to its current topic {s_cur:.2f}"
+    return _r("regroup_similarity", ok, words)
 
 
 # -- bbox ----------------------------------------------------------------------------------------
@@ -804,7 +868,8 @@ _BODY: Final = frozenset(
 
 def check_changed_bbox(new: Sequence[float], cur: Sequence[float] | None) -> RecheckResult:
     if cur is not None and g.iou(new, cur) >= BBOX_IOU_SAME:
-        return _r("changed", False, f"IoU with the current crop is {g.iou(new, cur):.2f}")
+        same = g.iou(new, cur)
+        return _r("changed", False, f"the new crop overlaps the current one by {same:.0%}")
     return _r("changed", True)
 
 
@@ -818,11 +883,13 @@ def check_bbox_geometry(bbox: Sequence[float], page: Sequence[float]) -> Recheck
     ):
         return _r("bbox_geometry", False, "the box leaves the page")
     if min(w, h) < BBOX_MIN_SIDE:
-        return _r("bbox_geometry", False, f"min side {min(w, h):.0f} pt < {BBOX_MIN_SIDE:.0f}")
+        side = f"{min(w, h):.0f} pt"
+        return _r("bbox_geometry", False, f"a side is {side}, under {BBOX_MIN_SIDE:.0f} pt")
     frac = g.area(bbox) / g.area(page) if g.area(page) > 0 else 0.0
     if frac < BBOX_MIN_AREA_FRAC or frac >= BBOX_MAX_AREA_FRAC:
-        return _r("bbox_geometry", False, f"area fraction {frac:.3f} outside [0.002, 0.9)")
-    return _r("bbox_geometry", True, f"{w:.0f}x{h:.0f} pt, {frac:.3f} of the page")
+        size = f"it covers {frac:.1%} of the page, too little or too much"
+        return _r("bbox_geometry", False, size)
+    return _r("bbox_geometry", True, f"{w:.0f} × {h:.0f} pt, {frac:.1%} of the page")
 
 
 def check_bbox_text_overlap(
@@ -854,8 +921,8 @@ def ink_fraction(pdf_path: Any, page_no: int, bbox: Sequence[float]) -> float:
 
 def check_bbox_content(frac: float) -> RecheckResult:
     if frac < BBOX_INK_MIN:
-        return _r("bbox_content", False, f"ink fraction {frac:.3f} < {BBOX_INK_MIN}")
-    return _r("bbox_content", True, f"ink fraction {frac:.3f}")
+        return _r("bbox_content", False, f"{frac:.1%} of it is drawn, under {BBOX_INK_MIN:.1%}")
+    return _r("bbox_content", True, f"{frac:.1%} of it is drawn")
 
 
 # -- orchestration -------------------------------------------------------------------------------

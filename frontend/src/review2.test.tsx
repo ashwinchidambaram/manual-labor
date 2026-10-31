@@ -74,7 +74,8 @@ describe("M4 one sentence for how a flag is resolved, true to the server", () =>
     expect(FLAG_RESOLUTION).toMatch(/approve or edit the block in Verify/);
     expect(FLAG_RESOLUTION).toMatch(/accept the agent's fix on the Agent screen/);
     expect(FLAG_RESOLUTION).toMatch(/override that names the flag on the Export screen/);
-    expect(FLAG_RESOLUTION).toMatch(/labor export --override/);
+    // the command line is documented in README, never named in the screens (design 11 section 19)
+    expect(FLAG_RESOLUTION).not.toMatch(/labor export|--override/);
     expect(FLAG_RESOLUTION).toMatch(/override of the block alone never covers a flag/);
   });
   it("the flag dialog says it", async () => {
@@ -285,9 +286,11 @@ describe("L3 the override form counts what it records", () => {
     installFake({ exportStatus: locked({ open_flags: 1, flag_blockers: [fb(2)] }) });
     renderApp("/export");
     const form = await screen.findByTestId("override-form");
-    expect(form).toHaveTextContent("Records one override for each of the 2 unflagged blocks listed above");
+    // an older status without the scope partition: the listed unflagged blockers are what the form can count
+    expect(form).toHaveTextContent("Records one override for each of the 2 blocks still to review (every one, not only those listed)");
+    expect(within(form).getByTestId("override-submit")).toHaveTextContent("Override the remaining 2 with this reason");
     expect(within(form).getByTestId("override-left-out")).toHaveTextContent(
-      "1 flagged block left out of this batch: a block override never covers a flag; each flag needs its own decision, below.",
+      "1 flagged block is left out: a block override never covers a flag; each flag needs its own decision, below.",
     );
   });
 });

@@ -84,7 +84,7 @@ def test_look_alike_fix_with_structured_attestation_passes() -> None:
     b = tb(LA_RAW, build_table_data(LA_CUR, 1), docling=LA_OTHER)
     r = pos(b, LA_FIXED, {"docling": build_table_data(LA_FIXED, 1)})
     assert r.passed, r.detail
-    assert "docling" in (r.detail or "")
+    assert "shown by the layout parser" in (r.detail or "")
 
 
 def test_a_reader_without_structured_cells_attests_nothing() -> None:
@@ -125,7 +125,8 @@ def test_fix_under_a_row_span_cell_is_not_refused() -> None:
     assert [(c.row, c.col, c.row_span) for c in td.cells if c.row_span > 1] == [(1, 0, 2)]
     assert "ragged" not in (check_table_consistency(b, td).detail or "")
     dense = build_table_data(fixed, 1)
-    assert "1 ragged row" in (check_table_consistency(b, dense).detail or "")
+    ragged = check_table_consistency(b, dense).detail or ""
+    assert "1 row has a different number of cells" in ragged
     # the dense text of the merged table attests nothing
     assert not pos(b, fixed).passed
 

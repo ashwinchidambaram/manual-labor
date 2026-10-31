@@ -1681,10 +1681,13 @@ export interface components {
         /**
          * ExportScopeCounts
          * @description Every in-scope body block of the ready documents (the Verify scope: page headers and
-         *     footers excluded) in exactly one bucket (design 11 section 14): ``in_scope ==
-         *     auto_approved + approved + edited + rejected + overridden + blocking``. A block that is
-         *     queued, flagged or carries an open flag is ``overridden`` when an active override covers it,
-         *     else ``blocking``; every other block is counted by its review status.
+         *     footers excluded) in exactly one bucket (design 11 sections 14 and 17): ``in_scope ==
+         *     auto_approved + approved + edited + rejected + overridden + to_review + flagged``. A block
+         *     that is queued, flagged or carries an open flag is ``overridden`` when an active override
+         *     covers it, else ``blocking``; a blocking block is ``flagged`` when an open flag no override
+         *     covers holds it, else ``to_review`` (``blocking == to_review + flagged``). Every other block
+         *     is counted by its review status. This is the one partition every screen reads: "to review"
+         *     is ``to_review``, never a block an override covers.
          */
         ExportScopeCounts: {
             /** Approved */
@@ -1695,12 +1698,16 @@ export interface components {
             blocking: number;
             /** Edited */
             edited: number;
+            /** Flagged */
+            flagged: number;
             /** In Scope */
             in_scope: number;
             /** Overridden */
             overridden: number;
             /** Rejected */
             rejected: number;
+            /** To Review */
+            to_review: number;
         };
         /**
          * ExportStatus

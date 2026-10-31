@@ -7,6 +7,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 import type { BlockDetail, Cursor, DiffOp, DocFigure, FigureRailItem, JobInfo, PageBlock, QueueItem, QueuePage } from "../src/api/schema";
+import { plainDetail } from "../src/verify/labels";
 import { api, latencyBudget, resetSelection, waitJobsIdle } from "./helpers";
 
 test.describe.configure({ mode: "default" });
@@ -437,7 +438,7 @@ test("T5 extracted pane: Text/Diff toggle with t, exact diff segments, why list"
     await key(page, "t");
     await expect(page.getByTestId("view-text")).toHaveAttribute("aria-pressed", "true");
 
-    // Why this needs you: every signal, in API order, with its detail verbatim
+    // Why this needs you: every signal, in API order, with its detail (the scorer's jargon translated, design 09 section 14)
     const signals = (d.why ?? []).filter((w) => w.kind === "signal");
     const items = page.getByLabel("Why this needs you, signals").getByRole("listitem");
     await expect(items).toHaveCount(signals.length);
@@ -450,7 +451,8 @@ test("T5 extracted pane: Text/Diff toggle with t, exact diff segments, why list"
         expect(t, `${w.name} value`).toContain(w.value == null ? "n/a" : w.value.toFixed(2));
         expect(t.includes("critical"), `${w.name} critical badge`).toBe(w.critical);
       }
-      if (w.detail) expect(t.replace(/\s+/g, " "), `${w.name} detail verbatim`).toContain(w.detail.replace(/\s+/g, " "));
+      if (w.detail) expect(t.replace(/\s+/g, " "), `${w.name} detail`).toContain((plainDetail(w.name, w.detail) ?? "").replace(/\s+/g, " "));
+      expect(t, `${w.name}: no scorer jargon`).not.toMatch(/symbol soup|pymupdf vs|docling vs/);
     }
     // criticals come first (design: server order critical first)
     const flags = signals.map((w) => w.critical);

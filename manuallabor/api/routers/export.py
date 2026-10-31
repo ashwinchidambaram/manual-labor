@@ -77,6 +77,7 @@ def export_override(body: OverrideIn, ctx: Ctx) -> ExportStatus:
     if store is None:
         raise not_implemented("module 11")
     from manuallabor.export.pipeline import record_override
+    from manuallabor.state.review import ReviewService
 
     record_override(
         ctx.paths,
@@ -85,6 +86,8 @@ def export_override(body: OverrideIn, ctx: Ctx) -> ExportStatus:
         target_id=body.target_id,
         flag_id=body.flag_id,
         request_id=body.request_id,
+        # the serving cache: one click overrides every unflagged blocker (design 11 section 18)
+        review=ctx.review if isinstance(ctx.review, ReviewService) else None,
     )
     return _status(ctx)
 

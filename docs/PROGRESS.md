@@ -476,3 +476,28 @@ $ npm run e2e
 99 passed, 1 skipped (opt-in reader's pass) in 8.2m; two earlier full runs 88/90 passed: later-ingest (summary docs count, a server bug, fixed) and VE3 (no timeout on a four-job wait, now 240 s)
 $ GitHub Actions on ci-linux (ubuntu-latest): python job green from 06d3ce2 on; see the run for the final commit
 ```
+
+## Second user run and last round — PASSED 2026-10-30
+
+Dana's second recorded run on the fixed build (report, diary, 118 screenshots and the MP4 in `build/human-runs/run-2/`, gitignored): every first-run finding fixed or better; verdict "I would trust it and use it again for real manuals". Her remaining friction fixed in one round, each failing-test-first, read twice by a fresh reviewer:
+- Counts: `ExportScopeCounts.to_review` and `.flagged` split `blocking`; one `scopeTerms` module feeds the rail, next-step card, Verify strip and Export screen; overridden blocks are never "to review"; during scoring no waiting count is claimed (`countsAgree.test.tsx`; design 11 §17).
+- Overrides: the server's 20-blocker status cap stays; one click overrides the remaining unflagged blockers in successive rounds with one kept reason and a progress bar, never a flagged block; `record_override` reads the serving review cache (154 ms to under 5 ms per override; design 11 §18; Playwright `override-flow.spec.ts`).
+- Wording: no CLI hint inside the product; agent re-checks and notes in plain sentences (`recheck.ts`, `agent/recheck.py`, pinned by `test_recheck_words.py`); scorer details translated where shown.
+- The flagged block's title is its section heading, then excerpt, file name last.
+- Topic naming ignores a leading section number when comparing titles ("Connector Data (section 5)"; design 04 §3.4.2).
+Left for the owner: marking unreviewed paragraphs inside exported articles; gating Approve on having scrolled the block at small windows; a block briefly shown as both overridden and flagged between an approve and the next status read.
+
+```
+$ uv run pytest tests/export tests/grouping tests/agent tests/api tests/state -o addopts="-m 'not slow' --basetemp=.pytest_tmp_last2"
+593 passed, 5 skipped, 1 deselected in 796.48s (0:13:16)
+$ uv run ruff check manuallabor/ tests/ scripts/ && uv run ruff format --check manuallabor/ tests/ scripts/ && uv run mypy manuallabor/
+All checks passed! / 411 files already formatted / Success: no issues found in 195 source files
+$ uv run labor schemas export --check && uv run labor openapi export --check
+schemas up to date / openapi up to date
+$ cd frontend && npm run typecheck && npm test -- --run
+tsc clean
+ Test Files  56 passed (56)
+      Tests  468 passed (468)
+$ npm run e2e
+100 passed, 1 skipped (opt-in reader's pass) in 9.7m
+```

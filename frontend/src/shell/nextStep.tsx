@@ -6,6 +6,7 @@ import type { ExportStatus } from "../api/schema";
 import type { HotkeyId } from "../hotkeys";
 import type { GuideControl } from "../onboarding/useGuideState";
 import type { StepId } from "../onboarding/guide";
+import { blockingFlagsOf, scopeTerms, toReviewOf } from "./scopeTerms";
 
 export interface NextStep {
   /** the sentence; `{hotkeyId}` tokens render as keycaps */
@@ -16,17 +17,39 @@ export interface NextStep {
 
 const plural = (n: number, w: string): string => `${n} ${w}${n === 1 ? "" : "s"}`;
 
-/** The step's own next step, from the export gate (the only counts the shell reads). */
-export function defaultNextStep(step: StepId, st: ExportStatus | undefined): NextStep {
-  const queued = st?.queued ?? 0;
+/** What the shell knows beyond the gate: a job that reads or scores manuals is queued or running. */
+export interface NextStepLive {
+  scoring: boolean;
+  reading?: boolean;
+}
+
+/**
+ * The step's own next step, from the export gate's partition (design 11 section 17: "to review" is `to_review`, never
+ * a block an override covers) and the active jobs (a block being scored is not waiting for anyone yet).
+ */
+export function defaultNextStep(step: StepId, st: ExportStatus | undefined, live: NextStepLive = { scoring: false }): NextStep {
+  const queued = toReviewOf(st);
+  const overridden = scopeTerms(st)?.overridden ?? 0;
   const flags = st?.open_flags ?? 0;
+  const blockingFlags = blockingFlagsOf(st);
   switch (step) {
     case "scope":
       return {
         text: "Choose what goes into the knowledge base. Everything starts selected: {toggleRow} selects or clears a row, {selectAll} selects every block. {confirm} confirms: scoring starts and Verify opens at once.",
       };
     case "verify":
-      return { text: queued > 0 ? `Check each block against its page. ${plural(queued, "block")} ${queued === 1 ? "waits" : "wait"} for you.` : "Check each block against its page." };
+      if (live.scoring)
+        return {
+          text: live.reading
+            ? "Your manuals are being read. Blocks come here once they are scored; confirm your scope on the Scope screen when reading finishes."
+            : "Your selection is being scored. Blocks come here as each manual finishes scoring.",
+        };
+      if (queued > 0) return { text: `Check each block against its page. ${plural(queued, "block")} ${queued === 1 ? "waits" : "wait"} for you.` };
+      if (overridden > 0)
+        return {
+          text: `Nothing waits for you. ${plural(overridden, "overridden block")} will be exported unreviewed; approving one here checks it after all.`,
+        };
+      return { text: "Check each block against its page." };
     case "agent":
       return flags > 0
         ? { text: `Run the agent pass on ${plural(flags, "open flag")}. Every proposal is checked again before you decide.` }
@@ -37,8 +60,8 @@ export function defaultNextStep(step: StepId, st: ExportStatus | undefined): Nex
       return {
         text: [
           queued > 0 ? `${plural(queued, "block")} still ${queued === 1 ? "waits" : "wait"} for review.` : "",
-          flags > 0 ? `${plural(flags, "open flag")} still ${flags === 1 ? "blocks" : "block"} the export.` : "",
-          queued > 0 && flags > 0 ? "Export unlocks when both are done." : "Export unlocks after that.",
+          blockingFlags > 0 ? `${plural(blockingFlags, "open flag")} still ${blockingFlags === 1 ? "blocks" : "block"} the export.` : "",
+          queued > 0 && blockingFlags > 0 ? "Export unlocks when both are done." : "Export unlocks after that.",
         ]
           .filter(Boolean)
           .join(" "),

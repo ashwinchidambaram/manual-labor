@@ -26,12 +26,23 @@ export const pageBlocksKey = (slug: string, page: number) => ["pageBlocks", slug
 export const fetchBlock = async (id: string): Promise<BlockDetail> =>
   unwrap(await client.GET("/api/verify/blocks/{block_id}", { params: { path: { block_id: id } } }));
 
+/** The section headings of these blocks (`/api/verify/titles`), keyed by block id; best effort, never blocking. */
+export async function fetchSectionTitles(ids: readonly string[]): Promise<Map<string, string>> {
+  if (!ids.length) return new Map();
+  try {
+    const rows = unwrap(await client.GET("/api/verify/titles", { params: { query: { ids: [...ids] } } }));
+    return new Map(rows.filter((r) => r.section_title && r.section_title.trim()).map((r) => [r.block_id, r.section_title!.trim()]));
+  } catch {
+    return new Map();
+  }
+}
+
 /**
  * A queue item for a block outside the loaded list (the pinned card), built by the server's own card rules (shared
  * helper `cardExcerpt`), so the card reads the same when the block comes back in the list. The section title is not
  * in the detail: it is kept from the item when this block was seen in the list before.
  */
-export function itemFromDetail(d: BlockDetail, known?: QueueItem | null): QueueItem {
+export function itemFromDetail(d: BlockDetail, known?: Partial<Pick<QueueItem, "section_title" | "weakest_word">> | null): QueueItem {
   const b = d.block;
   const caption = b.figure_id ? ((d.figures ?? []).find((f) => f.figure_id === b.figure_id)?.record.caption_original ?? null) : null;
   const ocrMin = d.why?.find((w) => w.kind === "signal" && w.name === "ocr_min");
@@ -270,8 +281,20 @@ export function useVerifyState() {
     const s = state;
     if (!s.currentId || s.pinned?.block_id === s.currentId || s.items.some((i) => i.block_id === s.currentId)) return;
     let live = true;
-    qc.fetchQuery({ queryKey: blockKey(s.currentId), queryFn: () => fetchBlock(s.currentId!), staleTime: Infinity })
-      .then((d) => live && dispatch({ type: "pin", item: itemFromDetail(d, s.seen[d.block.id] ?? (s.pinned?.block_id === d.block.id ? s.pinned : null)) }))
+    const id = s.currentId;
+    const known = s.seen[id] ?? (s.pinned?.block_id === id ? s.pinned : null);
+    // the detail has no section heading: a block not seen in the list before (a flagged one opened from Agent or Export)
+    // asks for it, so its card and heading read "1.1 Overview", not the file name (design 09 section 14)
+    Promise.all([
+      qc.fetchQuery({ queryKey: blockKey(id), queryFn: () => fetchBlock(id), staleTime: Infinity }),
+      known?.section_title ? Promise.resolve(null) : fetchSectionTitles([id]),
+    ])
+      .then(([d, sections]) => {
+        if (!live) return;
+        const section = sections?.get(d.block.id) ?? null;
+        const base = section ? { ...known, section_title: section } : known;
+        dispatch({ type: "pin", item: itemFromDetail(d, base) });
+      })
       .catch(() => live && s.items[0] && dispatch({ type: "browse", id: s.items[0].block_id }));
     return () => {
       live = false;

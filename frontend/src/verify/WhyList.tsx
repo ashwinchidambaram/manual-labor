@@ -1,7 +1,7 @@
 import type { WhyItem } from "../api/schema";
 import { signalHint } from "../onboarding/hints";
 import { AttentionIcon } from "../shell/Icon";
-import { FAITH_NOT_RUN, faithHeldSentence, human, label, STALE_NAME, weakestFromDetail } from "./labels";
+import { FAITH_NOT_RUN, faithHeldSentence, human, label, plainDetail, STALE_NAME, weakestFromDetail } from "./labels";
 import { pairForSignal, parserDiff, READER, readingLines, type LinePair, type ReadingPair } from "./parserDiff";
 
 interface Props {
@@ -127,7 +127,7 @@ function Tech({ w, outcome }: { w: WhyItem; outcome: WhyOutcome }) {
       {w.detail ? (
         <>
           {" · "}
-          <span className="font-mono">{w.detail}</span>
+          <span className="font-mono">{plainDetail(w.name, w.detail)}</span>
         </>
       ) : null}
     </p>

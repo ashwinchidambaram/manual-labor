@@ -171,9 +171,11 @@ test("OB6 step indicator: 'here' on the current route; Export locked with the co
   await waitForTree(page);
   const nav = page.getByRole("navigation", { name: "Screens" });
   await expect(nav.getByTestId("step-short-scope")).toHaveText("here");
-  const queued = st.queued ?? 0;
+  // "to review" is the gate partition's to_review; the lock names the flags that hold it (design 11 section 17)
+  const queued = st.counts?.to_review ?? st.queued ?? 0;
+  const holdFlags = (st.flag_blockers ?? []).length;
   expect((st.blockers ?? []).length, "the seeded project starts locked").toBeGreaterThan(0);
-  const short = `locked: ${st.open_flags > 0 ? plural(st.open_flags, "open flag") : `${queued} to review`}`;
+  const short = `locked: ${holdFlags > 0 ? plural(holdFlags, "open flag") : `${queued} to review`}`;
   await expect(nav.getByTestId("step-short-export")).toHaveText(short);
   await expect(nav.getByRole("link", { name: "Export" })).toHaveAccessibleDescription(/Step 4 of 4\. Locked: /);
   if (queued > 0) await expect(nav.getByTestId("step-short-verify")).toHaveText(`${queued} to review`);
@@ -229,7 +231,8 @@ test("OB9 Export locked view lists the API's blockers; a blocker link opens that
   await page.goto("/export");
   await expect(page.getByRole("heading", { name: "Export is locked" })).toBeVisible();
   await expect(page.getByTestId("blocker-link")).toHaveText(blockers);
-  if ((st.queued ?? 0) > 0) await expect(page.getByTestId("reason-queued")).toContainText(`${st.queued} block`);
+  const toReview = st.counts?.to_review ?? st.queued ?? 0;
+  if (toReview > 0) await expect(page.getByTestId("reason-queued")).toContainText(`${toReview} block`);
   const target = blockers[1];
   await page.getByTestId("blocker-link").nth(1).click();
   await expect(page).toHaveURL(/\/verify$/);

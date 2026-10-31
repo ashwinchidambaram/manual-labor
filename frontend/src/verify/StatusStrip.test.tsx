@@ -1,6 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { counts } from "../test/verifyFake";
+import { scopeTerms } from "../shell/scopeTerms";
 import StatusStrip, { type StatusStripProps } from "./StatusStrip";
 
 const props = (over: Partial<StatusStripProps> = {}): StatusStripProps => ({
@@ -55,5 +56,36 @@ describe("StatusStrip: the progress bar is drawn from the server's own counts", 
     const btn = screen.getByRole("button", { name: "Counts and filters" });
     expect(btn).toHaveAttribute("aria-expanded", "false");
     expect(within(document.getElementById("review-details")!).getByTestId("cnt-done")).toBeInTheDocument();
+  });
+});
+
+// design 11 section 17: the strip shows the gate's partition only when it describes the same moment as the list below
+describe("StatusStrip: the gate's partition or the list's own counts", () => {
+  const gate = (over: Record<string, number> = {}) =>
+    scopeTerms({
+      unlocked: false,
+      open_flags: 1,
+      queued: 4,
+      overrides: [],
+      counts: { in_scope: 10, auto_approved: 3, approved: 1, edited: 0, rejected: 1, overridden: 2, blocking: 3, to_review: 2, flagged: 1, ...over },
+    });
+  it("names overridden blocks apart from those waiting when the two reads agree", () => {
+    render(<StatusStrip {...props({ scope: gate() })} />);
+    expect(screen.getByTestId("cnt-queued")).toHaveTextContent("2");
+    expect(screen.getByTestId("cnt-overridden")).toHaveTextContent("2");
+    expect(screen.getByTestId("reconcile-review")).toHaveTextContent("In scope 10 = 2 to review + 2 overridden + 3 auto-approved + 1 done + 1 flagged + 1 rejected");
+  });
+  it("an older gate read (one approve behind the list): the list's buckets, its overrides still apart from those waiting", () => {
+    // the list already counts the approve (done 1 -> 2, queued 4 -> 3); the gate does not yet
+    const newer = counts({ in_scope: 10, auto_approved: 3, approved: 2, flagged_open: 1, rejected: 1, pending: 3 });
+    render(<StatusStrip {...props({ counts: newer, scope: gate() })} />);
+    expect(screen.getByTestId("cnt-done")).toHaveTextContent("2");
+    expect(screen.getByTestId("cnt-overridden")).toHaveTextContent("2");
+    expect(screen.getByTestId("reconcile-review")).toHaveTextContent("In scope 10 = 1 to review + 2 overridden + 3 auto-approved + 2 done + 1 flagged + 1 rejected");
+  });
+  it("a gate read of another scope (a manual scored between the reads): the list's own counts only", () => {
+    render(<StatusStrip {...props({ scope: gate({ in_scope: 70, auto_approved: 63 }) })} />);
+    expect(screen.queryByTestId("cnt-overridden")).toBeNull();
+    expect(screen.getByTestId("reconcile-review")).toHaveTextContent("In scope 10 = 4 to review + 3 auto-approved + 1 done + 1 flagged + 1 rejected");
   });
 });

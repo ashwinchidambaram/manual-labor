@@ -5,6 +5,7 @@ import { trackJob, useActiveJobs, useExportStatus, useSources } from "../api/que
 import type { FigureRailItem, FlagCategory, PageRef } from "../api/schema";
 import { useHotkeys } from "../hooks/useHotkeys";
 import { useNextStep } from "../shell/nextStep";
+import { scopeTerms } from "../shell/scopeTerms";
 import { useMediaQuery, VAST_QUERY } from "../shell/useMediaQuery";
 import { useToast } from "../shell/Toast";
 import { Keycap } from "../onboarding/Copy";
@@ -310,6 +311,7 @@ export default function VerifyScreen() {
       <h2 className="sr-only">Verify</h2>
       <StatusStrip
         counts={state.counts}
+        scope={state.loaded ? scopeTerms(exportGate.data) : null}
         viewAdded={v.viewAdded}
         viewAddedPartial={partial}
         appliedView={state.cursor.view_threshold ?? null}

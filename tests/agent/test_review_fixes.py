@@ -62,7 +62,7 @@ def test_permuted_values_fail_table_position() -> None:
     n = numeric_attested(BNW, {"pymupdf": BNW}, "pymupdf", cells_text(permuted), None, False)
     assert not n.passed
     r = position(b, permuted)
-    assert not r.passed and "(1,1)" in (r.detail or "")
+    assert not r.passed and "row 2, column 2" in (r.detail or "")
     assert position(b, BNW_CELLS).passed
 
 
@@ -88,7 +88,7 @@ def test_attested_look_alike_in_one_cell_passes() -> None:
     b = table_block(raw, [["Part", "Torque"], ["Bolt", "1O N·m"], ["Nut", "25 N·m"]], docling=other)
     r = position(b, fixed, docling=grid(other))
     assert r.passed, r.detail
-    assert "docling" in (r.detail or "")
+    assert "shown by the layout parser" in (r.detail or "")
     # the same change with no reader showing it at that position is refused
     lone = table_block(raw, None)
     assert not position(lone, fixed).passed

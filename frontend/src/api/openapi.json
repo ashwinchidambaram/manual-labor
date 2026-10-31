@@ -2047,7 +2047,7 @@
       },
       "ExportScopeCounts": {
         "additionalProperties": false,
-        "description": "Every in-scope body block of the ready documents (the Verify scope: page headers and\nfooters excluded) in exactly one bucket (design 11 section 14): ``in_scope ==\nauto_approved + approved + edited + rejected + overridden + blocking``. A block that is\nqueued, flagged or carries an open flag is ``overridden`` when an active override covers it,\nelse ``blocking``; every other block is counted by its review status.",
+        "description": "Every in-scope body block of the ready documents (the Verify scope: page headers and\nfooters excluded) in exactly one bucket (design 11 sections 14 and 17): ``in_scope ==\nauto_approved + approved + edited + rejected + overridden + to_review + flagged``. A block\nthat is queued, flagged or carries an open flag is ``overridden`` when an active override\ncovers it, else ``blocking``; a blocking block is ``flagged`` when an open flag no override\ncovers holds it, else ``to_review`` (``blocking == to_review + flagged``). Every other block\nis counted by its review status. This is the one partition every screen reads: \"to review\"\nis ``to_review``, never a block an override covers.",
         "properties": {
           "approved": {
             "minimum": 0.0,
@@ -2069,6 +2069,11 @@
             "title": "Edited",
             "type": "integer"
           },
+          "flagged": {
+            "minimum": 0.0,
+            "title": "Flagged",
+            "type": "integer"
+          },
           "in_scope": {
             "minimum": 0.0,
             "title": "In Scope",
@@ -2083,6 +2088,11 @@
             "minimum": 0.0,
             "title": "Rejected",
             "type": "integer"
+          },
+          "to_review": {
+            "minimum": 0.0,
+            "title": "To Review",
+            "type": "integer"
           }
         },
         "required": [
@@ -2092,7 +2102,9 @@
           "edited",
           "rejected",
           "overridden",
-          "blocking"
+          "blocking",
+          "to_review",
+          "flagged"
         ],
         "title": "ExportScopeCounts",
         "type": "object"

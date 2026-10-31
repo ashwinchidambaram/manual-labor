@@ -25,7 +25,6 @@ const keepFocus = (e: React.MouseEvent): void => {
 export default function StepRail({ path, status, mock }: { path: string; status: ExportStatus | undefined; mock: boolean }) {
   const step = GUIDE_STEPS[stepForPath(path)];
   const published = usePublishedNextStep();
-  const next = published ?? defaultNextStep(step.id, status);
   const sources = useSources();
   const scanned = (sources.data ?? []).some((s) => s.kind === "scanned_pdf");
   // a job reading or scoring manuals is queued or running: Verify and Export wait for it (server truth, not a guess)
@@ -33,6 +32,7 @@ export default function StepRail({ path, status, mock }: { path: string; status:
   const pipeline = (active.data ?? []).filter(isPipelineJob);
   const scoring = pipeline.length > 0;
   const reading = scoring && pipeline.every(isReadingJob);
+  const next = published ?? defaultNextStep(step.id, status, { scoring, reading });
 
   const ref = useRef<HTMLElement>(null);
   useLayoutEffect(() => {

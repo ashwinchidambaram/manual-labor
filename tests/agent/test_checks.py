@@ -36,7 +36,7 @@ class TestNumberAttestation:
 
     def test_look_alike_needs_one_reader(self) -> None:
         r = N(self.raw, {"pymupdf": self.raw, "docling": "Torque 35 N·m"}, "Torque 35 N·m")
-        assert r.passed and "docling" in (r.detail or "")
+        assert r.passed and "the layout parser" in (r.detail or "")
 
     def test_new_value_needs_two(self) -> None:
         raw = "Torque 36 N·m"
@@ -76,7 +76,7 @@ class TestAttestedFaithfulness:
     def test_whitespace_only_passes_strict(self) -> None:
         b = self.block("Check the\ndrive belt.", docling="Check the drive belt.")
         r = attested_faithfulness(b, ctx(), [], "Check the drive belt.")
-        assert r.passed and "§5.2" in (r.detail or "")
+        assert r.passed and r.detail == "only the allowed clean-up edits"
 
     def test_span_from_two_readers_passes(self) -> None:
         raw = "Torque 3S N·m and wait 4 min"
@@ -84,13 +84,17 @@ class TestAttestedFaithfulness:
             raw, docling="Torque 35 N·m and wait 4 min", ocr="Torque 35 N·m and wait 4 min"
         )
         r = attested_faithfulness(b, ctx(), [], "Torque 35 N·m and wait 4 min")
-        assert r.passed and "strict" in (r.detail or "") or r.detail == "§5.2 normalization only"
+        assert (
+            r.passed
+            and "beyond clean-up" in (r.detail or "")
+            or (r.detail == "only the allowed clean-up edits")
+        )
 
     def test_span_from_no_reader_fails(self) -> None:
         raw = "Tighten the bolt firmly"
         b = self.block(raw, docling="Tighten the bolt firmly")
         r = attested_faithfulness(b, ctx(), [], "Tighten the bolt not firmly")
-        assert not r.passed and "unattested" in (r.detail or "")
+        assert not r.passed and "not in the manual" in (r.detail or "")
 
     def test_split_word_from_ocr_passes(self) -> None:
         raw = "Wipe witha clean cloth"

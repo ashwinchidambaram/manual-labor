@@ -84,7 +84,7 @@ def test_2b_inserted_word_fails_faithfulness(aenv: AEnv) -> None:
     aenv.run_agent({Task.agent: corrupting("insert")})
     (p,) = aenv.agent.proposals()
     failed = {r.check: r.detail for r in p.rechecks if not r.passed}
-    assert "faithfulness" in failed and "unattested" in (failed["faithfulness"] or "")
+    assert "faithfulness" in failed and "not in the manual" in (failed["faithfulness"] or "")
 
 
 def test_3_reject_returns_item_with_history(aenv: AEnv) -> None:
@@ -212,7 +212,10 @@ def test_14_missing_figure_accept(aenv: AEnv) -> None:
     (p,) = aenv.agent.proposals()
     assert p.kind == ProposalKind.attach and p.all_checks_passed
     ev = next(r for r in p.rechecks if r.check == "attach_evidence")
-    assert ev.detail and (ev.detail.startswith(("caption_ref", "caption_match", "proximity")))
+    # the evidence in a reviewer's words: a citation, shared caption words or a nearby page
+    assert ev.detail and ev.detail.startswith(
+        ("the article cites figure", "the article shares the caption's words", "the figure (page")
+    )
     aenv.agent.accept(p.id, "r-acc")
     rows = aenv.store.overrides("attach_overrides")
     assert len(rows) == 1
@@ -229,7 +232,8 @@ def test_15_regroup_accept(aenv: AEnv) -> None:
     assert p.kind == ProposalKind.regroup
     by = {r.check: r for r in p.rechecks}
     assert by["regroup_target"].passed
-    assert by["regroup_similarity"].detail and "target" in by["regroup_similarity"].detail
+    assert by["regroup_similarity"].detail
+    assert "likeness to the new topic" in by["regroup_similarity"].detail
     if p.all_checks_passed:
         aenv.agent.accept(p.id, "r-acc")
         assert aenv.store.overrides("group_overrides")

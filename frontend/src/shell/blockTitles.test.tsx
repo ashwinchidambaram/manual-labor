@@ -43,10 +43,24 @@ describe("blockTitles", () => {
     await new Promise((r) => setTimeout(r, 20));
     expect(seen).toEqual([]);
   });
-  it("useFlagTitles titles each flagged block from its own detail", async () => {
+  it("useFlagTitles titles a flagged block by its section heading, else its excerpt, the file name last", async () => {
     installFake();
-    server.use(http.get("*/api/verify/blocks/:id", ({ params }) => HttpResponse.json(makeBlockDetail(makeQueueItem(1, { block_id: String(params.id), doc_id: "beta", page: 2 })))));
-    const { result } = renderHook(() => useFlagTitles(["b-beta-p002-01"]), { wrapper });
-    await waitFor(() => expect(result.current.get("b-beta-p002-01")).toEqual({ title: "beta.pdf, page 2, paragraph", page: 2, doc: "beta.pdf" }));
+    server.use(
+      http.get("*/api/verify/blocks/:id", ({ params }) => HttpResponse.json(makeBlockDetail(makeQueueItem(1, { block_id: String(params.id), doc_id: "beta", page: 2 })))),
+      http.get("*/api/verify/titles", () => HttpResponse.json([{ block_id: "b-beta-p002-01", doc_id: "beta", page: 2, type: "paragraph", section_title: "1.1 Overview" }])),
+    );
+    const { result } = renderHook(() => useFlagTitles(["b-beta-p002-01", "b-beta-p002-02"]), { wrapper });
+    await waitFor(() => expect(result.current.get("b-beta-p002-01")).toEqual({ title: "1.1 Overview", page: 2, doc: "beta.pdf" }));
+    await waitFor(() => expect(result.current.get("b-beta-p002-02")).toEqual({ title: "Text of b-beta-p002-02 set to 0.25 mm.", page: 2, doc: "beta.pdf" }));
+  });
+  it("useFlagTitles falls back to the place (file, page, type) only when the block has no text to show", async () => {
+    installFake();
+    server.use(
+      http.get("*/api/verify/blocks/:id", ({ params }) =>
+        HttpResponse.json(makeBlockDetail(makeQueueItem(1, { block_id: String(params.id), doc_id: "beta", page: 2, type: "figure" }), {}, { figure_id: null })),
+      ),
+    );
+    const { result } = renderHook(() => useFlagTitles(["b-beta-p002-03"]), { wrapper });
+    await waitFor(() => expect(result.current.get("b-beta-p002-03")).toEqual({ title: "beta.pdf, page 2, figure", page: 2, doc: "beta.pdf" }));
   });
 });

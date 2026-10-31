@@ -447,11 +447,14 @@ test("UX7 Export locked: reason text, counts match the queue, override needs a r
   await expect(page.getByRole("heading", { name: "Export is locked" })).toBeVisible();
   note("export-locked-text", await page.getByTestId("export-locked").innerText());
   await expect(page.getByTestId("export-locked")).toContainText("the export only contains text a person or the checks have accepted");
-  if ((st.queued ?? 0) > 0) {
-    await expect(page.getByTestId("reason-queued")).toContainText(`${st.queued} block`);
-    expect(st.queued, "locked-export queued count must equal the server's queued count").toBe(queue.counts.queued);
+  // "to review" is the gate partition's to_review (design 11 section 17); with no override recorded it is the queue's queued
+  const toReview = st.counts?.to_review ?? st.queued ?? 0;
+  if (toReview > 0) {
+    await expect(page.getByTestId("reason-queued")).toContainText(`${toReview} block`);
+    expect(toReview + (st.counts?.overridden ?? 0), "to review + overridden must equal the server's queued count").toBe(queue.counts.queued);
   }
-  if (st.open_flags > 0) await expect(page.getByTestId("reason-flags")).toContainText(`${st.open_flags} open flag`);
+  const holdFlags = (st.flag_blockers ?? []).length;
+  if (holdFlags > 0) await expect(page.getByTestId("reason-flags")).toContainText(`${holdFlags} open flag`);
   // the copy says what an override covers before anything is recorded
   await expect(page.getByTestId("override-form")).toContainText(
     "a flag raised on it after you record the override blocks the export again",
@@ -482,7 +485,8 @@ test("UX7 Export locked: reason text, counts match the queue, override needs a r
   await page.getByTestId("override-submit").click();
   await expect(page.getByRole("alert").filter({ hasText: "write why" })).toBeVisible();
   expect(posted).toEqual([]);
-  // a reason sends one override per listed blocker, each with its own request id, never a blanket override
+  // a reason sends one override per unflagged blocker, each with its own request id, never a blanket override; the stub
+  // lists no further page after the first, so the run ends with the listed ones (design 11 section 18)
   const reason = `ux check ${Date.now()}`;
   await page.getByTestId("override-reason").fill(reason);
   await page.getByTestId("override-submit").click();

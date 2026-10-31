@@ -2,7 +2,8 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import type { DocReadiness, QueueSort, ReviewCounts } from "../api/schema";
 import Hint from "../onboarding/Hint";
-import { MISMATCH, reconcileReview, reviewMismatchDetail, reviewReconcileText } from "../onboarding/reconcile";
+import { MISMATCH } from "../onboarding/reconcile";
+import { scopeEquation, scopeMismatch, stripTerms, type ScopeTerms } from "../shell/scopeTerms";
 import { STAGE_WORDS } from "../shell/jobStep";
 import { FOCUS } from "./labels";
 import { normalizeView, sliderCopy } from "./sliderCopy";
@@ -15,6 +16,13 @@ const SORTS: { id: QueueSort; label: string }[] = [
 
 export interface StatusStripProps {
   counts: ReviewCounts;
+  /**
+   * The export gate's partition (`shell/scopeTerms`, design 11 section 17): what the rail and the next-step card read.
+   * Combined with the list's own `counts` by `stripTerms`: the gate's terms when both reads agree, the list's buckets
+   * with the gate's overrides kept apart after a write the gate has not seen yet, the list's counts alone when the scope
+   * differs (a document scored between the two reads).
+   */
+  scope?: ScopeTerms | null;
   /** auto-approved blocks currently listed because of the view filter */
   viewAdded: number;
   viewAddedPartial: boolean;
@@ -66,31 +74,35 @@ export default function StatusStrip(p: StatusStripProps) {
   //  - no view filter: every pending block is queued, so `pending` is exact;
   //  - view filter and every page loaded: pending minus the loaded auto-approved rows is exact;
   //  - view filter and more pages exist: only a lower bound is known (pending minus ALL auto-approved), shown as "N+".
+  const t: ScopeTerms = stripTerms(p.scope, p.counts);
+  const fromGate = t.source === "export" || t.overridden > 0;
   const filtered = p.appliedView !== null;
-  const queuedPartial = filtered && p.viewAddedPartial;
-  const queued = Math.max(0, p.counts.pending - (!filtered ? 0 : queuedPartial ? p.counts.auto_approved : p.viewAdded));
+  const queuedPartial = !fromGate && filtered && p.viewAddedPartial;
+  // the gate's `to_review` is exact; the queue's fallback derives it from the list as before
+  const queued = fromGate ? t.toReview : Math.max(0, p.counts.pending - (!filtered ? 0 : queuedPartial ? p.counts.auto_approved : p.viewAdded));
   const T = p.threshold;
-  const rec = reconcileReview(p.counts);
-  const c = p.counts;
-  const done = c.approved + c.edited;
+  const done = t.done;
   // on a short window (200% zoom) the block folds to the bar and one line; the rest is one button away
   const [details, setDetails] = useState(false);
   // The bar is drawn from the server's independent buckets over in scope (owner decision D1a), every segment from its
   // own count, so the bar adds up only when the counts do. When they do not, it is drawn empty (grey) and the line
   // under it says why: a bar that "fills" with whatever is left would hide the mismatch.
-  const total = Math.max(1, c.in_scope);
-  const flaggedN = c.flagged_open + c.rejected;
-  const flagWords = c.rejected > 0 ? `${flaggedN} flagged or rejected` : `${c.flagged_open} flagged`;
-  const segs = rec.ok
+  const total = Math.max(1, t.inScope);
+  const flaggedN = t.flagged + t.rejected;
+  const flagWords = t.rejected > 0 ? `${flaggedN} flagged or rejected` : `${t.flagged} flagged`;
+  const segs = t.ok
     ? [
         { key: "done", n: done, cls: "bg-done-mid" },
-        { key: "auto", n: c.auto_approved, cls: "hatch-cleared" },
+        { key: "auto", n: t.auto, cls: "hatch-cleared" },
         { key: "flagged", n: flaggedN, cls: "hatch-flag" },
-        { key: "queued", n: c.queued, cls: "bg-needs-fill" },
+        // overridden: will be exported unreviewed; neither cleared nor waiting (design 11 section 17)
+        ...(t.overridden > 0 ? [{ key: "overridden", n: t.overridden, cls: "hatch-overridden" }] : []),
+        { key: "queued", n: t.toReview, cls: "bg-needs-fill" },
       ]
     : [];
   let at = 0;
-  const yours = done + c.queued + c.flagged_open + c.rejected;
+  const yours = done + t.toReview + t.overridden + t.flagged + t.rejected;
+  const overriddenWords = t.overridden > 0 ? `, ${t.overridden} overridden and not reviewed` : "";
   // Work is claimed only while a job does it (CLAUDE.md "Claiming work is happening"): a pending document no job covers
   // is "not scored yet", a stale one no job re-scores is "scores out of date", and both point at Scope.
   const chips = p.docs
@@ -114,13 +126,13 @@ export default function StatusStrip(p: StatusStripProps) {
         <div
           role="img"
           aria-label={
-            rec.ok
-              ? `${done} of ${yours} checked by you, ${c.auto_approved} cleared by the checks, ${c.queued} waiting for you, ${flagWords}, ${c.in_scope} in scope`
-              : `Progress not drawn: the review counts do not add up to the ${c.in_scope} in scope`
+            t.ok
+              ? `${done} of ${yours} checked by you, ${t.auto} cleared by the checks, ${t.toReview} waiting for you${overriddenWords}, ${flagWords}, ${t.inScope} in scope`
+              : `Progress not drawn: the review counts do not add up to the ${t.inScope} in scope`
           }
           className="relative h-3 min-w-0 flex-1 overflow-hidden rounded-full bg-line-soft shadow-[inset_0_0_0_1px_var(--line)] short:min-w-[5rem]"
           data-testid="review-bar"
-          data-reconciled={rec.ok ? "true" : "false"}
+          data-reconciled={t.ok ? "true" : "false"}
         >
           {segs.map((s) => {
             const start = at / total;
@@ -161,21 +173,24 @@ export default function StatusStrip(p: StatusStripProps) {
               of <span className="tabular-nums">{yours}</span> checked by you
             </span>
           </span>
-          <Stat id="cnt-auto" label="cleared by the checks" value={c.auto_approved} swatch="hatch-cleared ring-1 ring-inset ring-done-mid" />
+          <Stat id="cnt-auto" label="cleared by the checks" value={t.auto} swatch="hatch-cleared ring-1 ring-inset ring-done-mid" />
           <Stat id="cnt-queued" label="waiting for you" value={queued} partial={queuedPartial} swatch="bg-needs-fill ring-1 ring-inset ring-needs-line" />
-          <Stat id="cnt-flagged" label="flagged" value={c.flagged_open} swatch="hatch-flag" />
-          {c.rejected > 0 ? (
+          {t.overridden > 0 ? (
+            <Stat id="cnt-overridden" label="overridden, not reviewed" value={t.overridden} swatch="hatch-overridden ring-1 ring-inset ring-line-strong" />
+          ) : null}
+          <Stat id="cnt-flagged" label="flagged" value={t.flagged} swatch="hatch-flag" />
+          {t.rejected > 0 ? (
             <span className="-ml-3 inline-flex items-baseline gap-1.5 whitespace-nowrap text-sm text-muted">
               and
               <span className="font-bold tabular-nums text-ink" data-testid="cnt-rejected">
-                {c.rejected}
+                {t.rejected}
               </span>
               rejected
             </span>
           ) : null}
           <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap">
             <span className="text-sm font-bold tabular-nums text-ink" data-testid="cnt-scope">
-              {c.in_scope}
+              {t.inScope}
             </span>
             <span className="text-sm text-muted">in scope</span>
           </span>
@@ -233,15 +248,15 @@ export default function StatusStrip(p: StatusStripProps) {
         </span>
       </div>
       </div>
-        {rec.ok ? (
+        {t.ok ? (
           <p className="text-xs tabular-nums text-muted" data-testid="reconcile-review">
-            {reviewReconcileText(rec)}
-            {rec.skipped > 0 ? ` (${rec.skipped} skipped)` : ""}
+            {scopeEquation(t)}
+            {p.counts.skipped > 0 ? ` (${p.counts.skipped} skipped)` : ""}
           </p>
         ) : (
           <p role="note" className="text-xs font-medium text-fail" data-testid="reconcile-mismatch">
             <span aria-hidden="true">✕ </span>
-            {MISMATCH(reviewMismatchDetail(rec))}
+            {MISMATCH(scopeMismatch(t))}
           </p>
         )}
         {chips.map((c) => (

@@ -78,6 +78,9 @@ describe("U10 AgentScreen", () => {
     const checks = within(p).getByTestId("rechecks");
     expect(within(checks).getAllByRole("listitem").map((l) => l.getAttribute("data-outcome"))).toEqual(["passed", "failed"]);
     expect(checks).toHaveTextContent("36 became 35");
+    // a known check reads as a sentence, never its code name (design 09 section 14)
+    expect(checks).toHaveTextContent("Passed It adds no words that are not in the manual");
+    expect(checks).not.toHaveTextContent("faithfulness");
     expect(within(p).getByText("36 N·m").tagName).toBe("S");
     expect(p).toHaveTextContent("(not found in this source)");
   });
@@ -142,7 +145,7 @@ describe("U10 AgentScreen", () => {
     expect(c).toHaveTextContent("The scorer's note: edit rate above 0.90 is under the 5% target");
     expect(c).toHaveTextContent("never applied for you");
   });
-  it("an open flag is titled from its block (file, page, type), with the category and the id; a fresh flag reads 'not tried yet'", async () => {
+  it("an open flag without a section heading is titled by its excerpt (design 09 section 14), with the category and the id; a fresh flag reads 'not tried yet'", async () => {
     installFake({ flags: [{ ...flag, target_id: "b-beta-p009-10" }] });
     const blocks: string[] = [];
     server.use(
@@ -154,8 +157,9 @@ describe("U10 AgentScreen", () => {
     );
     renderApp("/agent");
     const row = await screen.findByTestId("agent-flag");
-    await waitFor(() => expect(row).toHaveTextContent("beta.pdf, page 9, paragraph"));
-    expect(row.firstElementChild).toHaveTextContent(/^beta\.pdf, page 9, paragraph$/);
+    await waitFor(() => expect(row).toHaveTextContent("Text of b-beta-p009-10 set to 0.25 mm."));
+    expect(row.firstElementChild).toHaveTextContent(/^Text of b-beta-p009-10 set to 0\.25 mm\. · page 9$/);
+    expect(row).not.toHaveTextContent("beta.pdf");
     expect(row).toHaveTextContent("Wrong text");
     expect(row).toHaveTextContent("b-beta-p009-10");
     expect(row).toHaveTextContent("not tried yet");

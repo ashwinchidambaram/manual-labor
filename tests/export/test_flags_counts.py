@@ -41,6 +41,12 @@ def assert_partition(paths: ProjectPaths, store: Store) -> ExportStatus:
     assert c is not None
     buckets = c.auto_approved + c.approved + c.edited + c.rejected + c.overridden + c.blocking
     assert buckets == c.in_scope, c
+    # design 11 section 17: one partition every screen reads; "to review" never counts a block an
+    # override covers, and "flagged" is a blocker held by a flag no override covers
+    assert c.to_review + c.flagged == c.blocking, c
+    split = c.auto_approved + c.approved + c.edited + c.rejected + c.overridden
+    assert split + c.to_review + c.flagged == c.in_scope, c
+    assert c.flagged == len({f.block_id for f in st.flag_blockers}), (c, st.flag_blockers)
     rc = review_counts(paths, store)
     assert c.in_scope == rc.in_scope, (c, rc)
     assert (c.auto_approved, c.approved, c.edited, c.rejected) == (
@@ -113,6 +119,66 @@ def test_a_block_override_batch_never_covers_an_open_flag(unreviewed: ProjectPat
     (mine,) = [o for o in m.overrides if o.target_id == flagged]
     assert mine.flag_id == fid and mine.reason == "checked on paper"
     assert rec.summary.review.overrides == len(m.overrides)
+
+
+def test_overriding_every_unflagged_block_leaves_nothing_to_review(
+    unreviewed: ProjectPaths,
+) -> None:
+    """Dana's second run (design 11 section 17): after the batch, 105 blocks were overridden and
+    one flag still blocked, and three places said "105 to review". The split says 0 to review."""
+    store = Store.open(unreviewed)
+    try:
+        before = assert_partition(unreviewed, store)
+        assert before.counts is not None and before.counts.to_review > 2
+        assert before.counts.flagged == 0
+        flagged = before.blockers[1]
+        flag_block(unreviewed, store, flagged)
+        mid = assert_partition(unreviewed, store).counts
+        assert mid is not None
+        assert (mid.to_review, mid.flagged) == (before.counts.to_review - 1, 1)
+        override_all(unreviewed, store, "pilot", skip={flagged})
+        st = assert_partition(unreviewed, store)
+        c = st.counts
+        assert c is not None
+        assert (c.to_review, c.flagged, c.blocking) == (0, 1, 1)
+        assert c.overridden == before.counts.to_review - 1
+        # the gate's raw `queued` still counts the overridden blocks: no screen calls it "to review"
+        assert st.queued == c.overridden
+    finally:
+        store.close()
+
+
+def test_record_override_reads_the_serving_review_cache(
+    unreviewed: ProjectPaths, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """One click overrides every unflagged blocker (design 11 section 18): the route passes its
+    serving `ReviewService`, so each override checks its target against the cached overlays
+    instead of re-reading every document's blocks (154 ms per override on the e2e project). The
+    refusals are the same."""
+    import manuallabor.export.pipeline as pipeline
+    from manuallabor.state.data import ProjectData
+    from manuallabor.state.review import ReviewService
+
+    store = Store.open(unreviewed)
+    try:
+        review = ReviewService(unreviewed, store, ProjectData(unreviewed, store))
+        st = export_status(unreviewed, store, review)
+        first, flagged = st.blockers[0], st.blockers[1]
+        fid = flag_block(unreviewed, store, flagged)
+
+        def uncached(*_a: object, **_k: object) -> None:
+            raise AssertionError("record_override re-read the blocks instead of the review cache")
+
+        monkeypatch.setattr(pipeline, "load_review_blocks", uncached)
+        with pytest.raises(InvalidOp, match="unknown block"):
+            record_override(unreviewed, store, "r", target_id="b-nope-p001-01", review=review)
+        with pytest.raises(InvalidOp, match=fid):
+            record_override(unreviewed, store, "r", target_id=flagged, review=review)
+        record_override(unreviewed, store, "r", target_id=first, request_id="t-c1", review=review)
+        st = export_status(unreviewed, store, review)
+        assert first not in st.blockers and flagged in st.blockers
+    finally:
+        store.close()
 
 
 def test_a_flag_raised_before_a_block_override_still_blocks(unreviewed: ProjectPaths) -> None:

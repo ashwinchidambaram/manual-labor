@@ -88,7 +88,8 @@ describe("VC4 ExtractedPane", () => {
     });
     const items = await screen.findAllByTestId("why-item");
     expect(items[0]).toHaveTextContent(/parsers disagree · 0\.31 of 1 · critical/);
-    expect(items[0]).toHaveTextContent("pymupdf vs docling 0.31; numeric: '+0.05' vs '±0.05'");
+    // the scorer's reader keys in the readers' names (design 09 section 14)
+    expect(items[0]).toHaveTextContent("PDF text layer vs Layout parser: 0.31; numbers differ: '+0.05' vs '±0.05'");
     expect(items[1]).toHaveTextContent("low OCR");
     expect(screen.getByTestId("why-rule")).toHaveTextContent("Rule: always reviewed");
   });

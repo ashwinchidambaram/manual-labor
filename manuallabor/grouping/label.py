@@ -187,6 +187,11 @@ _SMALL_WORDS = frozenset(
     | {"per", "the", "to", "via", "vs", "with"}
 )
 _TOPIC_SLUG_BANNED = frozenset({ids.UNASSIGNED, "front-matter"})
+# a leading section number (design 04 section 3.4.2): "5. " or "5.1. " (a trailing dot), or "5.1 "
+# when it is the topic's own section; a number without a dot ("12 Volt Supply"), inside a word
+# ("X200 belt path") or a measurement ("2.5 Inch Drive Bay" in section 4) is part of the title
+_DOTTED_PREFIX_RE = re.compile(r"^(\d+(?:\.\d+)*)\.\s+")
+_BARE_PREFIX_RE = re.compile(r"^(\d+(?:\.\d+)+)\s+")
 
 
 @dataclass(frozen=True)
@@ -233,6 +238,27 @@ def _slug_of(text: str, max_len: int) -> str | None:
     return s
 
 
+def _same_section(number: str, section: str | None) -> bool:
+    """`3.1` and section `3.1` or `3.1.2`: the number names this topic's section or its parent.
+    A number below the section (`2.5` in section `2`) may be a measurement and is kept."""
+    if not section:
+        return False
+    return number == section or section.startswith(number + ".")
+
+
+def strip_section_number(title: str, section: str | None = None) -> str:
+    """The title without a leading section number ("5. Connector Data" -> "Connector Data"):
+    always for "N. " and "N.N. ", for "N.N " only when it is the topic's own `section`;
+    unchanged when it has none or nothing would be left."""
+    m = _DOTTED_PREFIX_RE.match(title)
+    if m is None:
+        m = _BARE_PREFIX_RE.match(title)
+        if m is not None and not _same_section(m.group(1), section):
+            m = None
+    rest = title[m.end() :].strip() if m else title
+    return rest or title
+
+
 def _qualified(base: str, qualifier: str) -> str:
     room = TITLE_MAX - len(qualifier) - 3
     return f"{base[:room].rstrip()} ({qualifier})"
@@ -242,10 +268,12 @@ def finalize_topic_names(items: Sequence[TopicNameInput]) -> dict[str, tuple[str
     """key -> (title, slug) for every topic, deterministic in `items` order (final-id order).
 
     1. The title is case-normalised (`title_case`).
-    2. A title equal, ignoring case, to an earlier topic's title gets a disambiguator that tells
-       it apart from every earlier topic of that name: the number of the section holding most of
-       its blocks when theirs differ, else its page range when theirs differ, else `part N` (N
-       counts the topics of that name, the first being part 1).
+    2. A title equal, ignoring case and a leading section number ("5. ", "5.1 "), to an earlier
+       topic's title gets a disambiguator that tells it apart from every earlier topic of that
+       name: the number of the section holding most of its blocks when theirs differ, else its
+       page range when theirs differ, else `part N` (N counts the topics of that name, the first
+       being part 1). Its shown title is then the title without the section number plus the
+       disambiguator (design 04 section 3.4.2).
     3. The slug is made from the shown title (never from a model's slug): the slug of the base
        title cut to leave room for the slug of the disambiguator. A slug a topic may not use
        (`unassigned`, `front-matter`, `pages-*`) is prefixed `topic-`; a title with nothing to
@@ -258,9 +286,13 @@ def finalize_topic_names(items: Sequence[TopicNameInput]) -> dict[str, tuple[str
     for pos, it in enumerate(items, start=1):
         base = title_case(it.title)[:TITLE_MAX].strip() or f"Topic {pos:02d}"
         title, qual = base, ""
-        same = earlier.setdefault(base.casefold(), [])
-        if base.casefold() in seen:
-            # a disambiguator must tell this topic apart from the earlier ones of the same name
+        # a leading section number does not tell two titles apart (section 3.4.2)
+        name = strip_section_number(base, it.section)
+        same = earlier.setdefault(name.casefold(), [])
+        if same or base.casefold() in seen:
+            # a disambiguator must tell this topic apart from the earlier ones of the same name;
+            # the section number the title began with is then said by the disambiguator
+            base = name
             quals: list[str] = []
             if it.section and all(o.section != it.section for o in same):
                 quals.append(f"section {it.section}")

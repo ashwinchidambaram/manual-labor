@@ -10,6 +10,7 @@ import { openInVerify } from "../shell/openInVerify";
 import { FLAG_CATEGORIES } from "../verify/labels";
 import { jobWords } from "../shell/JobsBar";
 import { stuck, triedText } from "./outcome";
+import { recheckSentence } from "./recheck";
 
 const FOCUS = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus";
 const LINK = `font-medium text-act-ink underline underline-offset-2 hover:text-act-hover ${FOCUS}`;
@@ -143,7 +144,12 @@ function FlagsSection({ flags, items, error, titles }: { flags: Flag[] | undefin
             const t = titles.get(f.target_id);
             return (
               <li key={f.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-4 py-3" data-testid="agent-flag">
-                {t ? <span className="basis-full font-semibold text-ink">{t.title}</span> : null}
+                {t ? (
+                  <span className="basis-full font-semibold text-ink">
+                    {t.title} <span className="font-normal text-muted">· page {t.page}</span>
+                  </span>
+                ) : null}
+                {t ? " " : null}
                 <span className="font-medium text-ink">{CATEGORY.get(f.category) ?? f.category}</span>
                 <Target id={f.target_id} />
                 {f.note ? <q className="text-muted">{f.note}</q> : null}
@@ -247,7 +253,7 @@ function ProposalItem({ p }: { p: Proposal }) {
                     <span aria-hidden="true">{r.passed ? "✓ " : "✕ "}</span>
                     {r.passed ? "Passed" : "Failed"}
                   </span>{" "}
-                  {r.check.replace(/_/g, " ")}
+                  {recheckSentence(r.check, r.passed)}
                   {r.detail ? <span className="block text-xs text-muted">{r.detail}</span> : null}
                 </li>
               ))}

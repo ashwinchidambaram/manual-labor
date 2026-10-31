@@ -75,7 +75,7 @@ describe("U10 ExportScreen", () => {
     );
     const { user } = renderApp("/export");
     await screen.findByTestId("export-locked");
-    expect(screen.getByTestId("override-form")).toHaveTextContent("one override for each of the 2 blocks listed above");
+    expect(screen.getByTestId("override-form")).toHaveTextContent("one override for each of the 2 blocks still to review");
     expect(screen.getByTestId("override-form")).toHaveTextContent("a flag raised on it after you record the override blocks the export again, and a block that starts blocking later is not covered");
     await user.click(screen.getByTestId("override-submit"));
     expect(screen.getByRole("alert")).toHaveTextContent("Please write why");
@@ -130,7 +130,7 @@ describe("U10 ExportScreen", () => {
     await screen.findByTestId("export-locked");
     await user.type(screen.getByTestId("override-reason"), "deadline");
     await user.click(screen.getByTestId("override-submit"));
-    expect(await screen.findByText(/Override refused for b-doc-p001-01 \(unknown block\)\. 2 of 3 recorded\./)).toBeInTheDocument();
+    expect(await screen.findByText(/Override refused for b-doc-p001-01 \(unknown block\)\. Recorded 2 of 3\./)).toBeInTheDocument();
     expect(sent).toEqual(["b-doc-p001-01", "b-doc-p001-02", "b-doc-p001-03"]);
   });
   it("blocks that no longer block after refreshing the status are skipped", async () => {
@@ -202,11 +202,13 @@ describe("U10 ExportScreen", () => {
     expect((await within(screen.getByTestId("blocker-list")).findAllByRole("listitem"))[0]).toHaveTextContent("2 blocks");
   });
   it("unlocked: Export starts a job; a 409 renders the locked view from the refusal body", async () => {
-    installFake();
+    const f = installFake();
     server.use(
-      http.post("*/api/export", () =>
-        HttpResponse.json({ detail: "export is locked", code: "export_locked", open_flags: 1, queued: 0, blockers: ["b-doc-p002-01"] }, { status: 409 }),
-      ),
+      http.post("*/api/export", () => {
+        // the gate closed since the screen read it: the server's status says so too, and the screen rereads it
+        f.exportStatus = locked({ open_flags: 1, queued: 0, blockers: ["b-doc-p002-01"] });
+        return HttpResponse.json({ detail: "export is locked", code: "export_locked", open_flags: 1, queued: 0, blockers: ["b-doc-p002-01"] }, { status: 409 });
+      }),
     );
     const { user } = renderApp("/export");
     await user.click(await screen.findByTestId("export-start"));
@@ -252,10 +254,167 @@ describe("U10 step indicator states", () => {
   });
 });
 
+// Second first-use report C3 (design 11 section 18): the server lists 20 blockers at a time; one click with one reason
+// overrides every unflagged blocker in successive rounds, never a flagged one, shows progress and keeps the reason.
+describe("U10c override the remaining blocks in one decision", () => {
+  const ids = Array.from({ length: 46 }, (_, i) => `b-doc-p${String(i + 1).padStart(3, "0")}-01`);
+  const flaggedId = ids[5];
+  const flag = { flag_id: "flag-000009", block_id: flaggedId, category: "wrong_text" as const, note: "check the 2.5 L line" };
+
+  /** A server that covers each overridden block and lists the first 20 still blocking, as the real one does. */
+  function paginatedServer(hold?: (n: number) => Promise<void> | undefined) {
+    const covered = new Set<string>();
+    const statusNow = (): ExportStatus => {
+      const blocking = ids.filter((id) => !covered.has(id));
+      const toReview = blocking.filter((id) => id !== flaggedId).length;
+      return locked({
+        open_flags: 1,
+        queued: ids.length - 1,
+        blockers: blocking.slice(0, BLOCKER_LIMIT),
+        flag_blockers: [flag],
+        counts: { in_scope: 60, auto_approved: 14, approved: 0, edited: 0, rejected: 0, overridden: covered.size, blocking: blocking.length, to_review: toReview, flagged: 1 },
+      });
+    };
+    const f = installFake({ exportStatus: statusNow() });
+    const bodies: { reason: string; target_id?: string | null; flag_id?: string | null; request_id: string }[] = [];
+    server.use(
+      http.get("*/api/export/status", () => HttpResponse.json(statusNow())),
+      http.post("*/api/export/override", async ({ request }) => {
+        const b = (await request.json()) as (typeof bodies)[number];
+        bodies.push(b);
+        await hold?.(bodies.length);
+        // the server refuses a block override on a flagged block (design 11 section 14)
+        if (b.target_id === flaggedId) return HttpResponse.json({ detail: `${flaggedId} has an open flag`, code: "invalid" }, { status: 422 });
+        covered.add(String(b.target_id));
+        f.exportStatus = statusNow();
+        return HttpResponse.json(f.exportStatus);
+      }),
+    );
+    return { f, bodies, covered };
+  }
+
+  it("one click, one reason: all 45 unflagged blocks are overridden across three pages of blockers, never the flagged one", async () => {
+    const { bodies, covered } = paginatedServer();
+    const { user } = renderApp("/export");
+    const form = await screen.findByTestId("override-form");
+    expect(within(form).getByTestId("override-submit")).toHaveTextContent("Override the remaining 45 with this reason");
+    expect(form).toHaveTextContent("1 flagged block is left out");
+    await user.type(within(form).getByTestId("override-reason"), "vendor deadline");
+    await user.click(within(form).getByTestId("override-submit"));
+    await waitFor(() => expect(covered.size).toBe(45));
+    expect(bodies.some((b) => b.target_id === flaggedId)).toBe(false);
+    expect(bodies).toHaveLength(45);
+    expect(bodies.every((b) => b.reason === "vendor deadline" && b.flag_id == null)).toBe(true);
+    expect(new Set(bodies.map((b) => b.request_id)).size).toBe(45);
+    // progress, then the outcome, both said; the reason stays until the person clears it
+    await waitFor(() => expect(screen.getByTestId("override-progress")).toHaveTextContent("Recorded 45 of 45"));
+    expect(within(form).getByTestId("override-reason")).toHaveValue("vendor deadline");
+    // nothing unflagged is left: the button says so, and only the flag still blocks, in its own box
+    await waitFor(() => expect(within(form).getByTestId("override-submit")).toBeDisabled());
+    expect(within(form).getByTestId("override-submit")).toHaveTextContent("Nothing left to override");
+    expect(within(screen.getByTestId("flag-overrides")).getByTestId("flag-override")).toHaveTextContent(flaggedId);
+    expect(screen.getByTestId("export-reconcile")).toHaveTextContent("60 blocks in scope = 14 auto-approved + 0 approved by you + 0 edited by you + 45 overridden + 0 to review + 1 flagged");
+  });
+
+  it("shows progress while the rounds run", async () => {
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((r) => (release = r));
+    // the 25th override (in the second page of blockers) waits until the test has read the progress
+    const { covered } = paginatedServer((n) => (n === 25 ? held : undefined));
+    const { user } = renderApp("/export");
+    await user.type(await screen.findByTestId("override-reason"), "pilot");
+    await user.click(screen.getByTestId("override-submit"));
+    const bar = await screen.findByRole("progressbar", { name: /Recording overrides/ });
+    await waitFor(() => expect(bar).toHaveAttribute("value", "24"));
+    expect(bar).toHaveAttribute("max", "45");
+    expect(screen.getByTestId("override-progress")).toHaveTextContent("Recorded 24 of 45");
+    expect(screen.getByTestId("override-submit")).toBeDisabled();
+    release();
+    await waitFor(() => expect(covered.size).toBe(45));
+  });
+});
+
+describe("U10d the one-click run says when it could not finish", () => {
+  const id = (n: number) => `b-doc-p${String(n).padStart(3, "0")}-01`;
+  it("blocks reviewed elsewhere during the run are said to need no override, not left as a short tally", async () => {
+    const covered = new Set<string>();
+    const approved = new Set<string>();
+    const statusNow = (): ExportStatus => {
+      // a flagged block stays, so the form (and its message) stays on screen after the run
+      const ids = [id(1), id(2), id(3)].filter((b) => !covered.has(b) && !approved.has(b));
+      const flag = { flag_id: "flag-000001", block_id: id(9), category: "wrong_text" as const, note: null };
+      return locked({ open_flags: 1, queued: ids.length, blockers: [...ids, id(9)], flag_blockers: [flag], counts: { in_scope: 11, auto_approved: 7, approved: approved.size, edited: 0, rejected: 0, overridden: covered.size, blocking: ids.length + 1, to_review: ids.length, flagged: 1 } });
+    };
+    installFake({ exportStatus: statusNow() });
+    server.use(
+      http.get("*/api/export/status", () => HttpResponse.json(statusNow())),
+      http.post("*/api/export/override", async ({ request }) => {
+        covered.add(((await request.json()) as { target_id: string }).target_id);
+        approved.add(id(3)); // a colleague approved the third block in Verify meanwhile
+        return HttpResponse.json(statusNow());
+      }),
+    );
+    const { user } = renderApp("/export");
+    await user.type(await screen.findByTestId("override-reason"), "pilot");
+    await user.click(screen.getByTestId("override-submit"));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Recorded 2 of 3. 1 block no longer needed an override: reviewed or changed meanwhile.");
+    expect([...covered]).toEqual([id(1), id(2)]);
+  });
+  it("when the first page of blockers is all flags, it says the rest cannot be reached instead of stopping quietly", async () => {
+    // 21 flagged blocks come first in reading order, then 5 unflagged: the server lists only the first 20
+    const all = Array.from({ length: 26 }, (_, i) => id(i + 1));
+    const flags = all.slice(0, 21).map((b, i) => ({ flag_id: `flag-0000${String(i).padStart(2, "0")}`, block_id: b, category: "wrong_text" as const, note: null }));
+    const st = locked({
+      open_flags: 21,
+      queued: 5,
+      blockers: all.slice(0, BLOCKER_LIMIT),
+      flag_blockers: flags,
+      counts: { in_scope: 40, auto_approved: 14, approved: 0, edited: 0, rejected: 0, overridden: 0, blocking: 26, to_review: 5, flagged: 21 },
+    });
+    installFake({ exportStatus: st });
+    const posted: string[] = [];
+    server.use(http.post("*/api/export/override", async ({ request }) => (posted.push(((await request.json()) as { target_id: string }).target_id), HttpResponse.json(st))));
+    const { user } = renderApp("/export");
+    await user.type(await screen.findByTestId("override-reason"), "pilot");
+    await user.click(screen.getByTestId("override-submit"));
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Recorded 0 of 5. 5 blocks still to review are not listed yet: the server lists blockers 20 at a time and the first ones are flagged. Decide on the flags below, then press the button again.");
+    expect(posted).toEqual([]);
+  });
+  it("covers no more blocks than the button named: a block that starts blocking during the run is left for a new decision", async () => {
+    const covered = new Set<string>();
+    let extra = false;
+    const statusNow = (): ExportStatus => {
+      const ids = [id(1), id(2), id(3), ...(extra ? [id(4)] : [])].filter((b) => !covered.has(b));
+      return locked({ open_flags: 0, queued: 3, blockers: ids, flag_blockers: [], counts: { in_scope: 10, auto_approved: 7 - (extra ? 1 : 0), approved: 0, edited: 0, rejected: 0, overridden: covered.size, blocking: ids.length, to_review: ids.length, flagged: 0 } });
+    };
+    installFake({ exportStatus: statusNow() });
+    const posted: string[] = [];
+    server.use(
+      http.get("*/api/export/status", () => HttpResponse.json(statusNow())),
+      http.post("*/api/export/override", async ({ request }) => {
+        const b = ((await request.json()) as { target_id: string }).target_id;
+        posted.push(b);
+        covered.add(b);
+        extra = true; // a manual finished scoring: one more block blocks now
+        return HttpResponse.json(statusNow());
+      }),
+    );
+    const { user } = renderApp("/export");
+    expect(await screen.findByTestId("override-submit")).toHaveTextContent("Override the remaining 3 with this reason");
+    await user.type(screen.getByTestId("override-reason"), "pilot");
+    await user.click(screen.getByTestId("override-submit"));
+    await waitFor(() => expect(screen.getByTestId("override-progress")).toHaveTextContent("Recorded 3 of 3."));
+    expect(posted).toEqual([id(1), id(2), id(3)]);
+    expect(screen.getByRole("alert")).toHaveTextContent("1 block still to review is not covered (it started blocking after you pressed the button)");
+    expect(screen.getByTestId("override-submit")).toHaveTextContent("Override the remaining block with this reason");
+  });
+});
+
 // Browser-run findings of 2026-10-30 (design 11 section 14): a batch of block overrides never includes a flagged block,
 // every count reconciles on screen, and after an export the result is on top.
 describe("U10b export: flags need their own decision, counts reconcile, the last export on top", () => {
-  const counts = { in_scope: 160, auto_approved: 51, approved: 7, edited: 1, rejected: 0, overridden: 80, blocking: 21 };
+  const counts = { in_scope: 160, auto_approved: 51, approved: 7, edited: 1, rejected: 0, overridden: 80, blocking: 21, to_review: 20, flagged: 1 };
   const flagged = { flag_id: "flag-000001", block_id: "b-doc-p001-02", category: "wrong_text" as const, note: "digit unclear" };
   const doneSummary: ExportSummary = {
     ...summary,
@@ -277,8 +436,8 @@ describe("U10b export: flags need their own decision, counts reconcile, the last
     );
     const { user } = renderApp("/export");
     const form = await screen.findByTestId("override-form");
-    expect(within(form).getByTestId("override-submit")).toHaveTextContent("Record 2 overrides");
-    expect(form).toHaveTextContent("1 flagged block left out");
+    expect(within(form).getByTestId("override-submit")).toHaveTextContent("Override the remaining 20 with this reason");
+    expect(form).toHaveTextContent("1 flagged block is left out");
     await user.type(within(form).getByTestId("override-reason"), "pilot");
     await user.click(within(form).getByTestId("override-submit"));
     await waitFor(() => expect(bodies).toHaveLength(2));
@@ -304,11 +463,11 @@ describe("U10b export: flags need their own decision, counts reconcile, the last
     installFake({ exportStatus: locked({ open_flags: 1, queued: 20, flag_blockers: [flagged], counts }) });
     renderApp("/export");
     const line = await screen.findByTestId("export-reconcile");
-    expect(line).toHaveTextContent("160 blocks in scope = 51 auto-approved + 7 approved by you + 1 edited by you + 80 overridden + 21 still blocking");
+    expect(line).toHaveTextContent("160 blocks in scope = 51 auto-approved + 7 approved by you + 1 edited by you + 80 overridden + 20 to review + 1 flagged");
   });
 
   it("after an export that spent its overrides: the last export is on top, the new lock below it", async () => {
-    installFake({ exportStatus: locked({ open_flags: 1, queued: 100, summary: doneSummary, counts: { ...counts, overridden: 0, blocking: 101 } }) });
+    installFake({ exportStatus: locked({ open_flags: 1, queued: 100, summary: doneSummary, counts: { ...counts, overridden: 0, blocking: 101, to_review: 100, flagged: 1 } }) });
     renderApp("/export");
     const top = await screen.findByTestId("export-summary");
     const lock = screen.getByTestId("export-locked");
@@ -333,11 +492,11 @@ describe("U10b export: flags need their own decision, counts reconcile, the last
   });
 
   it("clicking Export: when the job is done the result is on top with its download, the spent lock below", async () => {
-    const f = installFake({ exportStatus: { ...locked({ blockers: [], open_flags: 0, queued: 0, counts: { ...counts, overridden: 101, blocking: 0 } }), unlocked: false } });
+    const f = installFake({ exportStatus: { ...locked({ blockers: [], open_flags: 0, queued: 0, counts: { ...counts, overridden: 101, blocking: 0, to_review: 0, flagged: 0 } }), unlocked: false } });
     server.use(
       http.post("*/api/export", () => {
         // the server after the export: the summary is recorded and the overrides are spent (design 11 P3)
-        f.exportStatus = locked({ open_flags: 1, queued: 100, summary: doneSummary, counts: { ...counts, overridden: 0, blocking: 101 } });
+        f.exportStatus = locked({ open_flags: 1, queued: 100, summary: doneSummary, counts: { ...counts, overridden: 0, blocking: 101, to_review: 100, flagged: 1 } });
         return HttpResponse.json(makeJob({ id: "exp2", kind: "export", status: "queued" }), { status: 202 });
       }),
     );

@@ -1,5 +1,6 @@
 import { NavLink } from "react-router-dom";
 import type { ExportStatus } from "../api/schema";
+import { blockingFlagsOf, scopeTerms, toReviewOf } from "../shell/scopeTerms";
 import Hint from "./Hint";
 import type { HintId } from "./hints";
 import type { StepId } from "./guide";
@@ -30,10 +31,12 @@ export interface LiveState {
 }
 
 /**
- * Step states from server truth (first-use report C10): the export gate (`queued`, `blockers`, `open_flags`, its scope
- * `counts`, the last `summary`) and the active jobs. Nothing is shown that the API did not say, and no two states
- * contradict: while scoring runs Verify and Export wait for it; Verify is done only with blocks in scope and none
- * waiting; Export is never done (checkmark) while it is locked, and is not "ready" with nothing in scope.
+ * Step states from server truth (first-use report C10): the export gate (its scope partition `counts`, `blockers`,
+ * `flag_blockers`, `open_flags`, the last `summary`) and the active jobs. Nothing is shown that the API did not say, and
+ * no two states contradict: while scoring runs Verify and Export wait for it; "to review" is the partition's
+ * `to_review` (design 11 section 17), never a block an override covers, which reads "overridden"; Verify is done only
+ * with blocks in scope and none to review, flagged or overridden; Export is never done (checkmark) while it is locked,
+ * and is not "ready" with nothing in scope.
  */
 export function stepStates(path: string, st: ExportStatus | undefined, live: LiveState = { scoring: false }): Record<StepId, StepState> {
   const out = {} as Record<StepId, StepState>;
@@ -45,16 +48,22 @@ export function stepStates(path: string, st: ExportStatus | undefined, live: Liv
     let done = false;
     if (st) {
       const blockers = st.blockers ?? [];
-      const queued = st.queued ?? 0;
+      const terms = scopeTerms(st);
+      const queued = toReviewOf(st);
+      const overridden = terms?.overridden ?? 0;
+      const flags = blockingFlagsOf(st);
       const nothing = inScope === 0;
       if (s.id === "verify") {
         if (live.scoring) short = long = live.reading ? "reading manuals" : "scoring in progress";
         else if (queued > 0) short = long = `${queued} to review`;
-        else if (!nothing && blockers.length === 0) done = true;
+        else if (overridden > 0) {
+          short = `${overridden} overridden`;
+          long = `${overridden} overridden, not reviewed`;
+        } else if (!nothing && blockers.length === 0) done = true;
       }
       if (s.id === "agent" && st.open_flags > 0) short = long = plural(st.open_flags, "open flag");
       if (s.id === "export") {
-        const why = [st.open_flags > 0 ? plural(st.open_flags, "open flag") : "", queued > 0 ? `${queued} to review` : ""].filter(Boolean);
+        const why = [flags > 0 ? plural(flags, "open flag") : "", queued > 0 ? `${queued} to review` : ""].filter(Boolean);
         if (live.scoring) {
           short = live.reading ? "after reading" : "after scoring";
           long = `waits for ${live.reading ? "reading" : "scoring"} to finish`;

@@ -80,6 +80,48 @@ describe("open in Verify", () => {
   }, 15000);
 });
 
+// Second first-use report C8 (design 09 section 14): the flagged block was titled by its file name ("x200-two-column.pdf")
+// on the Agent card and on Verify. Its title comes from where a queue card's does: the section heading, then the
+// block's excerpt, the file name last.
+describe("a flagged block's title", () => {
+  const titleRow = (section_title: string | null) => [{ block_id: FLAGGED, doc_id: "alpha", page: 2, type: "paragraph", section_title }];
+  const flagIn = (section_title: string | null) => {
+    const f = installFake({ flags: [{ ...flag }], sources: [{ slug: "alpha", filename: "x200-two-column.pdf", kind: "born_digital_pdf", pages: 4, ocr_warning: null, nodes: [] }] });
+    server.use(
+      http.get("*/api/agent/items", () => HttpResponse.json([item])),
+      http.get("*/api/verify/titles", () => HttpResponse.json(titleRow(section_title))),
+      http.get(`*/api/verify/blocks/${FLAGGED}`, () =>
+        HttpResponse.json(makeBlockDetail(makeQueueItem(7, { block_id: FLAGGED, doc_id: "alpha", page: 2, status: "flagged" }), { flags: [flag] }, { doc_id: "alpha", clean_text: "Allow the unit to cool before you refill 2.5 L." })),
+      ),
+    );
+    return f;
+  };
+  it("on the Agent card: the section heading, never the file name", async () => {
+    flagIn("1.1 Overview");
+    renderApp("/agent");
+    const row = await screen.findByTestId("agent-flag");
+    await waitFor(() => expect(row).toHaveTextContent("1.1 Overview"));
+    expect(row).not.toHaveTextContent("x200-two-column.pdf");
+  });
+  it("on the Agent card without a heading above it: the block's excerpt", async () => {
+    flagIn(null);
+    renderApp("/agent");
+    const row = await screen.findByTestId("agent-flag");
+    await waitFor(() => expect(row).toHaveTextContent("Allow the unit to cool before you refill 2.5 L."));
+    expect(row).not.toHaveTextContent("x200-two-column.pdf");
+  });
+  it("on Verify, opened from the Agent card: the section heading", async () => {
+    const s = await setup();
+    server.use(http.get("*/api/verify/titles", () => HttpResponse.json([{ block_id: FLAGGED, doc_id: "doc", page: 2, type: "paragraph", section_title: "1.1 Overview" }])));
+    await act(() => s.r.router.navigate("/agent"));
+    const row = await screen.findByTestId("agent-flag");
+    await s.r.user.click(within(row).getByRole("link", { name: `Open ${FLAGGED} in Verify` }));
+    await waitFor(() => expect(current()).toBe(`card-${FLAGGED}`));
+    await waitFor(() => expect(screen.getByTestId(`card-${FLAGGED}`)).toHaveTextContent("1.1 Overview"));
+    expect(screen.getByRole("heading", { level: 3, name: "1.1 Overview" })).toBeInTheDocument();
+  }, 15000);
+});
+
 describe("the flag card after agent passes that failed", () => {
   it("says how often it was tried and how the last try ended, in words, with a way out", async () => {
     installFake({ flags: [flag] });

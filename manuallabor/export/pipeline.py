@@ -324,8 +324,12 @@ def record_override(
     target_id: str | None = None,
     flag_id: str | None = None,
     request_id: str | None = None,
+    review: ReviewService | None = None,
 ) -> int:
-    """Append an `export_override` action (idempotent per `request_id`); returns its id."""
+    """Append an `export_override` action (idempotent per `request_id`); returns its id. The API
+    passes its serving `ReviewService`: the target is then checked against the cached overlays,
+    not by re-reading every document's blocks, so one click can record a hundred overrides in a
+    second or two (design 11 section 18)."""
     if not reason.strip():
         raise InvalidOp("an override needs a reason")
     prev = store.action_by_request(request_id)
@@ -335,7 +339,12 @@ def record_override(
         block_of: dict[str, str] = {}  # block or figure id -> block id
         for slug in paths.list_slugs():
             if doc_ready(paths, slug):
-                for b in load_review_blocks(paths, store, slug):
+                blocks = (
+                    review.review_blocks(slug)
+                    if review is not None
+                    else load_review_blocks(paths, store, slug)
+                )
+                for b in blocks:
                     block_of[b.id] = b.id
                     if b.figure_id is not None:
                         block_of[str(b.figure_id)] = b.id

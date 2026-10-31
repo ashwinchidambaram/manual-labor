@@ -7,6 +7,7 @@ import AxeBuilder from "@axe-core/playwright";
 import fs from "node:fs";
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 import type { BlockDetail, Cursor, ExportStatus, Flag, GuideState, QueueItem, QueuePage, ScopeSummary, SourceInfo } from "../src/api/schema";
+import { plainDetail } from "../src/verify/labels";
 import { api, resetSelection, waitForTree, waitJobsIdle } from "./helpers";
 
 test.describe.configure({ mode: "default" });
@@ -337,7 +338,8 @@ test("UC3 trust by showing on a scanned block: strip with the page image, every 
   note("why-list", texts.map((t, i) => `[${signals[i].name}=${signals[i].value}] ${t}`).join(" || "));
   signals.forEach((w, i) => {
     if (w.value !== null && w.value !== undefined && w.name !== "has_numeric_spec") expect(texts[i], `${w.name} at position ${i}`).toContain(`${w.value.toFixed(2)} of 1`);
-    if (w.detail) expect(texts[i], `${w.name} detail at position ${i}`).toContain(w.detail);
+    // the scorer's jargon translated at the point of use (design 09 section 14)
+    if (w.detail) expect(texts[i], `${w.name} detail at position ${i}`).toContain(plainDetail(w.name, w.detail) ?? "");
   });
   // a passed check reads "Passed" and nothing in it is red
   const passedRows = page.getByLabel("Why this needs you, signals").locator(":scope > li[data-outcome='passed']");
@@ -558,14 +560,17 @@ test("UC6b Agent lists the UC2 flag with a human title; Export is locked, groupe
   expect(short).toMatch(/^locked: /);
   const nums = [...short.matchAll(/\d+/g)].map((m) => Number(m[0]));
   expect(nums.length).toBe(1);
-  expect([st.open_flags, st.queued], `the sub-line's number is one of the gate's counts`).toContain(nums[0]);
-  if (st.open_flags > 0) expect(long).toContain(plural(st.open_flags, "open flag"));
-  if (st.queued > 0) expect(long).toContain(`${st.queued} to review`);
+  // the gate's counts as every screen reads them (design 11 section 17): flags that hold the export, blocks to review
+  const holdFlags = (st.flag_blockers ?? []).length;
+  const toReview = st.counts?.to_review ?? st.queued;
+  expect([holdFlags, toReview], `the sub-line's number is one of the gate's counts`).toContain(nums[0]);
+  if (holdFlags > 0) expect(long).toContain(plural(holdFlags, "open flag"));
+  if (toReview > 0) expect(long).toContain(`${toReview} to review`);
   // Export: locked, reasons with the gate's counts, blockers grouped by section
   await page.goto("/export");
   await expect(page.getByRole("heading", { name: "Export is locked" })).toBeVisible();
-  if (st.open_flags > 0) await expect(page.getByTestId("reason-flags")).toContainText(plural(st.open_flags, "open flag"));
-  if (st.queued > 0) await expect(page.getByTestId("reason-queued")).toContainText(plural(st.queued, "block"));
+  if (holdFlags > 0) await expect(page.getByTestId("reason-flags")).toContainText(plural(holdFlags, "open flag"));
+  if (toReview > 0) await expect(page.getByTestId("reason-queued")).toContainText(plural(toReview, "block"));
   const list = page.getByTestId("blocker-list");
   await expect(list).toBeVisible();
   const groups = list.locator(":scope > li");

@@ -10,6 +10,7 @@ import { useBlockTitles } from "../shell/blockTitles";
 import { AttentionIcon } from "../shell/Icon";
 import { openInVerify } from "../shell/openInVerify";
 import { FLAG_CATEGORIES, FLAG_RESOLUTION } from "../verify/labels";
+import { blockingFlagsOf, scopeTerms, toReviewOf } from "../shell/scopeTerms";
 
 /** The server lists at most this many blockers (manuallabor/export/types.py BLOCKER_LIMIT). */
 export const BLOCKER_LIMIT = 20;
@@ -37,7 +38,9 @@ const LEFT_OUT: Record<string, string> = {
 function ScopeLine({ c }: { c: ScopeCounts }) {
   const terms: string[] = [`${c.auto_approved} auto-approved`, `${c.approved} approved by you`, `${c.edited} edited by you`];
   if (c.rejected) terms.push(`${c.rejected} rejected`);
-  terms.push(`${c.overridden} overridden`, `${c.blocking} still blocking`);
+  // the words the Verify strip and the rail use (design 11 section 17); an older server says only "still blocking"
+  const split = typeof c.to_review === "number" && typeof c.flagged === "number";
+  terms.push(`${c.overridden} overridden`, ...(split ? [`${c.to_review} to review`, `${c.flagged} flagged`] : [`${c.blocking} still blocking`]));
   const sum = c.auto_approved + c.approved + c.edited + c.rejected + c.overridden + c.blocking;
   return (
     <p className="text-sm tabular-nums text-muted" data-testid="export-reconcile">
@@ -63,7 +66,9 @@ function Locked({ st, after }: { st: ExportStatus; after: ExportSummary | null }
   const [opening, setOpening] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const blockers = st.blockers ?? [];
-  const queued = st.queued ?? 0;
+  // design 11 section 17: "to review" never counts a block an override covers; a flag counts while it holds the export
+  const queued = toReviewOf(st);
+  const flags = blockingFlagsOf(st);
   const open = async (id: string): Promise<void> => {
     setOpening(id);
     setError(null);
@@ -110,9 +115,9 @@ function Locked({ st, after }: { st: ExportStatus; after: ExportSummary | null }
         </div>
       </div>
       <ul className="space-y-2 text-base" data-testid="export-reasons">
-        {st.open_flags > 0 ? (
+        {flags > 0 ? (
           <li data-testid="reason-flags" className="rounded-xl bg-raised px-4 py-3 ring-1 ring-inset ring-line">
-            <span className="font-semibold tabular-nums">{plural(st.open_flags, "open flag")}</span>. {FLAG_RESOLUTION}{" "}
+            <span className="font-semibold tabular-nums">{plural(flags, "open flag")}</span>. {FLAG_RESOLUTION}{" "}
             <Link className={LINK} to="/agent">
               Go to the Agent screen
             </Link>
@@ -188,21 +193,29 @@ function Locked({ st, after }: { st: ExportStatus; after: ExportSummary | null }
 }
 
 /**
- * Export anyway: one override per listed blocker that has no open flag (review M12 #6; design 11 section 14: a block
- * override never covers a flag, so a flagged block is left out of the batch, said so, and gets its own decision in
- * FlagOverrides). A blanket override (no target) would also cover
- * blocks and flags that start blocking later, until the next export; per-blocker overrides cover exactly what the
- * reader saw: the block's queued state and the flags open on it now (a flag raised on it afterwards blocks again,
- * design 11 P3). Request ids are stable per form and blocker, so a retry after a partial failure records nothing
- * twice. The status is refreshed first and after every write: a block that no longer blocks is skipped. A 422 on one
- * block (it vanished or its id is unknown) is reported and the rest are still recorded; any other failure stops.
+ * Export before review is finished: one decision, one reason, every unflagged blocker (design 11 section 18). The
+ * server lists at most BLOCKER_LIMIT blockers at a time (a rule of the status, which is polled after every approve);
+ * one click therefore runs successive rounds: override every listed blocker that no uncovered flag holds in the latest
+ * status, then take the next page from the last answer (every override POST answers with the status), until no
+ * unflagged blocker is listed. A round that records nothing ends the run, so it cannot loop. A block override never
+ * covers a flag (section 14): a flagged block is left out, said so, and gets its own decision in FlagOverrides; the
+ * server refuses one anyway (422). Per-block overrides cover exactly the blocks blocking now: a flag raised on one
+ * afterwards blocks again, and a block that starts blocking later is not covered (P3). Request ids are `<run>:<block>`
+ * and the run id is renewed only after a run that recorded everything, so a retry after a stop records nothing twice.
+ * The reason stays in the box until the person clears it. A 422 on one block is reported and the rest are still
+ * recorded; any other failure stops the run.
  */
-function OverrideForm({ blockers, flagged, onDone }: { blockers: string[]; flagged: Set<string>; onDone: (st: ExportStatus) => void }) {
-  const batch = blockers.filter((id) => !flagged.has(id));
-  const leftOut = blockers.length - batch.length;
+function OverrideForm({ st, onDone }: { st: ExportStatus; onDone: (st: ExportStatus) => void }) {
+  const flagged = new Set((st.flag_blockers ?? []).map((f) => f.block_id));
+  const listed = (st.blockers ?? []).filter((id) => !flagged.has(id));
+  // every unflagged blocker, not only the listed ones; an older server without the partition: what is listed
+  const terms = scopeTerms(st);
+  const remaining = terms ? terms.toReview : listed.length;
+  const leftOut = terms ? terms.flagged : (st.blockers ?? []).length - listed.length;
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<{ done: number; of: number; final: boolean } | null>(null);
   const [rid, setRid] = useState(() => crypto.randomUUID());
   const submit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
@@ -212,7 +225,6 @@ function OverrideForm({ blockers, flagged, onDone }: { blockers: string[]; flagg
     }
     setBusy(true);
     setError(null);
-    const targets = [...batch];
     let latest: ExportStatus;
     try {
       latest = unwrap(await client.GET("/api/export/status"));
@@ -221,63 +233,85 @@ function OverrideForm({ blockers, flagged, onDone }: { blockers: string[]; flagg
       setBusy(false);
       return;
     }
+    const unflagged = (x: ExportStatus): string[] => {
+      const held = new Set((x.flag_blockers ?? []).map((f) => f.block_id));
+      return (x.blockers ?? []).filter((id) => !held.has(id));
+    };
+    // never more than the button named when it was pressed, nor more than the server says are left now
+    const of = Math.min(n, scopeTerms(latest)?.toReview ?? unflagged(latest).length);
     let recorded = 0;
-    let skipped = 0;
-    let nowFlagged = 0;
+    const tried = new Set<string>();
     const rejected: string[] = [];
     let stopped: string | null = null;
-    for (const id of targets) {
-      if (!(latest.blockers ?? []).includes(id)) {
-        skipped++;
-        continue;
-      }
-      if ((latest.flag_blockers ?? []).some((f) => f.block_id === id)) {
-        nowFlagged++; // flagged since the list was read: it needs its own decision, never a batch override
-        continue;
-      }
-      try {
-        latest = unwrap(await client.POST("/api/export/override", { body: { reason: reason.trim(), target_id: id, flag_id: null, request_id: `${rid}:${id}` } }));
-        recorded++;
-      } catch (err) {
-        if (err instanceof ApiError && err.status === 422) {
-          rejected.push(`${id} (${errText(err)})`);
-          continue;
+    setProgress({ done: 0, of, final: false });
+    // never more than the button named: a block that starts blocking during the run needs its own decision (P3)
+    while (recorded < of) {
+      const todo = unflagged(latest).filter((id) => !tried.has(id));
+      if (!todo.length) break;
+      const before = recorded;
+      for (const id of todo) {
+        if (recorded >= of) break;
+        // the last answer is newer than this page: a block approved or flagged since is not overridden
+        if (!unflagged(latest).includes(id) && (latest.blockers ?? []).length < BLOCKER_LIMIT) continue;
+        tried.add(id);
+        try {
+          latest = unwrap(await client.POST("/api/export/override", { body: { reason: reason.trim(), target_id: id, flag_id: null, request_id: `${rid}:${id}` } }));
+          recorded++;
+          setProgress({ done: recorded, of, final: false });
+        } catch (err) {
+          if (err instanceof ApiError && err.status === 422) {
+            rejected.push(`${id} (${errText(err)})`);
+            continue;
+          }
+          stopped = `Override not recorded for ${id}: ${errText(err)}.`;
+          break;
         }
-        stopped = `Override not recorded for ${id}: ${errText(err)}.`;
-        break;
       }
+      if (stopped || recorded === before) break;
     }
     onDone(latest);
-    const tally = `${recorded} of ${targets.length} recorded${skipped ? `, ${skipped} skipped because they no longer block` : ""}${
-      nowFlagged ? `, ${plural(nowFlagged, "block")} left out because flagged meanwhile` : ""
-    }.`;
-    if (stopped) setError(`${stopped} ${tally} Record overrides again to retry the rest.`);
+    setProgress({ done: recorded, of, final: true });
+    const tally = `Recorded ${recorded} of ${of}.`;
+    // what still waits after the run, said rather than left for the reader to find (design 11 section 18)
+    const left = scopeTerms(latest)?.toReview ?? unflagged(latest).length;
+    const isAre = (n: number): string => (n === 1 ? "is" : "are");
+    if (stopped) setError(`${stopped} ${tally} Press the button again to record the rest.`);
     else if (rejected.length) setError(`Override refused for ${rejected.join(", ")}. ${tally}`);
+    else if (left > 0 && recorded >= of)
+      setError(
+        `${tally} ${plural(left, "block")} still to review ${isAre(left)} not covered (${left === 1 ? "it" : "they"} started blocking after you pressed the button): press it again to override ${left === 1 ? "it" : "them"} too.`,
+      );
+    else if (left > 0)
+      setError(
+        `${tally} ${plural(left, "block")} still to review ${isAre(left)} not listed yet: the server lists blockers ${BLOCKER_LIMIT} at a time and the first ones are flagged. Decide on the flags below, then press the button again.`,
+      );
     else {
-      setReason("");
+      // done; blocks reviewed elsewhere during the run needed no override, and the tally says why it is short
+      if (recorded < of) setError(`${tally} ${plural(of - recorded, "block")} no longer needed an override: reviewed or changed meanwhile.`);
       setRid(crypto.randomUUID());
     }
     setBusy(false);
   };
-  const n = batch.length;
-  const which = leftOut ? (n === 1 ? "the 1 unflagged block" : `each of the ${n} unflagged blocks`) : n === 1 ? "the 1 block" : `each of the ${n} blocks`;
+  const n = remaining;
+  const label = busy ? "Recording..." : n === 0 ? "Nothing left to override" : n === 1 ? "Override the remaining block with this reason" : `Override the remaining ${n} with this reason`;
   return (
     <form onSubmit={(e) => void submit(e)} className="space-y-3 rounded-2xl border border-dashed border-line-strong p-5" data-testid="override-form" aria-labelledby="override-title">
       <h3 id="override-title" className="text-base font-semibold text-ink">
         Export before review is finished
       </h3>
       <p className="max-w-[68ch] text-sm text-muted">
-        Records one override for {which} listed above, with your reason. Each is exported unreviewed, with its machine-cleaned text, and listed in manifest.json. Each covers its block as it is now: a flag raised on it after you record the override blocks the export again, and a block that starts blocking later is not covered.
-        {blockers.length >= BLOCKER_LIMIT ? ` The server lists at most ${BLOCKER_LIMIT} at a time; record again for the next ones.` : ""}
+        Records one override for each of the {plural(n, "block")} still to review (every one, not only those listed), all with your reason. Each is
+        exported unreviewed, with its machine-cleaned text, and listed in manifest.json. Each covers its block as it is now: a flag raised on it after
+        you record the override blocks the export again, and a block that starts blocking later is not covered.
       </p>
       {leftOut ? (
         <p className="max-w-[68ch] rounded-xl bg-needs-wash px-3 py-2 text-sm text-ink" data-testid="override-left-out">
-          <span className="font-semibold">{plural(leftOut, "flagged block")} left out</span> of this batch: a block override never covers a flag;
-          each flag needs its own decision, below.
+          <span className="font-semibold">{leftOut === 1 ? "1 flagged block is left out" : `${leftOut} flagged blocks are left out`}</span>: a block
+          override never covers a flag; each flag needs its own decision, below.
         </p>
       ) : null}
       <label htmlFor="override-reason" className="block text-sm font-medium text-ink">
-        Reason <span className="font-normal text-muted">(required, written into manifest.json)</span>
+        Reason <span className="font-normal text-muted">(required, written into manifest.json; it stays here until you clear it)</span>
       </label>
       <Hint id="overrideReason">
         <textarea
@@ -296,8 +330,19 @@ function OverrideForm({ blockers, flagged, onDone }: { blockers: string[]; flagg
           {error}
         </p>
       ) : null}
+      {progress ? (
+        <div className="flex max-w-xl items-center gap-3">
+          {!progress.final ? (
+            <progress aria-label="Recording overrides" max={progress.of} value={progress.done} className="h-2 min-w-0 flex-1 accent-[var(--act)]" />
+          ) : null}
+          <p role="status" className="text-sm tabular-nums text-muted" data-testid="override-progress">
+            Recorded {progress.done} of {progress.of}
+            {progress.final ? "." : "..."}
+          </p>
+        </div>
+      ) : null}
       <button type="submit" disabled={busy || n === 0} data-testid="override-submit" className={BTN}>
-        {busy ? "Recording..." : n === 0 ? "No unflagged block listed" : n === 1 ? "Record override" : `Record ${n} overrides`}
+        {label}
       </button>
     </form>
   );
@@ -418,7 +463,7 @@ function Overrides({ list }: { list: Override[] }) {
             ) : o.target_id ? (
               <span className="font-mono text-xs">{o.target_id}</span>
             ) : (
-              "blanket: every block blocking the next export, including blocks and flags that start blocking after it was recorded"
+              "an override for everything: every block blocking the next export, including blocks and flags that start blocking after it was recorded"
             )}
             :{" "}
             <q>{o.reason}</q>
@@ -539,7 +584,6 @@ export default function ExportScreen() {
     setLive(EXPORT_FINISHED);
     setFocusTo("summary-title");
   }, [jobDone, qc]);
-  const flaggedIds = new Set((st?.flag_blockers ?? []).map((f) => f.block_id));
   const recorded = (next: ExportStatus): void => {
     qc.setQueryData(qk.exportStatus, next);
     invalidateReviewCounts(qc);
@@ -573,6 +617,8 @@ export default function ExportScreen() {
           queued: b.queued ?? old?.queued ?? 0,
           blockers: b.blockers ?? old?.blockers ?? [],
         }));
+        // the refusal has no scope partition: read the whole status, so the reasons do not mix old and new counts
+        void qc.invalidateQueries({ queryKey: qk.exportStatus });
       } else setStartError(`Export not started: ${errText(e)}`);
     } finally {
       setStarting(false);
@@ -657,7 +703,7 @@ export default function ExportScreen() {
             <div className="min-w-0 space-y-7" data-testid="export-side">
               {locked ? (
                 <>
-                  <OverrideForm blockers={st.blockers ?? []} flagged={flaggedIds} onDone={recorded} />
+                  <OverrideForm st={st} onDone={recorded} />
                   <FlagOverrides list={st.flag_blockers ?? []} onDone={flagRecorded} />
                 </>
               ) : null}

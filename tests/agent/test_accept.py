@@ -119,7 +119,9 @@ def test_5_attested_look_alike_end_to_end_through_the_api(aenv: AEnv) -> None:
     assert [r.check for r in p.rechecks if not r.passed] == []
     assert p.all_checks_passed
     n_att = next(r for r in p.rechecks if r.check == "numeric_attested")
-    assert "3S→35" in (n_att.detail or "") and "docling" in (n_att.detail or "")
+    # the note names the change and the reading in plain words (design 09 section 14)
+    assert "3S → 35: shown by" in (n_att.detail or "")
+    assert "the layout parser" in (n_att.detail or "")
     # a numeric-spec target is never bulk-accepted
     assert aenv.agent.accept_all_passing(None, "bulk") == []
     svc = AppServices(

@@ -338,6 +338,9 @@ def test_gate_counts_partition_the_scope_and_skip_page_headers() -> None:
         "rejected": 1,
         "overridden": 1,
         "blocking": 2,
+        # design 11 section 17: blocking splits into what waits for a person and what a flag holds
+        "to_review": 1,
+        "flagged": 1,
     }
     assert g.blockers == [bid(2), bid(5)] and g.queued == 2 and g.open_flags == 1
 

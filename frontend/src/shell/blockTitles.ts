@@ -2,7 +2,7 @@ import { keepPreviousData, useQueries, useQuery } from "@tanstack/react-query";
 import { client, unwrap } from "../api/client";
 import { useSources } from "../api/queries";
 import type { BlockDetail } from "../api/schema";
-import { cardTitle } from "../verify/labels";
+import { cardExcerpt, cardTitle } from "../verify/labels";
 import { blockKey, fetchBlock } from "../verify/useVerifyState";
 
 export interface BlockTitle {
@@ -52,20 +52,34 @@ export function placeTitle(d: Pick<BlockDetail["block"], "doc_id" | "page" | "ty
 }
 
 /**
- * Titles for flagged blocks (Agent): a flagged block is never in the review queue, so its title comes from its own
- * detail (`/api/verify/blocks/{id}`, cached under the same key Verify uses).
+ * Titles for flagged blocks (Agent; design 09 section 14). A flagged block is never in the review queue, so its title
+ * is built from the same sources as a queue card's, in this order: the section heading above it (`/api/verify/titles`,
+ * the server's `section_titles`), else its excerpt (`cardExcerpt` over its own detail, the server's card rule), and the
+ * file name only last ("x200-two-column.pdf, page 1, paragraph").
  */
 export function useFlagTitles(ids: readonly string[]): Map<string, BlockTitle> {
   const sources = useSources();
   const qs = useQueries({
     queries: ids.map((id) => ({ queryKey: blockKey(id), queryFn: () => fetchBlock(id), staleTime: 30_000, retry: false })),
   });
+  const sections = useQuery({
+    queryKey: ["verify", "titles", ids.join(" ")],
+    queryFn: async () => unwrap(await client.GET("/api/verify/titles", { params: { query: { ids: [...ids] } } })),
+    enabled: ids.length > 0,
+    staleTime: 30_000,
+    retry: false,
+  });
+  const heading = new Map((sections.data ?? []).filter((r) => r.section_title && r.section_title.trim()).map((r) => [r.block_id, r.section_title!.trim()]));
   const names = new Map((sources.data ?? []).map((s) => [s.slug, s.filename]));
   const out = new Map<string, BlockTitle>();
   qs.forEach((q, i) => {
-    const b = q.data?.block;
-    if (!b || b.id !== ids[i]) return;
-    out.set(ids[i], { title: placeTitle(b, names.get(b.doc_id)), page: b.page, doc: names.get(b.doc_id) ?? b.doc_id });
+    const d = q.data;
+    const b = d?.block;
+    if (!d || !b || b.id !== ids[i]) return;
+    const caption = b.figure_id ? ((d.figures ?? []).find((f) => f.figure_id === b.figure_id)?.record.caption_original ?? null) : null;
+    const excerpt = b.type === "figure" && !caption ? "" : cardExcerpt(b, caption);
+    const title = heading.get(b.id) ?? (excerpt || placeTitle(b, names.get(b.doc_id)));
+    out.set(ids[i], { title, page: b.page, doc: names.get(b.doc_id) ?? b.doc_id });
   });
   return out;
 }
