@@ -470,7 +470,7 @@ test("12 job progress shown; UI interactive while a job runs", async ({ page }) 
   const lat: number[] = [];
   for (let i = 0; i < 30; i++) {
     const st = (await (await page.request.get(`/api/jobs/${job.id}`)).json()) as { status: string };
-    if (st.status !== "running" && st.status !== "queued" && st.status !== "pending") break;
+    if (st.status !== "running" && st.status !== "queued" && st.status !== "merged" && st.status !== "pending") break;
     ran++;
     const s = Date.now();
     await putOp(page.request, { op: i % 2 ? "deselect_group" : "select_group", group_id: t.id, doc_id: groups[0].doc_id });
@@ -482,7 +482,7 @@ test("12 job progress shown; UI interactive while a job runs", async ({ page }) 
   // Wait for the job to finish so later tests see a settled project.
   for (let i = 0; i < 120; i++) {
     const st = (await (await page.request.get(`/api/jobs/${job.id}`)).json()) as { status: string };
-    if (!["running", "queued", "pending"].includes(st.status)) break;
+    if (!["running", "queued", "merged", "pending"].includes(st.status)) break;
     await page.waitForTimeout(1000);
   }
 });

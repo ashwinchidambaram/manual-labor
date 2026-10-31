@@ -404,6 +404,24 @@ describe("VC6 FigureRail and FigurePicker", () => {
     expect(await run()).toEqual([]);
   });
 
+  it("an attach whose job was merged into another keeps watching it and settles when it is done (design 07 section 18)", async () => {
+    const { f, scope, r } = await railSetup();
+    scope.jobById["job-a1"] = makeJob({ id: "job-a1", status: "merged", merged_into: "job-x", progress: 0 });
+    scope.jobById["job-d1"] = makeJob({ id: "job-d1", status: "merged", merged_into: "job-x", progress: 0 });
+    await r.user.keyboard("{Enter}");
+    await screen.findByTestId("pick-FIG-doc-p001-02");
+    await r.user.keyboard("p001-02{ArrowDown}{Enter}");
+    await waitFor(() => expect(f.detaches).toHaveLength(1));
+    const item = await screen.findByTestId("rail-item-FIG-doc-p001-02");
+    expect(within(item).getByTestId("rail-pending")).toBeInTheDocument();
+    const gets = scope.jobGets;
+    await waitFor(() => expect(scope.jobGets).toBeGreaterThan(gets + 1), { timeout: 4000 }); // still polling while merged
+    expect(within(screen.getByTestId("rail-item-FIG-doc-p001-02")).getByTestId("rail-pending")).toBeInTheDocument();
+    f.rail[A] = [makeRailItem("FIG-doc-p001-01", A), makeRailItem("FIG-doc-p001-02", A, "human")];
+    scope.jobById["job-a1"] = makeJob({ id: "job-a1", status: "done", merged_into: "job-x", progress: 1 });
+    await waitFor(() => expect(within(screen.getByTestId("rail-item-FIG-doc-p001-02")).queryByTestId("rail-pending")).toBeNull(), { timeout: 4000 });
+  }, 15000);
+
   it("without 'also detach' only the attach is posted", async () => {
     const { f, scope, r } = await railSetup();
     scope.jobById["job-a1"] = makeJob({ id: "job-a1", status: "running" });

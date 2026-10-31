@@ -129,7 +129,7 @@ class ActionKind(StrEnum):
 
 Screen = Literal["scope", "verify", "agent", "export", "settings", "cli"]
 NodeStateName = Literal["fresh", "stale", "missing", "failed"]
-JobStatus = Literal["queued", "running", "done", "failed", "cancelled", "interrupted"]
+JobStatus = Literal["queued", "running", "merged", "done", "failed", "cancelled", "interrupted"]
 
 
 class ActionRecord(ContractModel):
@@ -360,7 +360,12 @@ class JobInfo(ContractModel):
     ``step_unit``s is that unit's own count of pages, blocks or topics done; all three are None
     when the unit has reported no count (it has no estimate). ``progress`` is
     ``(units_done + step_done/step_total) / units_total``, monotonic. ``files`` are the file
-    names an ``ingest_run`` job was given (empty for other kinds)."""
+    names an ``ingest_run`` job was given (empty for other kinds).
+
+    A pipeline run enqueued while an identical one waits at the queue's tail is folded into it
+    (design 07 section 18): its row has status ``merged`` and ``merged_into`` names the job doing
+    the work. While merged it shows that job's progress; it then ends with that job's outcome
+    (``merged_into`` stays set). It never starts a worker of its own."""
 
     id: str
     kind: str
@@ -382,6 +387,7 @@ class JobInfo(ContractModel):
     pid: int | None = None
     error: str | None = None
     resumed_from: str | None = None
+    merged_into: str | None = None
 
 
 class DocStatus(ContractModel):

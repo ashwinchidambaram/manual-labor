@@ -79,9 +79,18 @@ export const useActiveJobs = () =>
     refetchInterval: (q) => (q.state.data?.length ? 1000 : false),
   });
 
-/** Make a freshly enqueued job visible at once so polling starts and its end is noticed. */
+/**
+ * Make a freshly enqueued job visible at once so polling starts and its end is noticed. A job the server folded into
+ * an identical queued one (`merged`, design 07 section 18) is not a bar of its own: the job doing the work is tracked
+ * instead (a stand-in until the refetch lists it), so its end is noticed even if it finishes before that refetch.
+ */
 export function trackJob(qc: QueryClient, job: JobInfo): void {
-  qc.setQueryData<JobInfo[]>(qk.jobs, (old) => [...(old ?? []).filter((j) => j.id !== job.id), job]);
+  const shown: JobInfo | null =
+    job.status !== "merged" ? job : job.merged_into ? { ...job, id: job.merged_into, status: "queued", merged_into: null } : null;
+  if (shown)
+    qc.setQueryData<JobInfo[]>(qk.jobs, (old) =>
+      job.status === "merged" && (old ?? []).some((j) => j.id === shown.id) ? old ?? [] : [...(old ?? []).filter((j) => j.id !== shown.id), shown],
+    );
   void qc.invalidateQueries({ queryKey: qk.jobs });
 }
 

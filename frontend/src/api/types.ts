@@ -2126,6 +2126,11 @@ export interface components {
          *     when the unit has reported no count (it has no estimate). ``progress`` is
          *     ``(units_done + step_done/step_total) / units_total``, monotonic. ``files`` are the file
          *     names an ``ingest_run`` job was given (empty for other kinds).
+         *
+         *     A pipeline run enqueued while an identical one waits at the queue's tail is folded into it
+         *     (design 07 section 18): its row has status ``merged`` and ``merged_into`` names the job doing
+         *     the work. While merged it shows that job's progress; it then ends with that job's outcome
+         *     (``merged_into`` stays set). It never starts a worker of its own.
          */
         JobInfo: {
             /**
@@ -2145,6 +2150,8 @@ export interface components {
             id: string;
             /** Kind */
             kind: string;
+            /** Merged Into */
+            merged_into?: string | null;
             /** Message */
             message?: string | null;
             /** Node */
@@ -2168,7 +2175,7 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "queued" | "running" | "done" | "failed" | "cancelled" | "interrupted";
+            status: "queued" | "running" | "merged" | "done" | "failed" | "cancelled" | "interrupted";
             /** Step Done */
             step_done?: number | null;
             /** Step Total */

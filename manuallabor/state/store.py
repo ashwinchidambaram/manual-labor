@@ -35,7 +35,22 @@ from manuallabor.state.models import (
     SnapshotInfo,
 )
 
-__all__ = ["Store", "fmt_ts", "parse_ts", "sha_text"]
+__all__ = [
+    "MERGED_ROWS_SQL",
+    "QUEUE_HEAD_SQL",
+    "QUEUE_TAIL_SQL",
+    "Store",
+    "fmt_ts",
+    "parse_ts",
+    "sha_text",
+]
+
+
+# design 07 section 18: both are single-index reads (`jobs_status`, `jobs_merged`); the literal
+# 'queued'/'merged' is what lets SQLite pick the index
+QUEUE_TAIL_SQL = "SELECT n, plan_key FROM jobs WHERE status='queued' ORDER BY n DESC LIMIT 1"
+QUEUE_HEAD_SQL = "SELECT n FROM jobs WHERE status='queued' ORDER BY n LIMIT 1"
+MERGED_ROWS_SQL = "SELECT * FROM jobs WHERE merged_into=? AND status='merged' ORDER BY n"
 
 
 def fmt_ts(dt: datetime) -> str:
@@ -688,13 +703,45 @@ class Store:
         plan: dict[str, Any],
         units_total: int = 0,
         resumed_from: str | None = None,
+        plan_key: str | None = None,
+        merged_into: str | None = None,
     ) -> str:
+        """A queued job, or with `merged_into` a row folded into that job (status `merged`)."""
         cur = self.x(
-            "INSERT INTO jobs(kind, plan, status, units_total, created_at, resumed_from) "
-            "VALUES (?,?,?,?,?,?)",
-            (kind, _j(plan), "queued", units_total, self.now(), resumed_from),
-        )
+            "INSERT INTO jobs(kind, plan, status, units_total, created_at, resumed_from, "
+            "plan_key, merged_into) VALUES (?,?,?,?,?,?,?,?)",
+            (
+                kind, _j(plan), "merged" if merged_into else "queued", units_total, self.now(),
+                resumed_from, plan_key, merged_into,
+            ),
+        )  # fmt: skip
         return f"job-{cur.lastrowid:06d}"
+
+    def queue_head(self) -> str | None:
+        """The oldest queued job's id (index `jobs_status`): the next one a tick starts."""
+        row = self.q1(QUEUE_HEAD_SQL)
+        return None if row is None else f"job-{row['n']:06d}"
+
+    def queue_tail(self) -> sqlite3.Row | None:
+        """The newest queued job (index `jobs_status`): the only one a new job may fold into."""
+        return self.q1(QUEUE_TAIL_SQL)
+
+    def merged_rows(self, job_id: str) -> list[sqlite3.Row]:
+        """Rows still folded into `job_id` (partial index `jobs_merged`)."""
+        return self.q(MERGED_ROWS_SQL, (job_id,))
+
+    def settle_merged(self, job_id: str, fields: dict[str, Any]) -> None:
+        """Copy the survivor's terminal `fields` onto every row still merged into it."""
+        sets = ", ".join(f"{k}=?" for k in fields)
+        self.x(
+            f"UPDATE jobs SET {sets} WHERE merged_into=? AND status='merged'",  # noqa: S608
+            (*fields.values(), job_id),
+        )
+
+    def repoint_merged(self, job_id: str, to: str) -> None:
+        self.x(
+            "UPDATE jobs SET merged_into=? WHERE merged_into=? AND status='merged'", (to, job_id)
+        )
 
     def job_row(self, job_id: str) -> sqlite3.Row | None:
         try:
@@ -757,7 +804,7 @@ class Store:
         allowed = {
             "status", "progress", "units_done", "units_total", "node", "doc", "message",
             "started_at", "finished_at", "pid", "log_path", "exit_code", "error",
-            "cancel_requested", "plan",
+            "cancel_requested", "plan", "merged_into",
         }  # fmt: skip
         sets = []
         args: list[Any] = []

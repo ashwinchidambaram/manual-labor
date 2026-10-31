@@ -501,3 +501,40 @@ tsc clean
 $ npm run e2e
 100 passed, 1 skipped (opt-in reader's pass) in 9.7m
 ```
+
+## Job collapse — identical queued runs fold into one job — PASSED 2026-10-30
+
+The owner approved this on one condition: no loss of performance. A figure re-attach (one attach, plus one detach per old article) used to queue one `score2` job per request, each with its own worker. Design 07 section 18 changes this: a new `run` job folds into an identical job, but only one that sits at the queue's tail and is still queued, never a running one. The folded row stays, with status `merged` and a `merged_into` pointer. It mirrors the survivor's progress and ends with its outcome in the same transaction. If the survivor is resumed, its merged rows move to the resumed job. If it is interrupted and not resumed, the oldest merged row is queued again. `_start` now marks a job `running` before it spawns the worker, and the tick reads only the queue head. Contract: `JobInfo.merged_into` and `JobStatus` `merged` (OpenAPI and TS regenerated); migration 4. Client: `trackJob` tracks the survivor and `useJobWatch` keeps polling a merged row. A fresh Opus reviewer read the change twice and found no blockers or majors. Its minors were fixed failing-test-first: interrupted work is promoted rather than dropped; a replay goes through `_live`; `trackJob` adds a stand-in so a fast survivor's end is still seen; a cancel-requested survivor found dead at start is cancelled together with its merged rows; the Playwright loops treat `merged` as pending. Rejected: a single move-figure endpoint (reasons in design 07 section 18).
+
+Measured on copies of `frontend/e2e/.cache/project`, served by `labor serve --mock --dev --port 8792`. Scripts are in `scratchpad/jobcollapse/` (`burst.py`, `tick.py`). Each figure is the median or pooled value of 3 runs per version; "before" is 51da735 in a worktree.
+
+| | before | after |
+|---|---|---|
+| click (attach + 2 detaches) to runner idle | 3.32 s | 1.25 s |
+| same, with the score unit stretched (`step:score2=0.3`) | 32.6 s | 30.7 s |
+| worker processes spawned (rows started) | 3 | 1 |
+| `unit_done` events | 2 | 2 |
+| job rows created | 3 (3 queued) | 3 (1 queued + 2 merged) |
+| approve ack, 30 approves racing the burst: median / max | 13.0 / 107.2 ms | 11.4 / 104.2 ms |
+| approve ack, all 30 during a stretched burst: median / max | 11.6 / 64.5 ms | 11.4 / 60.6 ms |
+| `poll()` per tick with a job running, 0 / 10 / 100 queued | 26.5 / 26.6 / 26.6 µs | 26.7 / 26.8 / 27.0 µs |
+| `poll()` per tick with nothing running, 0 / 10 / 100 queued | 6.6 / 25.4 / 181 µs | 5.3 / 6.0 / 6.1 µs |
+| `enqueue()` of a run | 147 to 158 µs | 161 to 173 µs (worse: plan hash plus tail read) |
+| end state (figure APIs, queue, selection, export status, every stage file's sha256) | 098eb9e5… | 098eb9e5… (byte-identical dumps) |
+
+Without the stretch, only 6 of the 10 approves in each run landed while the shorter after-burst was still running. That is why the stretched row is there: it puts all 10 inside the burst in both versions. A running tick is about 0.3 µs slower (wider rows, within run-to-run noise), and `enqueue` costs about 15 µs more per call.
+
+```
+$ uv run pytest tests/jobs tests/api tests/state tests/figures -p no:warnings --basetemp=.pytest_tmp_collapse
+394 passed in 313.83s (0:05:13)
+$ uv run ruff check manuallabor/ tests/ && uv run ruff format --check manuallabor/ tests/ && uv run mypy manuallabor/
+All checks passed! / 410 files already formatted / Success: no issues found in 195 source files
+$ uv run labor schemas export --check && uv run labor openapi export --check
+schemas up to date / openapi up to date
+$ cd frontend && npm run typecheck && npm test -- --run
+tsc clean
+ Test Files  56 passed (56)
+      Tests  471 passed (471)
+$ npm run e2e -- e2e/verify.spec.ts e2e/ux-verify.spec.ts e2e/progress.spec.ts
+27 passed (3.5m)
+```

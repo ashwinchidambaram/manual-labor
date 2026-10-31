@@ -150,6 +150,49 @@ def test_request_id_reuse_is_409_and_replays_enqueue_nothing(lp: ProjectPaths) -
         assert r.status_code == 409 and r.json()["code"] == "request_id_reused"
 
 
+def test_a_figure_reattach_burst_leaves_one_job(lp: ProjectPaths) -> None:
+    """Design 07 section 18: the Verify picker's re-attach (attach here, then detach from every
+    other article, one request each) queues one job; the others are merged rows that point at it
+    and replay to their first responses."""
+    with serving(lp) as (c, _svc):
+        fid = target = None
+        old: list[str] = []
+        for slug in ("scanned", "clean"):
+            figs = c.get(f"/api/docs/{slug}/figures").json()
+            arts = sorted({a["article_id"] for f in figs for a in f["attachments"]})
+            for f in figs:
+                mine = [a["article_id"] for a in f["attachments"]]
+                free = [a for a in arts if a not in mine]
+                if mine and free:
+                    fid, target, old = f["figure_id"], free[0], mine
+                    break
+            if fid:
+                break
+        assert fid and target and old, "no figure to move between articles"
+        n0 = len(c.get("/api/jobs").json())
+        detaches = [("detach", a, f"mv-d{i}") for i, a in enumerate(old)]
+        burst = [("attach", target, "mv-a"), *detaches]
+        first = {}
+        for op, art, rid in burst:
+            r = c.post(f"/api/figures/{fid}/{op}", json={"article_id": art, "request_id": rid})
+            assert r.status_code == 202, r.text
+            first[rid] = r.json()
+        jobs = c.get("/api/jobs").json()[n0:]
+        assert len(jobs) == len(burst)
+        survivor = first["mv-a"]["job"]
+        assert survivor["status"] == "queued"
+        assert [j["id"] for j in c.get("/api/jobs?status=queued&status=running").json()] == [
+            survivor["id"]
+        ]
+        for _op, _art, rid in burst[1:]:
+            j = first[rid]["job"]
+            assert j["status"] == "merged" and j["merged_into"] == survivor["id"], j
+        for op, art, rid in burst:  # replays: the first response, no new job
+            again = c.post(f"/api/figures/{fid}/{op}", json={"article_id": art, "request_id": rid})
+            assert again.json() == first[rid]
+        assert len(c.get("/api/jobs").json()) == n0 + len(burst)
+
+
 def _disp(b: dict[str, Any]) -> str:
     return b["clean_text"] if b["clean_text"] is not None else b["raw_text"]
 

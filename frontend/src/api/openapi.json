@@ -3423,7 +3423,7 @@
       },
       "JobInfo": {
         "additionalProperties": false,
-        "description": "One background job (design 07 section 4). While it runs, ``node``/``doc`` name the unit it\nis on (after the last unit: the last one finished) and ``step_done`` of ``step_total``\n``step_unit``s is that unit's own count of pages, blocks or topics done; all three are None\nwhen the unit has reported no count (it has no estimate). ``progress`` is\n``(units_done + step_done/step_total) / units_total``, monotonic. ``files`` are the file\nnames an ``ingest_run`` job was given (empty for other kinds).",
+        "description": "One background job (design 07 section 4). While it runs, ``node``/``doc`` name the unit it\nis on (after the last unit: the last one finished) and ``step_done`` of ``step_total``\n``step_unit``s is that unit's own count of pages, blocks or topics done; all three are None\nwhen the unit has reported no count (it has no estimate). ``progress`` is\n``(units_done + step_done/step_total) / units_total``, monotonic. ``files`` are the file\nnames an ``ingest_run`` job was given (empty for other kinds).\n\nA pipeline run enqueued while an identical one waits at the queue's tail is folded into it\n(design 07 section 18): its row has status ``merged`` and ``merged_into`` names the job doing\nthe work. While merged it shows that job's progress; it then ends with that job's outcome\n(``merged_into`` stays set). It never starts a worker of its own.",
         "properties": {
           "created_at": {
             "format": "date-time",
@@ -3478,6 +3478,17 @@
           "kind": {
             "title": "Kind",
             "type": "string"
+          },
+          "merged_into": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Merged Into"
           },
           "message": {
             "anyOf": [
@@ -3551,6 +3562,7 @@
             "enum": [
               "queued",
               "running",
+              "merged",
               "done",
               "failed",
               "cancelled",

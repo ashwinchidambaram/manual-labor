@@ -23,6 +23,7 @@ from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
+from manuallabor.contracts.io import canonical_json
 from manuallabor.jobs.providers import ProviderMode
 from manuallabor.project import ProjectPaths
 from manuallabor.state.errors import InvalidOp, NotFound
@@ -35,6 +36,20 @@ ADOPT_MAX_SILENCE = 30.0
 KILL_AFTER = 5.0
 TICK = 0.5
 TERMINAL = {"done", "failed", "cancelled", "interrupted"}
+# Only pipeline runs fold into an identical queued job (design 07 section 18): a run re-plans from
+# the current state when it starts, so a second identical run behind it would find nothing to
+# do. Exports, agent passes and ingests have per-job side effects and never fold.
+COLLAPSIBLE = {"run"}
+# what a merged row shows of its survivor while that one is queued or running (not stored)
+_MIRRORED = (
+    "progress", "units_done", "units_total", "node", "doc", "message",
+    "step_done", "step_total", "step_unit",
+)  # fmt: skip
+# what a merged row takes from its survivor when that one ends (stored, same transaction)
+_SETTLED = (
+    "status", "finished_at", "error", "progress", "units_done", "units_total", "node", "doc",
+    "message",
+)  # fmt: skip
 # Finished job rows are pruned (at start and hourly) once they are older than PRUNE_AFTER, beyond
 # the newest PRUNE_KEEP of them. A finished row is read for three things: the idempotency of a
 # replayed request (`enqueue(request_id=)`: a client retry, seconds to minutes later), the Jobs
@@ -68,6 +83,7 @@ def job_info(row: Any) -> JobInfo:
         pid=row["pid"],
         error=row["error"],
         resumed_from=row["resumed_from"],
+        merged_into=row["merged_into"],
     )
 
 
@@ -178,7 +194,7 @@ class JobRunner:
             with self.store.tx():
                 row = self.store.job_by_request(request_id)
                 if row is not None:
-                    return job_info(row)
+                    return self._live(job_info(row))  # its current state, as GET shows it
                 return self._enqueue(
                     {**plan.model_dump(mode="json"), "request_id": request_id}, kind, [], None
                 )
@@ -204,14 +220,44 @@ class JobRunner:
         # inside their own `store.tx()` (the agent pass, the calibration apply), so this path
         # takes no runner lock: the transaction alone makes the row and its plan file appear
         # together, and a tick reads the row only after the commit (review 2, lock order).
+        # The same transaction orders the fold check against `_start`'s queued -> running write.
+        key = self._plan_key(plan, kind, files) if kind in COLLAPSIBLE else None
         with self.store.tx():
-            job_id = self.store.add_job(kind=kind, plan=plan, resumed_from=resumed_from)
-            spec = {"kind": kind, "plan": plan, "files": files, "mode": self.mode}
-            p = self.paths.job_plan(job_id)
-            p.parent.mkdir(parents=True, exist_ok=True)
-            p.write_text(json.dumps(spec, sort_keys=True, indent=2) + "\n", encoding="utf-8")
-            self.store.update_job(job_id, log_path=str(self.paths.job_log(job_id)))
+            tail = self.store.queue_tail() if key is not None else None
+            if tail is not None and tail["plan_key"] == key:
+                # an identical job waits at the queue's tail and has no worker yet: it will plan
+                # from the state this job was asked for (design 07 section 18)
+                job_id = self.store.add_job(
+                    kind=kind, plan=plan, resumed_from=resumed_from, plan_key=key,
+                    merged_into=f"job-{tail['n']:06d}",
+                )  # fmt: skip
+                return self.get(job_id)
+            job_id = self.store.add_job(
+                kind=kind, plan=plan, resumed_from=resumed_from, plan_key=key
+            )
+            self._write_spec(job_id, kind, plan, files)
         return self.get(job_id)
+
+    def _write_spec(
+        self, job_id: str, kind: str, plan: dict[str, Any], files: Sequence[str]
+    ) -> None:
+        """The worker's input (inside the caller's transaction, with the row it belongs to)."""
+        spec = {"kind": kind, "plan": plan, "files": list(files), "mode": self.mode}
+        p = self.paths.job_plan(job_id)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(json.dumps(spec, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+        self.store.update_job(job_id, log_path=str(self.paths.job_log(job_id)))
+
+    def _plan_key(self, plan: dict[str, Any], kind: str, files: Sequence[str]) -> str:
+        """Every field of the plan except the request id that caused it, plus kind, files and
+        provider mode: two jobs with the same key do the same work."""
+        body = {
+            "kind": kind,
+            "plan": {k: v for k, v in plan.items() if k != "request_id"},
+            "files": list(files),
+            "mode": self.mode,
+        }
+        return hashlib.sha256(canonical_json(body)).hexdigest()
 
     def get(self, job_id: str) -> JobInfo:
         row = self.store.job_row(job_id)
@@ -224,7 +270,10 @@ class JobRunner:
 
     def _live(self, info: JobInfo) -> JobInfo:
         """Add what lives in memory, not in the row (design 07 section 4.1): the running unit's
-        own count, and the file names of a queued or running ingest job."""
+        own count, and the file names of a queued or running ingest job. A merged row shows its
+        survivor's progress (section 18)."""
+        if info.status == "merged":
+            return self._mirror(info)
         if info.status not in ("queued", "running"):
             return info
         update: dict[str, Any] = {}
@@ -238,6 +287,34 @@ class JobRunner:
             update["files"] = [Path(f).name for f in self._files_of(info.id)]
         return info.model_copy(update=update) if update else info
 
+    def _mirror(self, info: JobInfo) -> JobInfo:
+        row = self.store.job_row(info.merged_into) if info.merged_into else None
+        if row is None or row["status"] not in ("queued", "running"):
+            return info  # settled in the survivor's own transaction; nothing live to show
+        live = self._live(job_info(row))
+        return info.model_copy(update={k: getattr(live, k) for k in _MIRRORED})
+
+    def _settle_merged(self, job_id: str) -> None:
+        """Give the rows folded into `job_id` its terminal state (call inside the transaction
+        that wrote it, so no reader sees the survivor ended and its merged rows pending).
+
+        An `interrupted` survivor (its worker died, and it is not resumed) did not do the work,
+        and before section 18 the rows folded into it would have been queued jobs that still
+        ran: the oldest of them becomes a queued job again, at its own position, and the others
+        fold into it. Done, failed and cancelled survivors hand their outcome over."""
+        row = self.store.job_row(job_id)
+        if row is None or row["status"] not in TERMINAL:
+            return
+        if row["status"] == "interrupted":
+            merged = self.store.merged_rows(job_id)
+            if merged:
+                heir = f"job-{merged[0]['n']:06d}"
+                self._write_spec(heir, merged[0]["kind"], json.loads(merged[0]["plan"]), [])
+                self.store.update_job(heir, status="queued", merged_into=None)
+                self.store.repoint_merged(job_id, heir)
+                return
+        self.store.settle_merged(job_id, {k: row[k] for k in _SETTLED})
+
     def cancel(self, job_id: str) -> JobInfo:
         with self._lock:
             row = self.store.job_row(job_id)
@@ -246,10 +323,14 @@ class JobRunner:
             st = row["status"]
             if st in TERMINAL:
                 raise InvalidOp(f"{job_id} is already {st}")
-            if st == "queued":
-                self.store.update_job(
-                    job_id, status="cancelled", finished_at=self.store.now(), cancel_requested=1
-                )
+            if st in ("queued", "merged"):
+                # a merged row withdraws only itself: its survivor still runs for the others
+                with self.store.tx():
+                    self.store.update_job(
+                        job_id, status="cancelled", finished_at=self.store.now(),
+                        cancel_requested=1,
+                    )  # fmt: skip
+                    self._settle_merged(job_id)
                 return self.get(job_id)
             self.store.update_job(job_id, cancel_requested=1)
             self._signal(row["pid"], signal.SIGTERM)
@@ -257,8 +338,11 @@ class JobRunner:
         return self.get(job_id)
 
     def log(self, job_id: str, after_line: int, limit: int = 500) -> builtins.list[dict[str, Any]]:
-        if self.store.job_row(job_id) is None:
+        row = self.store.job_row(job_id)
+        if row is None:
             raise NotFound(job_id)
+        if row["merged_into"]:
+            job_id = str(row["merged_into"])  # a merged row has no log: its survivor's is the one
         p = self.paths.job_log(job_id)
         if not p.is_file():
             return []
@@ -329,14 +413,41 @@ class JobRunner:
                 if tail.end is not None:
                     self._finalize(job_id, tail, None)
                     continue
-                self.store.update_job(
-                    job_id, status="interrupted", finished_at=self.store.now(),
-                    error="worker is gone without a job_end line",
-                )  # fmt: skip
-                plan = json.loads(row["plan"])
-                # a killed `labor run` is the user's to repeat; only serve-owned jobs resume
-                if self.resume and not row["cancel_requested"] and plan.get("origin") != "cli":
-                    self._enqueue(plan, row["kind"], self._files_of(job_id), job_id)
+                with self.store.tx():
+                    if row["cancel_requested"]:
+                        # the user's Cancel landed before the worker died: cancelled, as
+                        # `_finalize` decides it mid-session, so its merged rows are cancelled
+                        # too and nothing redoes the work (section 18, re-review finding)
+                        self.store.update_job(
+                            job_id, status="cancelled", finished_at=self.store.now()
+                        )
+                        self._settle_merged(job_id)
+                        continue
+                    self.store.update_job(
+                        job_id, status="interrupted", finished_at=self.store.now(),
+                        error="worker is gone without a job_end line",
+                    )  # fmt: skip
+                    plan = json.loads(row["plan"])
+                    # a killed `labor run` is the user's to repeat; only serve-owned jobs resume
+                    if self.resume and plan.get("origin") != "cli":
+                        new = self._enqueue(plan, row["kind"], self._files_of(job_id), job_id)
+                        # the rows folded into it finish with the job that redoes the work
+                        self.store.repoint_merged(job_id, new.merged_into or new.id)
+                    else:
+                        self._settle_merged(job_id)
+            # defensive: a merged row whose survivor ended or vanished (only a hand edit gets here)
+            for row in self.store.job_rows({"merged"}):
+                into = row["merged_into"]
+                target = self.store.job_row(into) if into else None
+                with self.store.tx():  # a promotion and its repoint land together
+                    if target is None:
+                        self.store.update_job(
+                            f"job-{row['n']:06d}", status="interrupted",
+                            finished_at=self.store.now(),
+                            error=f"merged into {into}, which no longer exists",
+                        )  # fmt: skip
+                    elif target["status"] in TERMINAL:
+                        self._settle_merged(str(into))
 
     def _files_of(self, job_id: str) -> builtins.list[str]:
         try:
@@ -381,29 +492,41 @@ class JobRunner:
             # rows only change status under this lock (the runner is the single job-row writer;
             # a CLI run holds the project lock, so it cannot run beside serve)
             if not still_running:
-                queued = self.store.job_rows({"queued"})
-                if queued:
-                    self._start(f"job-{queued[0]['n']:06d}")
+                # one row, not every queued row: rows are wider since section 18 (plan_key)
+                head = self.store.queue_head()
+                if head is not None:
+                    self._start(head)
 
     def _start(self, job_id: str) -> None:
         paths = self.paths
-        paths.job_log(job_id).parent.mkdir(parents=True, exist_ok=True)
-        err = open(paths.job_log(job_id).with_suffix(".stderr"), "ab")  # noqa: SIM115
-        proc = subprocess.Popen(  # noqa: S603
-            [self.python, "-m", "manuallabor.jobs.worker", str(paths.root), job_id],
-            stdout=err,
-            stderr=err,
-            stdin=subprocess.DEVNULL,
-            start_new_session=True,
-            cwd=str(paths.root),
-        )
-        err.close()
+        # `running` before the process exists: a job is only folded into while queued, so no
+        # worker that may already be reading its inputs ever absorbs a later change (section 18)
+        self.store.update_job(job_id, status="running", started_at=self.store.now())
+        try:
+            paths.job_log(job_id).parent.mkdir(parents=True, exist_ok=True)
+            with open(paths.job_log(job_id).with_suffix(".stderr"), "ab") as err:
+                proc = subprocess.Popen(  # noqa: S603
+                    [self.python, "-m", "manuallabor.jobs.worker", str(paths.root), job_id],
+                    stdout=err,
+                    stderr=err,
+                    stdin=subprocess.DEVNULL,
+                    start_new_session=True,
+                    cwd=str(paths.root),
+                )
+        except OSError as exc:
+            with self.store.tx():
+                self.store.update_job(
+                    job_id, status="failed", finished_at=self.store.now(),
+                    error=f"could not start the worker: {exc}"[:500],
+                )  # fmt: skip
+                self._settle_merged(job_id)
+            return
         # set before the worker has imported anything: the threads it starts inherit it
         with contextlib.suppress(OSError, AttributeError):
             os.setpriority(os.PRIO_PROCESS, proc.pid, WORKER_NICE)
         self._procs[job_id] = proc
         self._tails[job_id] = _Tail()
-        self.store.update_job(job_id, status="running", pid=proc.pid, started_at=self.store.now())
+        self.store.update_job(job_id, pid=proc.pid)
 
     def _read(self, job_id: str, tail: _Tail) -> None:
         p = self.paths.job_log(job_id)
@@ -479,7 +602,9 @@ class JobRunner:
             fields["exit_code"] = exit_code
         if status == "done":
             fields["progress"] = 1.0
-        self.store.update_job(job_id, **fields)
+        with self.store.tx():
+            self.store.update_job(job_id, **fields)
+            self._settle_merged(job_id)
         self._procs.pop(job_id, None)
         self._tails.pop(job_id, None)
         self._kill_at.pop(job_id, None)

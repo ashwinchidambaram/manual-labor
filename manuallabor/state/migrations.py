@@ -174,4 +174,12 @@ CREATE INDEX jobs_status ON jobs(status, n);
 CREATE INDEX jobs_request ON jobs(json_extract(plan, '$.request_id'));
 """
 
-MIGRATIONS: list[str] = [MIGRATION_1, MIGRATION_2, MIGRATION_3]
+# design 07 section 18: an enqueued pipeline run folds into an identical job at the queue's tail
+# (`plan_key` is the hash it is compared on); the folded row keeps pointing at its survivor
+MIGRATION_4 = """
+ALTER TABLE jobs ADD COLUMN plan_key TEXT;
+ALTER TABLE jobs ADD COLUMN merged_into TEXT;
+CREATE INDEX jobs_merged ON jobs(merged_into) WHERE merged_into IS NOT NULL;
+"""
+
+MIGRATIONS: list[str] = [MIGRATION_1, MIGRATION_2, MIGRATION_3, MIGRATION_4]

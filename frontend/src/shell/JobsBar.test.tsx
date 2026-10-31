@@ -1,6 +1,7 @@
-import { screen, waitFor, within } from "@testing-library/react";
-import { http, HttpResponse } from "msw";
+import { act, screen, waitFor, within } from "@testing-library/react";
+import { delay, http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
+import { trackJob } from "../api/queries";
 import { makeJob } from "../test/fixtures";
 import { renderApp } from "../test/render";
 import { installFake, server } from "../test/server";
@@ -55,5 +56,43 @@ describe("JobsBar: a running job in words (review M13 P2-11)", () => {
     const other = screen.getAllByTestId("job-row")[1];
     expect(other).toHaveTextContent("reindex");
     expect(other).toHaveTextContent("Step 1 of 3");
+  }, 15000);
+});
+
+describe("JobsBar: a burst of identical jobs is one bar (design 07 section 18)", () => {
+  it("a re-attach's three responses (one queued, two merged into it) show one bar", async () => {
+    const f = installFake();
+    const survivor = makeJob({ id: "job-000016", kind: "run", status: "queued", plan: { to: "score2", docs: ["alpha"] }, progress: 0, units_done: 0, units_total: 0 });
+    f.jobPolls = [[survivor]];
+    // the server's list answers late, so whatever the client put in its cache is what shows meanwhile
+    server.use(http.get("*/api/jobs", async () => (await delay(400), HttpResponse.json([survivor]))));
+    const { qc } = renderApp("/export");
+    act(() => {
+      trackJob(qc, survivor);
+      trackJob(qc, makeJob({ id: "job-000017", status: "merged", merged_into: "job-000016", plan: { to: "score2", docs: ["alpha"] } }));
+      trackJob(qc, makeJob({ id: "job-000018", status: "merged", merged_into: "job-000016", plan: { to: "score2", docs: ["alpha"] } }));
+    });
+    const rows = await screen.findAllByTestId("job-row", undefined, { timeout: 5000 });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toHaveTextContent("Scoring your selection");
+    await new Promise((r) => setTimeout(r, 600));
+    expect(screen.getAllByTestId("job-row")).toHaveLength(1);
+  }, 15000);
+  it("merged responses alone (the survivor came from elsewhere) show one bar for the survivor, and its end reconciles", async () => {
+    const f = installFake();
+    const survivor = makeJob({ id: "job-000030", kind: "run", status: "running", plan: { to: "score2", docs: ["alpha"] } });
+    f.jobPolls = [[], []];
+    f.jobById = { "job-000030": { ...survivor, status: "done", progress: 1 } };
+    server.use(http.get("*/api/jobs", async () => (await delay(300), HttpResponse.json([]))));
+    const { qc } = renderApp("/export");
+    act(() => {
+      trackJob(qc, makeJob({ id: "job-000031", status: "merged", merged_into: "job-000030", plan: { to: "score2", docs: ["alpha"] } }));
+      trackJob(qc, makeJob({ id: "job-000032", status: "merged", merged_into: "job-000030", plan: { to: "score2", docs: ["alpha"] } }));
+    });
+    const rows = await screen.findAllByTestId("job-row", undefined, { timeout: 5000 });
+    expect(rows).toHaveLength(1);
+    // the survivor finished before the list was refetched: its record is still read once
+    await waitFor(() => expect(f.jobGets).toBeGreaterThan(0), { timeout: 5000 });
+    await waitFor(() => expect(screen.queryByTestId("job-row")).toBeNull(), { timeout: 5000 });
   }, 15000);
 });

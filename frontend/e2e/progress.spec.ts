@@ -41,7 +41,9 @@ test("while scoring runs: the step with its count, real motion, a sticky bar, an
   await page.setViewportSize({ width: 1100, height: 560 });
   const sources = (await (await api.get("/api/sources")).json()) as SourceInfo[];
   const file = new Map(sources.map((s) => [s.slug, s.filename]));
-  const job = (await (await api.post("/api/jobs", { data: { to: "score2", allow_reparse: false } })).json()) as JobInfo;
+  const posted = (await (await api.post("/api/jobs", { data: { to: "score2", allow_reparse: false } })).json()) as JobInfo;
+  // folded into an identical queued job (design 07 section 18): follow the job doing the work
+  const job = { ...posted, id: posted.merged_into ?? posted.id };
 
   const running = async (): Promise<JobInfo | undefined> =>
     ((await (await api.get("/api/jobs?status=running")).json()) as JobInfo[]).find((j) => j.id === job.id);

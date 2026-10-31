@@ -18,7 +18,8 @@ export interface JobsPolling {
 export function useJobsPolling(extra: readonly QueryKey[] = []): JobsPolling {
   const qc = useQueryClient();
   const { data } = useActiveJobs();
-  const jobs = data ?? [];
+  // a merged row is shown by the job it was folded into (design 07 section 18)
+  const jobs = (data ?? []).filter((j) => j.status !== "merged");
   const prev = useRef<Map<string, JobInfo>>(new Map());
   const extraRef = useRef(extra);
   extraRef.current = extra;
@@ -45,13 +46,13 @@ export function useJobsPolling(extra: readonly QueryKey[] = []): JobsPolling {
   return { jobs, failed, dismiss: (id) => setFailed((f) => f.filter((x) => x.id !== id)) };
 }
 
-/** One job's record, polled every second while it is queued or running. */
+/** One job's record, polled every second while it is queued, running or merged into a job that is (it then ends with it). */
 export function useJobWatch(id: string | null) {
   return useQuery({
     queryKey: ["jobs", "watch", id] as const,
     enabled: id !== null,
     queryFn: async () => unwrap(await client.GET("/api/jobs/{job_id}", { params: { path: { job_id: id! } } })),
     staleTime: 0,
-    refetchInterval: (q) => (q.state.data && !["queued", "running"].includes(q.state.data.status) ? false : 1000),
+    refetchInterval: (q) => (q.state.data && !["queued", "running", "merged"].includes(q.state.data.status) ? false : 1000),
   });
 }
