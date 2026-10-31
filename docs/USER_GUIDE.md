@@ -77,7 +77,7 @@ What to do:
 Why you can trust this:
 
 - The export contains only text a person or the checks accepted, plus any blocks you overrode with a recorded reason.
-- In each exported article, a paragraph no person checked ends with an invisible ml: comment (auto-approved or overridden), and articles/<name>.review.json lists who decided every paragraph and when.
+- In each exported article, every paragraph starts with an invisible ml: comment on the line above it naming who checked it (approved, edited, auto-approved or overridden), and articles/<name>.review.json lists every block with who decided it, when, and the start of its text.
 
 ## How it works
 

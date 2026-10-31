@@ -13,12 +13,14 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
+from manuallabor.contracts.article import ArticleReview
 from manuallabor.contracts.enums import FlagStatus
 from manuallabor.contracts.io import canonical_json, read_json, write_json
 from manuallabor.contracts.manifest import Manifest, Override
 from manuallabor.export.assemble import assemble, truncate_clock
 from manuallabor.export.gate import Gate, export_gate
 from manuallabor.export.load import doc_ready, load_inputs
+from manuallabor.export.markers import tally_markers
 from manuallabor.export.types import (
     BLOCKER_LIMIT,
     EXPORT_ALGO_VERSION,
@@ -462,8 +464,11 @@ def summarize(
     root: Path, zip_bytes: int, zip_sha256: str, review: ExportReviewSummary
 ) -> ExportSummary:
     """The Export-screen summary: the counts of a staging tree (so a resumed export gets the
-    same one) and its exported-block buckets, recorded when the tree was assembled."""
+    same one) and its exported-block buckets, recorded when the tree was assembled. `markers`
+    tallies the tree's review sidecars: paragraphs (one marker each) and figure blocks (none),
+    design 11 section 20.11."""
     m = read_json(root / "manifest.json", Manifest)
+    reviews = [read_json(root / a.review_sidecar, ArticleReview) for a in m.articles]
     warnings = []
     for a in m.articles:
         n = (root / a.path).stat().st_size
@@ -479,6 +484,7 @@ def summarize(
         zip_bytes=zip_bytes,
         zip_sha256=zip_sha256,
         generated_at=m.project.generated_at,
+        markers=tally_markers(reviews),
     )
 
 

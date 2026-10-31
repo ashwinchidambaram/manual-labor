@@ -14,15 +14,18 @@ import yaml
 from pydantic import ValidationError
 
 from manuallabor import ids
-from manuallabor.contracts.article import ArticleFrontmatter, ArticleReview
+from manuallabor.contracts.article import TEXT_PREFIX, ArticleFrontmatter, ArticleReview
 from manuallabor.contracts.figure import FigureRecord
 from manuallabor.contracts.manifest import Manifest
 from manuallabor.export.markers import (
     MARKER_LIKE_RE,
+    STATUS_WORD,
     misplaced_markers,
     needs_marker,
     parse_marker,
+    tally_markers,
 )
+from manuallabor.export.readme import tally_sentence
 from manuallabor.export.render import FIGURE_LINE_RE
 from manuallabor.export.types import Problem
 
@@ -207,7 +210,7 @@ def _check_articles_and_figures(
     for n in sorted(zip_articles ^ art_paths):
         bad("Z3", n, "article is not in both the zip and the manifest")
     refs: dict[str, list[str]] = {}  # article id -> figure ids of its figure lines, in order
-    over_counts: dict[str, int] = {}  # article id -> frontmatter review.overrides
+    over_counts: dict[str, int] = {}  # article id -> frontmatter review.overridden
     sidecars: dict[str, FigureRecord] = {}
     for f in manifest.figures:
         if f.sidecar not in have:
@@ -217,6 +220,7 @@ def _check_articles_and_figures(
         except ValidationError as exc:
             bad("Z4", f.sidecar, f"sidecar does not validate: {exc.errors()[0]['msg']}")
     checked_images: set[str] = set()
+    reviews: list[ArticleReview] = []  # the sidecars that validate, for the README tally
     for a in manifest.articles:
         if a.path not in have:
             continue
@@ -303,8 +307,15 @@ def _check_articles_and_figures(
                 bad("Z3", a.path, "generated_at differs from manifest.project.generated_at")
             if fm.id != a.id or fm.title != a.title or fm.source_doc != a.source_doc:
                 bad("Z3", a.path, "id/title/source_doc differ from the manifest")
-            over_counts[a.id] = fm.review.overrides
-        _check_review(zf, have, manifest, a, fm, body, bad)
+            over_counts[a.id] = fm.review.overridden
+        rv = _check_review(zf, have, manifest, a, fm_raw, body, bad)
+        if rv is not None:
+            reviews.append(rv)
+    # -- Z8 (the README's tally of markers and figure blocks, design 11 section 20.11) --------
+    if len(reviews) == len(manifest.articles) and "README.md" in have:
+        sentence = tally_sentence(tally_markers(reviews))
+        if sentence not in read("README.md").decode("utf-8", "replace"):
+            bad("Z8", "README.md", f"does not state this export's review tally: {sentence!r}")
     # -- Z9 (the review sidecar files themselves) --------------------------------------------
     zip_reviews = {n for n in have if _REVIEW_NAME.match(n)}
     for n in sorted(zip_reviews - {a.review_sidecar for a in manifest.articles}):
@@ -358,20 +369,17 @@ def _check_articles_and_figures(
             )
 
 
-_STATUS_WORD: Final = {"auto_approved": "auto-approved", "overridden": "overridden"}
-
-
 def _check_review(
     zf: zipfile.ZipFile,
     have: set[str],
     manifest: Manifest,
     a: Any,
-    fm: ArticleFrontmatter | None,
+    fm_raw: dict[str, Any],
     body: str,
     bad: Any,
-) -> None:
-    """Z9 (design 11 section 20.5): the article's review sidecar, its markers, its front matter
-    counts and the manifest's overrides agree."""
+) -> ArticleReview | None:
+    """Z9 (design 11 sections 20.5 and 20.11): the article's review sidecar, its markers, its
+    front matter counts and the manifest's overrides agree."""
     where = a.path
     if a.review_sidecar not in have:
         bad("Z9", a.review_sidecar, f"review sidecar of {a.id} is missing")
@@ -403,7 +411,7 @@ def _check_review(
         )
     markers = [mk for ln in lines if (mk := parse_marker(ln)) is not None]
     if rv is None:
-        return
+        return None
     if rv.article_id != a.id or rv.article != a.path:
         bad("Z9", a.review_sidecar, f"article {rv.article_id} / {rv.article} is not {a.id}")
     if rv.generated_at != manifest.project.generated_at:
@@ -419,7 +427,6 @@ def _check_review(
         if not missing and not extra:
             bad("Z9", a.review_sidecar, "blocks are not in the article's block order")
     entry = {b.block_id: b for b in rv.blocks}
-    want = [b for b in rv.blocks if needs_marker(b)]
     seen: dict[str, int] = {}
     for mk in markers:
         seen[mk.block_id] = seen.get(mk.block_id, 0) + 1
@@ -428,45 +435,49 @@ def _check_review(
             bad("Z9", where, f"marker for {mk.block_id}, which is not in the sidecar")
             continue
         if not needs_marker(e):
-            what = "a figure block" if e.type == "figure" else e.status
             bad(
                 "Z9",
                 where,
-                f"{mk.block_id}: marker says {_STATUS_WORD[mk.status]}, sidecar says {what} "
-                "(no marker expected)",
+                f"{mk.block_id}: marker says {STATUS_WORD[mk.status]}, sidecar says a figure "
+                "block (no marker expected)",
             )
             continue
         if mk.status != e.status:
             bad(
                 "Z9",
                 where,
-                f"{mk.block_id}: marker says {_STATUS_WORD[mk.status]}, sidecar says {e.status}",
+                f"{mk.block_id}: marker says {STATUS_WORD[mk.status]}, sidecar says "
+                f"{STATUS_WORD[e.status]}",
             )
         if mk.reason != e.reason:
             bad("Z9", where, f"{mk.block_id}: marker reason {mk.reason!r} != sidecar {e.reason!r}")
         if mk.flag_id != e.flag_id:
             bad("Z9", where, f"{mk.block_id}: marker flag {mk.flag_id} != sidecar {e.flag_id}")
-    for e in want:
+    reported = _check_alignment(body, rv, where, bad)
+    for e in rv.blocks:
+        if not needs_marker(e):
+            continue
         n = seen.get(e.block_id, 0)
-        if n == 0:
-            bad("Z9", where, f"{e.block_id} is {e.status} in the sidecar but has no marker")
+        if n == 0 and e.block_id not in reported:
+            bad("Z9", where, f"{e.block_id} is {STATUS_WORD[e.status]} but has no marker")
         elif n > 1:
             bad("Z9", where, f"{e.block_id} has {n} markers")
-    wanted = {e.block_id for e in want}
-    first = list(dict.fromkeys(mk.block_id for mk in markers if mk.block_id in wanted))
-    if first != [e.block_id for e in want if e.block_id in seen]:
-        bad("Z9", where, "markers are not in the sidecar's block order")
-    _check_alignment(body, rv, where, bad)
-    if fm is not None:
-        c = rv.counts
-        for key, mine, theirs in (
-            ("blocks", fm.blocks, len(rv.blocks)),
-            ("review.approved", fm.review.approved, c.auto_approved + c.approved + c.edited),
-            ("review.edited", fm.review.edited, c.edited),
-            ("review.overrides", fm.review.overrides, c.overridden),
-        ):
-            if mine != theirs:
-                bad("Z9", where, f"front matter {key} {mine} != review sidecar {theirs}")
+    # section 20.11: the front matter counts are the sidecar's, key for key. The raw mapping is
+    # compared, so a mapping in other categories (the first version's `approved` that included
+    # the checks) is reported by name even though it does not parse as the contract (Z3).
+    want = rv.counts.model_dump()
+    got = fm_raw.get("review")
+    if not isinstance(got, dict):
+        bad("Z9", where, f"front matter review {got!r} is not a mapping of counts")
+    else:
+        for key in sorted(set(got) | set(want)):
+            mine, theirs = got.get(key, "missing"), want.get(key, "missing")
+            if mine != theirs or type(mine) is not type(theirs):
+                shown = mine if isinstance(mine, int) or mine == "missing" else repr(mine)
+                bad("Z9", where, f"front matter review.{key} {shown} != review sidecar {theirs}")
+    blocks = fm_raw.get("blocks")
+    if blocks != len(rv.blocks) or type(blocks) is not int:
+        bad("Z9", where, f"front matter blocks {blocks!r} != review sidecar {len(rv.blocks)}")
     overrides = {o.target_id: o for o in manifest.overrides}
     for e in rv.blocks:
         o = overrides.get(e.block_id)
@@ -495,6 +506,7 @@ def _check_review(
                     a.review_sidecar,
                     f"{e.figure.figure_id}: placements {placed} != articles showing it {shown}",
                 )
+    return rv
 
 
 def _check_figure_status(
@@ -523,69 +535,107 @@ def _check_figure_status(
         )
 
 
-def _check_alignment(body: str, rv: ArticleReview, where: str, bad: Any) -> None:
-    """Every text block's part is in the body in sidecar order, unchanged (its sha256), and a
-    block that needs a marker is followed directly by its own marker; figure lines may sit
-    between parts. The body is `"\n# " + title + "\n"` then, when there are parts,
-    `"\n" + "\n\n".join(parts) + "\n"` (design 11 section 3.2). Parts are matched by position,
-    not by splitting on blank lines: a part may itself start or end with a newline, so it may end
-    at any (overlapping) "\n\n" or at the end."""
+def _check_alignment(body: str, rv: ArticleReview, where: str, bad: Any) -> set[str]:
+    """Every text block's unit is in the body in sidecar order: its own marker line, `"\n"`,
+    then its part, unchanged (its sha256), with the sidecar `text` its first 80 characters;
+    figure lines may sit between units, nothing else (design 11 section 20.11). The body is
+    `"\n# " + title + "\n"` then, when there are units, `"\n" + "\n\n".join(units) + "\n"`.
+    Parts are matched by position, not by splitting on blank lines: a part may itself start or
+    end with a newline, so it may end at any (overlapping) "\n\n" or at the end (20.10). Returns
+    the block ids reported as having no marker directly before their paragraph."""
     import hashlib
 
+    reported: set[str] = set()
     if not body.startswith("\n# "):
-        return  # reported by Z3
+        return reported  # reported by Z3
     rest = body[body.index("\n", 1) + 1 :]
     if rest == "":
-        content, n = "", -1  # no parts at all: nothing can match
+        content, n = "", -1  # no units at all: nothing can match
     elif len(rest) >= 2 and rest.startswith("\n") and rest.endswith("\n"):
         content = rest[1:-1]
         n = len(content)
     else:
         bad("Z9", where, "body is not a blank-line separated sequence of parts")
-        return
-    pos = 0  # start of the next part; > n once the parts are used up
+        return reported
 
-    def line_part(at: int) -> tuple[str, int] | None:
-        """The one-line part starting at `at` (a marker or a figure line), and the next start."""
+    def line_at(at: int) -> tuple[str, int] | None:
+        """The line starting at `at` and the offset of its end (its `\n`, or n)."""
         if at > n:
             return None
         end = content.find("\n", at)
         end = n if end < 0 else end
-        if end != n and not content.startswith("\n\n", end):
-            return None
-        return content[at:end], (end + 2 if end < n else n + 1)
+        return content[at:end], end
 
+    def lone(at: int) -> tuple[str, int] | None:
+        """A one-line unit at `at` (a figure line, or a marker standing alone), next start."""
+        ln = line_at(at)
+        if ln is None or (ln[1] != n and not content.startswith("\n\n", ln[1])):
+            return None
+        return ln[0], (ln[1] + 2 if ln[1] < n else n + 1)
+
+    def match(start: int, digest: str) -> int | None:
+        """Where the part with this sha256 that starts at `start` ends, if it does."""
+        if start > n:
+            return None
+        h = hashlib.sha256()
+        seg = j = start
+        while True:
+            k = content.find("\n\n", j)  # the next candidate end: an overlapping "\n\n", or n
+            end = n if k < 0 else k
+            h.update(content[seg:end].encode("utf-8"))
+            seg = end
+            if h.copy().hexdigest() == digest:
+                return end
+            if k < 0:
+                return None
+            j = k + 1
+
+    def misplaced(block_id: str) -> None:
+        bad("Z9", where, f"{block_id}: its marker is not directly before its paragraph")
+
+    def unmarked(block_id: str) -> None:
+        reported.add(block_id)
+        bad("Z9", where, f"{block_id} has no marker directly before its paragraph")
+
+    pos = 0  # start of the next unit; > n once the units are used up
     for e in rv.blocks:
         if e.text_sha256 is None:
-            continue  # a figure block has no part
-        while (lp := line_part(pos)) is not None:
-            mk = parse_marker(lp[0])
-            if mk is not None:
-                bad(
-                    "Z9", where, f"{mk.block_id}: its marker does not directly follow its paragraph"
-                )
-            elif not FIGURE_LINE_RE.match(lp[0]) or (
-                hashlib.sha256(lp[0].encode("utf-8")).hexdigest() == e.text_sha256
-            ):
-                break
-            pos = lp[1]
-        found = None
-        if pos <= n:
-            h = hashlib.sha256()
-            seg = pos
-            j = pos
-            while True:
-                # the next candidate end: an overlapping "\n\n" at or after j, or the end
-                k = content.find("\n\n", j)
-                end = n if k < 0 else k
-                h.update(content[seg:end].encode("utf-8"))
-                seg = end
-                if h.copy().hexdigest() == e.text_sha256:
-                    found = end
+            continue  # a figure block has no unit
+        digest = e.text_sha256
+        found: tuple[int, int] | None = None  # (start, end) of the part
+        while found is None:
+            one = lone(pos)
+            if one is not None and FIGURE_LINE_RE.match(one[0]):
+                pos = one[1]  # a figure line between units (every text unit starts with its marker)
+                continue
+            ln = line_at(pos)
+            mk = parse_marker(ln[0]) if ln is not None else None
+            if mk is not None and ln is not None:
+                below = ln[1] + 1
+                end = match(below, digest) if ln[1] < n else None
+                if mk.block_id == e.block_id:
+                    if end is not None:
+                        found = (below, end)
+                    elif one is not None and (end := match(one[1], digest)) is not None:
+                        misplaced(e.block_id)  # a blank line between marker and paragraph
+                        found = (one[1], end)
+                    else:
+                        break
+                else:
+                    misplaced(mk.block_id)
+                    if end is not None:  # another block's marker above this paragraph
+                        unmarked(e.block_id)
+                        found = (below, end)
+                    elif one is not None:
+                        pos = one[1]  # a marker standing alone: look again after it
+                    else:
+                        break
+            else:
+                end = match(pos, digest)
+                if end is None:
                     break
-                if k < 0:
-                    break
-                j = k + 1
+                unmarked(e.block_id)
+                found = (pos, end)
         if found is None:
             bad(
                 "Z9",
@@ -593,29 +643,31 @@ def _check_alignment(body: str, rv: ArticleReview, where: str, bad: Any) -> None
                 f"{e.block_id}: its paragraph text is not in the article where the sidecar puts "
                 "it (changed, moved or missing)",
             )
-            return
-        pos = found + 2 if found < n else n + 1
-        lp = line_part(pos)
-        nxt = parse_marker(lp[0]) if lp is not None else None
-        if needs_marker(e):
-            if nxt is None or nxt.block_id != e.block_id:
-                bad("Z9", where, f"{e.block_id}: its marker does not directly follow its paragraph")
-            elif lp is not None:
-                pos = lp[1]
-        elif nxt is not None and lp is not None:
+            return reported
+        start, end = found
+        if e.text != content[start:end][:TEXT_PREFIX]:
             bad(
                 "Z9",
                 where,
-                f"{nxt.block_id}: marker directly follows {e.block_id}, not its own paragraph "
-                "(its marker does not directly follow its paragraph)",
+                f"{e.block_id}: its text in the review file is not the first {TEXT_PREFIX} "
+                "characters of its paragraph",
             )
-            pos = lp[1]
+        pos = end + 2 if end < n else n + 1
     while pos <= n:
-        lp = line_part(pos)
-        if lp is None or not FIGURE_LINE_RE.match(lp[0]):
-            tail = content[pos : pos + 60]
-            what = parse_marker(lp[0]) if lp is not None else None
-            name = f"marker of {what.block_id}" if what else repr(tail)
-            bad("Z9", where, f"{name} after the last paragraph is not a figure line")
-            return
-        pos = lp[1]
+        one = lone(pos)
+        if one is not None and FIGURE_LINE_RE.match(one[0]):
+            pos = one[1]
+            continue
+        ln = line_at(pos)
+        mk = parse_marker(ln[0]) if ln is not None else None
+        if mk is not None:
+            misplaced(mk.block_id)
+            bad("Z9", where, f"marker of {mk.block_id} after the last paragraph")
+        else:
+            bad(
+                "Z9",
+                where,
+                f"{content[pos : pos + 60]!r} after the last paragraph is not a figure line",
+            )
+        return reported
+    return reported

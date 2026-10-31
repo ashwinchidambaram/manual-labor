@@ -19,7 +19,9 @@ from manuallabor.contracts.group import GroupsFile
 from manuallabor.contracts.manifest import Manifest, ManifestLearning
 from manuallabor.state.models import ExportReviewSummary
 
-EXPORT_ALGO_VERSION: Final = "2"  # 2: review markers and sidecars (section 20)
+# 2: review markers and sidecars (section 20); 3: a marker before every paragraph, front matter
+# counts in the sidecar's categories, sidecar `text` and `placement` (section 20.11)
+EXPORT_ALGO_VERSION: Final = "3"
 MAX_ARTICLE_BYTES: Final = 500_000
 BLOCKER_LIMIT: Final = 20
 NO_CAPTION: Final = "(no caption)"
@@ -112,10 +114,16 @@ class AssembleInputs:
 
 @dataclass(frozen=True)
 class BodyPart:
-    kind: Literal["block", "figure", "marker"]
-    block_id: str | None  # the source block of a "block" part, the marked block of a "marker"
+    kind: Literal["block", "figure"]
+    block_id: str | None  # the source block of a "block" part
     figure_id: str | None
-    text: str
+    text: str  # the block's part as rendered (what `text_sha256` hashes), or the figure line
+    marker: str | None = None  # a "block" part's review marker (design 11 section 20.11)
+
+    @property
+    def unit(self) -> str:
+        """What the article holds: the marker line directly above the part."""
+        return self.text if self.marker is None else self.marker + "\n" + self.text
 
 
 @dataclass

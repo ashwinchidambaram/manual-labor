@@ -576,3 +576,38 @@ tsc clean
 $ npm run e2e -- e2e/override-flow.spec.ts e2e/ux-onboarding.spec.ts e2e/onboarding.spec.ts
 21 passed (3.9m)
 ```
+
+### Markers before every paragraph; one set of review categories (design 11 section 20.11) — PASSED 2026-10-31
+
+A first-time user (Dana) read a fresh export as a recipient. A program could find every unchecked paragraph, but a person reading the source pinned each marker to the paragraph below it. Changes, each with a failing test first:
+- **Markers.** Every text block's marker is now on the line directly before its paragraph, with a blank line above it. Every paragraph is marked (`approved`, `edited`, `auto-approved`, `overridden`), so a missing marker is a Z9 problem, never "a person checked it". Z9 aligns each unit as marker, `\n`, then the part (by hash). An unclosed fence or raw HTML block before any later paragraph now refuses the export, and the message says to edit or reject the opening block.
+- **Sidecar.** Each entry gains `text` (the first 80 characters of the part as written) and `placement` (`paragraph` or `figure`). The zip README says there are no user accounts, so "person" means whoever reviewed the project.
+- **Front matter.** `review` is now `ArticleReviewCounts`, the sidecar's own categories, and they sum to `blocks`. Z9 compares the raw mapping key for key. The old Z9 compared groupings (`approved == auto_approved + approved + edited`), so Dana's `approved: 4` against her review file's approved 2 + auto-approved 2 passed. It now fails. SPEC 6.2's example was updated.
+- **Reconciliation.** Markers count paragraphs; the screen, the sidecar and the front matter count blocks. Per status, blocks = markers + figure blocks. Dana's project: auto-approved 60 = 56 + 4, approved 8 = 7 + 1, edited 1 = 1 + 0, overridden 104 = 104 + 0, so 173 = 168 markers + 5 figure blocks. This is stated in the zip README (Z8 checks the tally against the sidecars), in `ExportSummary.markers` and on the Export screen, which raises an alert on a mismatch.
+- **Export screen.** Markers are described only when the summary carries `markers`; older summaries get the old sentence. The override reason now lives in screen state, survives the form closing, and is cleared when an export finishes; the label says so.
+- `EXPORT_ALGO_VERSION` is now "3". Schemas, OpenAPI and TS types were regenerated, and USER_GUIDE was regenerated.
+
+A fresh Opus reviewer worked in a frozen snapshot. It found no blocker or major. Its minors and nits were fixed with failing tests first (`test_markers.py` RV1, RV2, RV7; vitest U20):
+- A paragraph equal to the figure line before it failed Z9.
+- Untested alignment branches.
+- Stale design text, and an unescaped reason in the worked example.
+- Per-status addition on the screen.
+- Type-aware front matter messages.
+- README wording for `edited`.
+
+```
+$ uv run pytest tests/export tests/contracts tests/api -p no:warnings --basetemp=.pytest_tmp_m2
+491 passed, 1 skipped, 2 deselected in 311.31s (0:05:11)
+$ uv run pytest tests/export -m slow -p no:warnings --basetemp=.pytest_tmp_m2
+2 passed, 234 deselected in 188.84s (0:03:08)
+$ uv run ruff check manuallabor/ tests/ && uv run ruff format --check manuallabor/ tests/ && uv run mypy manuallabor/
+All checks passed! / 412 files already formatted / Success: no issues found in 196 source files
+$ uv run labor schemas export --check && uv run labor openapi export --check
+schemas up to date / openapi up to date
+$ cd frontend && npm run typecheck && npm test -- --run
+tsc clean
+ Test Files  56 passed (56)
+      Tests  476 passed (476)
+$ npm run e2e -- e2e/override-flow.spec.ts e2e/ux-onboarding.spec.ts e2e/onboarding.spec.ts
+21 passed (2.6m)
+```

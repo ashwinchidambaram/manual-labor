@@ -41,6 +41,7 @@ from manuallabor.contracts._base import (
     Unit,
     UTCDateTime,
 )
+from manuallabor.contracts.article import ArticleReviewCounts
 from manuallabor.contracts.config import TaskModels
 from manuallabor.contracts.decision import Decision
 from manuallabor.contracts.enums import BlockStatus, BlockType, DocKind, FlagCategory
@@ -62,6 +63,7 @@ __all__ = [
     "DocStatus",
     "EditConflict",
     "ExportFlagBlocker",
+    "ExportMarkers",
     "ExportReviewSummary",
     "ExportScopeCounts",
     "ExportStatus",
@@ -485,8 +487,20 @@ class ExportReviewSummary(ContractModel):
     left_out: dict[str, int] = Field(default_factory=dict)
 
 
+class ExportMarkers(ContractModel):
+    """The exported blocks by where they went (design 11 section 20.11), tallied from the
+    review sidecars of the export: `paragraphs` are the text blocks, each with one marker in its
+    article; `figures` are the figure blocks, which have none. For each status, `paragraphs` +
+    `figures` equals that bucket of `ExportReviewSummary` (overridden = `overrides`)."""
+
+    paragraphs: ArticleReviewCounts
+    figures: ArticleReviewCounts
+
+
 class ExportSummary(ContractModel):
-    """What the Export screen shows after an export (SPEC 7.4)."""
+    """What the Export screen shows after an export (SPEC 7.4). `markers` is None in a summary
+    recorded before design 11 section 20.11 (an export whose articles carry no marker, or only
+    the first version's): the screen then says nothing about markers."""
 
     articles: int = Field(ge=0)
     figures: int = Field(ge=0)
@@ -497,6 +511,7 @@ class ExportSummary(ContractModel):
     zip_bytes: int = Field(ge=0)
     zip_sha256: str
     generated_at: UTCDateTime
+    markers: ExportMarkers | None = None
 
 
 class ExportScopeCounts(ContractModel):

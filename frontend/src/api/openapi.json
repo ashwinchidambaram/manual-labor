@@ -230,6 +230,40 @@
         "title": "ApplyTierOut",
         "type": "object"
       },
+      "ArticleReviewCounts": {
+        "additionalProperties": false,
+        "description": "An article's blocks (figure blocks included) by who decided they could go out: the\nreview sidecar's `counts` and, since design 11 section 20.11, the front matter `review`.",
+        "properties": {
+          "approved": {
+            "minimum": 0.0,
+            "title": "Approved",
+            "type": "integer"
+          },
+          "auto_approved": {
+            "minimum": 0.0,
+            "title": "Auto Approved",
+            "type": "integer"
+          },
+          "edited": {
+            "minimum": 0.0,
+            "title": "Edited",
+            "type": "integer"
+          },
+          "overridden": {
+            "minimum": 0.0,
+            "title": "Overridden",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "auto_approved",
+          "approved",
+          "edited",
+          "overridden"
+        ],
+        "title": "ArticleReviewCounts",
+        "type": "object"
+      },
       "ArticleSplit": {
         "enum": [
           "per_topic",
@@ -1986,6 +2020,24 @@
         "title": "ExportFlagBlocker",
         "type": "object"
       },
+      "ExportMarkers": {
+        "additionalProperties": false,
+        "description": "The exported blocks by where they went (design 11 section 20.11), tallied from the\nreview sidecars of the export: `paragraphs` are the text blocks, each with one marker in its\narticle; `figures` are the figure blocks, which have none. For each status, `paragraphs` +\n`figures` equals that bucket of `ExportReviewSummary` (overridden = `overrides`).",
+        "properties": {
+          "figures": {
+            "$ref": "#/components/schemas/ArticleReviewCounts"
+          },
+          "paragraphs": {
+            "$ref": "#/components/schemas/ArticleReviewCounts"
+          }
+        },
+        "required": [
+          "paragraphs",
+          "figures"
+        ],
+        "title": "ExportMarkers",
+        "type": "object"
+      },
       "ExportReviewSummary": {
         "additionalProperties": false,
         "description": "The blocks of one export (design 11 section 14). Every exported block (assigned to an\narticle in the manifest) is in exactly one bucket: ``blocks == auto_approved + approved +\nedited + overrides``; an override-covered block counts only as an override. ``left_out``\ncounts the other parsed blocks by their manifest reason (``header_footer``,\n``not_selected``, ``empty``, ``rejected``): ``total_blocks == blocks + sum(left_out)``.\n``numbers_verified`` is the manifest's ``numbers_verified_blocks`` count, a cross-cut.",
@@ -2189,7 +2241,7 @@
       },
       "ExportSummary": {
         "additionalProperties": false,
-        "description": "What the Export screen shows after an export (SPEC 7.4).",
+        "description": "What the Export screen shows after an export (SPEC 7.4). `markers` is None in a summary\nrecorded before design 11 section 20.11 (an export whose articles carry no marker, or only\nthe first version's): the screen then says nothing about markers.",
         "properties": {
           "articles": {
             "minimum": 0.0,
@@ -2210,6 +2262,16 @@
             "format": "date-time",
             "title": "Generated At",
             "type": "string"
+          },
+          "markers": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExportMarkers"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "pages_covered": {
             "minimum": 0.0,

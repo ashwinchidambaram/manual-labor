@@ -20,7 +20,6 @@ from manuallabor.contracts.article import (
     BlockReview,
     FigurePlacement,
     FigureReview,
-    ReviewCounts,
 )
 from manuallabor.contracts.block import (
     Block,
@@ -224,7 +223,6 @@ __all__ = [
     "Proposal",
     "ProposalStatus",
     "RecheckResult",
-    "ReviewCounts",
     "ReviewStats",
     "Selection",
     "Sha256Hex",

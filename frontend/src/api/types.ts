@@ -1056,6 +1056,21 @@ export interface components {
             stale: components["schemas"]["NodeState"][];
         };
         /**
+         * ArticleReviewCounts
+         * @description An article's blocks (figure blocks included) by who decided they could go out: the
+         *     review sidecar's `counts` and, since design 11 section 20.11, the front matter `review`.
+         */
+        ArticleReviewCounts: {
+            /** Approved */
+            approved: number;
+            /** Auto Approved */
+            auto_approved: number;
+            /** Edited */
+            edited: number;
+            /** Overridden */
+            overridden: number;
+        };
+        /**
          * ArticleSplit
          * @enum {string}
          */
@@ -1650,6 +1665,17 @@ export interface components {
             note?: string | null;
         };
         /**
+         * ExportMarkers
+         * @description The exported blocks by where they went (design 11 section 20.11), tallied from the
+         *     review sidecars of the export: `paragraphs` are the text blocks, each with one marker in its
+         *     article; `figures` are the figure blocks, which have none. For each status, `paragraphs` +
+         *     `figures` equals that bucket of `ExportReviewSummary` (overridden = `overrides`).
+         */
+        ExportMarkers: {
+            figures: components["schemas"]["ArticleReviewCounts"];
+            paragraphs: components["schemas"]["ArticleReviewCounts"];
+        };
+        /**
          * ExportReviewSummary
          * @description The blocks of one export (design 11 section 14). Every exported block (assigned to an
          *     article in the manifest) is in exactly one bucket: ``blocks == auto_approved + approved +
@@ -1739,7 +1765,9 @@ export interface components {
         };
         /**
          * ExportSummary
-         * @description What the Export screen shows after an export (SPEC 7.4).
+         * @description What the Export screen shows after an export (SPEC 7.4). `markers` is None in a summary
+         *     recorded before design 11 section 20.11 (an export whose articles carry no marker, or only
+         *     the first version's): the screen then says nothing about markers.
          */
         ExportSummary: {
             /** Articles */
@@ -1753,6 +1781,7 @@ export interface components {
              * Format: date-time
              */
             generated_at: string;
+            markers?: components["schemas"]["ExportMarkers"] | null;
             /** Pages Covered */
             pages_covered: number;
             review: components["schemas"]["ExportReviewSummary"];

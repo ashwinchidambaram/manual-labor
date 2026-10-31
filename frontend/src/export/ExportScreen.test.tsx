@@ -520,3 +520,93 @@ describe("U10b export: flags need their own decision, counts reconcile, the last
     expect(screen.queryByTestId("export-summary")).toBeNull();
   });
 });
+
+// Third first-use report (design 11 section 20.11): the "Last export" box describes review markers only for an export
+// that has them, and says how the blocks on screen reconcile with the markers (figure blocks have none); the reason box
+// keeps the reason until an export uses the overrides up, then is empty.
+describe("U20 export: markers described only when the export has them; the reason box is cleared after an export", () => {
+  const review = { blocks: 160, auto_approved: 51, approved: 7, edited: 1, overrides: 101, numbers_verified: 7, total_blocks: 184, left_out: { header_footer: 24 } };
+  const markers = {
+    paragraphs: { auto_approved: 47, approved: 6, edited: 1, overridden: 101 },
+    figures: { auto_approved: 4, approved: 1, edited: 0, overridden: 0 },
+  };
+  const old: ExportSummary = { ...summary, review };
+
+  it("an export recorded before markers: the old sentence, nothing about markers", async () => {
+    installFake({ exportStatus: { ...locked({ blockers: [], open_flags: 0, queued: 0 }), unlocked: true, summary: old } });
+    renderApp("/export");
+    const top = await screen.findByTestId("export-summary");
+    expect(top).toHaveTextContent("The 101 overridden blocks went out unreviewed, with machine-cleaned text; manifest.json lists each one with its reason.");
+    expect(top).not.toHaveTextContent("ml:");
+    expect(within(top).queryByTestId("summary-markers")).toBeNull();
+    expect(within(top).queryByRole("alert")).toBeNull();
+  });
+
+  it("an export with markers: every paragraph's marker, the figure blocks without one, and the numbers reconcile", async () => {
+    installFake({ exportStatus: { ...locked({ blockers: [], open_flags: 0, queued: 0 }), unlocked: true, summary: { ...old, markers } } });
+    renderApp("/export");
+    const top = await screen.findByTestId("export-summary");
+    expect(within(top).getByTestId("summary-markers")).toHaveTextContent(
+      "In the articles, each of the 155 paragraphs starts with an invisible ml: comment on the line above it naming who checked it: 47 auto-approved, 6 approved, 1 edited, 101 overridden. The 5 figure blocks have none (4 auto-approved, 1 approved, 0 edited, 0 overridden); each article's review file lists every block with the start of its text.",
+    );
+    // the per-status addition is said, not left to the reader (review of design 11 section 20.11)
+    expect(within(top).getByTestId("summary-markers-sum")).toHaveTextContent(
+      "Exported blocks = paragraphs + figure blocks: 51 auto-approved = 47 + 4, 7 approved = 6 + 1, 1 edited = 1 + 0, 101 overridden = 101 + 0.",
+    );
+    expect(within(top).queryByRole("alert")).toBeNull();
+  });
+
+  it("an export without figure blocks says so instead of counting zeros", async () => {
+    const none = { paragraphs: { auto_approved: 51, approved: 7, edited: 1, overridden: 101 }, figures: { auto_approved: 0, approved: 0, edited: 0, overridden: 0 } };
+    installFake({ exportStatus: { ...locked({ blockers: [], open_flags: 0, queued: 0 }), unlocked: true, summary: { ...old, markers: none } } });
+    renderApp("/export");
+    const line = await screen.findByTestId("summary-markers");
+    expect(line).toHaveTextContent("each of the 160 paragraphs");
+    expect(line).toHaveTextContent("There are no figure blocks; each article's review file lists every block with the start of its text.");
+    expect(line).not.toHaveTextContent("0 figure blocks");
+    expect(screen.queryByTestId("summary-markers-sum")).toBeNull();
+  });
+
+  it("markers that do not add up to the exported blocks raise the alert", async () => {
+    const off = { ...markers, figures: { ...markers.figures, auto_approved: 3 } };
+    installFake({ exportStatus: { ...locked({ blockers: [], open_flags: 0, queued: 0 }), unlocked: true, summary: { ...old, markers: off } } });
+    renderApp("/export");
+    const top = await screen.findByTestId("export-summary");
+    expect(within(top).getByRole("alert")).toHaveTextContent("These counts do not add up");
+  });
+
+  it("the reason survives the form closing, and an export clears it, as the label says", async () => {
+    const counts = { in_scope: 4, auto_approved: 2, approved: 0, edited: 0, rejected: 0, overridden: 0, blocking: 2, to_review: 2, flagged: 0 };
+    const covered = { ...counts, overridden: 2, blocking: 0, to_review: 0 };
+    const f = installFake({ exportStatus: locked({ open_flags: 0, queued: 2, counts }) });
+    server.use(
+      http.post("*/api/export/override", () => {
+        f.exportStatus = { ...locked({ blockers: [], open_flags: 0, queued: 2, counts: covered }), unlocked: false };
+        return HttpResponse.json(f.exportStatus);
+      }),
+      http.post("*/api/export", () => {
+        f.exportStatus = locked({ open_flags: 0, queued: 2, counts, summary: { ...old, markers } });
+        return HttpResponse.json(makeJob({ id: "exp3", kind: "export", status: "queued" }), { status: 202 });
+      }),
+    );
+    f.jobById = { exp3: makeJob({ id: "exp3", kind: "export", status: "done" }) };
+    const { user, qc } = renderApp("/export");
+    const form = await screen.findByTestId("override-form");
+    expect(form).toHaveTextContent("cleared after an export, which uses up the overrides");
+    expect(form).not.toHaveTextContent("until you clear it");
+    await user.type(within(form).getByTestId("override-reason"), "pilot");
+    await user.click(within(form).getByTestId("override-submit"));
+    expect(await screen.findByText(/Overrides cover every remaining block/)).toBeInTheDocument();
+    expect(screen.queryByTestId("override-form")).toBeNull();
+    // a block starts blocking again before any export: the form comes back with the reason still in it
+    f.exportStatus = locked({ open_flags: 0, queued: 2, counts });
+    await qc.invalidateQueries({ queryKey: ["export", "status"] });
+    expect(await screen.findByTestId("override-reason")).toHaveValue("pilot");
+    // covered again, then exported: the export uses the overrides up and the box is empty
+    f.exportStatus = { ...locked({ blockers: [], open_flags: 0, queued: 2, counts: covered }), unlocked: false };
+    await qc.invalidateQueries({ queryKey: ["export", "status"] });
+    await user.click(await screen.findByTestId("export-start"));
+    await screen.findByTestId("export-fresh");
+    expect(await screen.findByTestId("override-reason")).toHaveValue("");
+  });
+});

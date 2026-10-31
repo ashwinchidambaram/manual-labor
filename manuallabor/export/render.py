@@ -131,7 +131,8 @@ def yaml_frontmatter(fm: ArticleFrontmatter) -> str:
         ("blocks", str(fm.blocks)),
         (
             "review",
-            f"{{ approved: {r.approved}, edited: {r.edited}, overrides: {r.overrides} }}",
+            f"{{ auto_approved: {r.auto_approved}, approved: {r.approved}, "
+            f"edited: {r.edited}, overridden: {r.overridden} }}",
         ),
         ("generated_at", _utc(fm.generated_at)),
     ]

@@ -153,26 +153,30 @@ export interface ArticleFrontmatter {
   id: string;
   pages: number[];
   product_model: string | null;
-  review: ReviewCounts;
+  review: ArticleReviewCounts;
   sections: string[];
   source_doc: string;
   source_file: string;
   title: string;
 }
 /**
+ * An article's blocks (figure blocks included) by who decided they could go out: the
+ * review sidecar's `counts` and, since design 11 section 20.11, the front matter `review`.
+ *
  * This interface was referenced by `_All`'s JSON-Schema
- * via the `definition` "ReviewCounts".
+ * via the `definition` "ArticleReviewCounts".
  */
-export interface ReviewCounts {
+export interface ArticleReviewCounts {
   approved: number;
+  auto_approved: number;
   edited: number;
-  overrides: number;
+  overridden: number;
 }
 /**
  * `articles/<id>.review.json`: every block of the article (its manifest `block_ids`, same
- * order) with its review status. A text block whose status is auto_approved or overridden is
- * followed in the article by an invisible `<!-- ml: ... -->` marker; approved and edited blocks
- * (a person looked) and figure blocks carry none.
+ * order) with its review status. Every text block (`placement: paragraph`) starts in the
+ * article with an invisible `<!-- ml: <status>; ... -->` marker on the line above it; a figure
+ * block (`placement: figure`) has none (design 11 section 20.11).
  *
  * This interface was referenced by `_All`'s JSON-Schema
  * via the `definition` "ArticleReview".
@@ -201,8 +205,10 @@ export interface BlockReview {
   figure: FigureReview | null;
   flag_id: string | null;
   page: number;
+  placement: 'paragraph' | 'figure';
   reason: string | null;
   status: 'auto_approved' | 'approved' | 'edited' | 'overridden';
+  text: string | null;
   text_sha256: string | null;
   type: BlockType;
 }
@@ -224,16 +230,6 @@ export interface FigurePlacement {
   article_id: string;
   confidence: number;
   rule: AttachRule;
-}
-/**
- * This interface was referenced by `_All`'s JSON-Schema
- * via the `definition` "ArticleReviewCounts".
- */
-export interface ArticleReviewCounts {
-  approved: number;
-  auto_approved: number;
-  edited: number;
-  overridden: number;
 }
 /**
  * This interface was referenced by `_All`'s JSON-Schema

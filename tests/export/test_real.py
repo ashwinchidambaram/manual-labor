@@ -57,7 +57,7 @@ def test_e1_body_is_derived_from_the_blocks_byte_for_byte(
         n_figs += len(figs)
         # section 20.6: deleting the markers gives the pre-marker body byte for byte
         old, _ = expected_body(exported_a.paths, ro_store, a.id, with_markers=False)
-        stripped = re.sub(r"\n\n<!-- ml: [^\n]* -->(?=\n)", "", text)
+        stripped = re.sub(r"(?<=\n\n)<!-- ml: [^\n]* -->\n", "", text)
         assert stripped[frontmatter_end(stripped) :] == "\n# " + a.title + "\n" + (
             "\n" + old + "\n" if old else ""
         ), a.id
@@ -113,9 +113,11 @@ def test_e3_every_body_line_is_explained(exported_a: Exported, ro_store: Store) 
         for ln in text[frontmatter_end(text) :].split("\n"):
             if ln == "" or ln == f"# {a.title}" or FIGURE_LINE_RE.match(ln):
                 continue
-            if ln.startswith("<!-- ml: auto-approved; block: ") and ln.endswith(" -->"):
-                bid = ln.split("block: ", 1)[1][: -len(" -->")]
-                assert bid in a.block_ids and by_id[bid].status == BlockStatus.auto_approved
+            mk = re.match(r"^<!-- ml: (auto-approved|approved|edited); block: (\S+) -->$", ln)
+            if mk is not None:  # section 20.11: every paragraph's marker (no override here)
+                bid = mk.group(2)
+                assert bid in a.block_ids
+                assert by_id[bid].status.value == mk.group(1).replace("-", "_")
                 continue
             assert ln in allowed, f"{a.id}: unexplained line {ln[:80]!r}"
 

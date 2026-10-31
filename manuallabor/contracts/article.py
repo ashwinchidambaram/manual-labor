@@ -22,16 +22,17 @@ from manuallabor.contracts._base import (
 from manuallabor.contracts.enums import AttachRule, BlockType
 
 
-class ReviewCounts(ContractModel):
+class ArticleReviewCounts(ContractModel):
+    """An article's blocks (figure blocks included) by who decided they could go out: the
+    review sidecar's `counts` and, since design 11 section 20.11, the front matter `review`."""
+
+    auto_approved: int = Field(ge=0)
     approved: int = Field(ge=0)
     edited: int = Field(ge=0)
-    overrides: int = Field(ge=0)
+    overridden: int = Field(ge=0)
 
-    @model_validator(mode="after")
-    def _check(self) -> ReviewCounts:
-        if self.edited > self.approved:
-            raise ValueError("review.edited must be <= review.approved")
-        return self
+    def total(self) -> int:
+        return self.auto_approved + self.approved + self.edited + self.overridden
 
 
 class ArticleFrontmatter(ContractModel):
@@ -44,7 +45,8 @@ class ArticleFrontmatter(ContractModel):
     sections: list[str]
     figures: list[FigureId]
     blocks: int = Field(ge=0)
-    review: ReviewCounts
+    # the sidecar's categories, key for key (design 11 section 20.11); they sum to `blocks`
+    review: ArticleReviewCounts
     generated_at: UTCDateTime
 
     @field_validator("pages")
@@ -56,8 +58,11 @@ class ArticleFrontmatter(ContractModel):
 
     @model_validator(mode="after")
     def _check(self) -> ArticleFrontmatter:
-        if self.review.approved > self.blocks:
-            raise ValueError("review.approved must be <= blocks")
+        if self.review.total() != self.blocks:
+            raise ValueError(
+                f"review counts sum to {self.review.total()}, not to blocks ({self.blocks}): "
+                "every block is in exactly one category"
+            )
         if self.id != self.source_doc and not self.id.startswith(f"{self.source_doc}--"):
             raise ValueError("id must equal source_doc or start with '<source_doc>--'")
         if len(set(self.figures)) != len(self.figures):
@@ -71,6 +76,10 @@ class ArticleFrontmatter(ContractModel):
 # -- the per-article review sidecar (design 11 section 20) -----------------------------------------
 
 ReviewStatus = Literal["auto_approved", "approved", "edited", "overridden"]
+# paragraph: a unit of the article, its marker on the line above; figure: a figure block, which
+# has no paragraph and no marker (design 11 section 20.11)
+Placement = Literal["paragraph", "figure"]
+TEXT_PREFIX: Final = 80  # BlockReview.text: the first 80 characters of the block's part
 DecidedBy = Literal["checks", "person", "override"]
 DECIDED_BY: Final[dict[str, DecidedBy]] = {
     "auto_approved": "checks",
@@ -119,8 +128,12 @@ class BlockReview(ContractModel):
     figure: FigureReview | None  # iff type == figure
     # sha256 of the block's part exactly as it is in the article (heading `#`s and list `* `
     # included); None for a figure block, which has no part. The validator uses it to prove that
-    # each marker directly follows its own paragraph and that the paragraph is unchanged.
+    # each marker stands directly above its own paragraph and that the paragraph is unchanged.
     text_sha256: Sha256Hex | None
+    # the first 80 characters of that part, so a reader can find the paragraph without counting;
+    # None for a figure block (design 11 section 20.11)
+    text: str | None
+    placement: Placement
 
     @model_validator(mode="after")
     def _check(self) -> BlockReview:
@@ -144,6 +157,12 @@ class BlockReview(ContractModel):
             raise ValueError("edited_by must be set if and only if status == edited")
         if (self.text_sha256 is None) != (self.type == BlockType.figure):
             raise ValueError("text_sha256 must be set if and only if the block is not a figure")
+        if (self.text is None) != (self.type == BlockType.figure):
+            raise ValueError("text must be set if and only if the block is not a figure")
+        if self.text is not None and len(self.text) > TEXT_PREFIX:
+            raise ValueError(f"text holds at most the first {TEXT_PREFIX} characters")
+        if (self.placement == "figure") != (self.type == BlockType.figure):
+            raise ValueError("placement must be 'figure' for a figure block, else 'paragraph'")
         if (self.figure is not None) != (self.type == BlockType.figure):
             raise ValueError("figure must be set if and only if type == figure")
         if self.figure is not None:
@@ -156,18 +175,11 @@ class BlockReview(ContractModel):
         return self
 
 
-class ArticleReviewCounts(ContractModel):
-    auto_approved: int = Field(ge=0)
-    approved: int = Field(ge=0)
-    edited: int = Field(ge=0)
-    overridden: int = Field(ge=0)
-
-
 class ArticleReview(ContractModel):
     """`articles/<id>.review.json`: every block of the article (its manifest `block_ids`, same
-    order) with its review status. A text block whose status is auto_approved or overridden is
-    followed in the article by an invisible `<!-- ml: ... -->` marker; approved and edited blocks
-    (a person looked) and figure blocks carry none."""
+    order) with its review status. Every text block (`placement: paragraph`) starts in the
+    article with an invisible `<!-- ml: <status>; ... -->` marker on the line above it; a figure
+    block (`placement: figure`) has none (design 11 section 20.11)."""
 
     schema_version: Literal["1.0"] = "1.0"
     article_id: ArticleId

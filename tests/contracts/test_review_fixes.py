@@ -321,7 +321,7 @@ def _frontmatter(**over: Any) -> dict[str, Any]:
         "sections": [],
         "figures": [],
         "blocks": 1,
-        "review": {"approved": 1, "edited": 0, "overrides": 0},
+        "review": {"auto_approved": 0, "approved": 1, "edited": 0, "overridden": 0},
         "generated_at": TS,
     }
     d.update(over)

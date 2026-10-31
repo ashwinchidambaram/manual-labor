@@ -7,7 +7,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from manuallabor.contracts.article import ArticleFrontmatter, ReviewCounts
+from manuallabor.contracts.article import ArticleFrontmatter, ArticleReviewCounts
 from manuallabor.contracts.enums import ArticleSplit, AttachRule, BlockStatus, BlockType
 from manuallabor.export.assemble import assemble
 from manuallabor.export.gate import export_gate
@@ -61,13 +61,14 @@ def all_parts(text: str) -> list[str]:
 
 
 def parts(text: str) -> list[str]:
-    """The text and figure parts, without the review markers (design 11 section 20; the
-    markers themselves are tested in test_markers.py)."""
-    return [p for p in all_parts(text) if not p.startswith("<!-- ml: ")]
+    """The text and figure parts, without the review markers (design 11 section 20.11: a
+    marker is the first line of its block's unit; the markers themselves are tested in
+    test_markers.py)."""
+    return [p.split("\n", 1)[1] if p.startswith("<!-- ml: ") else p for p in all_parts(text)]
 
 
 def markers(text: str) -> list[str]:
-    return [p for p in all_parts(text) if p.startswith("<!-- ml: ")]
+    return [p.split("\n", 1)[0] for p in all_parts(text) if p.startswith("<!-- ml: ")]
 
 
 # -- E4 frontmatter ----------------------------------------------------------------------------
@@ -84,7 +85,7 @@ def test_e4_frontmatter_matches_the_spec_example_byte_for_byte() -> None:
         sections=["5.1"],
         figures=["FIG-acme-x200-service-p042-01", "FIG-acme-x200-service-p042-02"],
         blocks=7,
-        review=ReviewCounts(approved=7, edited=1, overrides=0),
+        review=ArticleReviewCounts(auto_approved=6, approved=0, edited=1, overridden=0),
         generated_at=datetime(2026, 10, 28, 18, 0, 0, tzinfo=UTC),
     )
     assert yaml_frontmatter(fm) == (
@@ -98,7 +99,7 @@ def test_e4_frontmatter_matches_the_spec_example_byte_for_byte() -> None:
         'sections: ["5.1"]\n'
         "figures: [FIG-acme-x200-service-p042-01, FIG-acme-x200-service-p042-02]\n"
         "blocks: 7\n"
-        "review: { approved: 7, edited: 1, overrides: 0 }\n"
+        "review: { auto_approved: 6, approved: 0, edited: 1, overridden: 0 }\n"
         "generated_at: 2026-10-28T18:00:00Z\n"
         "---\n"
     )
@@ -133,7 +134,7 @@ def test_e4_awkward_strings_round_trip(title: str) -> None:
         sections=[],
         figures=[],
         blocks=0,
-        review=ReviewCounts(approved=0, edited=0, overrides=0),
+        review=ArticleReviewCounts(auto_approved=0, approved=0, edited=0, overridden=0),
         generated_at=CLOCK,
     )
     text = yaml_frontmatter(fm)
@@ -159,12 +160,14 @@ def test_assembled_frontmatter_pages_sections_and_order() -> None:
     (a,) = res.articles
     assert a.frontmatter.pages == [3, 5, 9]
     assert a.frontmatter.sections == ["2", "2.1", "10"]  # numeric tuple order, not text order
-    assert a.frontmatter.blocks == 6 and a.frontmatter.review == ReviewCounts(
-        approved=6, edited=0, overrides=0
+    assert a.frontmatter.blocks == 6 and a.frontmatter.review == ArticleReviewCounts(
+        auto_approved=0, approved=6, edited=0, overridden=0
     )
     assert a.title == "Main topic" and a.id == ART
     lines = a.text.split("\n")
-    assert lines[lines.index("# Main topic") + 2] == "## Intro."  # a top section is H2
+    at = lines.index("# Main topic")
+    assert lines[at + 2] == f"<!-- ml: approved; block: {bid(1, 3)} -->"  # section 20.11
+    assert lines[at + 3] == "## Intro."  # a top section is H2
     assert "### Sub." in lines  # depth 2 is H3
     assert "Later." not in lines and "## Later." in lines
 
@@ -211,7 +214,9 @@ def test_e5_statuses_and_text_sources() -> None:
     (a,) = res.articles
     assert parts(a.text) == ["clean auto", "clean approved", "HUMAN edited", "raw never cleaned"]
     assert a.frontmatter.blocks == 4
-    assert a.frontmatter.review == ReviewCounts(approved=4, edited=1, overrides=0)
+    assert a.frontmatter.review == ArticleReviewCounts(
+        auto_approved=1, approved=2, edited=1, overridden=0
+    )
     acc = res.manifest.accounting
     assert acc.assignments[bid(5)] == "unassigned" and acc.unassigned_reasons[bid(5)] == "rejected"
     assert res.manifest.review_stats.rejected == 1 and "rejected" not in a.text
@@ -270,17 +275,16 @@ def test_e7_blanket_override_exports_machine_text_with_an_invisible_marker() -> 
     )
     (a,) = res.articles
     assert parts(a.text) == ["ok", "clean q", "raw f"]  # machine clean_text, else raw
-    # section 20 (amends P2): each overridden part is followed by its HTML-comment marker
+    # section 20.11 (amends P2): each part starts with its HTML-comment marker
     assert all_parts(a.text) == [
-        "ok",
-        "clean q",
-        f'<!-- ml: overridden; block: {bid(2)}; reason: "customer waived review" -->',
-        "raw f",
+        f"<!-- ml: approved; block: {bid(1)} -->\nok",
+        f'<!-- ml: overridden; block: {bid(2)}; reason: "customer waived review" -->\nclean q',
         f"<!-- ml: overridden; block: {bid(3)}; flag: flag-000001; "
-        'reason: "customer waived review" -->',
+        'reason: "customer waived review" -->\nraw f',
     ]
-    assert a.frontmatter.review == ReviewCounts(approved=1, edited=0, overrides=2)
-    assert a.frontmatter.approved_check if False else True
+    assert a.frontmatter.review == ArticleReviewCounts(
+        auto_approved=0, approved=1, edited=0, overridden=2
+    )
     m = res.manifest
     assert [o.target_id for o in m.overrides] == [bid(2), bid(3)]
     assert [o.flag_id for o in m.overrides] == [None, "flag-000001"]
@@ -373,15 +377,15 @@ def test_e7_a_flag_override_covers_the_flagged_block() -> None:
     assert [(o.target_id, o.flag_id) for o in res.manifest.overrides] == [(bid(2), "flag-000007")]
     # an approved block with an open flag is counted once: as an override, not also approved
     fm = res.articles[0].frontmatter
-    assert fm.review == ReviewCounts(approved=1, edited=0, overrides=1)
-    assert fm.review.approved + fm.review.overrides <= fm.blocks
+    assert fm.review == ArticleReviewCounts(auto_approved=0, approved=1, edited=0, overridden=1)
+    assert sum(fm.review.model_dump().values()) == fm.blocks
     edited = synth_inputs(
         [blk(1, status=A), blk(2, "human", status=BlockStatus.edited)],
         flags=[flag(7, bid(2))],
         overrides=[override(3, "r", flag_id="flag-000007")],
     )
-    assert run(edited).articles[0].frontmatter.review == ReviewCounts(
-        approved=1, edited=0, overrides=1
+    assert run(edited).articles[0].frontmatter.review == ArticleReviewCounts(
+        auto_approved=0, approved=1, edited=0, overridden=1
     )
 
 
@@ -647,4 +651,5 @@ def test_the_body_is_deterministic_and_marks_overrides_only_in_comments() -> Non
     # the word appears only inside the markers (frontmatter counts them)
     outside = "\n".join(ln for ln in body.split("\n") if not ln.startswith("<!-- ml: "))
     assert "override" not in outside.lower()
-    assert len(markers(text)) == 2
+    assert len(markers(text)) == 3
+    assert len([m for m in markers(text) if m.startswith("<!-- ml: overridden;")]) == 2

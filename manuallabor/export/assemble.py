@@ -15,13 +15,13 @@ from manuallabor.cleanup.attach import build_articles
 from manuallabor.cleanup.types import Attachment
 from manuallabor.contracts.article import (
     DECIDED_BY,
+    TEXT_PREFIX,
     ArticleFrontmatter,
     ArticleReview,
     ArticleReviewCounts,
     BlockReview,
     FigurePlacement,
     FigureReview,
-    ReviewCounts,
     ReviewStatus,
 )
 from manuallabor.contracts.block import Block
@@ -53,6 +53,7 @@ from manuallabor.export.markers import (
     marker_line,
     misplaced_markers,
     needs_marker,
+    tally_markers,
 )
 from manuallabor.export.readme import render_readme
 from manuallabor.export.render import (
@@ -281,18 +282,16 @@ def _build_doc_articles(ctx: _Ctx, d: DocInput) -> list[BuiltArticle]:
         for b in kept:
             if b.type == BlockType.figure:
                 continue
-            part = BodyPart("block", b.id, None, rendered[b.id])
-            if SOURCE_MARKER_RE.search(part.text):
+            if SOURCE_MARKER_RE.search(rendered[b.id]):
                 raise ExportError(
                     f"{b.id}: its text contains an HTML comment opening 'ml:', which would read "
                     "as a review marker (design 11 section 20); edit the block in Verify"
                 )
-            text_parts.append(((b.reading_order, 0, 0), part))
             e = entry_of[b.id]
-            if needs_marker(e):  # right after its paragraph, before a figure anchored there
-                text_parts.append(
-                    ((b.reading_order, 0, 1), BodyPart("marker", b.id, None, marker_line(e)))
-                )
+            # section 20.11: every paragraph's marker on the line directly above it
+            mk = marker_line(e) if needs_marker(e) else None
+            part = BodyPart("block", b.id, None, rendered[b.id], marker=mk)
+            text_parts.append(((b.reading_order, 0, 0), part))
         has_part = {p.block_id for _, p in text_parts if p.kind == "block" and p.block_id}
         figs = _figure_parts(d, art_id, attach.get(art_id, []), kept_order, has_part)
         merged: list[tuple[tuple[int, int, int], BodyPart]] = [
@@ -310,12 +309,9 @@ def _build_doc_articles(ctx: _Ctx, d: DocInput) -> list[BuiltArticle]:
             key=_section_key,
         )
         pages = sorted({b.page for b in kept})
-        # an override-covered block (e.g. approved but with an open flag) counts once, as an
-        # override; `approved`/`edited` are only the blocks no override had to cover
-        covered = ctx.gate.covered
-        approved = sum(1 for b in kept if b.status in CONTRIBUTING and b.id not in covered)
-        edited = sum(1 for b in kept if b.status == BlockStatus.edited and b.id not in covered)
-        overrides = sum(1 for b in kept if b.id in covered)
+        # section 20.11: the front matter counts are the sidecar's, category for category (an
+        # override-covered block, e.g. approved but with an open flag, counts once, as overridden)
+        counts = _review_counts(entries)
         fm = ArticleFrontmatter(
             id=art_id,
             title=title,
@@ -326,17 +322,17 @@ def _build_doc_articles(ctx: _Ctx, d: DocInput) -> list[BuiltArticle]:
             sections=sections,
             figures=fig_ids,
             blocks=len(kept),
-            review=ReviewCounts(approved=approved, edited=edited, overrides=overrides),
+            review=counts,
             generated_at=ctx.generated_at,
         )
         head = yaml_frontmatter(fm) + "\n# " + title + "\n"
-        text = head + ("\n" + "\n\n".join(p.text for p in parts) + "\n" if parts else "")
+        text = head + ("\n" + "\n\n".join(p.unit for p in parts) + "\n" if parts else "")
         _refuse_visible_markers(art_id, text[len(yaml_frontmatter(fm)) :])
         review = ArticleReview(
             article_id=art_id,
             article=f"articles/{art_id}.md",
             generated_at=ctx.generated_at,
-            counts=_review_counts(entries),
+            counts=counts,
             blocks=entries,
         )
         for b in kept:
@@ -419,6 +415,8 @@ def _review_entry(
         text_sha256=(
             hashlib.sha256(part_text.encode("utf-8")).hexdigest() if part_text is not None else None
         ),
+        text=part_text[:TEXT_PREFIX] if part_text is not None else None,
+        placement="figure" if b.type == BlockType.figure else "paragraph",
     )
 
 
@@ -465,8 +463,8 @@ def _refuse_visible_markers(art_id: str, body: str) -> None:
     raise ExportError(
         f"{art_id}: the review marker of {block} would render as text{more}: it falls inside a "
         f"{_HOLDER.get(kind, kind)} that an earlier block of the article leaves open (an unclosed "
-        f"code fence or raw HTML block in the source text). Approve or edit {block} in Verify "
-        "(a paragraph a person checked needs no marker), or edit the block that opens it."
+        "code fence or raw HTML block in the source text). Every paragraph carries a marker "
+        "(design 11 section 20.11), so edit or reject the block that opens it in Verify."
     )
 
 
@@ -676,7 +674,7 @@ def assemble(inp: AssembleInputs, clock: datetime) -> Assembled:
         for a in articles
         if len(a.text.encode("utf-8")) > MAX_ARTICLE_BYTES
     ]
-    readme = render_readme(manifest)
+    readme = render_readme(manifest, tally_markers([a.review for a in articles]))
     files: dict[str, str | Path] = {"README.md": readme, "manifest.json": dump_json(manifest)}
     for a in articles:
         files[a.path] = a.text

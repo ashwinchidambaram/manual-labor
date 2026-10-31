@@ -1,11 +1,17 @@
 {
   "$defs": {
-    "ReviewCounts": {
+    "ArticleReviewCounts": {
       "additionalProperties": false,
+      "description": "An article's blocks (figure blocks included) by who decided they could go out: the\nreview sidecar's `counts` and, since design 11 section 20.11, the front matter `review`.",
       "properties": {
         "approved": {
           "minimum": 0,
           "title": "Approved",
+          "type": "integer"
+        },
+        "auto_approved": {
+          "minimum": 0,
+          "title": "Auto Approved",
           "type": "integer"
         },
         "edited": {
@@ -13,18 +19,19 @@
           "title": "Edited",
           "type": "integer"
         },
-        "overrides": {
+        "overridden": {
           "minimum": 0,
-          "title": "Overrides",
+          "title": "Overridden",
           "type": "integer"
         }
       },
       "required": [
+        "auto_approved",
         "approved",
         "edited",
-        "overrides"
+        "overridden"
       ],
-      "title": "ReviewCounts",
+      "title": "ArticleReviewCounts",
       "type": "object"
     }
   },
@@ -72,7 +79,7 @@
       "title": "Product Model"
     },
     "review": {
-      "$ref": "#/$defs/ReviewCounts"
+      "$ref": "#/$defs/ArticleReviewCounts"
     },
     "sections": {
       "items": {

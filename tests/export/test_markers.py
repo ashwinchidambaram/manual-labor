@@ -44,10 +44,12 @@ REASON = "paper -- rev B > A"
 ENC = r'"paper -\u002d rev B \u003e A"'
 # the grammar of design 11 section 20.2, written out again here (not imported)
 MARKER_RE = re.compile(
-    r"^<!-- ml: (?P<status>auto-approved|overridden); block: (?P<block>b-[a-z0-9-]+-p\d{3,}-\d{2,})"
+    r"^<!-- ml: (?P<status>approved|edited|auto-approved|overridden); "
+    r"block: (?P<block>b-[a-z0-9-]+-p\d{3,}-\d{2,})"
     r"(?:; flag: (?P<flag>flag-\d{6}))?(?:; reason: (?P<reason>\"(?:[^\"\\]|\\.)*\"))? -->$"
 )
-_STRIP_RE = re.compile(r"\n\n<!-- ml: [^\n]* -->(?=\n)")
+# section 20.11: a marker is the first line of its unit, right after a blank line
+_STRIP_RE = re.compile(r"(?<=\n\n)<!-- ml: [^\n]* -->\n")
 
 
 def strip_markers(text: str) -> str:
@@ -59,7 +61,14 @@ def body_of(text: str) -> str:
 
 
 def parts(text: str) -> list[str]:
+    """The units of the body: a text block's unit is its marker line, "\n", its part."""
     return body_of(text).split("\n", 3)[3].rstrip("\n").split("\n\n")
+
+
+def unmarked(unit: str) -> str:
+    """A unit without its leading marker line (a figure line is returned as it is)."""
+    first, _, rest = unit.partition("\n")
+    return rest if MARKER_RE.match(first) else unit
 
 
 _LIKE = re.compile(r"(?<!\\)<!--\s*ml\s*:", re.I)  # an unescaped comment opening "ml:"
@@ -170,32 +179,33 @@ def test_m1_the_worked_example_reason() -> None:
 # -- M2 markers and sidecar on every status ----------------------------------------------------
 
 
-def test_m2_markers_follow_exactly_the_paragraphs_nobody_checked() -> None:
+def test_m2_n1_every_paragraph_starts_with_its_marker() -> None:
+    """Section 20.11: the marker is on the line before its paragraph (a blank line above it, the
+    paragraph directly below), and every text block has one, a person's decisions included."""
     res = run(every_status())
     (a,) = res.articles
     m1 = f"<!-- ml: auto-approved; block: {bid(1)} -->"
+    m2 = f"<!-- ml: approved; block: {bid(2)} -->"
     m3 = f"<!-- ml: auto-approved; block: {bid(3)} -->"
+    m4 = f"<!-- ml: edited; block: {bid(4)} -->"
     m5 = f"<!-- ml: overridden; block: {bid(5)}; reason: {ENC} -->"
     m6 = f"<!-- ml: overridden; block: {bid(6)}; flag: flag-000001; reason: {ENC} -->"
     m8 = f"<!-- ml: auto-approved; block: {bid(8)} -->"
     fig = next(p for p in parts(a.text) if p.startswith("![FIG-"))
     assert parts(a.text) == [
-        "## 1 Intro",
-        m1,
-        "Approved text.",
-        "| a | b |\n| --- | --- |\n| 1 | 2 |",
-        m3,  # the whole table is one unit: one marker after its last row
-        "* one\n* two",  # edited by a person: no marker
-        "Queued text.",
-        m5,
-        "Flagged text.",
-        m6,
+        m1 + "\n## 1 Intro",
+        m2 + "\nApproved text.",
+        m3 + "\n| a | b |\n| --- | --- |\n| 1 | 2 |",  # the whole table is one unit
+        m4 + "\n* one\n* two",
+        m5 + "\nQueued text.",
+        m6 + "\nFlagged text.",
         fig,  # a figure block has no marker
-        "Last.",
-        m8,
+        m8 + "\nLast.",
     ]
-    assert [m.group("block") for m in marker_lines(a.text)] == [bid(n) for n in (1, 3, 5, 6, 8)]
-    assert "\n" + m1 + "\n" in a.text  # each marker is a whole line
+    assert [m.group("block") for m in marker_lines(a.text)] == [
+        bid(n) for n in (1, 2, 3, 4, 5, 6, 8)
+    ]
+    assert "\n# Main topic\n\n" + m1 + "\n## 1 Intro\n" in a.text  # the title, a blank line
 
 
 def test_m2_the_sidecar_lists_every_block_with_who_decided_it() -> None:
@@ -212,6 +222,12 @@ def test_m2_the_sidecar_lists_every_block_with_who_decided_it() -> None:
     def row(n: int) -> dict[str, Any]:
         return by[bid(n)].model_dump(mode="json")
 
+    assert [row(n)["placement"] for n in range(1, 9)] == ["paragraph"] * 6 + [
+        "figure",
+        "paragraph",
+    ]
+    assert row(3)["text"] == "| a | b |\n| --- | --- |\n| 1 | 2 |"
+    assert row(4)["text"] == "* one\n* two" and row(7)["text"] is None
     assert row(1) == {
         "block_id": bid(1),
         "type": "heading",
@@ -225,6 +241,8 @@ def test_m2_the_sidecar_lists_every_block_with_who_decided_it() -> None:
         "flag_id": None,
         "figure": None,
         "text_sha256": sha("## 1 Intro"),
+        "text": "## 1 Intro",
+        "placement": "paragraph",
     }
     assert (row(2)["status"], row(2)["decided_by"], row(2)["at"]) == (
         "approved",
@@ -255,6 +273,8 @@ def test_m2_the_sidecar_lists_every_block_with_who_decided_it() -> None:
         "flag_id": None,
         "figure": None,
         "text_sha256": sha("Queued text."),
+        "text": "Queued text.",
+        "placement": "paragraph",
     }
     assert (row(6)["status"], row(6)["flag_id"], row(6)["reason"]) == (
         "overridden",
@@ -274,8 +294,9 @@ def test_m2_the_sidecar_lists_every_block_with_who_decided_it() -> None:
     }
     fm = a.frontmatter
     assert fm.blocks == len(rv.blocks) == 8
-    assert fm.review.approved == rv.counts.auto_approved + rv.counts.approved + rv.counts.edited
-    assert fm.review.edited == rv.counts.edited and fm.review.overrides == rv.counts.overridden
+    # section 20.11: the front matter counts are the sidecar's, category for category
+    assert fm.review.model_dump() == rv.counts.model_dump()
+    assert "\nreview: { auto_approved: 4, approved: 1, edited: 1, overridden: 2 }\n" in a.text
     # the sidecar is in the zip next to its article and the manifest points at it
     assert ArticleReview.model_validate_json(str(res.files[a.review_path])) == rv
     (ma,) = res.manifest.articles
@@ -297,7 +318,8 @@ def test_m2_a_figure_block_shown_in_no_article_has_empty_placements() -> None:
     (entry,) = [b for b in a.review.blocks if b.type == BlockType.figure]
     assert entry.figure is not None and entry.figure.placements == []
     assert entry.status == "approved" and entry.decided_by == "person"
-    assert marker_lines(a.text) == []
+    assert entry.placement == "figure" and entry.text is None
+    assert [m.group(0) for m in marker_lines(a.text)] == [f"<!-- ml: approved; block: {bid(1)} -->"]
 
 
 def test_m2_a_covered_approved_block_with_an_open_flag_is_overridden() -> None:
@@ -317,7 +339,7 @@ def test_m2_a_covered_approved_block_with_an_open_flag_is_overridden() -> None:
     )
     assert (
         parts(a.text)[-1]
-        == f'<!-- ml: overridden; block: {bid(2)}; flag: flag-000003; reason: "ok" -->'
+        == f'<!-- ml: overridden; block: {bid(2)}; flag: flag-000003; reason: "ok" -->\nB.'
     )
 
 
@@ -329,7 +351,8 @@ def test_m3_stripping_markers_gives_the_previous_output_and_the_same_visible_tex
     (a,) = res.articles
     stripped = strip_markers(a.text)
     # the pre-section-20 body: the same parts, no markers
-    want_parts = [p for p in parts(a.text) if not p.startswith("<!-- ml:")]
+    want_parts = [unmarked(p) for p in parts(a.text)]
+    assert want_parts != parts(a.text)
     assert (
         stripped
         == a.text[: a.text.index("\n# ")] + "\n# Main topic\n\n" + "\n\n".join(want_parts) + "\n"
@@ -349,6 +372,9 @@ def test_m3_stripping_markers_gives_the_previous_output_and_the_same_visible_tex
         ("<div>raw html</div>", BlockType.paragraph),
         ("1. first\n2. second", BlockType.list),
         ("trailing spaces  ", BlockType.paragraph),
+        ("Setext heading\n===", BlockType.paragraph),
+        ("# looks like a heading", BlockType.paragraph),
+        ("--> an arrow first", BlockType.paragraph),
     ],
 )
 def test_m3_markers_never_show_after_tricky_source(text: str, type_: BlockType) -> None:
@@ -377,10 +403,23 @@ def test_m4_an_open_construct_before_a_marked_block_refuses_the_export(opener: s
     assert bid(2) in msg and "marker" in msg and "Verify" in msg
 
 
-def test_m4_an_open_construct_with_no_marker_after_it_is_not_refused() -> None:
+def test_m4_n6_an_open_construct_before_an_approved_block_refuses_the_export() -> None:
+    """Section 20.11 (k): every paragraph has a marker now, so approving the next block no longer
+    avoids the swallowed marker; the way out is the block that opens the construct."""
     blocks = [
         blk(1, "```\ncode", status=BlockStatus.approved),
         blk(2, "B.", status=BlockStatus.approved),
+    ]
+    with pytest.raises(ExportError) as ei:
+        run(synth_inputs(blocks))
+    msg = str(ei.value)
+    assert bid(2) in msg and "opens" in msg and "Approve" not in msg
+
+
+def test_m4_an_open_construct_in_the_last_unit_is_not_refused() -> None:
+    blocks = [
+        blk(1, "A.", status=BlockStatus.approved),
+        blk(2, "```\ncode", status=BlockStatus.approved),
     ]
     assert run(synth_inputs(blocks)).articles
 
@@ -479,7 +518,7 @@ def test_m6_a_tampered_status_fails(tmp_path: Path) -> None:
 
 
 def test_m6_a_missing_marker_fails(tmp_path: Path) -> None:
-    gone = f"\n\n<!-- ml: auto-approved; block: {bid(3)} -->"
+    gone = f"<!-- ml: auto-approved; block: {bid(3)} -->\n"
 
     def fn(f: Files) -> None:
         edit_article(f, lambda t: t.replace(gone, "", 1) if gone in t else pytest.fail("no marker"))
@@ -492,7 +531,7 @@ def test_m6_a_marker_moved_into_the_paragraph_fails(tmp_path: Path) -> None:
     mk = f"<!-- ml: auto-approved; block: {bid(3)} -->"
 
     def fn(f: Files) -> None:
-        edit_article(f, lambda t: t.replace("\n\n" + mk, " " + mk, 1))
+        edit_article(f, lambda t: t.replace(mk + "\nAuto text.", "Auto text. " + mk, 1))
 
     msgs = z9(check(tmp_path, fn))
     assert any(bid(3) in m and "own" in m for m in msgs), msgs
@@ -503,6 +542,7 @@ def test_m6_a_marker_swallowed_by_a_fence_fails(tmp_path: Path) -> None:
 
     def fn(f: Files) -> None:
         edit_article(f, lambda t: t.replace("\n\n" + mk, "\n\n```\n" + mk, 1))
+        assert mk in f[ARTP].decode()
 
     msgs = z9(check(tmp_path, fn))
     assert any(bid(3) in m and "fence" in m for m in msgs), msgs
@@ -548,18 +588,18 @@ def test_m6_counts_out_of_tally_fail(tmp_path: Path) -> None:
 def test_m6_front_matter_counts_must_equal_the_sidecar(tmp_path: Path) -> None:
     def fn(f: Files) -> None:
         def t(text: str) -> str:
-            new = re.sub(
-                r"review: \{ approved: (\d+), edited: 0, overrides: 2 \}",
-                lambda m: f"review: {{ approved: {int(m.group(1)) - 1}, edited: 0, overrides: 2 }}",
-                text,
+            # the sidecar says auto_approved 2, approved 1: swap them in the front matter only
+            old = "review: { auto_approved: 2, approved: 1, edited: 0, overridden: 2 }"
+            assert old in text
+            return text.replace(
+                old, "review: { auto_approved: 1, approved: 2, edited: 0, overridden: 2 }", 1
             )
-            assert new != text
-            return new
 
         edit_article(f, t)
 
     msgs = z9(check(tmp_path, fn))
-    assert any("review.approved" in m for m in msgs), msgs
+    assert any("review.approved 2 != review sidecar 1" in m for m in msgs), msgs
+    assert any("review.auto_approved 1 != review sidecar 2" in m for m in msgs), msgs
 
 
 def test_m6_a_missing_or_stray_sidecar_file_fails(tmp_path: Path) -> None:
@@ -583,19 +623,22 @@ def test_m6_manifest_overrides_must_match_the_sidecar(tmp_path: Path) -> None:
     assert any(bid(4) in m and "manifest.overrides" in m for m in msgs), msgs
 
 
-def test_m6_a_marker_on_a_person_checked_block_fails(tmp_path: Path) -> None:
+def test_m6_an_unchecked_marker_on_a_person_checked_block_fails(tmp_path: Path) -> None:
     def fn(f: Files) -> None:
+        old = f"<!-- ml: approved; block: {bid(2)} -->"
         edit_article(
             f,
-            lambda t: t.replace(
-                "Approved text.",
-                f"Approved text.\n\n<!-- ml: auto-approved; block: {bid(2)} -->",
-                1,
+            lambda t: (
+                t.replace(old, f"<!-- ml: auto-approved; block: {bid(2)} -->", 1)
+                if old in t
+                else pytest.fail("no approved marker")
             ),
         )
 
     msgs = z9(check(tmp_path, fn))
-    assert any(bid(2) in m and "approved" in m for m in msgs), msgs
+    assert any(
+        bid(2) in m and "marker says auto-approved, sidecar says approved" in m for m in msgs
+    ), msgs
 
 
 def test_m6_the_manifest_must_point_at_the_sidecar(tmp_path: Path) -> None:
@@ -616,6 +659,7 @@ def _check_markers_and_sidecars(zf: zipfile.ZipFile) -> dict[str, int]:
     m = Manifest.model_validate_json(zf.read("manifest.json"))
     names = set(zf.namelist())
     seen = {"auto": 0, "person": 0, "override": 0, "figure": 0, "markers": 0}
+    by_place: dict[tuple[str, str], int] = {}
     overrides = {o.target_id: o for o in m.overrides}
     for a in m.articles:
         assert a.review_sidecar == f"articles/{a.id}.review.json" and a.review_sidecar in names
@@ -624,14 +668,13 @@ def _check_markers_and_sidecars(zf: zipfile.ZipFile) -> dict[str, int]:
         text = zf.read(a.path).decode("utf-8")
         fm, _ = split_article(text)
         assert fm["blocks"] == len(rv.blocks)
-        c = rv.counts
-        assert fm["review"] == {
-            "approved": c.auto_approved + c.approved + c.edited,
-            "edited": c.edited,
-            "overrides": c.overridden,
-        }
+        # section 20.11: the front matter counts are the sidecar's categories, key for key
+        assert fm["review"] == rv.counts.model_dump(), a.id
         want = []
         for b in rv.blocks:
+            key = (b.placement, b.status)
+            by_place[key] = by_place.get(key, 0) + 1
+            assert (b.placement == "figure") == (b.type == BlockType.figure)
             if b.type == BlockType.figure:
                 seen["figure"] += 1
                 assert b.figure is not None
@@ -647,7 +690,7 @@ def _check_markers_and_sidecars(zf: zipfile.ZipFile) -> dict[str, int]:
                 seen["override"] += 1
                 o = overrides[b.block_id]
                 assert (o.reason, o.flag_id, o.at) == (b.reason, b.flag_id, b.at)
-            if b.status in ("auto_approved", "overridden") and b.type != BlockType.figure:
+            if b.type != BlockType.figure:  # every paragraph has a marker (20.11)
                 want.append(b)
         got = marker_lines(text)
         seen["markers"] += len(got)
@@ -656,8 +699,13 @@ def _check_markers_and_sidecars(zf: zipfile.ZipFile) -> dict[str, int]:
             assert g.group("status") == b.status.replace("_", "-")
             assert g.group("flag") == b.flag_id
             assert (json.loads(g.group("reason")) if g.group("reason") else None) == b.reason
+            # on its own line after a blank line, its paragraph's first characters right below
+            assert b.text is not None and len(b.text) <= 80
+            assert "\n\n" + g.group(0) + "\n" + b.text in text, b.block_id
         assert visible(body_of(text)) == visible(body_of(strip_markers(text))), a.id
         assert "ml:" not in visible(body_of(text))
+    for (place, status), n in by_place.items():
+        seen[f"{place}:{status}"] = n
     return seen
 
 
@@ -738,7 +786,7 @@ def test_export_markers_on_scanned_pdf(requires_docling: None, tmp_path: Path) -
     assert seen["override"] >= 1 and seen["person"] >= 1
     entry = next(b for r in reviews for b in r.blocks if b.block_id == approved)
     assert entry.status == "approved" and entry.at is not None
-    assert f"block: {approved}" not in bodies
+    assert f"\n\n<!-- ml: approved; block: {approved} -->\n" in bodies
     decoded = [
         json.loads(mm.group("reason"))
         for ln in bodies.split("\n")
@@ -751,23 +799,40 @@ def test_export_markers_on_scanned_pdf(requires_docling: None, tmp_path: Path) -
 # -- review fixes (fresh reviewer, 2026-10-31) -------------------------------------------------
 
 
-def test_r1_a_marker_moved_after_another_paragraph_fails(tmp_path: Path) -> None:
-    """Reviewer major: moving block 03's marker to just after the approved block 02 kept the
-    markers in order and passed. Each marker must directly follow its own paragraph."""
+def test_r1_a_marker_moved_before_another_paragraph_fails(tmp_path: Path) -> None:
+    """Reviewer major (20.10), in the 20.11 layout: block 03's marker moved to stand above the
+    approved block 02 in place of its own marker."""
     mk = f"<!-- ml: auto-approved; block: {bid(3)} -->"
+    m2 = f"<!-- ml: approved; block: {bid(2)} -->"
 
     def fn(f: Files) -> None:
         def t(text: str) -> str:
-            new = text.replace("\n\n" + mk, "", 1).replace(
-                "Approved text.", "Approved text.\n\n" + mk, 1
-            )
+            new = text.replace(mk + "\n", "", 1).replace(m2, mk, 1)
             assert new != text
             return new
 
         edit_article(f, t)
 
     msgs = z9(check(tmp_path, fn))
-    assert any(bid(3) in m and "directly follow" in m for m in msgs), msgs
+    assert any(bid(2) in m and "no marker directly before" in m for m in msgs), msgs
+
+
+def test_r1_n1_a_marker_after_its_paragraph_fails(tmp_path: Path) -> None:
+    """The first version's layout (marker after its paragraph) is what misled the reader: it
+    fails Z9 naming the block."""
+    mk = f"<!-- ml: auto-approved; block: {bid(3)} -->"
+
+    def fn(f: Files) -> None:
+        def t(text: str) -> str:
+            new = text.replace(mk + "\nAuto text.", "Auto text.\n\n" + mk, 1)
+            assert new != text
+            return new
+
+        edit_article(f, t)
+
+    msgs = z9(check(tmp_path, fn))
+    assert any(bid(3) in m and "no marker directly before" in m for m in msgs), msgs
+    assert any(bid(3) in m and "not directly before its paragraph" in m for m in msgs), msgs
 
 
 def test_r1_two_markers_in_a_row_fail(tmp_path: Path) -> None:
@@ -775,10 +840,10 @@ def test_r1_two_markers_in_a_row_fail(tmp_path: Path) -> None:
     m3 = f"<!-- ml: auto-approved; block: {bid(3)} -->"
 
     def fn(f: Files) -> None:
-        edit_article(f, lambda t: t.replace("\n\n" + m3, "", 1).replace(m1, m1 + "\n\n" + m3, 1))
+        edit_article(f, lambda t: t.replace(m3 + "\n", "", 1).replace(m1, m3 + "\n\n" + m1, 1))
 
     msgs = z9(check(tmp_path, fn))
-    assert any(bid(3) in m and "directly follow" in m for m in msgs), msgs
+    assert any(bid(3) in m and "not directly before its paragraph" in m for m in msgs), msgs
 
 
 def test_r1_a_changed_paragraph_text_fails(tmp_path: Path) -> None:
@@ -807,8 +872,8 @@ def test_r2_a_lookalike_marker_without_the_space_fails(tmp_path: Path) -> None:
         edit_article(
             f,
             lambda t: t.replace(
-                "Approved text.",
-                f"Approved text.\n\n<!--ml: auto-approved; block: {bid(2)} -->",
+                f"<!-- ml: approved; block: {bid(2)} -->",
+                f"<!--ml: approved; block: {bid(2)} -->",
                 1,
             ),
         )
@@ -837,7 +902,8 @@ def test_r3_a_caption_that_looks_like_a_marker_is_escaped_not_blamed_on_a_block(
     )
     (a,) = res.articles
     line = next(p for p in parts(a.text) if p.startswith("![FIG-"))
-    assert "\\<!-- ml:" in line and marker_lines(a.text) == []
+    assert "\\<!-- ml:" in line
+    assert [m.group("block") for m in marker_lines(a.text)] == [bid(1)]
     assert res.manifest.articles[0].figures == [fid(2)]
 
 
@@ -868,7 +934,7 @@ def test_r4_two_flags_with_their_own_overrides_pair_flag_and_reason() -> None:
     (o,) = res.manifest.overrides
     assert (o.flag_id, o.reason) == ("flag-000002", "ok for flag two")
     (mk,) = marker_lines(a.text)
-    assert mk.group("flag") == "flag-000002"
+    assert mk.group("flag") == "flag-000002" and mk.group("status") == "overridden"
 
 
 # -- re-review fixes (2026-10-31) --------------------------------------------------------------
@@ -970,3 +1036,250 @@ def test_rr4_a_block_with_an_external_image_link_validates(tmp_path: Path) -> No
     files = {n: v.encode() for n, v in res.files.items() if isinstance(v, str)}
     write_zip(files, tmp_path / "e.zip")
     assert validate_zip(tmp_path / "e.zip") == []
+
+
+# -- third first-use report (design 11 section 20.11) ------------------------------------------
+
+
+def _zip_of(res: Any, tmp: Path, name: str = "e.zip") -> Path:
+    files = {
+        n: v.encode() if isinstance(v, str) else Path(v).read_bytes() for n, v in res.files.items()
+    }
+    write_zip(files, tmp / name)
+    return tmp / name
+
+
+def test_n1_a_paragraph_without_its_approved_marker_fails(tmp_path: Path) -> None:
+    """A missing marker never means "a person checked it": an approved paragraph whose marker
+    was stripped is a problem, like any other."""
+    gone = f"<!-- ml: approved; block: {bid(2)} -->\n"
+
+    def fn(f: Files) -> None:
+        edit_article(f, lambda t: t.replace(gone, "", 1) if gone in t else pytest.fail("none"))
+
+    msgs = z9(check(tmp_path, fn))
+    assert any(bid(2) in m and "no marker directly before" in m for m in msgs), msgs
+
+
+def test_n1_stripping_every_marker_fails_for_every_paragraph(tmp_path: Path) -> None:
+    """An export whose comments a converter removed reads as broken, not as all checked."""
+    msgs = z9(check(tmp_path, lambda f: edit_article(f, strip_markers)))
+    for n in (1, 2, 3, 4, 5):
+        assert any(bid(n) in m and "no marker" in m for m in msgs), (n, msgs)
+
+
+def test_n2_the_sidecar_carries_the_first_80_characters_of_each_paragraph(
+    tmp_path: Path,
+) -> None:
+    long = "Torque the cover plate bolts to 35 N·m in a cross pattern, then check " * 3
+    blocks = [
+        blk(1, "Short.", status=BlockStatus.approved),
+        blk(2, long, status=BlockStatus.auto_approved, confidence=0.9),
+        blk(3, "• one\n• two", type=BlockType.list, status=BlockStatus.approved),
+        blk(4, type=BlockType.figure, status=BlockStatus.approved),
+    ]
+    res = run(synth_inputs(blocks, figures=[figure_data(4)], attach={ART: [att(fid(4))]}))
+    (a,) = res.articles
+    by = {e.block_id: e for e in a.review.blocks}
+    assert by[bid(1)].text == "Short."
+    assert by[bid(2)].text == long[:80] and len(long) > 80
+    assert by[bid(3)].text == "* one\n* two"
+    assert by[bid(4)].text is None and by[bid(4)].placement == "figure"
+    # written by dump_json right before the hash
+    raw = str(res.files[a.review_path])
+    assert raw.index('"text": "Short."') < raw.index('"text_sha256"')
+    no_figure = run(synth_inputs(blocks[:3]))  # synthetic figures have no image file
+    assert validate_zip(_zip_of(no_figure, tmp_path)) == []
+
+
+def test_n2_a_tampered_text_fails(tmp_path: Path) -> None:
+    def fn(f: Files) -> None:
+        def t(d: dict[str, Any]) -> None:
+            assert d["blocks"][2]["text"] == "Auto text."
+            d["blocks"][2]["text"] = "Approved text."
+
+        edit_review(f, t)
+
+    msgs = z9(check(tmp_path, fn))
+    assert any(bid(3) in m and "text" in m for m in msgs), msgs
+
+
+def dana_torque() -> Any:
+    """Dana's torque article: 2 approved by her, 2 auto-approved, 7 exported under an override."""
+    blocks = [
+        blk(1, "Torque Data", type=BlockType.heading, status=BlockStatus.auto_approved),
+        blk(2, "Table 1. Torque values", type=BlockType.caption, status=BlockStatus.auto_approved),
+        blk(
+            3,
+            "| Bolt | N·m |\n| --- | --- |\n| M8 | 35 |",
+            type=BlockType.table,
+            status=BlockStatus.approved,
+        ),
+        *[blk(n, f"Queued {n}.", status=BlockStatus.queued) for n in range(4, 9)],
+        blk(9, "Tighten the cover plate bolts to 35 N·m.", status=BlockStatus.approved),
+        *[blk(n, f"Queued {n}.", status=BlockStatus.queued) for n in range(10, 12)],
+    ]
+    return synth_inputs(blocks, levels={bid(1): 1}, overrides=[override(5, "Pilot export")])
+
+
+def test_n3_front_matter_counts_use_the_sidecar_categories_on_dana_s_numbers() -> None:
+    (a,) = run(dana_torque()).articles
+    assert a.review.counts.model_dump() == {
+        "auto_approved": 2,
+        "approved": 2,
+        "edited": 0,
+        "overridden": 7,
+    }
+    assert "\nreview: { auto_approved: 2, approved: 2, edited: 0, overridden: 7 }\n" in a.text
+    assert a.frontmatter.review == a.review.counts
+
+
+def test_n3_dana_s_old_front_matter_line_fails_z9(tmp_path: Path) -> None:
+    """Her zip said `approved: 4` where the review file said approved 2 and auto-approved 2. The
+    first version's Z9 compared `approved` with auto_approved + approved + edited, so it passed."""
+    res = run(dana_torque())
+    (a,) = res.articles
+    files = {n: v.encode() for n, v in res.files.items() if isinstance(v, str)}
+    new = "review: { auto_approved: 2, approved: 2, edited: 0, overridden: 7 }"
+    files[a.path] = files[a.path].replace(
+        new.encode(), b"review: { approved: 4, edited: 0, overrides: 7 }"
+    )
+    write_zip(files, tmp_path / "d.zip")
+    msgs = z9(validate_zip(tmp_path / "d.zip"))
+    assert any("review.approved 4 != review sidecar 2" in m for m in msgs), msgs
+    assert any("review.auto_approved missing != review sidecar 2" in m for m in msgs), msgs
+    assert any("review.overrides 7 != review sidecar missing" in m for m in msgs), msgs
+
+
+def test_n4_every_entry_says_where_its_block_went_and_the_readme_reconciles() -> None:
+    res = run(every_status())
+    (a,) = res.articles
+    assert {e.placement for e in a.review.blocks if e.type == BlockType.figure} == {"figure"}
+    assert {e.placement for e in a.review.blocks if e.type != BlockType.figure} == {"paragraph"}
+    # 8 blocks: 7 paragraphs (3 auto-approved, 1 approved, 1 edited, 2 overridden) + 1 figure
+    readme = res.readme
+    assert (
+        "In this export: 8 blocks = 7 paragraphs with a marker (3 auto-approved, 1 approved, "
+        "1 edited, 2 overridden) + 1 figure block without one (1 auto-approved, 0 approved, "
+        "0 edited, 0 overridden)." in readme
+    )
+    assert "no user accounts" in readme and "`person`" in readme
+    assert "blocks = paragraphs with that marker + figure blocks with that status" in readme
+    assert "grep -rnE '^<!-- ml: (auto-approved|overridden);' articles/" in readme
+
+
+def test_n4_a_stale_readme_tally_fails_z8(tmp_path: Path) -> None:
+    def fn(f: Files) -> None:
+        r = f["README.md"].decode()
+        assert "In this export: 5 blocks = 5 paragraphs" in r
+        f["README.md"] = r.replace("5 blocks = 5 paragraphs", "5 blocks = 4 paragraphs").encode()
+
+    problems = check(tmp_path, fn)
+    assert any(p.code == "Z8" and "In this export" in p.detail for p in problems), problems
+
+
+def test_n4_the_export_summary_counts_markers_and_figure_blocks(exported_a: Any) -> None:
+    """The Export screen's blocks reconcile with the zip: per status, the exported blocks are
+    the paragraphs with that marker plus the figure blocks with that status."""
+    from manuallabor.export.pipeline import read_state
+
+    st = read_state(exported_a.paths)
+    assert st.export is not None
+    s = st.export.summary
+    assert s.markers is not None
+    with zipfile.ZipFile(exported_a.zip) as zf:
+        seen = _check_markers_and_sidecars(zf)
+        readme = zf.read("README.md").decode()
+    r = s.review
+    buckets = {
+        "auto_approved": r.auto_approved,
+        "approved": r.approved,
+        "edited": r.edited,
+        "overridden": r.overrides,
+    }
+    for status, n in buckets.items():
+        para = getattr(s.markers.paragraphs, status)
+        figs = getattr(s.markers.figures, status)
+        assert para == seen.get(f"paragraph:{status}", 0), status
+        assert figs == seen.get(f"figure:{status}", 0), status
+        assert para + figs == n, status
+    total_markers = sum(s.markers.paragraphs.model_dump().values())
+    assert total_markers == seen["markers"] and seen["figure"] > 0
+    figs_total = sum(s.markers.figures.model_dump().values())
+    assert f"In this export: {r.blocks} blocks = {total_markers} paragraphs" in readme
+    assert f"+ {figs_total} figure blocks without one" in readme
+
+
+# -- review fixes of 20.11 (fresh Opus reviewer, 2026-10-31) -----------------------------------
+
+
+def test_rv1_a_paragraph_whose_text_is_the_figure_line_before_it_validates(tmp_path: Path) -> None:
+    """Reviewer minor 1: the figure-line skip still let a part equal to the figure line before
+    it through unskipped (a 20.10 leftover), so a valid export failed Z9. Every unit starts with
+    its marker now; a figure line is always skipped."""
+    from manuallabor.contracts.enums import AttachRule
+
+    line = f"![{fid(2)} — Figure 1. A pump.](images/doc/{fid(2)}.png)"
+    blocks = [
+        blk(1, "One.", status=BlockStatus.approved),
+        blk(2, type=BlockType.figure, status=BlockStatus.approved),
+        blk(3, line, status=BlockStatus.approved),
+    ]
+    caption = "Figure 1. A pump."
+    res = run(
+        synth_inputs(
+            blocks,
+            figures=[figure_data(2, caption=caption)],
+            attach={ART: [att(fid(2), rule=AttachRule.caption_ref, anchor=bid(1))]},
+        )
+    )
+    (a,) = res.articles
+    assert "\n\n" + line + "\n\n<!-- ml: approved; block: " + bid(3) + " -->\n" + line in a.text
+    files = {n: v.encode() if isinstance(v, str) else b"" for n, v in res.files.items()}
+    write_zip(files, tmp_path / "f.zip")
+    assert z9(validate_zip(tmp_path / "f.zip")) == []
+
+
+def test_rv2_a_blank_line_between_marker_and_paragraph_fails(tmp_path: Path) -> None:
+    m2 = f"<!-- ml: approved; block: {bid(2)} -->"
+
+    def fn(f: Files) -> None:
+        edit_article(f, lambda t: t.replace(m2 + "\n", m2 + "\n\n", 1))
+
+    msgs = z9(check(tmp_path, fn))
+    assert any(bid(2) in m and "not directly before its paragraph" in m for m in msgs), msgs
+
+
+@pytest.mark.parametrize(
+    "tail,want",
+    [
+        (f"\n<!-- ml: approved; block: {bid(2)} -->\n", "after the last paragraph"),
+        ("\njunk\n", "after the last paragraph is not a figure line"),
+    ],
+)
+def test_rv2_anything_but_figure_lines_after_the_last_paragraph_fails(
+    tmp_path: Path, tail: str, want: str
+) -> None:
+    msgs = z9(check(tmp_path, lambda f: edit_article(f, lambda t: t + tail)))
+    assert any(want in m for m in msgs), msgs
+
+
+def test_rv2_a_body_without_the_final_newline_fails(tmp_path: Path) -> None:
+    msgs = z9(check(tmp_path, lambda f: edit_article(f, lambda t: t.removesuffix("\n"))))
+    assert any("not a blank-line separated sequence" in m for m in msgs), msgs
+
+
+def test_rv7_front_matter_counts_of_another_type_are_reported_with_their_type(
+    tmp_path: Path,
+) -> None:
+    def fn(f: Files) -> None:
+        edit_article(
+            f,
+            lambda t: t.replace("approved: 1, edited: 0", "approved: '1', edited: 0", 1).replace(
+                "\nblocks: 5\n", "\nblocks: 5.0\n", 1
+            ),
+        )
+
+    msgs = z9(check(tmp_path, fn))
+    assert any("review.approved '1' != review sidecar 1" in m for m in msgs), msgs
+    assert any("front matter blocks 5.0 != review sidecar 5" in m for m in msgs), msgs

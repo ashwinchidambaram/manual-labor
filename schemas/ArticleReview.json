@@ -2,6 +2,7 @@
   "$defs": {
     "ArticleReviewCounts": {
       "additionalProperties": false,
+      "description": "An article's blocks (figure blocks included) by who decided they could go out: the\nreview sidecar's `counts` and, since design 11 section 20.11, the front matter `review`.",
       "properties": {
         "approved": {
           "minimum": 0,
@@ -129,6 +130,14 @@
           "title": "Page",
           "type": "integer"
         },
+        "placement": {
+          "enum": [
+            "paragraph",
+            "figure"
+          ],
+          "title": "Placement",
+          "type": "string"
+        },
         "reason": {
           "anyOf": [
             {
@@ -149,6 +158,17 @@
           ],
           "title": "Status",
           "type": "string"
+        },
+        "text": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Text"
         },
         "text_sha256": {
           "anyOf": [
@@ -178,7 +198,9 @@
         "reason",
         "flag_id",
         "figure",
-        "text_sha256"
+        "text_sha256",
+        "text",
+        "placement"
       ],
       "title": "BlockReview",
       "type": "object"
@@ -250,7 +272,7 @@
     }
   },
   "additionalProperties": false,
-  "description": "`articles/<id>.review.json`: every block of the article (its manifest `block_ids`, same\norder) with its review status. A text block whose status is auto_approved or overridden is\nfollowed in the article by an invisible `<!-- ml: ... -->` marker; approved and edited blocks\n(a person looked) and figure blocks carry none.",
+  "description": "`articles/<id>.review.json`: every block of the article (its manifest `block_ids`, same\norder) with its review status. Every text block (`placement: paragraph`) starts in the\narticle with an invisible `<!-- ml: <status>; ... -->` marker on the line above it; a figure\nblock (`placement: figure`) has none (design 11 section 20.11).",
   "properties": {
     "article": {
       "title": "Article",

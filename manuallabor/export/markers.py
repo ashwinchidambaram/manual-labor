@@ -1,8 +1,9 @@
-"""Review markers (design 11 section 20). Pure.
+"""Review markers (design 11 sections 20 and 20.11). Pure.
 
-A marker is an HTML comment on a line of its own, set as its own Markdown part after the block
-part of every exported paragraph nobody checked (auto-approved or overridden). Renderers show
-nothing; `grep 'ml:'` lists the paragraphs; the block id leads to the article's review sidecar.
+A marker is an HTML comment on a line of its own, the first line of every exported paragraph's
+unit: a blank line above it, the paragraph directly below it. Every text block has one, whatever
+its status (approved, edited, auto-approved, overridden); figure blocks have none. Renderers show
+nothing; `grep '^<!-- ml: '` lists the paragraphs; the block id leads to the review sidecar.
 """
 
 from __future__ import annotations
@@ -12,20 +13,23 @@ import re
 from dataclasses import dataclass
 from typing import Any, Final
 
-from manuallabor.contracts.article import BlockReview
+from manuallabor.contracts.article import ArticleReview, ArticleReviewCounts, BlockReview
 from manuallabor.contracts.enums import BlockType
+from manuallabor.state.models import ExportMarkers
 
 __all__ = [
     "MARKER_LIKE_RE",
     "MARKER_PREFIX",
     "MARKER_RE",
     "SOURCE_MARKER_RE",
+    "STATUS_WORD",
     "Marker",
     "encode_reason",
     "marker_line",
     "misplaced_markers",
     "needs_marker",
     "parse_marker",
+    "tally_markers",
 ]
 
 MARKER_PREFIX: Final = "<!-- ml:"
@@ -36,18 +40,40 @@ MARKER_LIKE_RE: Final = re.compile(r"(?<!\\)(?:\\\\)*<!--\s*ml\s*:", re.IGNORECA
 # the same in source text, backslashes or not: block text and titles holding it are refused
 SOURCE_MARKER_RE: Final = re.compile(r"<!--\s*ml\s*:", re.IGNORECASE)
 MARKER_RE: Final = re.compile(
-    r"^<!-- ml: (?P<status>auto-approved|overridden); block: "
+    r"^<!-- ml: (?P<status>approved|edited|auto-approved|overridden); block: "
     r"(?P<block>b-[a-z0-9-]+-p\d{3,}-\d{2,})"
     r"(?:; flag: (?P<flag>flag-\d{6}))?"
     r"(?:; reason: (?P<reason>\"(?:[^\"\\]|\\.)*\"))? -->$"
 )
-_STATUS_WORD: Final = {"auto_approved": "auto-approved", "overridden": "overridden"}
+STATUS_WORD: Final = {
+    "approved": "approved",
+    "edited": "edited",
+    "auto_approved": "auto-approved",
+    "overridden": "overridden",
+}
+_SIDECAR_STATUS: Final = {w: s for s, w in STATUS_WORD.items()}
 _LINE_BREAKS: Final = {"\u2028", "\u2029", "\x85"}
 
 
 def needs_marker(entry: BlockReview) -> bool:
-    """A text block (not a figure block) that no person checked."""
-    return entry.type != BlockType.figure and entry.status in _STATUS_WORD
+    """Every text block (not a figure block), whoever decided it (section 20.11)."""
+    return entry.type != BlockType.figure
+
+
+def tally_markers(reviews: list[ArticleReview]) -> ExportMarkers:
+    """The exported blocks by placement and status, from the review sidecars (section 20.11):
+    paragraphs carry one marker each, figure blocks none."""
+    counts: dict[str, dict[str, int]] = {
+        "paragraph": dict.fromkeys(STATUS_WORD, 0),
+        "figure": dict.fromkeys(STATUS_WORD, 0),
+    }
+    for rv in reviews:
+        for e in rv.blocks:
+            counts[e.placement][e.status] += 1
+    return ExportMarkers(
+        paragraphs=ArticleReviewCounts(**counts["paragraph"]),
+        figures=ArticleReviewCounts(**counts["figure"]),
+    )
 
 
 def encode_reason(reason: str) -> str:
@@ -71,7 +97,7 @@ def encode_reason(reason: str) -> str:
 def marker_line(entry: BlockReview) -> str:
     if not needs_marker(entry):
         raise ValueError(f"{entry.block_id}: a {entry.status} {entry.type} block has no marker")
-    s = f"<!-- ml: {_STATUS_WORD[entry.status]}; block: {entry.block_id}"
+    s = f"<!-- ml: {STATUS_WORD[entry.status]}; block: {entry.block_id}"
     if entry.status == "overridden":
         if entry.flag_id is not None:
             s += f"; flag: {entry.flag_id}"
@@ -81,7 +107,7 @@ def marker_line(entry: BlockReview) -> str:
 
 @dataclass(frozen=True)
 class Marker:
-    status: str  # sidecar spelling: auto_approved | overridden
+    status: str  # sidecar spelling: approved | edited | auto_approved | overridden
     block_id: str
     flag_id: str | None
     reason: str | None
@@ -92,11 +118,11 @@ def parse_marker(line: str) -> Marker | None:
     m = MARKER_RE.match(line)
     if m is None:
         return None
-    status = "auto_approved" if m.group("status") == "auto-approved" else "overridden"
+    status = _SIDECAR_STATUS[m.group("status")]
     raw = m.group("reason")
-    if (raw is None) != (status == "auto_approved"):
+    if (raw is not None) != (status == "overridden"):
         return None  # a reason only and always on an override
-    if status == "auto_approved" and m.group("flag") is not None:
+    if status != "overridden" and m.group("flag") is not None:
         return None
     reason = None
     if raw is not None:

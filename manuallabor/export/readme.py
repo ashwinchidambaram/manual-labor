@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from manuallabor.contracts.article import ArticleReviewCounts
 from manuallabor.contracts.io import to_jsonable
 from manuallabor.contracts.manifest import Manifest
+from manuallabor.state.models import ExportMarkers
 
-__all__ = ["render_readme"]
+__all__ = ["render_readme", "tally_sentence"]
 
 FIG_REGEX = r"FIG-[a-z0-9-]+-p\d{3}-\d{2}"
 FIG_LINE_REGEX = (
@@ -14,8 +16,31 @@ FIG_LINE_REGEX = (
 )
 
 
-def render_readme(m: Manifest) -> str:
-    """Deterministic: the only time in it is `manifest.project.generated_at`."""
+def _n(n: int, word: str) -> str:
+    return f"{n} {word}" + ("" if n == 1 else "s")
+
+
+def _by_status(c: ArticleReviewCounts) -> str:
+    return (
+        f"{c.auto_approved} auto-approved, {c.approved} approved, {c.edited} edited, "
+        f"{c.overridden} overridden"
+    )
+
+
+def tally_sentence(t: ExportMarkers) -> str:
+    """This export's blocks as paragraphs with a marker plus figure blocks without one (design
+    11 section 20.11). The validator recomputes it from the sidecars (Z8)."""
+    p, f = t.paragraphs.total(), t.figures.total()
+    return (
+        f"In this export: {_n(p + f, 'block')} = {_n(p, 'paragraph')} with a marker "
+        f"({_by_status(t.paragraphs)}) + {_n(f, 'figure block')} without one "
+        f"({_by_status(t.figures)})."
+    )
+
+
+def render_readme(m: Manifest, markers: ExportMarkers) -> str:
+    """Deterministic: the only time in it is `manifest.project.generated_at`. `markers` is the
+    tally of the review sidecars (`markers.tally_markers`)."""
     gen = str(to_jsonable(m.project)["generated_at"])
     pages = len({(a.source_doc, p) for a in m.articles for p in a.pages})
     lines: list[str] = [
@@ -80,27 +105,45 @@ def render_readme(m: Manifest) -> str:
         "",
         "Cleanup may only join hyphenated line breaks, normalise whitespace and bullet glyphs "
         "and strip header/footer text. Numbers are checked against the source. "
-        f"`review` in each article counts the approved blocks, the human-edited blocks and "
-        f"the overrides. {len(m.review_stats.numbers_verified_blocks)} block(s) with numeric "
+        "`review` in each article counts its blocks by who decided they could go out, in the "
+        "categories of its review file (see Review markers). "
+        f"{len(m.review_stats.numbers_verified_blocks)} block(s) with numeric "
         "specifications were verified by a human (`review_stats.numbers_verified_blocks`).",
         "",
         "## Review markers",
         "",
-        "A paragraph that no person checked ends with an HTML comment on its own line: "
+        "Every paragraph of an article starts with an HTML comment on the line directly above "
+        "it, after a blank line, that says who checked it: "
+        "`<!-- ml: approved; block: <block-id> -->` (a person approved it), "
+        "`<!-- ml: edited; block: <block-id> -->` (a person edited its text or accepted a proposed "
+        "edit; the review file's `edited_by` says which), "
         "`<!-- ml: auto-approved; block: <block-id> -->` (the checks passed and nobody looked) "
-        'or `<!-- ml: overridden; block: <block-id>; reason: "..." -->` (exported under an '
-        "override; `flag: <flag-id>` is added when the override covered an open flag). "
-        "A paragraph without a marker was approved or edited by a person. Figures carry no "
-        "marker. Markdown renderers show nothing for these comments (a renderer that escapes "
-        "raw HTML shows them as text); `grep -rn '^<!-- ml: ' articles/` lists them.",
+        'or `<!-- ml: overridden; block: <block-id>; reason: "..." -->` (exported unreviewed '
+        "under an override; `flag: <flag-id>` is added when the override covered an open "
+        "flag). The comment belongs to the paragraph below it. Every paragraph has exactly one, "
+        "so a paragraph without a marker means the file was changed after the export, never "
+        "that a person checked it. Figure blocks have no marker; the review file lists them. "
+        "Markdown renderers show nothing for these comments (a renderer that escapes raw HTML "
+        "shows them as text). `grep -rn '^<!-- ml: ' articles/` lists every paragraph with its "
+        "status; `grep -rnE '^<!-- ml: (auto-approved|overridden);' articles/` lists the "
+        "paragraphs nobody checked.",
         "The reason is a JSON string in which `>`, `<` and a `-` after a `-` are written as "
         "`\\u003e`, `\\u003c` and `\\u002d`, so the comment never ends early; decode it "
         "with any JSON parser.",
         "`articles/<article-id>.review.json` lists every block of the article in order: "
-        "`block_id`, `type`, `page`, `status` (auto_approved, approved, edited, overridden), "
+        "`block_id`, `type`, `page`, `placement` (`paragraph`: a paragraph of the article, with "
+        "its marker; `figure`: a figure block, which has no paragraph and no marker), `text` "
+        "(the first 80 characters of the paragraph as written in the article, so you can find "
+        "it without counting), `status` (auto_approved, approved, edited, overridden), "
         "`decided_by` (checks, person, override), `at`, the auto-approve `confidence`, the "
-        "override `reason` and `flag_id`, and for a figure block the articles that show the "
-        "figure. Its `counts` equal the article's frontmatter `review` counts.",
+        "override `reason` and `flag_id`, the paragraph's `text_sha256`, and for a figure block "
+        "the articles that show the figure. Manual Labor has no user accounts: `person` means "
+        "whoever reviewed in this project, not a named individual. Its `counts` equal the "
+        "article's frontmatter `review` counts, key for key.",
+        "Counts: the review files' `counts`, the frontmatter `review` and the Export screen "
+        "count blocks, figure blocks included; markers count paragraphs. For each status, "
+        "blocks = paragraphs with that marker + figure blocks with that status. "
+        + tally_sentence(markers),
         "",
         "## Overrides",
         "",

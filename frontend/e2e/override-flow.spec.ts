@@ -93,14 +93,31 @@ test("OV1 one click overrides every unflagged block with one reason; nothing ove
   await expect(page.locator("#step-state-export")).toHaveText(/Ready with an override/);
   expect((await status()).counts).toMatchObject({ to_review: 0, flagged: 0, blocking: 0, overridden: n + 1 });
 
-  // design 11 section 20: the export marks every overridden paragraph and ships a review file per article
+  // design 11 section 20.11: the export marks every paragraph and ships a review file per article; the screen says how
+  // the exported blocks reconcile with the markers (figure blocks have none), from the server's own tally
   await expect(page.getByTestId("export-ready")).toContainText("a review file names who checked each paragraph");
   await page.getByTestId("export-start").click();
   const summary = page.getByTestId("export-summary");
   await expect(summary).toBeVisible({ timeout: 120_000 });
-  await expect(summary).toContainText("ml: overridden");
   const done = await status();
   expect(done.summary?.review.overrides).toBe(n + 1);
+  const mk = done.summary?.markers;
+  expect(mk).toBeTruthy();
+  const r = done.summary!.review;
+  expect(mk!.paragraphs.overridden + mk!.figures.overridden).toBe(r.overrides);
+  expect(mk!.paragraphs.auto_approved + mk!.figures.auto_approved).toBe(r.auto_approved);
+  expect(mk!.paragraphs.approved + mk!.figures.approved).toBe(r.approved);
+  expect(mk!.paragraphs.edited + mk!.figures.edited).toBe(r.edited);
+  const paragraphs = mk!.paragraphs.auto_approved + mk!.paragraphs.approved + mk!.paragraphs.edited + mk!.paragraphs.overridden;
+  await expect(page.getByTestId("summary-markers")).toContainText(`each of the ${paragraphs} paragraph`);
+  await expect(page.getByTestId("summary-markers")).toContainText(`${mk!.paragraphs.overridden} overridden`);
+  const figureBlocks = mk!.figures.auto_approved + mk!.figures.approved + mk!.figures.edited + mk!.figures.overridden;
+  if (figureBlocks) await expect(page.getByTestId("summary-markers-sum")).toContainText(`${r.auto_approved} auto-approved = ${mk!.paragraphs.auto_approved} + ${mk!.figures.auto_approved}`);
+  else await expect(page.getByTestId("summary-markers")).toContainText("There are no figure blocks");
+  await expect(summary.getByRole("alert")).toHaveCount(0);
+  // the export used the overrides up: the reason box, back with the new lock, is empty as its label says
+  await expect(page.getByTestId("export-locked")).toBeVisible();
+  await expect(page.getByTestId("override-reason")).toHaveValue("");
   const zip = await api.get("/api/export/download");
   expect(zip.ok()).toBeTruthy();
   const bytes = await zip.body();

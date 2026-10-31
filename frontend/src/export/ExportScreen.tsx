@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ApiError, client, unwrap } from "../api/client";
 import { invalidateReviewCounts, qk, trackJob, useExportStatus, useOpenFlags } from "../api/queries";
-import type { ExportStatus, ExportSummary, Override } from "../api/schema";
+import type { ArticleReviewCounts, ExportStatus, ExportSummary, Override } from "../api/schema";
 import { useJobWatch } from "../hooks/useJobsPolling";
 import Hint from "../onboarding/Hint";
 import { useBlockTitles } from "../shell/blockTitles";
@@ -202,17 +202,27 @@ function Locked({ st, after }: { st: ExportStatus; after: ExportSummary | null }
  * server refuses one anyway (422). Per-block overrides cover exactly the blocks blocking now: a flag raised on one
  * afterwards blocks again, and a block that starts blocking later is not covered (P3). Request ids are `<run>:<block>`
  * and the run id is renewed only after a run that recorded everything, so a retry after a stop records nothing twice.
- * The reason stays in the box until the person clears it. A 422 on one block is reported and the rest are still
- * recorded; any other failure stops the run.
+ * The reason lives in the screen (design 11 section 20.11): it stays while the form closes and opens again, and an
+ * export, which uses the overrides up, clears it. A 422 on one block is reported and the rest are still recorded; any
+ * other failure stops the run.
  */
-function OverrideForm({ st, onDone }: { st: ExportStatus; onDone: (st: ExportStatus) => void }) {
+function OverrideForm({
+  st,
+  onDone,
+  reason,
+  setReason,
+}: {
+  st: ExportStatus;
+  onDone: (st: ExportStatus) => void;
+  reason: string;
+  setReason: (r: string) => void;
+}) {
   const flagged = new Set((st.flag_blockers ?? []).map((f) => f.block_id));
   const listed = (st.blockers ?? []).filter((id) => !flagged.has(id));
   // every unflagged blocker, not only the listed ones; an older server without the partition: what is listed
   const terms = scopeTerms(st);
   const remaining = terms ? terms.toReview : listed.length;
   const leftOut = terms ? terms.flagged : (st.blockers ?? []).length - listed.length;
-  const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<{ done: number; of: number; final: boolean } | null>(null);
@@ -311,7 +321,7 @@ function OverrideForm({ st, onDone }: { st: ExportStatus; onDone: (st: ExportSta
         </p>
       ) : null}
       <label htmlFor="override-reason" className="block text-sm font-medium text-ink">
-        Reason <span className="font-normal text-muted">(required, written into manifest.json; it stays here until you clear it)</span>
+        Reason <span className="font-normal text-muted">(required, written into manifest.json; cleared after an export, which uses up the overrides)</span>
       </label>
       <Hint id="overrideReason">
         <textarea
@@ -493,7 +503,18 @@ function Summary({ s, fresh }: { s: ExportSummary; fresh: boolean }) {
   const leftOut = Object.entries(r.left_out ?? {}).filter(([, n]) => n > 0);
   const leftTotal = leftOut.reduce((a, [, n]) => a + n, 0);
   const bucketSum = r.auto_approved + r.approved + r.edited + r.overrides;
-  const adds = bucketSum === r.blocks && r.blocks + leftTotal === r.total_blocks;
+  // design 11 section 20.11: per status, the exported blocks are the paragraphs (one marker each) plus the figure
+  // blocks (none); `markers` is absent from a summary recorded before markers were described here
+  const m = s.markers ?? null;
+  const byStatus = (c: ArticleReviewCounts): string => `${c.auto_approved} auto-approved, ${c.approved} approved, ${c.edited} edited, ${c.overridden} overridden`;
+  const total = (c: ArticleReviewCounts): number => c.auto_approved + c.approved + c.edited + c.overridden;
+  const markersAdd =
+    !m ||
+    (m.paragraphs.auto_approved + m.figures.auto_approved === r.auto_approved &&
+      m.paragraphs.approved + m.figures.approved === r.approved &&
+      m.paragraphs.edited + m.figures.edited === r.edited &&
+      m.paragraphs.overridden + m.figures.overridden === r.overrides);
+  const adds = bucketSum === r.blocks && r.blocks + leftTotal === r.total_blocks && markersAdd;
   return (
     <section aria-labelledby="summary-title" data-testid="export-summary" className="space-y-3 rounded-2xl border border-line bg-raised p-5 shadow-lift">
       <h3 id="summary-title" tabIndex={-1} className={`text-xl font-semibold text-ink ${FOCUS}`}>
@@ -520,8 +541,24 @@ function Summary({ s, fresh }: { s: ExportSummary; fresh: boolean }) {
       </p>
       {r.overrides ? (
         <p className="text-sm text-muted">
-          The {plural(r.overrides, "overridden block")} went out unreviewed, with machine-cleaned text; manifest.json lists each one with its reason, and in the
-          article each one ends with an invisible <code>ml: overridden</code> comment.
+          The {plural(r.overrides, "overridden block")} went out unreviewed, with machine-cleaned text; manifest.json lists each one with its reason.
+        </p>
+      ) : null}
+      {m ? (
+        <p className="text-sm tabular-nums text-muted" data-testid="summary-markers">
+          In the articles, each of the {plural(total(m.paragraphs), "paragraph")} starts with an invisible <code>ml:</code> comment on the line above it
+          naming who checked it: {byStatus(m.paragraphs)}.{" "}
+          {total(m.figures)
+            ? `The ${plural(total(m.figures), "figure block")} ${total(m.figures) === 1 ? "has" : "have"} none (${byStatus(m.figures)}); `
+            : "There are no figure blocks; "}
+          each article&apos;s review file lists every block with the start of its text.
+        </p>
+      ) : null}
+      {m && total(m.figures) ? (
+        <p className="text-sm tabular-nums text-muted" data-testid="summary-markers-sum">
+          Exported blocks = paragraphs + figure blocks: {r.auto_approved} auto-approved = {m.paragraphs.auto_approved} + {m.figures.auto_approved},{" "}
+          {r.approved} approved = {m.paragraphs.approved} + {m.figures.approved}, {r.edited} edited = {m.paragraphs.edited} + {m.figures.edited},{" "}
+          {r.overrides} overridden = {m.paragraphs.overridden} + {m.figures.overridden}.
         </p>
       ) : null}
       {!adds ? (
@@ -558,6 +595,8 @@ export default function ExportScreen() {
   const [startError, setStartError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
   const job = useJobWatch(jobId);
+  // the block-override reason (design 11 section 20.11): kept while the form closes, cleared by an export
+  const [overrideReason, setOverrideReason] = useState("");
   const st = status.data;
   const locked = !!st && (st.blockers ?? []).length > 0;
   // the second column holds the override forms (locked) and the active overrides; it is left out when empty
@@ -580,6 +619,7 @@ export default function ExportScreen() {
     // the export just finished: read the gate and the new summary now, not on the next navigation. The Ready section
     // with the Export button may be replaced by the lock (the export spent its overrides): focus goes to the result.
     if (!jobDone) return;
+    setOverrideReason(""); // the export used the overrides up
     void qc.invalidateQueries({ queryKey: qk.exportStatus });
     setLive(EXPORT_FINISHED);
     setFocusTo("summary-title");
@@ -703,7 +743,7 @@ export default function ExportScreen() {
             <div className="min-w-0 space-y-7" data-testid="export-side">
               {locked ? (
                 <>
-                  <OverrideForm st={st} onDone={recorded} />
+                  <OverrideForm st={st} onDone={recorded} reason={overrideReason} setReason={setOverrideReason} />
                   <FlagOverrides list={st.flag_blockers ?? []} onDone={flagRecorded} />
                 </>
               ) : null}

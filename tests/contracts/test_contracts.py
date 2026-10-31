@@ -181,7 +181,7 @@ def test_c3_extra_forbidden(model: type[BaseModel]) -> None:
             "sections": [],
             "figures": [],
             "blocks": 1,
-            "review": {"approved": 1, "edited": 0, "overrides": 0},
+            "review": {"auto_approved": 1, "approved": 0, "edited": 0, "overridden": 0},
             "generated_at": TS,
         },
         "Manifest": manifest_dict(),
@@ -721,8 +721,9 @@ def test_misc_models() -> None:
     }
     assert c.LLMCallLog.model_validate(log).latency_ms == 1.235
     bad(c.LLMCallLog, {**log, "latency_ms": -1})
-    rc = {"approved": 1, "edited": 2, "overrides": 0}
-    bad(c.ReviewCounts, rc, "edited")
+    # design 11 section 20.11: the front matter counts are the sidecar's categories
+    assert c.ArticleFrontmatter.model_fields["review"].annotation is c.ArticleReviewCounts
+    assert not hasattr(c, "ReviewCounts")
     bad(
         c.ArticleFrontmatter,
         {
@@ -735,7 +736,7 @@ def test_misc_models() -> None:
             "sections": [],
             "figures": [],
             "blocks": 1,
-            "review": {"approved": 1, "edited": 0, "overrides": 0},
+            "review": {"auto_approved": 1, "approved": 0, "edited": 0, "overridden": 0},
             "generated_at": TS,
         },
         "pages",
@@ -752,7 +753,7 @@ def test_misc_models() -> None:
             "sections": [],
             "figures": [],
             "blocks": 0,
-            "review": {"approved": 1, "edited": 0, "overrides": 0},
+            "review": {"auto_approved": 1, "approved": 0, "edited": 0, "overridden": 0},
             "generated_at": TS,
         },
         "blocks",
@@ -855,3 +856,32 @@ def test_c19_article_review_contract() -> None:
     pl = two["blocks"][4]["figure"]["placements"]
     pl.append(dict(pl[0]))
     bad(c.ArticleReview, two, "placements")
+    # section 20.11: where each block went, and the first characters of its paragraph
+    bad(c.ArticleReview, mut(1, placement="figure"), "placement")
+    bad(c.ArticleReview, mut(4, placement="paragraph"), "placement")
+    bad(c.ArticleReview, mut(1, text=None), "text")
+    bad(c.ArticleReview, mut(4, text="x"), "text")
+    bad(c.ArticleReview, mut(1, text="x" * 81), "text")
+    c.ArticleReview.model_validate(mut(1, text="x" * 80))
+    c.ArticleReview.model_validate(mut(1, text=""))
+
+
+def test_c20_front_matter_review_sums_to_blocks() -> None:
+    """Section 20.11: one block, one category; the four counts add up to `blocks`."""
+    fm = {
+        "id": SLUG,
+        "title": "T",
+        "source_doc": SLUG,
+        "source_file": "a",
+        "product_model": None,
+        "pages": [1],
+        "sections": [],
+        "figures": [],
+        "blocks": 11,
+        "review": {"auto_approved": 2, "approved": 2, "edited": 0, "overridden": 7},
+        "generated_at": TS,
+    }
+    c.ArticleFrontmatter.model_validate(fm)
+    bad(c.ArticleFrontmatter, {**fm, "blocks": 12}, "blocks")
+    # Dana's zip: the first version's grouped counts no longer validate
+    bad(c.ArticleFrontmatter, {**fm, "review": {"approved": 4, "edited": 0, "overrides": 7}})

@@ -133,6 +133,8 @@ def article_review_dict() -> dict[str, Any]:
             "flag_id": None,
             "figure": None,
             "text_sha256": "d" * 64,
+            "text": "Loosen the four M8 bolts.",
+            "placement": "paragraph",
         }
         d.update(over)
         return d
@@ -169,6 +171,8 @@ def article_review_dict() -> dict[str, Any]:
                 at=None,
                 confidence=0.99,
                 text_sha256=None,
+                text=None,
+                placement="figure",
                 figure={
                     "figure_id": f"FIG-{SLUG}-p042-01",
                     "placements": [{"article_id": art, "rule": "caption_ref", "confidence": 0.96}],

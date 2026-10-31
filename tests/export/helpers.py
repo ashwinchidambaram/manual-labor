@@ -155,9 +155,9 @@ def expected_body(
 ) -> tuple[str, list[str]]:
     """(the article text after the frontmatter block's closing line, figure ids in order),
     derived only from the review blocks, groups.json, attach.json and the sidecars. With
-    `with_markers`, each auto-approved text block is followed by its review marker (design 11
-    section 20; the projects these tests export carry no override); without, the body is the
-    one the section 3.2 grammar produced before section 20."""
+    `with_markers`, every text block's part has its review marker on the line directly above it
+    (design 11 section 20.11; the projects these tests export carry no override); without, the
+    body is the one the section 3.2 grammar produced before section 20."""
     from manuallabor import ids
     from manuallabor.cleanup.types import AttachFile
     from manuallabor.contracts.figure import FigureRecord, parse_figure_file
@@ -197,11 +197,14 @@ def expected_body(
             t = "#" * min(6, 1 + level_of[b.id]) + " " + t
         elif b.type == BlockType.list:
             t = "\n".join(list_lines(t))
+        if with_markers:
+            word = {
+                BlockStatus.auto_approved: "auto-approved",
+                BlockStatus.approved: "approved",
+                BlockStatus.edited: "edited",
+            }[b.status]
+            t = f"<!-- ml: {word}; block: {b.id} -->\n" + t
         items.append(((b.reading_order, 0, 0), t, None))
-        if with_markers and b.status == BlockStatus.auto_approved:
-            items.append(
-                ((b.reading_order, 0, 1), f"<!-- ml: auto-approved; block: {b.id} -->", None)
-            )
     have = {b.id for b in kept if b.type != BlockType.figure}
     kept_order = {b.id: b.reading_order for b in kept}
     cap_block = {

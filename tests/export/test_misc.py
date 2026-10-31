@@ -10,7 +10,7 @@ from manuallabor.contracts.enums import BlockStatus
 from manuallabor.contracts.manifest import ManifestDocLearning, ManifestLearning
 from manuallabor.export.load import last_models
 from manuallabor.export.pipeline import summarize
-from manuallabor.export.readme import FIG_REGEX, render_readme
+from manuallabor.export.readme import FIG_REGEX
 from manuallabor.export.types import MAX_ARTICLE_BYTES
 from manuallabor.project import ProjectPaths
 from tests.export.helpers import Exported
@@ -39,7 +39,7 @@ def test_e18_readme_names_overrides_and_learning() -> None:
     inp.learning = ManifestLearning(
         enabled=True, docs={"doc": ManifestDocLearning(group="001", clean="002")}
     )
-    text = render_readme(run(inp).manifest)
+    text = run(inp).readme
     assert "1 block(s) were exported without human approval" in text
     assert "Learning enabled: yes." in text and "grouping `001`, cleanup `002`" in text
     assert "None: every exported" not in text

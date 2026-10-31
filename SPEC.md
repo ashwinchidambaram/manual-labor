@@ -141,18 +141,21 @@ pages: [41, 42, 43, 44, 45]
 sections: ["5.1"]
 figures: [FIG-acme-x200-service-p042-01, FIG-acme-x200-service-p042-02]
 blocks: 7
-review: { approved: 7, edited: 1, overrides: 0 }
+review: { auto_approved: 6, approved: 0, edited: 1, overridden: 0 }
 generated_at: 2026-10-28T18:00:00Z
 ---
 
 # Belt tension & drive maintenance
 
+<!-- ml: auto-approved; block: b-acme-x200-service-p042-02 -->
 To adjust belt tension, loosen the four M8 bolts on the motor mount …
 
 ![FIG-acme-x200-service-p042-01 — Belt tension adjustment points](images/acme-x200-service/FIG-acme-x200-service-p042-01.png)
 
+<!-- ml: edited; block: b-acme-x200-service-p042-04 -->
 Tighten bolts to 35 N·m in a cross pattern.
 ```
+`review` counts the article's blocks (figure blocks included) in the categories of its review file `articles/<id>.review.json`: `auto_approved` (the checks passed, nobody looked), `approved` and `edited` (a person), `overridden` (exported unreviewed under an override); they sum to `blocks`. Every paragraph starts with an invisible review marker on the line above it, `<!-- ml: <status>; block: <id>[; flag: …][; reason: …] -->`, with status `approved`, `edited`, `auto-approved` or `overridden` (amended 2026-10-31, design 11 section 20.11).
 The alt text always begins with the figure ID, followed by ` — ` and the caption (original if present, else generated). This keeps the reference useful in plain-text contexts and lets an agent map image → manifest record with one regex.
 
 ### 6.3 Figure sidecar (`images/<docslug>/<FIG-ID>.json`)
