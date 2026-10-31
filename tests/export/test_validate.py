@@ -297,7 +297,11 @@ def test_an_image_link_outside_images_in_source_text_is_left_alone(
     def fn(f: Files) -> None:
         append_paragraph(f, "Source text with ![logo](https://example.com/logo.png) in it.")
 
-    assert mutate(exported_a, tmp_path, fn) == []
+    # no image problem; the appended paragraph belongs to no block, which Z9 reports (design
+    # 11 section 20.10: every paragraph of an article is in its review sidecar)
+    problems = mutate(exported_a, tmp_path, fn)
+    assert "Z4" not in codes(problems)
+    assert codes(problems) == {"Z9"}
 
 
 def test_a_caption_with_brackets_and_parens_still_validates(

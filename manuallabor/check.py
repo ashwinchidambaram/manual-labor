@@ -433,7 +433,7 @@ def k16_figure_refs(ctx: CheckCtx) -> str | None:
     with zipfile.ZipFile(ctx.export["zip"]) as zf:
         names = set(zf.namelist())
         for name in sorted(names):
-            if not name.startswith("articles/"):
+            if not (name.startswith("articles/") and name.endswith(".md")):
                 continue
             images: list[tuple[str, str]] = []
             stack = list(md.parse(zf.read(name).decode("utf-8")))

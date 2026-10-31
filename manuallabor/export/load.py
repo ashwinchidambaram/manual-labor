@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import json
+from typing import Literal
 
 import manuallabor
 from manuallabor import ids
 from manuallabor.cleanup.types import AttachFile
-from manuallabor.contracts.enums import Task
+from manuallabor.contracts.block import Block
+from manuallabor.contracts.enums import BlockStatus, Task
 from manuallabor.contracts.figure import FigureRecord, parse_figure_file
 from manuallabor.contracts.io import read_json
 from manuallabor.contracts.manifest import ManifestDocLearning, ManifestLearning
@@ -17,13 +19,14 @@ from manuallabor.export.types import (
     DocInput,
     ExportError,
     FigureData,
+    HumanDecision,
 )
 from manuallabor.figures.types import FigureReport
 from manuallabor.project import ProjectPaths
 from manuallabor.scoring.pipeline import scores_current
 from manuallabor.state.data import ProjectData
 from manuallabor.state.models import ActionKind
-from manuallabor.state.review import load_review_blocks
+from manuallabor.state.review import Derived, load_review_overlay
 from manuallabor.state.store import Store
 
 __all__ = ["active_overrides", "doc_ready", "last_models", "load_inputs"]
@@ -76,6 +79,21 @@ def last_models(paths: ProjectPaths) -> dict[str, tuple[str, str]]:
     return out
 
 
+def human_decisions(overlay: list[tuple[Block, Derived]]) -> dict[str, HumanDecision]:
+    """Block id -> the decision behind every approved or edited block: its time, and for an
+    edited block whether a person wrote the text or accepted an agent proposal (section 20)."""
+    out: dict[str, HumanDecision] = {}
+    for b, r in overlay:
+        if b.status not in (BlockStatus.approved, BlockStatus.edited) or r.decision is None:
+            continue
+        edited_by: Literal["person", "agent_proposal"] | None = None
+        if b.status == BlockStatus.edited:
+            src = r.edit.source if r.edit is not None else r.decision.source
+            edited_by = "agent_proposal" if src == "agent" else "person"
+        out[b.id] = HumanDecision(at=r.decision.decision.timestamp, edited_by=edited_by)
+    return out
+
+
 def _load_figures(paths: ProjectPaths, slug: str) -> dict[str, FigureData]:
     dp = paths.doc(slug)
     if not dp.figure_report.is_file():
@@ -118,14 +136,16 @@ def load_inputs(paths: ProjectPaths, store: Store, after_action_id: int = 0) -> 
         learn_docs[slug] = ManifestDocLearning(
             group=gf.learning_snapshot, clean=cf.learning_snapshot if cf else "baseline"
         )
+        overlay = load_review_overlay(paths, store, slug)
         docs[slug] = DocInput(
             doc=paths.load_document(slug),
-            blocks=load_review_blocks(paths, store, slug),
+            blocks=[b for b, _ in overlay],
             groups=gf,
             attach=af,
             figures=_load_figures(paths, slug),
             selected={b for b in selected_all if ids.parse_block_id(b)[0] == slug},
             scope=data.scope_ids(slug, selected_all),
+            decisions=human_decisions(overlay),
         )
     return AssembleInputs(
         config=cfg,

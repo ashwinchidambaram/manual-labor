@@ -38,6 +38,7 @@ from manuallabor.export.types import (
     AssembleInputs,
     DocInput,
     FigureData,
+    HumanDecision,
 )
 from manuallabor.grouping.structure import page_ranges
 from manuallabor.grouping.types import default_params
@@ -70,6 +71,8 @@ def blk(
         text = ""
     if status == BlockStatus.edited and clean is None:
         clean = text
+    if status == BlockStatus.auto_approved:  # scoring auto-approves only a scored block
+        kw.setdefault("confidence", 0.95)
     return make_block(text, n=n, page=page, type=type, status=status, clean_text=clean, **kw)  # type: ignore[arg-type]
 
 
@@ -318,8 +321,17 @@ def synth_inputs(
     title: str | None = "Doc Title",
     product_model: str | None = None,
     scope_extra: set[str] | None = None,
+    decisions: Mapping[str, HumanDecision] | None = None,
 ) -> AssembleInputs:
     blocks = list(blocks)
+    if decisions is None:  # a person decided every approved or edited block, at CLOCK
+        decisions = {
+            b.id: HumanDecision(
+                at=CLOCK, edited_by="person" if b.status == BlockStatus.edited else None
+            )
+            for b in blocks
+            if b.status in (BlockStatus.approved, BlockStatus.edited)
+        }
     gf = _groups(blocks, levels or {}, sections or {}, topics, unassigned_topic)
     doc = Document(
         slug=SLUG,
@@ -359,6 +371,7 @@ def synth_inputs(
                 figures={f.record.id: f for f in figures},
                 selected=set(sel),
                 scope=scope,
+                decisions=dict(decisions),
             )
         },
         flags=list(flags),

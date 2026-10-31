@@ -38,6 +38,7 @@ class Gate:
     blockers: list[str]  # blocks no active override covers, in reading order per document
     covered: dict[str, ActiveOverride] = field(default_factory=dict)  # block id -> override
     open_flag_of: dict[str, str] = field(default_factory=dict)  # block id -> its open flag id
+    block_flags: dict[str, list[str]] = field(default_factory=dict)  # block id -> open flag ids
     # every open flag no override covers, with its block, in the blockers' order
     flag_blockers: list[tuple[Flag, str]] = field(default_factory=list)
     counts: dict[str, int] = field(default_factory=dict)  # COUNT_KEYS -> n
@@ -108,7 +109,10 @@ def export_gate(
                 uncovered_flags.setdefault(b, []).append(f)
             used += hits
         if ok and used:
-            covered[b] = max(used, key=lambda o: o.action_id)  # the latest covering override
+            # the record names the decision about the flag when the block has one: the latest
+            # override covering a flag, else the latest covering override (design 11 section 20)
+            about_flag = [ov for ov in used if any(_covers_flag(ov, f) for f in bflags)]
+            covered[b] = max(about_flag or used, key=lambda o: o.action_id)
     blockers = sorted((b for b in raw if b not in covered), key=lambda b: order.get(b, ("", 0)))
     flag_blockers = [
         (f, b) for b in blockers for f in sorted(uncovered_flags.get(b, []), key=lambda f: f.id)
@@ -134,6 +138,7 @@ def export_gate(
         blockers=blockers,
         covered=covered,
         open_flag_of=open_flag_of,
+        block_flags={b: [f.id for f in fs] for b, fs in flags_of.items()},
         flag_blockers=flag_blockers,
         counts=counts,
     )

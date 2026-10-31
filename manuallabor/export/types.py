@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Final, Literal
 
 from manuallabor.cleanup.types import AttachFile
-from manuallabor.contracts.article import ArticleFrontmatter
+from manuallabor.contracts.article import ArticleFrontmatter, ArticleReview
 from manuallabor.contracts.block import Block
 from manuallabor.contracts.config import ProjectConfig
 from manuallabor.contracts.document import Document
@@ -19,7 +19,7 @@ from manuallabor.contracts.group import GroupsFile
 from manuallabor.contracts.manifest import Manifest, ManifestLearning
 from manuallabor.state.models import ExportReviewSummary
 
-EXPORT_ALGO_VERSION: Final = "1"
+EXPORT_ALGO_VERSION: Final = "2"  # 2: review markers and sidecars (section 20)
 MAX_ARTICLE_BYTES: Final = 500_000
 BLOCKER_LIMIT: Final = 20
 NO_CAPTION: Final = "(no caption)"
@@ -77,6 +77,14 @@ class FigureData:
     svg: Path | None
 
 
+@dataclass(frozen=True)
+class HumanDecision:
+    """The decision that gives an approved or edited block its status (design 11 section 20)."""
+
+    at: datetime  # the effective decision's timestamp
+    edited_by: Literal["person", "agent_proposal"] | None  # for an edited block: who wrote it
+
+
 @dataclass
 class DocInput:
     doc: Document
@@ -86,6 +94,8 @@ class DocInput:
     figures: dict[str, FigureData]
     selected: set[str]
     scope: set[str]  # selected blocks + figure blocks attached to an article
+    # block id -> the person's decision, for every approved or edited block (section 20)
+    decisions: dict[str, HumanDecision] = field(default_factory=dict)
 
 
 @dataclass
@@ -102,8 +112,8 @@ class AssembleInputs:
 
 @dataclass(frozen=True)
 class BodyPart:
-    kind: Literal["block", "figure"]
-    block_id: str | None  # the source block of a "block" part
+    kind: Literal["block", "figure", "marker"]
+    block_id: str | None  # the source block of a "block" part, the marked block of a "marker"
     figure_id: str | None
     text: str
 
@@ -117,6 +127,8 @@ class BuiltArticle:
     title: str
     block_ids: list[str]
     figure_ids: list[str]
+    review: ArticleReview  # the sidecar, articles/<id>.review.json (section 20)
+    review_path: str
     body_parts: list[BodyPart] = field(default_factory=list)
 
 

@@ -13,7 +13,15 @@ from manuallabor.contracts._base import (
     Unit,
     UTCDateTime,
 )
-from manuallabor.contracts.article import ArticleFrontmatter, ReviewCounts
+from manuallabor.contracts.article import (
+    ArticleFrontmatter,
+    ArticleReview,
+    ArticleReviewCounts,
+    BlockReview,
+    FigurePlacement,
+    FigureReview,
+    ReviewCounts,
+)
 from manuallabor.contracts.block import (
     Block,
     DiffOp,
@@ -124,6 +132,7 @@ EXPORTED_MODELS: tuple[type[BaseModel], ...] = (
     Decision,
     Proposal,
     ArticleFrontmatter,
+    ArticleReview,
     Manifest,
     ProjectConfig,
     LLMCallLog,
@@ -165,6 +174,11 @@ __all__ = [
     "EXPORTED_MODELS",
     "KNOWN_PROVIDERS",
     "ArticleFrontmatter",
+    "ArticleReview",
+    "ArticleReviewCounts",
+    "BlockReview",
+    "FigurePlacement",
+    "FigureReview",
     "ArticleSplit",
     "AttachRule",
     "BBox",

@@ -66,6 +66,7 @@ __all__ = [
     "derive_status",
     "display_text",
     "load_review_blocks",
+    "load_review_overlay",
     "numeric_changes",
     "overlay_block",
     "why_items",
@@ -160,9 +161,11 @@ def overlay_block(block: Block, r: Derived) -> Block:
     return Block.model_validate({**block.model_dump(mode="json"), **fields})
 
 
-def load_review_blocks(paths: ProjectPaths, store: Store, slug: str) -> list[Block]:
-    """scoring.load_scored_blocks + the decision overlay. The API and module 11 read blocks
-    only through this (or ReviewService); it never feeds back into scoring."""
+def load_review_overlay(
+    paths: ProjectPaths, store: Store, slug: str
+) -> list[tuple[Block, Derived]]:
+    """Each block with the human overlay applied, and the derivation that produced it (the
+    effective decision, for the export's review sidecar, design 11 section 20)."""
     from manuallabor.scoring.pipeline import load_scored_blocks
 
     machine = load_scored_blocks(paths, slug)
@@ -170,7 +173,17 @@ def load_review_blocks(paths: ProjectPaths, store: Store, slug: str) -> list[Blo
     for d in store.decisions(doc_id=slug):
         decisions.setdefault(d.decision.block_id, []).append(d)
     flags = {f.id: f for f in store.flags()}
-    return [overlay_block(b, derive(b, decisions.get(b.id, ()), flags)) for b in machine]
+    out: list[tuple[Block, Derived]] = []
+    for b in machine:
+        r = derive(b, decisions.get(b.id, ()), flags)
+        out.append((overlay_block(b, r), r))
+    return out
+
+
+def load_review_blocks(paths: ProjectPaths, store: Store, slug: str) -> list[Block]:
+    """scoring.load_scored_blocks + the decision overlay. The API and module 11 read blocks
+    only through this (or ReviewService); it never feeds back into scoring."""
+    return [b for b, _ in load_review_overlay(paths, store, slug)]
 
 
 def _title_rows(slug: str, overlays: Sequence[Block]) -> dict[str, dict[str, Any]]:

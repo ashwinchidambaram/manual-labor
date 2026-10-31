@@ -19,7 +19,7 @@ from tests.export.synth import bid, blk, flag, override, run, synth_inputs
 
 def test_e18_readme_of_a_real_export(exported_a: Exported) -> None:
     text = exported_a.text("README.md")
-    n = len([x for x in exported_a.names() if x.startswith("articles/")])
+    n = len([x for x in exported_a.names() if x.startswith("articles/") and x.endswith(".md")])
     assert f"{n} articles" in text
     assert FIG_REGEX in text and "How to ingest" in text
     assert re.search(r"A figure reference line matches the regex `\^!\\\[FIG-", text)

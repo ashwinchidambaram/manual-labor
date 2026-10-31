@@ -3,14 +3,20 @@
 
 /**
  * This interface was referenced by `_All`'s JSON-Schema
- * via the `definition` "ArticleSplit".
- */
-export type ArticleSplit = 'per_topic' | 'per_document';
-/**
- * This interface was referenced by `_All`'s JSON-Schema
  * via the `definition` "AttachRule".
  */
 export type AttachRule = 'caption_ref' | 'caption_match' | 'proximity' | 'none' | 'human';
+/**
+ * This interface was referenced by `_All`'s JSON-Schema
+ * via the `definition` "BlockType".
+ */
+export type BlockType =
+  'heading' | 'paragraph' | 'list' | 'table' | 'figure' | 'caption' | 'header' | 'footer' | 'other';
+/**
+ * This interface was referenced by `_All`'s JSON-Schema
+ * via the `definition` "ArticleSplit".
+ */
+export type ArticleSplit = 'per_topic' | 'per_document';
 /**
  * This interface was referenced by `_All`'s JSON-Schema
  * via the `definition` "DiffOpKind".
@@ -39,12 +45,6 @@ export type SignalName =
   | 'figure_attach_rule'
   | 'has_numeric_spec'
   | 'llm_verifier';
-/**
- * This interface was referenced by `_All`'s JSON-Schema
- * via the `definition` "BlockType".
- */
-export type BlockType =
-  'heading' | 'paragraph' | 'list' | 'table' | 'figure' | 'caption' | 'header' | 'footer' | 'other';
 /**
  * This interface was referenced by `_All`'s JSON-Schema
  * via the `definition` "BlockStatus".
@@ -167,6 +167,73 @@ export interface ReviewCounts {
   approved: number;
   edited: number;
   overrides: number;
+}
+/**
+ * `articles/<id>.review.json`: every block of the article (its manifest `block_ids`, same
+ * order) with its review status. A text block whose status is auto_approved or overridden is
+ * followed in the article by an invisible `<!-- ml: ... -->` marker; approved and edited blocks
+ * (a person looked) and figure blocks carry none.
+ *
+ * This interface was referenced by `_All`'s JSON-Schema
+ * via the `definition` "ArticleReview".
+ */
+export interface ArticleReview {
+  article: string;
+  article_id: string;
+  blocks: BlockReview[];
+  counts: ArticleReviewCounts;
+  generated_at: string;
+  schema_version: '1.0';
+}
+/**
+ * Who decided that one block of an article could go out, and when. `status` fixes
+ * `decided_by`: auto_approved -> checks, approved/edited -> person, overridden -> override.
+ *
+ * This interface was referenced by `_All`'s JSON-Schema
+ * via the `definition` "BlockReview".
+ */
+export interface BlockReview {
+  at: string | null;
+  block_id: string;
+  confidence: number | null;
+  decided_by: 'checks' | 'person' | 'override';
+  edited_by: ('person' | 'agent_proposal') | null;
+  figure: FigureReview | null;
+  flag_id: string | null;
+  page: number;
+  reason: string | null;
+  status: 'auto_approved' | 'approved' | 'edited' | 'overridden';
+  text_sha256: string | null;
+  type: BlockType;
+}
+/**
+ * This interface was referenced by `_All`'s JSON-Schema
+ * via the `definition` "FigureReview".
+ */
+export interface FigureReview {
+  figure_id: string;
+  placements: FigurePlacement[];
+}
+/**
+ * One attachment of a figure in a written article: where its figure line appears.
+ *
+ * This interface was referenced by `_All`'s JSON-Schema
+ * via the `definition` "FigurePlacement".
+ */
+export interface FigurePlacement {
+  article_id: string;
+  confidence: number;
+  rule: AttachRule;
+}
+/**
+ * This interface was referenced by `_All`'s JSON-Schema
+ * via the `definition` "ArticleReviewCounts".
+ */
+export interface ArticleReviewCounts {
+  approved: number;
+  auto_approved: number;
+  edited: number;
+  overridden: number;
 }
 /**
  * This interface was referenced by `_All`'s JSON-Schema
@@ -638,6 +705,7 @@ export interface ManifestArticle {
   id: string;
   pages: number[];
   path: string;
+  review_sidecar: string;
   sections: string[];
   source_doc: string;
   title: string;

@@ -29,7 +29,7 @@ from manuallabor.project import ProjectPaths
 from manuallabor.state.errors import InvalidOp
 from manuallabor.state.models import ActionKind, ReviewActionIn
 from manuallabor.state.store import Store
-from tests.export.helpers import CLOCK, CLOCK2, Exported, reviewer
+from tests.export.helpers import CLOCK, CLOCK2, reviewer
 from tests.subproc import run_bounded
 
 LABOR = [sys.executable, "-m", "manuallabor"]
@@ -176,6 +176,11 @@ def test_e14_zip_is_byte_identical_across_processes_and_hash_seeds(
     assert (outs[0].assembled / "README.md").read_bytes() == (
         outs[1].assembled / "README.md"
     ).read_bytes()
+    # design 11 section 20.7: the articles and their review sidecars are byte-identical too
+    sidecars = sorted((outs[0].assembled / "articles").glob("*.review.json"))
+    assert sidecars
+    for f in sorted((outs[0].assembled / "articles").iterdir()):
+        assert f.read_bytes() == (outs[1].assembled / "articles" / f.name).read_bytes(), f.name
     # a different clock changes only the `generated_at` lines
     p = outs[0]
     r = labor("export", str(p.root), "--now", CLOCK2, "--force")
@@ -282,8 +287,19 @@ def tree(root: Path) -> dict[str, str]:
 
 
 def test_e21_a_crash_after_assemble_resumes_to_the_same_export(
-    work: ProjectPaths, exported_a: Exported
+    work: ProjectPaths, approved_a: ProjectPaths, tmp_path: Path
 ) -> None:
+    """The clean run is an export of another copy of the same approved project: since design 11
+    section 20 the review sidecars carry the time of each person's decision, so the comparison
+    needs the same decisions (exported_a's scripted reviewer approved at another moment)."""
+    from tests.conftest import labor_copy
+
+    clean = ProjectPaths(labor_copy(approved_a.root, tmp_path / "clean", db=True))
+    cs = Store.open(clean)
+    try:
+        want = run_export(clean, cs, clock=resolve_clock(CLOCK))
+    finally:
+        cs.close()
     store = Store.open(work)
     try:
         assert run_assemble(work, store, clock=resolve_clock(CLOCK)) == "built"
@@ -295,8 +311,8 @@ def test_e21_a_crash_after_assemble_resumes_to_the_same_export(
         store.close()
     assert not stray.exists() and not list(work.export_dir.glob("*.rejected"))
     assert not list(work.export_dir.rglob("*.tmp"))
-    assert tree(work.assembled) == tree(exported_a.paths.assembled)
-    assert rec.summary.zip_sha256 == exported_a.sha
+    assert tree(work.assembled) == tree(clean.assembled)
+    assert rec.summary.zip_sha256 == want.summary.zip_sha256
 
 
 def test_e21_a_zip_that_does_not_validate_is_rejected_not_left(

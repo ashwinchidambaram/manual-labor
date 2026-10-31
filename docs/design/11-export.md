@@ -23,7 +23,7 @@ Implementer: one Opus agent for `export/` + pipeline/API/check wiring; one Sonne
 | # | Policy |
 |---|---|
 | P1 | **Contributing blocks.** A block contributes text to an article iff its overlay status is `auto_approved`, `approved` or `edited`. Text = `clean_text` (for `edited`, the human text). `raw_text` is used only when `clean_text is None` on a text block that is approved (a block cleanup never touched). |
-| P2 | **Non-approved blocks (`queued`, `flagged`) are never exported silently and never exported with a marker.** The export **gate** (stricter than SPEC §7.4's "zero open flags", see open issue 1) blocks while any in-scope block is `queued` or `flagged`. `unlocked = (open_flags == 0 and queued == 0)`. Without an override, `labor export` / `POST /export` refuse with the counts and the first 20 offending block ids. **With an override** the blocks are exported with their machine `clean_text` (else `raw_text`), exactly like approved ones (no inline marker: the body stays pure source text), counted in `review.overrides` of their article, and listed one by one in `manifest.overrides` (`target_id` = block id, `flag_id` = its open flag or None, `reason`, `at`). `rejected` blocks are never exported (assigned `unassigned`, reason `rejected`). |
+| P2 | **Non-approved blocks (`queued`, `flagged`) are never exported silently.** (Amended 2026-10-30, section 20: every exported block nobody checked, auto-approved or overridden, now carries an invisible HTML-comment marker after its part and an entry in the article's review sidecar; the struck text below is kept for history.) The export **gate** (stricter than SPEC §7.4's "zero open flags", see open issue 1) blocks while any in-scope block is `queued` or `flagged`. `unlocked = (open_flags == 0 and queued == 0)`. Without an override, `labor export` / `POST /export` refuse with the counts and the first 20 offending block ids. **With an override** the blocks are exported with their machine `clean_text` (else `raw_text`), exactly like approved ones (~~no inline marker: the body stays pure source text~~; since section 20 the part is followed by an `<!-- ml: overridden; ... -->` marker that renders as nothing, and the visible text is still pure source text), counted in `review.overrides` of their article, and listed one by one in `manifest.overrides` (`target_id` = block id, `flag_id` = its open flag or None, `reason`, `at`). `rejected` blocks are never exported (assigned `unassigned`, reason `rejected`). |
 | P3 | **Override record.** `POST /export/override` / `labor export --override "<reason>"` appends an `actions` row (`kind=export_override`, `payload{reason, target_id|None, flag_id|None}`). `target_id=None` (and no `flag_id`) is blanket (covers every queued/flagged block at export time, including flags raised after it was recorded). A `flag_id` covers that flag (and the queued/flagged state of the block it targets). A `target_id` covers the block's queued/flagged review state and **never an open flag** on it, whichever was recorded first (amended 2026-10-30, §14; before, it covered the flags already open when it was recorded, which let a batch of block overrides swallow a flag); `POST /export/override` refuses a `target_id` (without `flag_id`) on a block with an open flag (422). Overrides count only if their action id is greater than the last `export_run` action (new `ActionKind`, appended after every successful export), so an old override never silently covers new problems. |
 | P4 | **Selected + header/footer.** Unselected body blocks and header/footer blocks are `unassigned` (`not_selected`, `header_footer`). A selected non-figure block whose `collapse_ws(raw_text) == ""` is `unassigned` (`empty`) and removed from its article. An article left with no member that renders anything (all `empty`) is not written. |
 | P5 | **Figures.** A figure is exported iff `attach.json` attaches it to ≥ 1 *written* article (a caption_ref pulls in a figure whose own block is unselected; that block stays `unassigned/not_selected`, the figure is still exported). Its canonical (`duplicate_of` chain root) is exported too, even if unattached (manifest rule f). One image file per canonical; every duplicate keeps its own sidecar. Vector figures export **both** `FIG-x.svg` and `FIG-x.png`; Markdown references the PNG. |
@@ -38,6 +38,7 @@ Implementer: one Opus agent for `export/` + pipeline/API/check wiring; one Sonne
 | `types.py` | `EXPORT_ALGO_VERSION="1"`, `ExportError`, `Problem{code, where, detail}`, `ExportPlan`, `BuiltArticle{id, path, text: str, frontmatter: ArticleFrontmatter, block_ids, figure_ids, body_parts: list[BodyPart]}`, `BodyPart{kind: title\|block\|figure, block_id\|figure_id, text}` (kept so tests can re-derive), `Assembled{articles, figures: list[BuiltFigure], manifest, readme, files: dict[str, bytes\|Path]}` |
 | `gate.py` | `export_gate(blocks_by_doc, flags, overrides) -> Gate{unlocked, open_flags, queued, blockers: list[BlockId], covered: dict[BlockId, Override]}` (P2/P3) |
 | `render.py` | `render_block(block, heading_depth) -> str`, `render_list`, `alt_text`, `figure_line`, `yaml_frontmatter(fm) -> str` (§3.2-3.4) |
+| `markers.py` | (section 20) `encode_reason`, `marker_line(BlockReview)`, `MARKER_RE`, `parse_marker`, `needs_marker`, `misplaced_markers(body)` |
 | `assemble.py` | `assemble(inputs: AssembleInputs, clock) -> Assembled` (pure over loaded data) and `load_inputs(paths, store) -> AssembleInputs` (I/O: `load_review_blocks`, `GroupsFile`, `AttachFile`, `DescribeFile` not needed, sidecars, `figures/index.json`, selection, flags, actions) |
 | `manifest.py` | `build_manifest(...) -> Manifest`, `used_models(paths, cfg)`, `learning_provenance(paths, cfg, slugs)` |
 | `readme.py` | `render_readme(manifest, summary) -> str` (§5.2) |
@@ -71,7 +72,7 @@ part      := block_part | figure_part
 | list | `render_list(t)`: each line `L` → `"* " + L[2:]` if `L` starts with `"• "`; `L` unchanged if it matches `^(?:\(?\d{1,2}[.)]\|[a-z][.)])\s`; otherwise (item without glyph) `"* " + L`. `*` is used, not `-`, because `FAITH_NUM_RE` treats a sign before a number as part of the number (`- 12 V`). |
 | figure block | no part (P6); placement of the figure itself is §3.3 |
 
-`t` = P1 text, no trimming, no escaping, no reflow. Markdown meta-characters in source text are **not** escaped (escaping would alter the text; open issue 3). Separator between parts is exactly one blank line. No marker is ever inserted for overridden blocks.
+`t` = P1 text, no trimming, no escaping, no reflow. Markdown meta-characters in source text are **not** escaped (escaping would alter the text; open issue 3). Separator between parts is exactly one blank line. ~~No marker is ever inserted for overridden blocks.~~ Since section 20, a block part whose review status is auto-approved or overridden is followed by one marker part (an HTML comment, its own block, separated by the same blank line); markers are not text and the visible text is unchanged (section 20.6).
 
 ### 3.3 Figure placement (per article, from `attach.json` `ArticleAttachments.figures`, already sorted)
 | Rule | Position `P(F, A)` |
@@ -82,7 +83,7 @@ part      := block_part | figure_part
 
 Several figures at one position keep attach order. `figure_part = "![" + alt + "](" + image_path + ")"`.
 - `image_path` = `images/<canon-slug>/<canon-id>.png` (**rewritten to the canonical** for duplicates; the alt text keeps the figure's own id).
-- `alt` = `f"{fid} — {cap}"`, ` — ` = U+2014 with single spaces. `cap` = `caption_original` (whitespace-collapsed) if present; else `"[generated] " + description_generated`; else `"(no caption)"`. `\`, `[`, `]`, `)` in `cap` are backslash-escaped (CommonMark punctuation escapes, so a caption containing `](` can never break the link; review fix M11.4); newlines become spaces. Alt text is metadata, not article text, so it is outside the byte-derivation rule except for its id prefix.
+- `alt` = `f"{fid} — {cap}"`, ` — ` = U+2014 with single spaces. `cap` = `caption_original` (whitespace-collapsed) if present; else `"[generated] " + description_generated`; else `"(no caption)"`. `\`, `[`, `]`, `)` in `cap` are backslash-escaped (CommonMark punctuation escapes, so a caption containing `](` can never break the link; review fix M11.4), and since section 20 also `<` (so a caption or generated description can never hold an HTML comment or read as a review marker); newlines become spaces. Alt text is metadata, not article text, so it is outside the byte-derivation rule except for its id prefix.
 - Regex every figure line must satisfy: `^!\[FIG-[a-z0-9-]+-p\d{3,4}-\d{2,3} — .*\]\(images/[a-z0-9-]+/FIG-[a-z0-9-]+-p\d{3,4}-\d{2,3}\.png\)$`.
 
 ### 3.4 Frontmatter (`render.yaml_frontmatter`)
@@ -233,7 +234,7 @@ Marker registration (`pyproject.toml`): `acc2, acc3, acc5` on the named existing
 
 ## 12. Open issues (each resolved with a choice)
 1. **Gate stricter than SPEC §7.4.** SPEC unlocks at zero open flags; numeric blocks are always queued (§5.1) and an unreviewed queued block cannot be exported as approved text. Choice: gate = open flags 0 **and** queued 0; the override path exports them (P2) so SPEC's "override allowed" is intact. UI wording: "N blocks not yet reviewed".
-2. **Queued blocks excluded vs raw-with-marker.** Choice: neither is silent. Exclusion would hide content; a marker would add text that is not source. The override exports machine text and records every block in the manifest; there is no third state.
+2. **Queued blocks excluded vs raw-with-marker.** Choice: neither is silent. Exclusion would hide content; a marker would add text that is not source. (Amended 2026-10-30, section 20: the owner chose a marker that is not text, an HTML comment a renderer shows as nothing, so the objection no longer applies.) The override exports machine text and records every block in the manifest; there is no third state.
 3. **Markdown escaping.** Source text starting with `#`, `>`, `1.` or containing `*`/`_` may render unexpectedly. Choice: no escaping in v1 (faithfulness over rendering); README states the body is source text. A later optional `--escape-markdown` would be a contract change.
 4. **Per-document ordering.** Choice: reading order (`reading_order`), never by section or topic; per-topic articles use reading order within the topic.
 5. **SVG + PNG for vector.** Choice: both, PNG referenced inline.
@@ -274,7 +275,7 @@ Rule (P3 amended):
 - `ExportStatus.flag_blockers: list[ExportFlagBlocker{flag_id, block_id, category, note}]`: every open in-scope flag no override covers, uncapped, in the blockers' order.
 - Export screen: the batch leaves out every listed blocker that has an open flag and says so ("1 flagged block left out of this batch"); each flag gets its own reason and button ("Export despite this flag", sends `flag_id`) in a separate "open flags" section. A blocker flagged between reading and sending is left out too and reported in the tally.
 
-**Marking in the export.** Unchanged and deliberate (P2, open issue 2): no marker in the article body. An overridden block is counted in its article's `review.overrides` and listed in `manifest.overrides` with its reason and, for a flagged block, its `flag_id`; README says how many went out unreviewed. Which paragraphs a person checked is not visible in the article text. Whether to add per-block review provenance (a marker, or a per-block review map in the manifest) is a product decision for the owner, not made here.
+**Marking in the export.** Unchanged and deliberate (P2, open issue 2): no marker in the article body. An overridden block is counted in its article's `review.overrides` and listed in `manifest.overrides` with its reason and, for a flagged block, its `flag_id`; README says how many went out unreviewed. Which paragraphs a person checked is not visible in the article text. Whether to add per-block review provenance (a marker, or a per-block review map in the manifest) is a product decision for the owner, not made here. (Decided 2026-10-30: both an invisible marker and a per-article review sidecar, section 20.)
 
 **F2. The Export screen's counts did not add up, and after a success it showed the lock.** `ExportSummary.review` copied `manifest.review_stats`, which counts every parsed block by status (page headers and footers included, all auto-approved) and adds `overrides` as a cross-cut over queued and flagged blocks: 7 approved + 1 edited + 75 auto-approved + 101 overridden = 184, against 160 blocks in scope (51 auto-approved + 24 headers/footers = 75; 100 queued + 1 flagged = 101 overridden, also counted in `queued`/`flagged`). After the export, the gate is locked again because the export spends its overrides (P3), and the screen put "Export is locked" with the same blockers on top and the result below the fold.
 
@@ -326,3 +327,173 @@ The document slug stays in every name, not only when two documents share a topic
 
 ## 19. The CLI stays in the docs
 The flag sentence (`verify/labels.FLAG_RESOLUTION`, design 09 section 10) no longer mentions `labor export --override`: nobody using the screens has a command line, and the screens never record a blanket override. The CLI's blanket override is documented in README (CLI table) and in section 14. The Export screen's list of active overrides names a CLI one as "an override for everything".
+
+## 20. Review markers and the per-article review sidecar (owner decision, 2026-10-30)
+
+**What failed.** A first-time user said a reader of the exported knowledge base cannot tell which paragraphs a human checked. The article front matter only counts (`review: { approved, edited, overrides }`), `manifest.overrides` lists overridden blocks by id, and nothing at all says which paragraphs went out because the checks passed with no person looking. Section 14 left the choice to the owner.
+
+**Decision (owner, 2026-10-30).** Three parts, all required:
+1. An invisible marker after every paragraph nobody checked, as an HTML comment, so Markdown renderers and search tools show nothing, while anyone who opens the file or greps for `ml:` sees the status.
+2. A per-article sidecar `articles/<id>.review.json` listing every block of the article with its status, who decided it, when, and the override reason or the auto-approve confidence; referenced from the manifest.
+3. The export validator checks that markers, sidecar and front matter agree.
+
+### 20.1 Which blocks get a marker
+The owner's words: "which paragraph a human checked and which one went out under an override". So the marker goes on the paragraphs **nobody checked**:
+
+| Review status in the export (same rule as the front matter, section 3.1 step 4) | Decided by | Marker |
+|---|---|---|
+| `auto_approved` (score at or above the threshold, not covered by an override) | `checks` | `<!-- ml: auto-approved; ... -->` |
+| `overridden` (in `Gate.covered`: queued, flagged, or carrying an open flag that an override covers; whatever its status) | `override` | `<!-- ml: overridden; ... -->` |
+| `approved` (a person approved it) | `person` | none |
+| `edited` (a person edited it, or accepted an agent proposal for it) | `person` | none |
+
+No marker means a person looked at that paragraph. A reader therefore needs to know one rule: **a marker means nobody checked this paragraph**. Rejected alternative: marking every paragraph (approved too). It doubles the noise in the raw file and makes "grep `ml:`" useless as a list of what was not checked; the sidecar already lists every block.
+
+Paragraph unit = one block part (section 3.2). A heading block, a list block (all its lines) and a **table block (the whole GFM table)** are each one unit with at most one marker, after the last line of the unit. A **figure block has no marker** (it renders no part; its figure line is metadata, placed by section 3.3); its sidecar entry carries its review status and where the figure is shown (20.3). Figures pulled into an article from a block outside it (caption_ref, P5) have no entry in this article's sidecar: their block is accounted where it lives, and `images/<slug>/<FIG>.json` already carries `articles` and `review`.
+
+### 20.2 Marker grammar
+A marker is its own part: the separator before and after it is the usual blank line, so it is a CommonMark HTML block (type 2, "starts with `<!--`, ends at the first line containing `-->`") and never part of the paragraph, list item or table row before it. It follows its block part directly (before any figure anchored at that block).
+
+```
+marker   = "<!-- ml: " status "; block: " block-id [ "; flag: " flag-id ] [ "; reason: " reason ] " -->"
+status   = "auto-approved" | "overridden"
+block-id = b-<slug>-p<page>-<n>           (ids.BLOCK_ID_PATTERN; a slug never contains "--")
+flag-id  = flag-NNNNNN                    (only when the override covered an open flag on the block)
+reason   = a JSON string (double quotes), only and always for "overridden"
+```
+- `auto-approved` carries neither `flag` nor `reason`. `overridden` always carries `reason` (the recorded reason, `""` if none was given); `flag` iff `manifest.overrides` records a `flag_id` for the block.
+- The block id is in the marker so a grep hit alone leads to the sidecar entry, the manifest and the source page; the validator matches markers to sidecar entries by id, not by position.
+- **Reason escaping** (`export/markers.py` `encode_reason`; decode is plain `json.loads`): `json.dumps(reason, ensure_ascii=False)`, then, scanning that output left to right, `>` becomes `\u003e`, `<` becomes `\u003c`, a `-` directly after a `-` becomes `\u002d`, and U+2028, U+2029, U+0085 become `\u2028`, `\u2029`, `\u0085`. JSON already escapes `"`, `\` and control characters (newlines become `\n`). Result: the marker is one line, contains no `--` between `<!--` and `-->`, no `>` and no `<`, so no HTML or CommonMark parser can end the comment early, and HTML5's comment rules (no `--!>`, no `<!--` inside) hold. Every escape is a valid JSON escape, so decoding returns the reason exactly.
+- Not escaped: nothing else; the reason keeps its Unicode.
+
+Regex the validator uses (single line, anchored):
+```
+^<!-- ml: (auto-approved|overridden); block: (b-[a-z0-9-]+-p\d{3,}-\d{2,})(?:; flag: (flag-\d{6}))?(?:; reason: ("(?:[^"\\]|\\.)*"))? -->$
+```
+
+### 20.3 Sidecar contract (`contracts/article.py`, exported to `schemas/ArticleReview.json` and TypeScript)
+```
+ArticleReview {
+  schema_version: "1.0"
+  article_id: ArticleId
+  article: "articles/<article_id>.md"
+  generated_at: UTCDateTime            # = manifest.project.generated_at
+  counts: { auto_approved, approved, edited, overridden: int >= 0 }   # tally of `blocks` by status
+  blocks: [BlockReview]                # exactly manifest.articles[].block_ids, same order (reading order)
+}
+BlockReview {
+  block_id: BlockId; type: BlockType; page: int >= 1
+  status: "auto_approved" | "approved" | "edited" | "overridden"
+  decided_by: "checks" | "person" | "override"     # fixed by status (20.1)
+  at: UTCDateTime | None      # person: the effective decision's timestamp; override: when the override was recorded; checks: None
+  confidence: Unit | None     # auto_approved only: the block's combined score
+  edited_by: "person" | "agent_proposal" | None    # edited only: who wrote the text (an accepted agent proposal is a person's decision on a model's text)
+  reason: str | None          # overridden only (required): the override's reason
+  flag_id: FlagId | None      # overridden only: the open flag the override covered
+  figure: FigureReview | None # iff type == figure
+  text_sha256: Sha256Hex | None  # sha256 of the block's part as written; None for a figure block (added by 20.10)
+}
+FigureReview { figure_id: FigureId; placements: [ { article_id, rule: AttachRule, confidence: Unit } ] }
+```
+`placements` are the figure's attachments (attach.json) in written articles, sorted by article id: where its figure line appears. Empty means the figure is shown nowhere (unattached, extraction failed, or attached to an article that was not written, P6). Contract validators: status fixes `decided_by`; `reason` iff overridden; `flag_id` only when overridden; `at` is None for checks and required for override; `confidence` only for auto_approved; `edited_by` only for edited; `figure` iff type figure, with the figure's slug and page equal to the block's; header/footer types are refused; block ids unique and of the article's document; `counts` equals the tally of `blocks`; placements unique and sorted.
+
+**Front matter relation** (unchanged keys, SPEC 6.2): `blocks == len(sidecar.blocks)`, `review.approved == counts.auto_approved + counts.approved + counts.edited`, `review.edited == counts.edited`, `review.overrides == counts.overridden`.
+
+### 20.4 Manifest and zip
+- `ManifestArticle.review_sidecar: str`, required, validated as exactly `articles/<id>.review.json`. `schema_version` stays `"1.0"` (same precedent as C1's `learning`: an additive field of an export that is always read with the schema that shipped in the same zip).
+- Zip layout: `articles/<id>.md` and `articles/<id>.review.json` side by side (byte-sorted, the sidecar right after its article). Z1 accepts `articles/<id>.review.json`.
+- README: the Contents block gains the sidecar line; a new **Review markers** section states the rule (a marker means nobody checked the paragraph), the grammar, one example of each, and that a marker renders as nothing.
+- `EXPORT_ALGO_VERSION` becomes `"2"` so a staging tree from before is rebuilt, not reused.
+- Inputs: `DocInput.decisions: dict[block id, HumanDecision{at, edited_by}]`, filled by `export/load.py` from `state.review.load_review_overlay` (the same derivation as `load_review_blocks`, returning the `Derived` record too). The assemble fingerprint already covers it (`max(decisions.seq)` per doc).
+
+### 20.5 Validator (new code Z9; `labor validate-export` and the validation inside `export`)
+| Check | Problem detail names |
+|---|---|
+| `{review sidecars in the zip} == {manifest.articles[].review_sidecar}` | the missing or stray file |
+| the sidecar parses as `ArticleReview` (so its counts equal its tally) | the contract message |
+| `article_id`, `article`, `generated_at` agree with the manifest | the field |
+| `[b.block_id for b in blocks] == manifest block_ids` (every block once, same order) | missing, extra or duplicate ids |
+| every `<!-- ml:` in the body is a full marker line that is its own top-level HTML block (markdown-it, CommonMark + tables) | the marker, and the construct that swallowed it |
+| each marker's block is in the sidecar with a status that needs a marker, its status word matches, its decoded reason and flag equal the sidecar's; each block that needs one has exactly one; markers appear in sidecar order; no marker for approved, edited or figure entries | the block id and both statuses ("marker says auto-approved, sidecar says approved") |
+| front matter counts equal the sidecar's (20.3) | the key and both numbers |
+| (20.10) each text block's part is in the body in sidecar order with its `text_sha256`, followed directly by its own marker when it needs one and by no marker otherwise; only figure lines between and after parts | the block id: "its marker does not directly follow its paragraph", "its paragraph text is not in the article where the sidecar puts it" |
+| (20.10) a figure entry's status equals its figure sidecar's `review` unless overridden; a figure placed in an article is exported | the block and both statuses |
+| overridden entries equal `manifest.overrides` for the article's blocks (target, reason, flag, `at`) | the block |
+| a figure entry's placement articles == the manifest articles whose `figures` list it | the figure |
+
+### 20.6 Faithfulness: markers are not text
+- Byte level: deleting every `"\n\n" + marker` from an article gives exactly the article the section 3.2 grammar produced before section 20 (test M3, on the fixtures and synthetic inputs).
+- Rendered level: the visible text (markdown-it HTML with comments removed, tags stripped, entities unescaped, whitespace collapsed) is identical with and without markers. Structural differences are accepted and documented: two adjacent list parts (or two indented-code parts) that a renderer used to merge into one list are now two lists with the same items, because an HTML block sits between them; and a part indented under a preceding list part, which used to render inside the last list item, now renders after the list (section 20.10).
+- A marker could become visible only if the source text before it leaves a construct open that swallows later lines (an unclosed code fence, or an unclosed raw HTML block of CommonMark types 1 to 5 such as `<pre` or `<!--`). The assembler checks every article with the same function the validator uses (`markers.misplaced_markers`) and refuses the export with `ExportError` naming the marked block and the swallowing construct; the way out is to approve or edit that block in Verify (a checked paragraph needs no marker) or edit the block that opens the construct. Source text that itself contains `<!-- ml:` is refused the same way, so no source line can impersonate a marker. Refusing loudly is chosen over omitting the marker (a silent third state) or moving it (it would be swallowed anywhere after the open construct).
+- Renderers that escape raw HTML (a "safe mode" with HTML disabled) show the comment as text. GitHub, CommonMark's reference renderer, markdown-it defaults, VS Code and Obsidian hide it. README says so.
+
+### 20.7 Determinism
+Markers and sidecars are pure functions of the assemble inputs: statuses and confidences from the overlay, `at` from the decision and action logs (fixed timestamps, never wall time), reasons byte for byte, entries in `block_ids` order, JSON via `dump_json`. Same project state and clock: byte-identical articles and sidecars across processes and hash seeds (E14 extended, test M5).
+
+### 20.8 Worked example
+Article `pump--belt-tension`, threshold 0.85: block 01 a heading auto-approved at 0.97, block 02 a paragraph a person approved, block 03 a table auto-approved at 0.91, block 04 a queued paragraph exported under the override "checked against paper manual -- rev B > rev A", block 05 a figure block auto-approved and shown in this article.
+```
+---
+id: pump--belt-tension
+...
+blocks: 5
+review: { approved: 3, edited: 0, overrides: 1 }
+generated_at: 2026-10-30T12:00:00Z
+---
+
+# Belt tension
+
+## 5.1 Belt tension
+
+<!-- ml: auto-approved; block: b-pump-p042-01 -->
+
+Loosen the four M8 bolts on the motor mount.
+
+| Step | Torque |
+| --- | --- |
+| 1 | 35 N·m |
+
+<!-- ml: auto-approved; block: b-pump-p042-03 -->
+
+Tighten bolts in a cross pattern.
+
+<!-- ml: overridden; block: b-pump-p042-04; reason: "checked against paper manual -\u002d rev B \u003e rev A" -->
+
+![FIG-pump-p042-01 — Figure 1. Belt tension points](images/pump/FIG-pump-p042-01.png)
+```
+`articles/pump--belt-tension.review.json` (abridged):
+```json
+{"article": "articles/pump--belt-tension.md", "article_id": "pump--belt-tension",
+ "blocks": [
+  {"block_id": "b-pump-p042-01", "type": "heading", "page": 42, "status": "auto_approved", "decided_by": "checks", "at": null, "confidence": 0.97, ...},
+  {"block_id": "b-pump-p042-02", "type": "paragraph", "page": 42, "status": "approved", "decided_by": "person", "at": "2026-10-30T11:02:13Z", "confidence": null, ...},
+  {"block_id": "b-pump-p042-03", "type": "table", "page": 42, "status": "auto_approved", "decided_by": "checks", "at": null, "confidence": 0.91, ...},
+  {"block_id": "b-pump-p042-04", "type": "paragraph", "page": 42, "status": "overridden", "decided_by": "override", "at": "2026-10-30T11:40:00Z", "reason": "checked against paper manual -- rev B > rev A", "flag_id": null, ...},
+  {"block_id": "b-pump-p042-05", "type": "figure", "page": 42, "status": "auto_approved", "decided_by": "checks", "confidence": 0.99,
+   "figure": {"figure_id": "FIG-pump-p042-01", "placements": [{"article_id": "pump--belt-tension", "rule": "caption_ref", "confidence": 0.96}]}, ...}],
+ "counts": {"approved": 1, "auto_approved": 3, "edited": 0, "overridden": 1},
+ "generated_at": "2026-10-30T12:00:00Z", "schema_version": "1.0"}
+```
+`manifest.json` lists the article with `"review_sidecar": "articles/pump--belt-tension.review.json"`. `grep -rn '^<!-- ml: ' articles/` lists blocks 01, 03 and 04: the three paragraphs nobody checked.
+
+### 20.9 Tests
+`tests/export/test_markers.py`: M1 reason escaping round-trips and never yields `--`, `>`, `<` or a line break (fixed cases plus a Hypothesis property); M2 synthetic article with every status, a heading, a list, a table and a figure block: markers exactly after auto-approved and overridden parts, sidecar entries field by field, counts against the front matter; M3 stripping markers gives the pre-section-20 bytes, and the rendered visible text is identical (tables, lists, indented code); M4 an unclosed fence or raw `<pre` before a marked block, and source text containing `<!-- ml:`, refuse the export with a message naming the block; M5 two assembles are byte-identical (articles and sidecars); M6 validator: the synthetic override zip validates, then a tampered status, a removed marker, a marker moved into a fence or mid-line, a changed reason, a dropped or duplicated sidecar entry, a front-matter count, a missing or stray sidecar file and a manifest override mismatch each give Z9 with a message naming the block or file. Real fixtures: E1 to E3 re-derive the body with markers; `test_markers_and_sidecars_on_project_a` (every block of every article in its sidecar once, a marker for each auto-approved paragraph, `at` on every person entry, confidence on every auto-approved entry, visible text unchanged); `test_export_markers_on_scanned_pdf` (slow: scanned.pdf with a person approval, an override whose reason holds `--` and `>`, validates, markers decode to the reason); E26 asserts sidecars and markers on all six fixtures; E14 compares sidecars across hash seeds. Contracts: `tests/contracts` C3 sample and validator cases for `ArticleReview`, `ManifestArticle.review_sidecar`.
+
+### 20.10 Review fixes (fresh Opus reviewer, 2026-10-31)
+The reviewer found no blocker. Each finding below has a failing test first (`tests/export/test_markers.py` R1 to R4, `tests/contracts` C19).
+- **Major, fixed: a marker after the wrong paragraph passed.** The validator checked the order of markers among themselves, so moving block 03's marker to just after the approved block 02 (or right after block 01's marker) gave no problem, while a reader would see the approved paragraph as unchecked. `BlockReview` gains `text_sha256` (sha256 of the block's part exactly as written, `#` prefixes and `* ` markers included; None for a figure block), and Z9 aligns the body: it splits the parts on blank lines, skips figure lines, finds each text block's part in sidecar order by its hash (joining chunks when the source text itself holds a blank line), and requires the block's own marker right after it when the block needs one, and no marker after it otherwise. A changed, moved or missing paragraph, a marker after another block, two markers in a row and stray parts after the last paragraph are each reported with the block id.
+- **Minor, fixed: a marker-shaped caption was blamed on another block.** Alt text now escapes `<` (section 3.3), so a figure line never holds a comment. A topic title that holds one is refused by name ("rename the topic in Scope"); block text is refused naming the block, as before.
+- **Minor, fixed: lookalike markers were ignored.** `MARKER_LIKE_RE` (`(?<!\\)<!--\s*ml\s*:`, case-insensitive) is what counts as marker-like everywhere: in source text it refuses the export; in the validator anything it matches must be a well-formed marker that is its own HTML block. A backslash before `<` makes it literal text (the alt-text escape).
+- **Minor, fixed: flag and reason could come from different decisions.** With two open flags on a block, each covered by its own flag override, the record took the first flag and the latest override's reason. The flag recorded is now the flag the chosen (latest covering) override names, else the block's first open flag (blanket or block override); `manifest.overrides` uses the same rule.
+- **Minor, fixed: the contract was looser than 20.3.** `at` is required for person and override, `confidence` iff auto_approved (scoring auto-approves only a block with a confidence), `edited_by` iff edited, `text_sha256` iff not a figure. A person-status block without a decision record refuses the export (`ExportError`) instead of writing `at: null`.
+- **Minor, added: figure status cross-check.** A figure entry's status equals its exported figure sidecar's `review` (an overridden figure block's figure keeps queued or flagged), and a figure placed in an article must be exported.
+- **Minor, documented: one more structural difference.** A list part followed by an indented part used to render the indented part inside the last list item; with a marker between them it renders after the list (as an indented code block when indented four spaces). The visible text is the same; section 20.6's list now includes this case.
+- **Minor, fixed: the suggested grep.** `grep -rn 'ml: '` also matched source text such as "Capacity ml: 250"; README, the export README and this design now say `grep -rn '^<!-- ml: ' articles/`.
+- **Not detectable, accepted:** changing an entry's `type`, lowering an auto-approve `confidence`, or relabelling approved as edited by an agent proposal (with the front matter adjusted) passes validation: the zip holds no independent record of those facts. The text hash, the marker alignment, the counts and the manifest overrides are what the validator can prove.
+
+**Re-review of 20.10 (2026-10-31), fixed with failing tests first (`test_markers.py` RR1 to RR3):**
+- **Blocker, fixed: a part ending in a newline failed the alignment.** The first version split the body on blank lines, so a person's edit ending in Enter (`"a\n"` followed by `"b"` is written `"a\n\n\nb"`) never matched its hash and the export was rejected. Parts are now matched by position: from the current offset a part may end at any overlapping `"\n\n"` or at the end of the body, hashed incrementally (linear in the article). Leading, trailing and inner newlines, empty text and identical texts validate.
+- **Minor, fixed: the recorded flag.** The override's `flag_id` is recorded only when it is an open flag on that block, else the block's first open flag. For a block with open flags the gate records the latest override that covers a flag (a blanket before a later block override records the blanket's reason with the flag), so flag and reason always come from the same decision.
+- **Minor, fixed: backslash parity.** `MARKER_LIKE_RE` treats only an odd run of backslashes before `<` as an escape (`(?<!\\)(?:\\\\)*<!--\s*ml\s*:`). Source text and titles are checked with `SOURCE_MARKER_RE` (`<!--\s*ml\s*:`, any backslashes), so no backslash trick passes assembly; only alt text, which escapes `<` itself, carries a literal `\<!-- ml:`.
+- The appended-paragraph validator test (`test_an_image_link_outside_images_in_source_text_is_left_alone`) now expects Z9 alone: a paragraph that belongs to no block is reported, the image link still is not.
+- Final check (2026-10-31): no blocker or major. Fixed: the appended-paragraph test asserts `== {"Z9"}` and a synthetic block holding an external image link validates cleanly (RR4); the grep advice is `grep -rn '^<!-- ml: ' articles/`, which matches only real markers (a figure line whose caption holds marker text starts with `![FIG-`). Accepted, pre-existing: a second copy of an existing figure line passes (figure lines between parts are skipped and Z5 dedupes).

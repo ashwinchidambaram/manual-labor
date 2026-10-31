@@ -40,6 +40,7 @@ def render_readme(m: Manifest) -> str:
         "",
         "```",
         "articles/<article-id>.md        one Markdown file per article, YAML frontmatter first",
+        "articles/<article-id>.review.json  who decided each block of the article, and when",
         "images/<doc-slug>/FIG-*.png     figure images (vector figures also ship FIG-*.svg)",
         "images/<doc-slug>/FIG-*.json    one sidecar record per figure",
         "manifest.json                   projects, documents, articles, figures, review stats,",
@@ -82,6 +83,24 @@ def render_readme(m: Manifest) -> str:
         f"`review` in each article counts the approved blocks, the human-edited blocks and "
         f"the overrides. {len(m.review_stats.numbers_verified_blocks)} block(s) with numeric "
         "specifications were verified by a human (`review_stats.numbers_verified_blocks`).",
+        "",
+        "## Review markers",
+        "",
+        "A paragraph that no person checked ends with an HTML comment on its own line: "
+        "`<!-- ml: auto-approved; block: <block-id> -->` (the checks passed and nobody looked) "
+        'or `<!-- ml: overridden; block: <block-id>; reason: "..." -->` (exported under an '
+        "override; `flag: <flag-id>` is added when the override covered an open flag). "
+        "A paragraph without a marker was approved or edited by a person. Figures carry no "
+        "marker. Markdown renderers show nothing for these comments (a renderer that escapes "
+        "raw HTML shows them as text); `grep -rn '^<!-- ml: ' articles/` lists them.",
+        "The reason is a JSON string in which `>`, `<` and a `-` after a `-` are written as "
+        "`\\u003e`, `\\u003c` and `\\u002d`, so the comment never ends early; decode it "
+        "with any JSON parser.",
+        "`articles/<article-id>.review.json` lists every block of the article in order: "
+        "`block_id`, `type`, `page`, `status` (auto_approved, approved, edited, overridden), "
+        "`decided_by` (checks, person, override), `at`, the auto-approve `confidence`, the "
+        "override `reason` and `flag_id`, and for a figure block the articles that show the "
+        "figure. Its `counts` equal the article's frontmatter `review` counts.",
         "",
         "## Overrides",
         "",

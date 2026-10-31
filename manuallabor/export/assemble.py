@@ -3,16 +3,27 @@ the same inputs and clock always produce the same bytes."""
 
 from __future__ import annotations
 
+import hashlib
 import re
 from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Final
+from typing import Final, Literal
 
 from manuallabor import ids
 from manuallabor.cleanup.attach import build_articles
 from manuallabor.cleanup.types import Attachment
-from manuallabor.contracts.article import ArticleFrontmatter, ReviewCounts
+from manuallabor.contracts.article import (
+    DECIDED_BY,
+    ArticleFrontmatter,
+    ArticleReview,
+    ArticleReviewCounts,
+    BlockReview,
+    FigurePlacement,
+    FigureReview,
+    ReviewCounts,
+    ReviewStatus,
+)
 from manuallabor.contracts.block import Block
 from manuallabor.contracts.config import ModelRef
 from manuallabor.contracts.document import Document
@@ -37,6 +48,12 @@ from manuallabor.contracts.manifest import (
     ReviewStats,
 )
 from manuallabor.export.gate import export_gate
+from manuallabor.export.markers import (
+    SOURCE_MARKER_RE,
+    marker_line,
+    misplaced_markers,
+    needs_marker,
+)
 from manuallabor.export.readme import render_readme
 from manuallabor.export.render import (
     alt_text,
@@ -230,6 +247,7 @@ def _build_doc_articles(ctx: _Ctx, d: DocInput) -> list[BuiltArticle]:
     attach = {a.article_id: a.figures for a in d.attach.articles}
     built: list[BuiltArticle] = []
 
+    kept_of: dict[str, list[Block]] = {}
     for art_id, member_ids in members.items():
         kept: list[Block] = []
         for bid in member_ids:
@@ -242,20 +260,40 @@ def _build_doc_articles(ctx: _Ctx, d: DocInput) -> list[BuiltArticle]:
                 raise ExportError(f"{bid} is {b.status.value} and not covered by an override")
             else:
                 kept.append(b)
-        if not kept:
-            continue
+        if kept:
+            kept_of[art_id] = kept
+    placements = _placements(d, set(kept_of))
+
+    for art_id, kept in kept_of.items():
         title = _collapse(doc_title if inp.split == ArticleSplit.per_document else titles[art_id])
         title = title or doc_title
         kept_order = {b.id: b.reading_order for b in kept}
-        text_parts = [
-            (
-                (b.reading_order, 0, 0),
-                BodyPart("block", b.id, None, _render_block(b, levels)),
+        if SOURCE_MARKER_RE.search(title):
+            raise ExportError(
+                f"{art_id}: the article title {title!r} contains an HTML comment opening "
+                "'ml:', which would read as a review marker (design 11 section 20); rename the "
+                "topic in Scope"
             )
-            for b in kept
-            if b.type != BlockType.figure
-        ]
-        has_part = {p.block_id for _, p in text_parts if p.block_id is not None}
+        rendered = {b.id: _render_block(b, levels) for b in kept if b.type != BlockType.figure}
+        entries = [_review_entry(ctx, d, b, placements, rendered.get(b.id)) for b in kept]
+        entry_of = {e.block_id: e for e in entries}
+        text_parts: list[tuple[tuple[int, int, int], BodyPart]] = []
+        for b in kept:
+            if b.type == BlockType.figure:
+                continue
+            part = BodyPart("block", b.id, None, rendered[b.id])
+            if SOURCE_MARKER_RE.search(part.text):
+                raise ExportError(
+                    f"{b.id}: its text contains an HTML comment opening 'ml:', which would read "
+                    "as a review marker (design 11 section 20); edit the block in Verify"
+                )
+            text_parts.append(((b.reading_order, 0, 0), part))
+            e = entry_of[b.id]
+            if needs_marker(e):  # right after its paragraph, before a figure anchored there
+                text_parts.append(
+                    ((b.reading_order, 0, 1), BodyPart("marker", b.id, None, marker_line(e)))
+                )
+        has_part = {p.block_id for _, p in text_parts if p.kind == "block" and p.block_id}
         figs = _figure_parts(d, art_id, attach.get(art_id, []), kept_order, has_part)
         merged: list[tuple[tuple[int, int, int], BodyPart]] = [
             *text_parts,
@@ -293,6 +331,14 @@ def _build_doc_articles(ctx: _Ctx, d: DocInput) -> list[BuiltArticle]:
         )
         head = yaml_frontmatter(fm) + "\n# " + title + "\n"
         text = head + ("\n" + "\n\n".join(p.text for p in parts) + "\n" if parts else "")
+        _refuse_visible_markers(art_id, text[len(yaml_frontmatter(fm)) :])
+        review = ArticleReview(
+            article_id=art_id,
+            article=f"articles/{art_id}.md",
+            generated_at=ctx.generated_at,
+            counts=_review_counts(entries),
+            blocks=entries,
+        )
         for b in kept:
             ctx.assignments[b.id] = art_id
             ctx.pages.add((slug, b.page))
@@ -305,10 +351,123 @@ def _build_doc_articles(ctx: _Ctx, d: DocInput) -> list[BuiltArticle]:
                 title=title,
                 block_ids=[b.id for b in kept],
                 figure_ids=fig_ids,
+                review=review,
+                review_path=f"articles/{art_id}.review.json",
                 body_parts=parts,
             )
         )
     return built
+
+
+def _placements(d: DocInput, written: set[str]) -> dict[str, list[FigurePlacement]]:
+    """Figure id -> its attachments in the written articles of the document, by article id:
+    where its figure line appears (design 11 section 20.3)."""
+    out: dict[str, list[FigurePlacement]] = {}
+    for arts in sorted(d.attach.articles, key=lambda x: x.article_id):
+        if arts.article_id not in written:
+            continue
+        for a in arts.figures:
+            out.setdefault(a.figure_id, []).append(
+                FigurePlacement(article_id=arts.article_id, rule=a.rule, confidence=a.confidence)
+            )
+    return out
+
+
+def _review_entry(
+    ctx: _Ctx,
+    d: DocInput,
+    b: Block,
+    placements: dict[str, list[FigurePlacement]],
+    part_text: str | None,
+) -> BlockReview:
+    """Who decided that `b` goes out, as the front matter counts it: an override-covered
+    block is `overridden` whatever its status; otherwise the overlay status decides."""
+    fig = None
+    if b.figure_id is not None:
+        fig = FigureReview(figure_id=b.figure_id, placements=placements.get(b.figure_id, []))
+    ov = ctx.gate.covered.get(b.id)
+    status: ReviewStatus
+    at: datetime | None = None
+    confidence: float | None = None
+    edited_by: Literal["person", "agent_proposal"] | None = None
+    if ov is not None:
+        status, at = "overridden", ov.ts
+    elif b.status == BlockStatus.auto_approved:
+        status, confidence = "auto_approved", b.confidence
+    elif b.status in (BlockStatus.approved, BlockStatus.edited):
+        status = "approved" if b.status == BlockStatus.approved else "edited"
+        dec = d.decisions.get(b.id)
+        if dec is None:  # the overlay derives approved/edited only from a decision
+            raise ExportError(f"{b.id} is {status} but no decision record says who decided it")
+        at = dec.at
+        if status == "edited":
+            edited_by = dec.edited_by or "person"
+    else:  # unreachable: assembly refuses an uncovered non-contributing block first
+        raise ExportError(f"{b.id} is {b.status.value} and not covered by an override")
+    return BlockReview(
+        block_id=b.id,
+        type=b.type,
+        page=b.page,
+        status=status,
+        decided_by=DECIDED_BY[status],
+        at=at,
+        confidence=confidence,
+        edited_by=edited_by,
+        reason=ov.reason if ov is not None else None,
+        flag_id=_override_flag(ctx, b.id, ov) if ov is not None else None,
+        figure=fig,
+        text_sha256=(
+            hashlib.sha256(part_text.encode("utf-8")).hexdigest() if part_text is not None else None
+        ),
+    )
+
+
+def _override_flag(ctx: _Ctx, block_id: str, ov: ActiveOverride) -> str | None:
+    """The flag an override record names for a block: the flag a flag override names when it is
+    an open flag on this block (so flag and reason come from the same decision), else the
+    block's first open flag (a blanket override), else None. The gate records, for a block with
+    open flags, the latest override that covers a flag (design 11 section 20.10)."""
+    if ov.flag_id is not None and ov.flag_id in ctx.gate.block_flags.get(block_id, ()):
+        return ov.flag_id
+    return ctx.gate.open_flag_of.get(block_id)
+
+
+def _review_counts(entries: list[BlockReview]) -> ArticleReviewCounts:
+    n = Counter(e.status for e in entries)
+    return ArticleReviewCounts(
+        auto_approved=n["auto_approved"],
+        approved=n["approved"],
+        edited=n["edited"],
+        overridden=n["overridden"],
+    )
+
+
+_HOLDER: Final = {
+    "fence": "code fence",
+    "code_block": "indented code block",
+    "html_block": "raw HTML block",
+    "inline": "paragraph",
+    "text": "line of text",
+}
+_BLOCK_IN_MARKER: Final = re.compile(r"block: (b-[a-z0-9-]+-p\d{3,}-\d{2,})")
+
+
+def _refuse_visible_markers(art_id: str, body: str) -> None:
+    """Design 11 section 20.6: a marker a renderer would show (swallowed by a construct the
+    source text leaves open) refuses the export, naming the marked block."""
+    bad = misplaced_markers(body)
+    if not bad:
+        return
+    line, kind = bad[0]
+    m = _BLOCK_IN_MARKER.search(line)
+    block = m.group(1) if m else "a block"
+    more = f" (+{len(bad) - 1} more)" if len(bad) > 1 else ""
+    raise ExportError(
+        f"{art_id}: the review marker of {block} would render as text{more}: it falls inside a "
+        f"{_HOLDER.get(kind, kind)} that an earlier block of the article leaves open (an unclosed "
+        f"code fence or raw HTML block in the source text). Approve or edit {block} in Verify "
+        "(a paragraph a person checked needs no marker), or edit the block that opens it."
+    )
 
 
 def _exported_figures(ctx: _Ctx) -> list[BuiltFigure]:
@@ -412,7 +571,7 @@ def _manifest(
                 overrides.append(
                     Override(
                         target_id=bid,
-                        flag_id=ctx.gate.open_flag_of.get(bid),
+                        flag_id=_override_flag(ctx, bid, ov),
                         reason=ov.reason,
                         at=ov.ts,
                     )
@@ -446,6 +605,7 @@ def _manifest(
                     figures=a.figure_ids,
                     pages=a.frontmatter.pages,
                     sections=a.frontmatter.sections,
+                    review_sidecar=a.review_path,
                 )
                 for a in articles
             ],
@@ -520,6 +680,7 @@ def assemble(inp: AssembleInputs, clock: datetime) -> Assembled:
     files: dict[str, str | Path] = {"README.md": readme, "manifest.json": dump_json(manifest)}
     for a in articles:
         files[a.path] = a.text
+        files[a.review_path] = dump_json(a.review)
     for f in figures:
         files[f.sidecar_path] = dump_json(f.sidecar)
         if f.png is not None and f.png_path is not None:

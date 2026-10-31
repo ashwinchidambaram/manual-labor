@@ -54,10 +54,20 @@ def body_lines(text: str) -> list[str]:
     return text[text.index("\n---\n", 3) + 5 :].split("\n")
 
 
-def parts(text: str) -> list[str]:
+def all_parts(text: str) -> list[str]:
     """The article parts: everything after `# title`, split on blank lines."""
     body = body_lines(text)
     return "\n".join(body[3:]).rstrip("\n").split("\n\n")
+
+
+def parts(text: str) -> list[str]:
+    """The text and figure parts, without the review markers (design 11 section 20; the
+    markers themselves are tested in test_markers.py)."""
+    return [p for p in all_parts(text) if not p.startswith("<!-- ml: ")]
+
+
+def markers(text: str) -> list[str]:
+    return [p for p in all_parts(text) if p.startswith("<!-- ml: ")]
 
 
 # -- E4 frontmatter ----------------------------------------------------------------------------
@@ -250,7 +260,7 @@ def two_open() -> list:  # type: ignore[type-arg]
     ]
 
 
-def test_e7_blanket_override_exports_machine_text_without_a_marker() -> None:
+def test_e7_blanket_override_exports_machine_text_with_an_invisible_marker() -> None:
     res = run(
         synth_inputs(
             two_open(),
@@ -259,7 +269,16 @@ def test_e7_blanket_override_exports_machine_text_without_a_marker() -> None:
         )
     )
     (a,) = res.articles
-    assert parts(a.text) == ["ok", "clean q", "raw f"]  # machine clean_text, else raw; no marker
+    assert parts(a.text) == ["ok", "clean q", "raw f"]  # machine clean_text, else raw
+    # section 20 (amends P2): each overridden part is followed by its HTML-comment marker
+    assert all_parts(a.text) == [
+        "ok",
+        "clean q",
+        f'<!-- ml: overridden; block: {bid(2)}; reason: "customer waived review" -->',
+        "raw f",
+        f"<!-- ml: overridden; block: {bid(3)}; flag: flag-000001; "
+        'reason: "customer waived review" -->',
+    ]
     assert a.frontmatter.review == ReviewCounts(approved=1, edited=0, overrides=2)
     assert a.frontmatter.approved_check if False else True
     m = res.manifest
@@ -619,9 +638,13 @@ def test_alt_text_rules() -> None:
     assert alt_text("FIG-a-p001-01", None, "a) b") == "FIG-a-p001-01 — [generated] a\\) b"
 
 
-def test_the_body_is_deterministic_and_contains_no_overrides_marker() -> None:
+def test_the_body_is_deterministic_and_marks_overrides_only_in_comments() -> None:
     inp = synth_inputs(two_open(), overrides=[override(1)], flags=[flag(1, bid(3))])
     a, b = run(inp), run(inp)
     assert a.files == b.files
     text = a.articles[0].text
-    assert "override" not in text[text.index("\n---\n", 3) :].lower()  # frontmatter counts them
+    body = text[text.index("\n---\n", 3) :]
+    # the word appears only inside the markers (frontmatter counts them)
+    outside = "\n".join(ln for ln in body.split("\n") if not ln.startswith("<!-- ml: "))
+    assert "override" not in outside.lower()
+    assert len(markers(text)) == 2

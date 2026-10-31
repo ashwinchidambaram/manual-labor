@@ -520,8 +520,8 @@ function Summary({ s, fresh }: { s: ExportSummary; fresh: boolean }) {
       </p>
       {r.overrides ? (
         <p className="text-sm text-muted">
-          The {plural(r.overrides, "overridden block")} went out unreviewed, with machine-cleaned text; manifest.json lists each one with its reason. The article text
-          itself carries no marker.
+          The {plural(r.overrides, "overridden block")} went out unreviewed, with machine-cleaned text; manifest.json lists each one with its reason, and in the
+          article each one ends with an invisible <code>ml: overridden</code> comment.
         </p>
       ) : null}
       {!adds ? (
@@ -667,7 +667,7 @@ export default function ExportScreen() {
                   {st.unlocked
                     ? "No flag is open and nothing in scope is waiting for review."
                     : "Overrides cover every remaining block; they will be exported unreviewed and listed in manifest.json."}{" "}
-                  The zip contains the articles, their figures, manifest.json and a README.
+                  The zip contains the articles, their figures, manifest.json and a README; next to each article, a review file names who checked each paragraph (a person, the checks or an override).
                 </p>
                 <Hint id="exportButton">
                   <button

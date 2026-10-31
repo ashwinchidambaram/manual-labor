@@ -58,6 +58,15 @@ def test_e26_six_fixture_round_trip(requires_docling: None, tmp_path: Path) -> N
                 # the scanned document's figures are exported (they are in scope by default)
                 assert len([f for f in m.figures if f.source_doc == slug]) >= min(1, n_figs)
         assert not m.overrides and m.review_stats.overrides == 0
+        # design 11 section 20: every article of all six fixtures (scanned.pdf included) has its
+        # review sidecar, and the markers agree with it
+        from tests.export.test_markers import _check_markers_and_sidecars
+
+        with zipfile.ZipFile(zp) as zf:
+            seen = _check_markers_and_sidecars(zf)
+        assert seen["auto"] > 0 and seen["markers"] > 0 and seen["person"] > 0
+        scanned = [a for a in m.articles if a.source_doc == "scanned"]
+        assert all(f"articles/{a.id}.review.json" == a.review_sidecar for a in scanned)
         # design 11 section 14: on all six fixtures (the scanned one included) the gate's counts
         # partition the scope and match Verify, and the summary partitions the exported blocks
         from manuallabor.export.pipeline import read_state

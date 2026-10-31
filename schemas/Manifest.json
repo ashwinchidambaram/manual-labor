@@ -210,6 +210,10 @@
           "title": "Path",
           "type": "string"
         },
+        "review_sidecar": {
+          "title": "Review Sidecar",
+          "type": "string"
+        },
         "sections": {
           "items": {
             "type": "string"
@@ -236,7 +240,8 @@
         "block_ids",
         "figures",
         "pages",
-        "sections"
+        "sections",
+        "review_sidecar"
       ],
       "title": "ManifestArticle",
       "type": "object"

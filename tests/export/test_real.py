@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import zipfile
 from collections import Counter
 from pathlib import Path
@@ -54,6 +55,12 @@ def test_e1_body_is_derived_from_the_blocks_byte_for_byte(
         assert text[frontmatter_end(text) :] == want, a.id
         assert figs == a.figures
         n_figs += len(figs)
+        # section 20.6: deleting the markers gives the pre-marker body byte for byte
+        old, _ = expected_body(exported_a.paths, ro_store, a.id, with_markers=False)
+        stripped = re.sub(r"\n\n<!-- ml: [^\n]* -->(?=\n)", "", text)
+        assert stripped[frontmatter_end(stripped) :] == "\n# " + a.title + "\n" + (
+            "\n" + old + "\n" if old else ""
+        ), a.id
     assert n_figs >= 10  # figures.pdf is figure-heavy
 
 
@@ -66,8 +73,8 @@ def test_e2_numeric_multiset_is_unchanged(exported_a: Exported, ro_store: Store)
         lines = body.split("\n")[2:]  # the blank line and `# title`
         kept = []
         for ln in lines:
-            if ln.startswith("![FIG-"):
-                continue  # alt text is metadata, not article text
+            if ln.startswith(("![FIG-", "<!-- ml: ")):
+                continue  # alt text and review markers are metadata, not article text
             ln = ln.removeprefix("* ") if ln.startswith("* ") else ln
             while ln.startswith("#"):
                 ln = ln.lstrip("#").lstrip(" ")
@@ -105,6 +112,10 @@ def test_e3_every_body_line_is_explained(exported_a: Exported, ro_store: Store) 
         text = exported_a.text(a.path)
         for ln in text[frontmatter_end(text) :].split("\n"):
             if ln == "" or ln == f"# {a.title}" or FIGURE_LINE_RE.match(ln):
+                continue
+            if ln.startswith("<!-- ml: auto-approved; block: ") and ln.endswith(" -->"):
+                bid = ln.split("block: ", 1)[1][: -len(" -->")]
+                assert bid in a.block_ids and by_id[bid].status == BlockStatus.auto_approved
                 continue
             assert ln in allowed, f"{a.id}: unexplained line {ln[:80]!r}"
 
@@ -290,7 +301,7 @@ def test_e24_summary_matches_a_recount(exported_a: Exported) -> None:
     assert (
         s.articles
         == len(m.articles)
-        == len([n for n in exported_a.names() if n.startswith("articles/")])
+        == len([n for n in exported_a.names() if n.startswith("articles/") and n.endswith(".md")])
     )
     assert (
         s.figures

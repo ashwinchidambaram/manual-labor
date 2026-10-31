@@ -220,7 +220,7 @@ Validators: exactly one of `proposal_text` / `proposed_bbox` is set. `status == 
 | schema_version | Literal["1.0"] = "1.0" |
 | project | ManifestProject{name: str, tool_version: str, generated_at: UTCDateTime} |
 | docs | list[Document] (sorted by slug) |
-| articles | list[ManifestArticle{id, path:`articles/<id>.md`, title, source_doc, block_ids: list[BlockId], figures: list[FigureId], pages: list[int], sections: list[str]}] (sorted by id) |
+| articles | list[ManifestArticle{id, path:`articles/<id>.md`, title, source_doc, block_ids: list[BlockId], figures: list[FigureId], pages: list[int], sections: list[str], review_sidecar:`articles/<id>.review.json`}] (sorted by id; `review_sidecar` added 2026-10-30, design 11 section 20) |
 | figures | list[ManifestFigure{id, sidecar:`images/<slug>/<id>.json`, file: str, source_doc, duplicate_of: FigureId \| None}] (sorted by id) |
 | review_stats | ReviewStats{total_blocks, auto_approved, approved, edited, flagged, rejected, queued, overrides: int ≥0; numbers_verified_blocks: list[BlockId] sorted} |
 | models | dict[Task, ModelRef] (only tasks that were used) |
@@ -238,6 +238,9 @@ Manifest validators:
 - (e) Every `article.figures` id is in `figures`.
 - (f) `duplicate_of` points to an existing figure whose own `duplicate_of` is None.
 - (g) Each `Document` carries `block_ids` (all blocks produced by parsing, in parse order). The multiset union of every article's `block_ids` plus the `unassigned` block ids must equal exactly the union of all docs' `block_ids` (no missing, extra or duplicate block), `accounting.total_blocks` equals that union's size, review-status counts sum to `review_stats.total_blocks`, every article/figure `source_doc` is in `docs`, doc slugs are unique and no article id is the reserved `unassigned` marker.
+
+### 4.10a `ArticleReview` (article.py, design 11 section 20, 2026-10-30)
+The per-article review sidecar `articles/<id>.review.json`: `schema_version: "1.0"`, `article_id`, `article` (`articles/<id>.md`), `generated_at`, `counts{auto_approved, approved, edited, overridden}` (equal to the tally of `blocks`), `blocks: list[BlockReview]` (the article's `block_ids`, same order). `BlockReview{block_id, type, page, status: auto_approved|approved|edited|overridden, decided_by: checks|person|override, at, confidence, edited_by, reason, flag_id, figure: FigureReview|None, text_sha256: Sha256Hex|None}`; `FigureReview{figure_id, placements: list[{article_id, rule, confidence}]}`. Validators and the marker grammar are in design 11 section 20.
 
 ### 4.11 `ProjectConfig` (config.py)
 - `ModelRef`: `provider: str` (pattern `^[a-z][a-z0-9_]*$`; known: mock, ollama, anthropic, openai_compatible, vllm, llamacpp), `model: str` (min 1), `api_base: str | None = None`, `api_key_env: str | None = None`. Secrets are never stored in config.
@@ -357,7 +360,7 @@ Public method flow: build the key with `cache.key(...)`. On a hit, return the ca
 - `dump_json(obj: BaseModel | Sequence[BaseModel] | Mapping) -> str` is `json.dumps(to_jsonable(obj), sort_keys=True, indent=2, ensure_ascii=False) + "\n"`, where models go through `model_dump(mode="json")`. `canonical_json(obj) -> bytes` is the compact form (`separators=(",",":")`) encoded as UTF-8, and it is the only input to any hash.
 - `write_json(path, obj)` writes atomically (tmp file plus `os.replace`) with LF line endings. `read_json(path, Model)` uses `Model.model_validate_json`, and `read_json_list(path, Model)` works through a `TypeAdapter(list[Model])`.
 - Floats: bbox/coords and Unit values are 6 places, `latency_ms` is 3 places, and embedding vectors are 6 places, all at validation time. Timestamps are ISO-8601 UTC with `Z` (§2). Sets never appear in contracts; lists are sorted where order has no meaning.
-- **Schema export:** `labor schemas export [--out schemas] [--check]` calls `export_schemas`. `EXPORTED_MODELS` is an ordered tuple: Block, Document, FigureRecord, Group, Selection, Flag, Decision, Proposal, ArticleFrontmatter, Manifest, ProjectConfig, LLMCallLog.
+- **Schema export:** `labor schemas export [--out schemas] [--check]` calls `export_schemas`. `EXPORTED_MODELS` is an ordered tuple: Block, Document, FigureRecord, Group, Selection, Flag, Decision, Proposal, ArticleFrontmatter, Manifest, ProjectConfig, LLMCallLog (later additions: GroupsFile, CoverageReport, ScopeSummary, ProbeResult, SuggestionTable, and ArticleReview after ArticleFrontmatter, design 11 section 20).
   - Per model it writes `schemas/<Name>.json` containing `dump_json(Model.model_json_schema(mode="serialization"))`.
   - It also writes `schemas/_all.json`, containing `models_json_schema([(M,"serialization") …], title="ManualLaborContracts")` with the same dump rules. Type generation runs on `_all.json` so no `$defs` type is declared twice.
   - Stale `schemas/*.json` files that are not in the set are deleted.

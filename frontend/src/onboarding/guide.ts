@@ -95,7 +95,10 @@ export const GUIDE_STEPS: GuideStep[] = [
       "Download the zip and compare its SHA-256 with the one shown.",
     ],
     keys: [],
-    trust: ["The export contains only text a person or the checks accepted, plus any blocks you overrode with a recorded reason."],
+    trust: [
+      "The export contains only text a person or the checks accepted, plus any blocks you overrode with a recorded reason.",
+      "In each exported article, a paragraph no person checked ends with an invisible ml: comment (auto-approved or overridden), and articles/<name>.review.json lists who decided every paragraph and when.",
+    ],
   },
 ];
 

@@ -1,0 +1,296 @@
+{
+  "$defs": {
+    "ArticleReviewCounts": {
+      "additionalProperties": false,
+      "properties": {
+        "approved": {
+          "minimum": 0,
+          "title": "Approved",
+          "type": "integer"
+        },
+        "auto_approved": {
+          "minimum": 0,
+          "title": "Auto Approved",
+          "type": "integer"
+        },
+        "edited": {
+          "minimum": 0,
+          "title": "Edited",
+          "type": "integer"
+        },
+        "overridden": {
+          "minimum": 0,
+          "title": "Overridden",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "auto_approved",
+        "approved",
+        "edited",
+        "overridden"
+      ],
+      "title": "ArticleReviewCounts",
+      "type": "object"
+    },
+    "AttachRule": {
+      "enum": [
+        "caption_ref",
+        "caption_match",
+        "proximity",
+        "none",
+        "human"
+      ],
+      "title": "AttachRule",
+      "type": "string"
+    },
+    "BlockReview": {
+      "additionalProperties": false,
+      "description": "Who decided that one block of an article could go out, and when. `status` fixes\n`decided_by`: auto_approved -> checks, approved/edited -> person, overridden -> override.",
+      "properties": {
+        "at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "At"
+        },
+        "block_id": {
+          "pattern": "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$",
+          "title": "Block Id",
+          "type": "string"
+        },
+        "confidence": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Confidence"
+        },
+        "decided_by": {
+          "enum": [
+            "checks",
+            "person",
+            "override"
+          ],
+          "title": "Decided By",
+          "type": "string"
+        },
+        "edited_by": {
+          "anyOf": [
+            {
+              "enum": [
+                "person",
+                "agent_proposal"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Edited By"
+        },
+        "figure": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FigureReview"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "flag_id": {
+          "anyOf": [
+            {
+              "pattern": "^flag-\\d{6}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Flag Id"
+        },
+        "page": {
+          "minimum": 1,
+          "title": "Page",
+          "type": "integer"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Reason"
+        },
+        "status": {
+          "enum": [
+            "auto_approved",
+            "approved",
+            "edited",
+            "overridden"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "text_sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Text Sha256"
+        },
+        "type": {
+          "$ref": "#/$defs/BlockType"
+        }
+      },
+      "required": [
+        "block_id",
+        "type",
+        "page",
+        "status",
+        "decided_by",
+        "at",
+        "confidence",
+        "edited_by",
+        "reason",
+        "flag_id",
+        "figure",
+        "text_sha256"
+      ],
+      "title": "BlockReview",
+      "type": "object"
+    },
+    "BlockType": {
+      "enum": [
+        "heading",
+        "paragraph",
+        "list",
+        "table",
+        "figure",
+        "caption",
+        "header",
+        "footer",
+        "other"
+      ],
+      "title": "BlockType",
+      "type": "string"
+    },
+    "FigurePlacement": {
+      "additionalProperties": false,
+      "description": "One attachment of a figure in a written article: where its figure line appears.",
+      "properties": {
+        "article_id": {
+          "pattern": "^(?:[a-z0-9]+(?:-[a-z0-9]+)*)(?:--(?:[a-z0-9]+(?:-[a-z0-9]+)*))?$",
+          "title": "Article Id",
+          "type": "string"
+        },
+        "confidence": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "rule": {
+          "$ref": "#/$defs/AttachRule"
+        }
+      },
+      "required": [
+        "article_id",
+        "rule",
+        "confidence"
+      ],
+      "title": "FigurePlacement",
+      "type": "object"
+    },
+    "FigureReview": {
+      "additionalProperties": false,
+      "properties": {
+        "figure_id": {
+          "pattern": "^FIG-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$",
+          "title": "Figure Id",
+          "type": "string"
+        },
+        "placements": {
+          "items": {
+            "$ref": "#/$defs/FigurePlacement"
+          },
+          "title": "Placements",
+          "type": "array"
+        }
+      },
+      "required": [
+        "figure_id",
+        "placements"
+      ],
+      "title": "FigureReview",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "`articles/<id>.review.json`: every block of the article (its manifest `block_ids`, same\norder) with its review status. A text block whose status is auto_approved or overridden is\nfollowed in the article by an invisible `<!-- ml: ... -->` marker; approved and edited blocks\n(a person looked) and figure blocks carry none.",
+  "properties": {
+    "article": {
+      "title": "Article",
+      "type": "string"
+    },
+    "article_id": {
+      "pattern": "^(?:[a-z0-9]+(?:-[a-z0-9]+)*)(?:--(?:[a-z0-9]+(?:-[a-z0-9]+)*))?$",
+      "title": "Article Id",
+      "type": "string"
+    },
+    "blocks": {
+      "items": {
+        "$ref": "#/$defs/BlockReview"
+      },
+      "title": "Blocks",
+      "type": "array"
+    },
+    "counts": {
+      "$ref": "#/$defs/ArticleReviewCounts"
+    },
+    "generated_at": {
+      "format": "date-time",
+      "title": "Generated At",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "article_id",
+    "article",
+    "generated_at",
+    "counts",
+    "blocks"
+  ],
+  "title": "ArticleReview",
+  "type": "object"
+}

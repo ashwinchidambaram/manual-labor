@@ -50,11 +50,14 @@ class ManifestArticle(ContractModel):
     figures: list[FigureId]
     pages: list[int]
     sections: list[str]
+    review_sidecar: str  # articles/<id>.review.json (design 11 section 20)
 
     @model_validator(mode="after")
     def _check(self) -> ManifestArticle:
         if self.path != f"articles/{self.id}.md":
             raise ValueError("path must be articles/<id>.md")
+        if self.review_sidecar != f"articles/{self.id}.review.json":
+            raise ValueError("review_sidecar must be articles/<id>.review.json")
         if self.id == ids.UNASSIGNED:
             raise ValueError("article id must not be the reserved 'unassigned' marker")
         if ids.parse_article_id(self.id)[0] != self.source_doc:

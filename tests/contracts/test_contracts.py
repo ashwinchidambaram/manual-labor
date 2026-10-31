@@ -19,6 +19,7 @@ from manuallabor.contracts.schema_export import export_schemas
 from tests.contracts.factories import (
     SLUG,
     TS,
+    article_review_dict,
     block_dict,
     document_dict,
     figure_dict,
@@ -184,6 +185,7 @@ def test_c3_extra_forbidden(model: type[BaseModel]) -> None:
             "generated_at": TS,
         },
         "Manifest": manifest_dict(),
+        "ArticleReview": article_review_dict(),
         "ProjectConfig": {"name": "x"},
         "ProbeResult": {
             "probed_at": TS,
@@ -455,7 +457,12 @@ def test_c12_manifest() -> None:
     # block in two articles
     def two(d: dict[str, Any]) -> None:
         d["articles"].append(
-            {**d["articles"][0], "id": f"{SLUG}--x", "path": f"articles/{SLUG}--x.md"}
+            {
+                **d["articles"][0],
+                "id": f"{SLUG}--x",
+                "path": f"articles/{SLUG}--x.md",
+                "review_sidecar": f"articles/{SLUG}--x.review.json",
+            }
         )
 
     bad(c.Manifest, mut(two), "block_ids")
@@ -783,3 +790,68 @@ def test_c12b_manifest_source_doc_cross_checks() -> None:
         },
         "source_doc",
     )
+
+
+def test_c12c_manifest_article_points_at_its_review_sidecar() -> None:
+    d = manifest_dict()
+    art = d["articles"][0]
+    bad(
+        c.ManifestArticle, {**art, "review_sidecar": "articles/other.review.json"}, "review_sidecar"
+    )
+    no = dict(art)
+    no.pop("review_sidecar")
+    bad(c.ManifestArticle, no, "review_sidecar")
+
+
+def test_c19_article_review_contract() -> None:
+    """Design 11 section 20.3: the status fixes who decided; each field belongs to one status."""
+    base = article_review_dict()
+    m = c.ArticleReview.model_validate(base)
+    assert [b.status for b in m.blocks] == [
+        "auto_approved",
+        "approved",
+        "edited",
+        "overridden",
+        "auto_approved",
+    ]
+
+    def mut(i: int | None, **over: Any) -> dict[str, Any]:
+        d = deepcopy(base)
+        if i is None:
+            d.update(over)
+        else:
+            d["blocks"][i].update(over)
+        return d
+
+    bad(c.ArticleReview, mut(1, decided_by="checks"), "decided_by")
+    bad(c.ArticleReview, mut(0, decided_by="person"), "decided_by")
+    bad(c.ArticleReview, mut(0, at=TS), "at")
+    bad(c.ArticleReview, mut(3, at=None), "at")
+    bad(c.ArticleReview, mut(3, reason=None), "reason")
+    bad(c.ArticleReview, mut(1, reason="x"), "reason")
+    bad(c.ArticleReview, mut(1, flag_id="flag-000002"), "flag_id")
+    bad(c.ArticleReview, mut(1, confidence=0.5), "confidence")
+    bad(c.ArticleReview, mut(1, edited_by="person"), "edited_by")
+    # review fix: the fields a status always has are required for it
+    bad(c.ArticleReview, mut(1, at=None), "at")
+    bad(c.ArticleReview, mut(2, edited_by=None), "edited_by")
+    bad(c.ArticleReview, mut(0, confidence=None), "confidence")
+    bad(c.ArticleReview, mut(1, text_sha256=None), "text_sha256")
+    bad(c.ArticleReview, mut(4, text_sha256="e" * 64), "text_sha256")
+    bad(c.ArticleReview, mut(4, figure=None), "figure")
+    bad(c.ArticleReview, mut(1, figure=base["blocks"][4]["figure"]), "figure")
+    bad(c.ArticleReview, mut(1, type="header"), "header")
+    other = {"figure_id": f"FIG-{SLUG}-p041-01", "placements": []}
+    bad(c.ArticleReview, mut(4, figure=other), "figure")
+    bad(c.ArticleReview, mut(None, counts={**base["counts"], "approved": 2}), "counts")
+    bad(c.ArticleReview, mut(None, article="articles/x.md"), "article")
+    dup = deepcopy(base)
+    dup["blocks"].append(dup["blocks"][1])
+    dup["counts"]["approved"] = 2
+    bad(c.ArticleReview, dup, "unique")
+    alien = mut(1, block_id="b-other-p042-02", figure=None)
+    bad(c.ArticleReview, alien, "document")
+    two = deepcopy(base)
+    pl = two["blocks"][4]["figure"]["placements"]
+    pl.append(dict(pl[0]))
+    bad(c.ArticleReview, two, "placements")

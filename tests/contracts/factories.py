@@ -73,6 +73,7 @@ def manifest_dict() -> dict[str, Any]:
             {
                 "id": art,
                 "path": f"articles/{art}.md",
+                "review_sidecar": f"articles/{art}.review.json",
                 "title": "T",
                 "source_doc": SLUG,
                 "block_ids": [b1, b2],
@@ -109,4 +110,69 @@ def manifest_dict() -> dict[str, Any]:
             "assignments": {b1: art, b2: art, b3: "unassigned"},
             "unassigned_reasons": {b3: "not_selected"},
         },
+    }
+
+
+def article_review_dict() -> dict[str, Any]:
+    """A valid `articles/<id>.review.json` (design 11 section 20): one block of each status and
+    a figure block."""
+    art = f"{SLUG}--belt-tension"
+    b = [f"b-{SLUG}-p042-0{i}" for i in range(1, 6)]
+
+    def row(i: int, **over: Any) -> dict[str, Any]:
+        d: dict[str, Any] = {
+            "block_id": b[i],
+            "type": "paragraph",
+            "page": 42,
+            "status": "approved",
+            "decided_by": "person",
+            "at": TS,
+            "confidence": None,
+            "edited_by": None,
+            "reason": None,
+            "flag_id": None,
+            "figure": None,
+            "text_sha256": "d" * 64,
+        }
+        d.update(over)
+        return d
+
+    return {
+        "schema_version": "1.0",
+        "article_id": art,
+        "article": f"articles/{art}.md",
+        "generated_at": TS,
+        "counts": {"auto_approved": 2, "approved": 1, "edited": 1, "overridden": 1},
+        "blocks": [
+            row(
+                0,
+                type="heading",
+                status="auto_approved",
+                decided_by="checks",
+                at=None,
+                confidence=0.97,
+            ),
+            row(1),
+            row(2, status="edited", edited_by="agent_proposal"),
+            row(
+                3,
+                status="overridden",
+                decided_by="override",
+                reason="paper -- ok",
+                flag_id="flag-000001",
+            ),
+            row(
+                4,
+                type="figure",
+                status="auto_approved",
+                decided_by="checks",
+                at=None,
+                confidence=0.99,
+                text_sha256=None,
+                figure={
+                    "figure_id": f"FIG-{SLUG}-p042-01",
+                    "placements": [{"article_id": art, "rule": "caption_ref", "confidence": 0.96}],
+                },
+            ),
+        ],
     }

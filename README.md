@@ -81,6 +81,8 @@ A zip containing:
 - `manifest.json`: every document, article and figure, the review statistics, the models and threshold used, every override with its reason, and an accounting that proves every parsed block ended up in an article or in the unassigned list.
 - `README.md` describing the layout.
 
+Every paragraph that no person checked ends with an invisible HTML comment such as `<!-- ml: auto-approved; block: b-<doc>-p012-03 -->` or `<!-- ml: overridden; block: …; reason: "…" -->`, so Markdown viewers and search tools show nothing while `grep -rn '^<!-- ml: ' articles/` lists them; a paragraph without one was approved or edited by a person. Next to each article, `articles/<id>.review.json` lists every block with its status, who decided it (the checks, a person or an override), when, and the auto-approve confidence or the override reason, and the export validator checks that the markers, this file and the article's front matter agree.
+
 IDs are stable and greppable: block `b-<doc>-p012-03`, figure `FIG-<doc>-p012-01`. Re-parsing the same bytes reproduces them.
 
 ## How it decides what needs you
@@ -144,6 +146,7 @@ Scores are an overlay. `blocks.json`, the raw parse, is never touched by later s
 - [Ollama](https://ollama.com) for local models. `labor probe` prints the exact `ollama pull` commands for a tier.
 - Docling layout models, downloaded once with `uv run docling-tools models download`. The parser never downloads at runtime.
 - Tesseract is optional; RapidOCR is bundled.
+- PyMuPDF is AGPL-3.0 (see [License](#license) below); replacing it with pypdfium2 is tracked as issue #7 for 0.2.
 
 A 200-page born-digital manual parses and scores in a few minutes on a laptop without a GPU. The model steps take longer and run as background jobs while you review.
 

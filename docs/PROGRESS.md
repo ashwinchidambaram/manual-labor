@@ -538,3 +538,41 @@ tsc clean
 $ npm run e2e -- e2e/verify.spec.ts e2e/ux-verify.spec.ts e2e/progress.spec.ts
 27 passed (3.5m)
 ```
+
+## Export review markers and per-article review sidecars — PASSED 2026-10-31
+
+A first-time user said a reader of the exported knowledge base cannot tell which paragraphs a person checked. The owner decided (2026-10-30) the path, recorded in design 11 section 20, which amends P2, section 3.2 and open issue 2. Every exported paragraph nobody checked, whether auto-approved or exported under an override, is followed by an invisible HTML-comment marker on its own line, such as `<!-- ml: auto-approved; block: b-…-p004-02 -->` or `<!-- ml: overridden; block: …; flag: flag-…; reason: "…" -->`. Approved and edited paragraphs carry no marker, and neither do figure blocks. The reason is JSON with `>`, `<`, a `-` after a `-` and Unicode line separators escaped, so the comment cannot end early.
+
+A new contract, `ArticleReview`, describes `articles/<id>.review.json`. It lists every block of the article in manifest order with its status, `decided_by` (checks, person, override), `at`, the auto-approve confidence or the override reason and flag, `text_sha256`, and for figure blocks their placements. `ManifestArticle.review_sidecar` points at it. Schemas and TypeScript were regenerated; OpenAPI is unchanged.
+
+Validator Z9 checks that the sidecar files match the manifest, that every block appears once and in order, and that each paragraph is unchanged (by hash). Each needed marker must directly follow its own paragraph, and no marker may follow a paragraph a person checked. It also checks that marker status, reason and flag equal the sidecar, that front-matter counts equal the sidecar counts, that overridden entries equal `manifest.overrides`, and that figure status and placements agree. A marker that a renderer would show is refused at assembly, as is source text that looks like a marker, since markdown-it would otherwise display it. Alt text now escapes `<`. `EXPORT_ALGO_VERSION` is `"2"`.
+
+Other changes:
+- The export README has a "Review markers" section.
+- The project README "What you get" section explains markers and sidecars. On the coordinator's request, the README Requirements section also gains a PyMuPDF AGPL line pointing to issue #7.
+- The Export screen copy and the onboarding export trust line mention the marker and the review file (USER_GUIDE regenerated).
+- `labor check` K16 scans only `articles/*.md`.
+
+A fresh Opus reviewer read the change three times, in a worktree of each commit:
+- **First pass:** one major (a marker moved after the wrong paragraph passed) plus minors: a marker-shaped caption was blamed on another block, lookalike markers, flag and reason pairing, a loose contract, an undocumented structural difference, and a grep that hit false positives.
+- **Second pass:** one blocker (a part ending in a newline failed the new alignment check) plus two minors (flag recorded on the wrong block, backslash parity).
+- **Third pass:** no blocker or major. A weakened test was fixed.
+
+Each finding was fixed with a failing test first (`test_markers.py` R1–R4, RR1–RR4; `tests/contracts` C19). Accepted and documented in 20.10: changes to an entry's `type` or `confidence` can't be detected, because the zip has no independent record of them, and a duplicated figure line still passes (pre-existing).
+
+```
+$ uv run pytest tests/export tests/contracts tests/api -p no:warnings --basetemp=.pytest_tmp_markers
+470 passed, 1 skipped, 2 deselected in 454.81s (0:07:34)
+$ uv run pytest tests/export -m slow -p no:warnings --basetemp=.pytest_tmp_markers
+2 passed, 214 deselected in 254.70s (0:04:14)
+$ uv run ruff check manuallabor/ tests/ && uv run ruff format --check manuallabor/ tests/ && uv run mypy manuallabor/
+All checks passed! / 412 files already formatted / Success: no issues found in 196 source files
+$ uv run labor schemas export --check && uv run labor openapi export --check
+schemas up to date / openapi up to date
+$ cd frontend && npm run typecheck && npm test -- --run
+tsc clean
+ Test Files  56 passed (56)
+      Tests  471 passed (471)
+$ npm run e2e -- e2e/override-flow.spec.ts e2e/ux-onboarding.spec.ts e2e/onboarding.spec.ts
+21 passed (3.9m)
+```

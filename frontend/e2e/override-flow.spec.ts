@@ -92,4 +92,22 @@ test("OV1 one click overrides every unflagged block with one reason; nothing ove
   await expect(page.getByTestId("export-ready")).toContainText("Overrides cover every remaining block");
   await expect(page.locator("#step-state-export")).toHaveText(/Ready with an override/);
   expect((await status()).counts).toMatchObject({ to_review: 0, flagged: 0, blocking: 0, overridden: n + 1 });
+
+  // design 11 section 20: the export marks every overridden paragraph and ships a review file per article
+  await expect(page.getByTestId("export-ready")).toContainText("a review file names who checked each paragraph");
+  await page.getByTestId("export-start").click();
+  const summary = page.getByTestId("export-summary");
+  await expect(summary).toBeVisible({ timeout: 120_000 });
+  await expect(summary).toContainText("ml: overridden");
+  const done = await status();
+  expect(done.summary?.review.overrides).toBe(n + 1);
+  const zip = await api.get("/api/export/download");
+  expect(zip.ok()).toBeTruthy();
+  const bytes = await zip.body();
+  // zip entry names are stored uncompressed: every article's review sidecar is in the archive
+  const names = bytes.toString("latin1");
+  const articles = (names.match(/articles\/[a-z0-9-]+\.md/g) ?? []).length;
+  const sidecars = (names.match(/articles\/[a-z0-9-]+\.review\.json/g) ?? []).length;
+  expect(articles).toBeGreaterThan(0);
+  expect(sidecars).toBe(articles);
 });

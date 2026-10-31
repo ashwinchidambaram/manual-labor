@@ -63,7 +63,12 @@ def test_m1_dropped_block_with_docs_also_edited_is_still_consistent() -> None:
 def test_m2_block_assigned_twice_fails() -> None:
     def twice(d: dict[str, Any]) -> None:
         d["articles"].append(
-            {**d["articles"][0], "id": f"{SLUG}--x", "path": f"articles/{SLUG}--x.md"}
+            {
+                **d["articles"][0],
+                "id": f"{SLUG}--x",
+                "path": f"articles/{SLUG}--x.md",
+                "review_sidecar": f"articles/{SLUG}--x.review.json",
+            }
         )
 
     bad(c.Manifest, mut(twice), "block_ids")
@@ -156,7 +161,11 @@ def test_m8_docs_slugs_unique_and_unassigned_article_id_reserved() -> None:
     bad(c.Manifest, mut(dup_doc), "slugs must be unique")
 
     def reserved(d: dict[str, Any]) -> None:
-        d["articles"][0].update(id="unassigned", path="articles/unassigned.md")
+        d["articles"][0].update(
+            id="unassigned",
+            path="articles/unassigned.md",
+            review_sidecar="articles/unassigned.review.json",
+        )
 
     bad(c.Manifest, mut(reserved), "reserved")
 
