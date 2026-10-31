@@ -511,6 +511,10 @@ Budget at 1100x700 after the change: status about 125, band about 205 (strip 158
 - **Capping and centring the content at 2560.** That leaves empty sides. The page column puts the space to use for the whole page, which a reviewer wants anyway.
 - **A larger rail on wide screens.** It gains nothing and would contradict DESIGN.md's 248 px.
 
+### 9.5a Minimum supported window (owner decision, 2026-10-30)
+
+The smallest window the product is designed for is **1024x600** (a small laptop, or 1440x900 at 150 percent zoom). Below that the layout stays usable and the §8.3 short-window rules keep the page strip, the text and the action bar on screen, but a long table block can need scrolling before Approve, and a reviewer at 720x450 (1440x900 at 200 percent) can press Approve having seen only the header. The owner decided not to gate Approve on scrolling at those sizes: "we don't need to build for a display that small". The responsive tests keep 720x450 as a no-overflow check only; nothing promises that every block fits there.
+
 ### 9.6 Tests
 
 Playwright `e2e/responsive.spec.ts`, one test for each of 720x450, 1024x768, 1100x700, 1366x768, 1440x900, 1920x1080 and 2560x1440, plus 200 percent on 1440x900 (720x450 at device scale 2) and 150 percent on 1920x1080 (1280x720 at 1.5). Each test opens Scope, Verify and Export.
