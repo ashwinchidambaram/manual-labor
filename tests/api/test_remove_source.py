@@ -58,6 +58,13 @@ def test_preview_delete_replay_and_status(env: Env) -> None:
     assert again.status_code == 200 and again.json() == body
     assert c.delete(f"/api/sources/{GONE}", params={"request_id": "t-rm2"}).status_code == 404
     assert c.get(f"/api/sources/{GONE}/removal").status_code == 404
+    # while a job runs the tidy-up of a removed manual waits, and the answer is still 404
+    store = env.ctx.store
+    assert isinstance(store, Store)
+    running = store.add_job(kind="run", plan=RunPlanIn(to="score2").model_dump(mode="json"))
+    store.update_job(running, status="running")
+    assert c.delete(f"/api/sources/{GONE}", params={"request_id": "t-rm3"}).status_code == 404
+    store.update_job(running, status="done")
     # the flag on a removed block no longer counts toward the export gate
     assert c.get("/api/export/status").json()["open_flags"] == 0
 

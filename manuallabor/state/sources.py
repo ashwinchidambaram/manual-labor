@@ -13,7 +13,7 @@ import logging
 import secrets
 import shutil
 from collections.abc import Callable, Iterator
-from contextlib import AbstractContextManager, contextmanager, nullcontext
+from contextlib import AbstractContextManager, ExitStack, contextmanager, nullcontext
 from typing import Any
 
 from manuallabor import ids
@@ -224,8 +224,16 @@ def _tidy_removed(paths: ProjectPaths, store: Store, slug: str) -> None:
     if not prior:
         return
     filename = str(prior[-1].payload.get("filename", ""))
-    live_names = {d.filename for d in paths.list_documents()}
-    with _worker_lock(paths, slug):
+    with ExitStack() as stack:
+        try:
+            stack.enter_context(_worker_lock(paths, slug))
+        except Conflict:
+            return  # a job is running: leave the tidy-up to a later request; the answer is 404
+        # decided inside the lock: an ingest that re-added this manual may have finished between
+        # the caller's check and the lock (re-review), and its files are live
+        if slug in paths.list_slugs():
+            return
+        live_names = {d.filename for d in paths.list_documents()}
         _purge_leftovers(paths)
         shutil.rmtree(paths.figure_dir(slug), ignore_errors=True)
         if filename and filename not in live_names:

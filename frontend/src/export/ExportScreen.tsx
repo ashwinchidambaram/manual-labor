@@ -696,7 +696,11 @@ export default function ExportScreen() {
   const nr = notReadyParts(st, active.data, sources.data);
   // design 11 section 20.18: manuals outside the selection that were left out or could not be read are named, never
   // dropped silently; the export accounts for their blocks as not selected
-  const leftOut = (st?.left_out ?? []).map((slug) => sources.data?.find((s) => s.slug === slug)?.filename ?? slug);
+  const leftOut = (st?.left_out ?? []).map((slug) => {
+    const src = sources.data?.find((s) => s.slug === slug);
+    const why = src?.nodes.some((n) => n.state === "failed") ? "could not be read" : "not in your selection";
+    return `${src?.filename ?? slug} (${why})`;
+  });
   const locked = !!st && ((st.blockers ?? []).length > 0 || notReady.length > 0);
   const overridable = locked && notReady.length === 0;
   // the second column holds the override forms (locked) and the active overrides; it is left out when empty
@@ -798,8 +802,8 @@ export default function ExportScreen() {
             {st.summary ? <Summary s={st.summary} fresh={jobDone} /> : null}
             {leftOut.length ? (
               <p role="note" data-testid="export-left-out" className="max-w-[62ch] text-sm text-muted">
-                Not in this export: {leftOut.join(", ")} ({leftOut.length === 1 ? "it is" : "they are"} not in your selection). The
-                manifest lists {leftOut.length === 1 ? "its" : "their"} blocks as not selected.
+                Not in this export: {leftOut.join(", ")}. The manifest lists {leftOut.length === 1 ? "its" : "their"} blocks as not
+                selected.
               </p>
             ) : null}
             {notReady.length ? (

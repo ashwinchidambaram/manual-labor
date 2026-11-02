@@ -714,3 +714,67 @@ $ cd frontend && npm run e2e
   1 skipped (UCR reader's pass screenshots, opt-in)
   100 passed (6.2m)
 ```
+
+## Outage recovery: failed stages re-run, model-service preflight, manuals outside the selection, remove a manual — PASSED 2026-11-02
+
+Branch `outage-recovery` (not merged). Source: first-time user run 5 (`build/human-test-3`): with Ollama stopped, two PDFs failed at `group`. After the service came back, every Re-run, Retry and "Apply small" failed in 20 ms with "Grouping into topics: skip, up to date", then "ended with an error". The stuck manuals also locked cleanup and the export although they were not selected. No manual could be removed, and the hardware probe could not be run again. Design: 07 sections 19 to 23, 08 sections 11 and 12, 04 section 3.6 step 8 (amended), 11 section 20.18.
+
+- **Root cause (design 07 section 19).** Reproduced on a scratch project against a private Ollama on 127.0.0.1:11435; the owner's 11434 was never touched.
+  - With 11435 down, `labor run --to group` wrote `groups.json` with `topic_status: failed` and `fingerprint: 07160bfa…`, which equals `group_fingerprint()`. `stages.json` recorded `group: failed, "stage failed"`.
+  - With 11435 up, the next run planned `group`, so the planner was not at fault. The group stage's own skip check then accepted the degraded file (`prior.fingerprint == fp` → `skip, up to date`) and returned `topic_status == "ok"`, which was False, so the run failed.
+  - **Fixes:**
+    - Nothing is written on a topic failure.
+    - `ProviderUnavailable` is never turned into a fallback. Six sites re-raise it.
+    - A unit whose last record is `failed` runs forced (parse excepted).
+    - The failure record carries the stage's real message.
+    - Live check: the evidence project and a copy of `build/human-test-3` recover with one `labor run --to group` (all three manuals `group: fresh`). Their score2 plan then leaves the two deselected PDFs out.
+- **Preflight (section 20).** Before any unit runs, and again after a unit that calls a model fails, the worker and `labor run` ask `GET <ollama host>/api/tags`. They ask only the configured host, never through a proxy, and never in mock mode.
+  - Message: "Ollama is not running at … Start it (`ollama serve`) and press Retry." It is also recorded on each manual's first node that needs the service (`code: provider_unreachable`).
+  - Contract and storage: `JobInfo.error_code` (migration 5) and `NodeState.code`.
+  - Client: the banner's Retry now covers reading jobs too. A failed job refreshes the screen. The card shows "Model service not running" with the server's sentence. The probe panel has "Run again" and no `ollama pull` advice while the service is stopped.
+  - Live: the same project failed in about 1 s with the sentence, instead of after 30 s of reading.
+- **Manuals outside the selection (section 21, design 11 section 20.18).** `graph.left_out_docs` is the one rule. A manual is left out when it has no selected block and is either grouped or failed up to `group`.
+  - Score2 and export plans skip left-out manuals.
+  - `not_ready` and `_check_fresh` ignore them, and the export reads the selection from the database.
+  - The manifest accounts for a left-out manual's blocks as `not_selected` (counted as `queued` in `review_stats`).
+  - `ExportStatus.left_out` names them, and the Export screen says so.
+  - A manual still being read still blocks the export.
+- **Remove a manual (section 22).**
+  - Surface: `GET /api/sources/{slug}/removal`, `DELETE /api/sources/{slug}?request_id=` (409 `job_active`) and `labor remove <project> <slug> --yes`.
+  - Deleted: the source file, `docs/<slug>`, `figures/<slug>` and the figure-index entries, and finished job rows that named only this manual.
+  - Selection: the manual's ids and its `known_docs` entry are dropped.
+  - Kept: decisions, flags, proposals and overrides stay in the log, orphaned, and appear in `ProjectStatus.removed` and in `labor status` ("removed: scanned.pdf (scanned): 2 orphaned decisions, 1 open flag").
+  - Re-adding: the re-parse guard now applies only when `blocks.json` exists, so a re-added manual parses, comes back selected, and its unchanged decisions apply again.
+  - UI: the Scope card has Remove, and the confirmation states the server's counts.
+- **Wording (design 08 section 12).**
+  - The Export screen no longer says "(or labor run)". Stage errors shown on screen lose their CLI advice (`withoutCommandHints`).
+  - "Table structure" is offered only for table blocks, and the server refuses it on any other block (422).
+  - The welcome headline names a failed manual and never flips back to "read and ready".
+- **Tests first** (each red on the old code before the fix):
+  - pytest: `tests/jobs/test_failed_stage.py` (11), `tests/jobs/test_preflight.py` (13), `tests/export/test_out_of_scope.py` (8), `tests/api/test_out_of_scope.py` (3), `tests/state/test_remove_source.py` (13), `tests/api/test_remove_source.py` (3), `tests/state/test_flag_category.py` (1).
+  - Vitest: `src/shell/outage.test.tsx`, `src/scope/removeManual.test.tsx`, plus additions to `StepRail.test.tsx` and `ExportNotReady.test.tsx`. These were red against the old components: 6 failing, and the removal suite did not import.
+  - Playwright: `e2e/outage.spec.ts` (jobs routes stubbed: banner sentence, Retry posts `{to: group}`) and `e2e/remove-manual.spec.ts` (own server on 8767: the card, the dialog, and the API agreeing afterwards).
+  - Updated: test 32 of design 04, `test_stages_json_has_no_timestamps` (`code` field), the route table, the T8/VE1 flag digits (5 only for a table) and the C8 probe panel.
+- **Fresh review (Opus, read-only, a62d61a).** No data loss. Findings and outcomes:
+  - Major, fixed: a manual ingested and never run was left out of the export.
+  - Minor, fixed: the selection projection was used for freshness; a figure-index error left a half-done removal; the service re-check could hide a parse error; a job queued during a removal was not refused; a legacy selection did not re-select a re-added manual.
+  - Accepted: the check fails runs that only the cache could serve. This is recorded as an owner decision.
+  - Nits, fixed: proxy, job logs after commit, one request id per confirmation.
+  - Re-review of the fixes (825b271): one low race in the post-crash tidy-up, which could have deleted a re-added manual's files. It now decides inside the worker lock (fixed with a test first).
+  - Gate flake investigated, not re-run until green: UC2 failed once in the full run. The trace showed the approve at 42.3 s and the confirm job ending at 44.2 s; cleanup then changed the block's text, so the server correctly answered "changed since approval". Running the spec alone passed three of three. The spec now waits for the confirm job.
+
+```
+$ uv run pytest tests/jobs tests/api tests/state tests/export tests/grouping -p no:warnings --basetemp=.pytest_tmp_outage
+838 passed, 3 skipped, 2 deselected in 737.82s (0:12:17)
+$ uv run ruff check manuallabor/ tests/ scripts/ && uv run ruff format --check manuallabor/ tests/ scripts/ && uv run mypy manuallabor/
+All checks passed! / 426 files already formatted / Success: no issues found in 198 source files
+$ uv run labor schemas export --check && uv run labor openapi export --check
+schemas up to date / openapi up to date
+$ cd frontend && npm run gen-guide && npm run check-types-fresh && npm run check-api-fresh && npm run typecheck && npx vitest run
+USER_GUIDE.md unchanged / no drift / tsc clean
+ Test Files  59 passed (59)
+      Tests  515 passed (515)
+$ cd frontend && npm run e2e
+  1 skipped (UCR reader's pass screenshots, opt-in)
+  102 passed (5.0m)
+```

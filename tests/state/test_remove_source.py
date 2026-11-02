@@ -343,3 +343,28 @@ def test_a_job_queued_after_the_preview_still_refuses_inside_the_transaction(
         assert not [a for a in env.store.iter_actions() if a.kind == ActionKind.remove_source]
     finally:
         env.close()
+
+
+def test_tidying_never_touches_a_manual_that_is_live_again(lp: ProjectPaths) -> None:
+    """Re-review: the tidy-up decides inside the worker lock. A manual re-added (same slug)
+    between the 'not listed' check and the lock keeps its figures and source file."""
+    from manuallabor.state.sources import _tidy_removed
+
+    env, _a, _f = reviewed(lp)
+    try:
+        filename = lp.load_document(GONE).filename
+        remove_source(lp, env.store, GONE, "t-remove")
+    finally:
+        env.close()
+    from tests.conftest import FIXTURES
+
+    ingest_files(lp, [FIXTURES / filename], emit=lambda _o: None)
+    assert GONE in lp.list_slugs()
+    lp.figure_dir(GONE).mkdir(parents=True, exist_ok=True)
+    (lp.figure_dir(GONE) / "keep.txt").write_text("live")
+    store = Store.open(lp)
+    try:
+        _tidy_removed(lp, store, GONE)  # as if the 'not listed' check had passed just before
+    finally:
+        store.close()
+    assert (lp.figure_dir(GONE) / "keep.txt").exists() and lp.source(filename).exists()

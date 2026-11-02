@@ -182,6 +182,10 @@ test("UC2 confirm scope, read the next step, process 6 blocks keyboard-only; ser
   await page.getByRole("button", { name: /Confirm scope and go to Verify/ }).click();
   await expect(page).toHaveURL(/\/verify/);
   await expect(currentCard(page)).toBeFocused();
+  // Confirm runs cleanup over the (reset) selection. An approve that lands before cleanup reaches its block approves
+  // the raw text; the cleaned text then differs and the server rightly sends the block back ("changed since approval",
+  // seen in the 2026-11-02 gate's trace: approve at 42.3 s, job end at 44.2 s). Process the blocks once it is done.
+  await waitJobsIdle(request);
   const q0 = await getQueue(request);
   const firstId = q0.items[0].block_id;
   await expect(page.getByTestId("block-id")).toHaveText(firstId);
