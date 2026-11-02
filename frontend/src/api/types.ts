@@ -1741,6 +1741,10 @@ export interface components {
          *     first blocks (reading order, at most 20) an active override does not cover: an export is
          *     possible iff `blockers` is empty. `flag_blockers` lists every uncovered open flag (no cap);
          *     `counts` partitions the scope (None from a store that is not a project store).
+         *     `not_ready` lists the documents the gate cannot see yet, because they have no current
+         *     scores (never run to score2, or scored by another `SCORING_ALGO_VERSION`, design 03 section
+         *     2.10a): none of their blocks is in any count, so while it is non-empty the project needs a
+         *     run before an export, whatever `unlocked` says (review D3).
          */
         ExportStatus: {
             /** Blockers */
@@ -1748,6 +1752,8 @@ export interface components {
             counts?: components["schemas"]["ExportScopeCounts"] | null;
             /** Flag Blockers */
             flag_blockers?: components["schemas"]["ExportFlagBlocker"][];
+            /** Not Ready */
+            not_ready?: string[];
             /** Open Flags */
             open_flags: number;
             /** Overrides */

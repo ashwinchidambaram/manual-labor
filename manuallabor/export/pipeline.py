@@ -302,12 +302,17 @@ def export_status(
     summary = None
     if st.export is not None and Path(st.export.zip_path).is_file():
         zip_path, summary = st.export.zip_path, st.export.summary
+    # the documents `_gate` skips (review D3): a gate over none of them is not "ready to export"
+    not_ready = [
+        s for s in paths.list_slugs() if not (doc_ready(paths, s) and review.data.scored(s))
+    ]
     return ExportStatus(
         unlocked=g.unlocked,
         open_flags=g.open_flags,
         overrides=list(overrides),
         queued=g.queued,
         blockers=g.blockers[:BLOCKER_LIMIT],
+        not_ready=not_ready,
         flag_blockers=[
             ExportFlagBlocker(flag_id=f.id, block_id=b, category=f.category, note=f.note)
             for f, b in g.flag_blockers

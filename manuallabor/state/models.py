@@ -549,13 +549,18 @@ class ExportStatus(ContractModel):
     """`unlocked` is the raw gate (no open flag, no queued in-scope block); `blockers` are the
     first blocks (reading order, at most 20) an active override does not cover: an export is
     possible iff `blockers` is empty. `flag_blockers` lists every uncovered open flag (no cap);
-    `counts` partitions the scope (None from a store that is not a project store)."""
+    `counts` partitions the scope (None from a store that is not a project store).
+    `not_ready` lists the documents the gate cannot see yet, because they have no current
+    scores (never run to score2, or scored by another `SCORING_ALGO_VERSION`, design 03 section
+    2.10a): none of their blocks is in any count, so while it is non-empty the project needs a
+    run before an export, whatever `unlocked` says (review D3)."""
 
     unlocked: bool
     open_flags: int
     overrides: list[Override] = Field(default_factory=list)
     queued: int = 0
     blockers: list[BlockId] = Field(default_factory=list)
+    not_ready: list[DocSlug] = Field(default_factory=list)
     flag_blockers: list[ExportFlagBlocker] = Field(default_factory=list)
     counts: ExportScopeCounts | None = None
     summary: ExportSummary | None = None
