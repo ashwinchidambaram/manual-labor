@@ -148,7 +148,12 @@ def _fingerprint_state(paths: ProjectPaths, slug: str, node: str, cfg: ProjectCo
         if sf.threshold != cfg.threshold_for(slug):
             return "project threshold changed"
         if node == "score" and dp.clean.is_file():
-            return None  # the file carries score2's fingerprint; score2 checks it
+            # the file carries score2's fingerprint; score2 checks it. It must still cover
+            # blocks.json, or the plan would start after `score` and every stage that loads the
+            # machine view would raise "has no score" (upgrade-fix review, finding 2)
+            ids = {b["id"] for b in json.loads(dp.blocks.read_text(encoding="utf-8"))}
+            n = len(ids - {b.block_id for b in sf.blocks})
+            return None if n == 0 else f"scores.json has no score for {n} block{'s' * (n != 1)}"
         return None if sf.fingerprint == score_fingerprint(paths, slug, cfg) else "inputs changed"
     if node == "group":
         from manuallabor.contracts.group import GroupsFile
@@ -201,7 +206,15 @@ def node_state(
         try:
             why = _fingerprint_state(paths, slug, node, cfg)
         except Exception as exc:  # unreadable/stale inputs: the stage will say why when it runs
-            why = f"{type(exc).__name__}: {exc}"
+            # an upstream node that is not fresh is the reason, not the error it causes here
+            # (`clean` over old score files raised CleanupError, upgrade-fix review finding 5)
+            ups = (node_state(paths, slug, u, cfg, stages, memo) for u in upstream(node))
+            bad = next((u for u in ups if u.state != "fresh"), None)
+            why = (
+                f"upstream {bad.node} is {bad.state}"
+                if bad is not None
+                else f"{type(exc).__name__}: {exc}"
+            )
         out = NodeState(node=node, state="fresh")
         if why is not None:
             out = NodeState(node=node, state="stale", reason=why)

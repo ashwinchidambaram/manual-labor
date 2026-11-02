@@ -2201,7 +2201,7 @@
       },
       "ExportStatus": {
         "additionalProperties": false,
-        "description": "`unlocked` is the raw gate (no open flag, no queued in-scope block); `blockers` are the\nfirst blocks (reading order, at most 20) an active override does not cover: an export is\npossible iff `blockers` is empty. `flag_blockers` lists every uncovered open flag (no cap);\n`counts` partitions the scope (None from a store that is not a project store).\n`not_ready` lists the documents the gate cannot see yet, because they have no current\nscores (never run to score2, or scored by another `SCORING_ALGO_VERSION`, design 03 section\n2.10a): none of their blocks is in any count, so while it is non-empty the project needs a\nrun before an export, whatever `unlocked` says (review D3).",
+        "description": "`unlocked` is the raw gate (no open flag, no queued in-scope block, and `not_ready`\nempty); `blockers` are the first blocks (reading order, at most 20) an active override does\nnot cover: an export is possible iff `blockers` and `not_ready` are both empty.\n`flag_blockers` lists every uncovered open flag (no cap); `counts` partitions the scope\n(None from a store that is not a project store).\n`not_ready` lists the documents the gate cannot see yet, because they have no current\nscores (never run to score2, or scored by another `SCORING_ALGO_VERSION`, design 03 section\n2.10a): none of their blocks is in any count, so while it is non-empty the project needs a\nrun before an export and `unlocked` is false (review D3, design 11 section 20.17).",
         "properties": {
           "blockers": {
             "items": {

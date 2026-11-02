@@ -169,3 +169,85 @@ def test_labor_run_mock_rescores_an_old_project_and_keeps_decisions(lp: ProjectP
         [*LABOR, "status", str(lp.root)], capture_output=True, text=True, timeout=120
     )
     assert "STALE" not in status.stdout and "FAILED" not in status.stdout, status.stdout
+
+
+# -- fresh review of the upgrade fix (integration 2026-11-02) ----------------------------------
+
+
+def test_clean_on_an_old_project_says_it_waits_for_score(lp: ProjectPaths) -> None:
+    """Review finding 5: `clean`'s reason was the raw `CleanupError` text pointing at `labor
+    score`; an upstream node that is not fresh is the reason."""
+    downgrade(lp)
+    st = {s.node: s for s in graph.doc_node_states(lp, "clean", lp.load_config())}
+    assert st["clean"].state == "stale"
+    assert st["clean"].reason == "upstream score is stale", st["clean"]
+    table = render_status(graph.project_status(lp, None), verbose=True)
+    assert "CleanupError" not in table and "Error:" not in table, table
+
+
+def test_score_is_stale_when_its_file_does_not_cover_every_block(lp: ProjectPaths) -> None:
+    """Review finding 2: a current-version scores.json that misses a block of blocks.json (a
+    re-parse that outran it) made `score` fresh while clean.json existed, so the plan started
+    later and every stage that loads the machine view raised "has no score"."""
+    p = lp.doc("clean").scores
+    data = json.loads(p.read_text(encoding="utf-8"))
+    dropped = data["blocks"].pop()["block_id"]
+    p.write_text(json.dumps(data, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+    assert scores_current(lp, "clean")
+    st = {s.node: s for s in graph.doc_node_states(lp, "clean", lp.load_config())}
+    assert st["score"].state == "stale", st["score"]
+    assert st["score"].reason == "scores.json has no score for 1 block", st["score"]
+    assert dropped
+    units = make_plan(lp, lp.load_config(), to="score2").units
+    assert units[0] == ("score", "clean"), units
+    assert [u for u in units if u[1] == "scanned"] == []
+
+
+def test_re_run_to_group_starts_at_score_on_an_old_project(lp: ProjectPaths) -> None:
+    """The Scope screen's Re-run posts `to: group`."""
+    downgrade(lp)
+    slugs = lp.list_slugs()
+    units = make_plan(lp, lp.load_config(), to="group").units
+    assert units == [(n, s) for n in ("score", "group") for s in slugs], units
+
+
+def test_a_project_that_already_recorded_group_failed_plans_score_first(lp: ProjectPaths) -> None:
+    """The real upgrade state: earlier runs recorded `group: failed` in stages.json."""
+    downgrade(lp)
+    for slug in lp.list_slugs():
+        st = graph.load_stages(lp, slug)
+        st.record("group", "failed", None, "ScoringError: scores.json missing or from another")
+        graph.save_stages(lp, slug, st)
+    slugs = lp.list_slugs()
+    states = {s.node: s.state for s in graph.doc_node_states(lp, slugs[0], lp.load_config())}
+    assert states["score"] == "stale" and states["group"] == "failed", states
+    assert make_plan(lp, lp.load_config(), to="score2").units == [
+        (n, s) for n in RESCORE for s in slugs
+    ]
+
+
+def test_no_score_file_beside_clean_json_is_missing(lp: ProjectPaths) -> None:
+    lp.doc("clean").scores.unlink()
+    st = {s.node: s.state for s in graph.doc_node_states(lp, "clean", lp.load_config())}
+    assert st["score"] == "missing" and st["score2"] == "missing", st
+    assert make_plan(lp, lp.load_config(), to="score2").units[0] == ("score", "clean")
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "{not json",
+        "[]",  # valid JSON, not an object
+        "{}",  # no algo_version
+        '{"algo_version": 5}',  # not a string
+        json.dumps({"algo_version": SCORING_ALGO_VERSION}),  # this version, but not a ScoreFile
+    ],
+)
+def test_an_unusable_score_file_is_unreadable(tmp_path: Path, text: str) -> None:
+    p = tmp_path / "scores.json"
+    p.write_text(text, encoding="utf-8")
+    assert graph._old_scores_reason(p) == "scores.json unreadable"
+    p.write_text(json.dumps({"algo_version": OLD}), encoding="utf-8")
+    assert graph._old_scores_reason(p) == (
+        f"scored by scoring version {OLD}; this version is {SCORING_ALGO_VERSION}"
+    )

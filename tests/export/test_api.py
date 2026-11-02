@@ -95,6 +95,7 @@ def test_e22_status_shape_and_the_locked_post(unreviewed_env: Env) -> None:
         "overrides",
         "queued",
         "blockers",
+        "not_ready",  # design 07 section 3.2 revision 2026-11-02, design 11 section 20.17
         "flag_blockers",
         "faith_blockers",  # design 11 section 20.16
         "counts",
@@ -193,6 +194,46 @@ def test_e22_post_runs_the_export_in_the_worker_and_download_matches(unreviewed_
     out = env.paths.root / "downloaded.zip"
     out.write_bytes(d.content)
     assert validate_zip(out) == []
+
+
+def test_a_document_not_scored_by_this_version_locks_the_export(unreviewed_env: Env) -> None:
+    """Design 11 section 20.17: a gate that cannot see a document is not open. One document
+    fully reviewed and another scored by an older version: locked, with `not_ready` naming it."""
+    import json
+
+    env = unreviewed_env
+    c = env.client
+    approve_everything(env)
+    s = c.get("/api/export/status").json()
+    assert s["unlocked"] is True and s["blockers"] == [] and s["not_ready"] == [], s
+    slug = env.paths.list_slugs()[-1]
+    p = env.paths.doc(slug).scores
+    orig = p.read_bytes()
+    data = json.loads(orig)
+    data["algo_version"] = "5"
+    p.write_text(json.dumps(data, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+    s = c.get("/api/export/status").json()
+    assert s["not_ready"] == [slug], s
+    assert s["unlocked"] is False and s["blockers"] == [], s
+    r = c.post("/api/export")
+    assert r.status_code == 409, r.text
+    body = r.json()
+    assert body["code"] == "export_locked" and body["not_ready"] == [slug], body
+    assert slug in body["detail"] and "run the pipeline" in body["detail"], body
+    assert c.get("/api/jobs").json() == [] or all(
+        j["kind"] != "export" for j in c.get("/api/jobs").json()
+    )
+    p.write_bytes(orig)
+    s = c.get("/api/export/status").json()
+    assert s["unlocked"] is True and s["not_ready"] == [], s
+    # current scores but no clean.json (scored, scope not confirmed yet): not ready either
+    clean = env.paths.doc(slug).clean
+    kept = clean.read_bytes()
+    clean.unlink()
+    s = c.get("/api/export/status").json()
+    assert s["not_ready"] == [slug] and s["unlocked"] is False, s
+    clean.write_bytes(kept)
+    assert c.get("/api/export/status").json()["unlocked"] is True
 
 
 def test_e22_unreviewed_blocks_can_go_out_with_a_blanket_override(unreviewed_env: Env) -> None:

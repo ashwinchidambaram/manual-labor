@@ -556,14 +556,15 @@ class ExportFlagBlocker(ContractModel):
 
 
 class ExportStatus(ContractModel):
-    """`unlocked` is the raw gate (no open flag, no queued in-scope block); `blockers` are the
-    first blocks (reading order, at most 20) an active override does not cover: an export is
-    possible iff `blockers` is empty. `flag_blockers` lists every uncovered open flag (no cap);
-    `counts` partitions the scope (None from a store that is not a project store).
+    """`unlocked` is the raw gate (no open flag, no queued in-scope block, and `not_ready`
+    empty); `blockers` are the first blocks (reading order, at most 20) an active override does
+    not cover: an export is possible iff `blockers` and `not_ready` are both empty.
+    `flag_blockers` lists every uncovered open flag (no cap); `counts` partitions the scope
+    (None from a store that is not a project store).
     `not_ready` lists the documents the gate cannot see yet, because they have no current
     scores (never run to score2, or scored by another `SCORING_ALGO_VERSION`, design 03 section
     2.10a): none of their blocks is in any count, so while it is non-empty the project needs a
-    run before an export, whatever `unlocked` says (review D3)."""
+    run before an export and `unlocked` is false (review D3, design 11 section 20.17)."""
 
     unlocked: bool
     open_flags: int

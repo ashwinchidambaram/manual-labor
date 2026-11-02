@@ -2,15 +2,16 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ApiError, client, unwrap } from "../api/client";
-import { invalidateReviewCounts, qk, trackJob, useExportStatus, useOpenFlags } from "../api/queries";
+import { invalidateReviewCounts, qk, trackJob, useActiveJobs, useExportStatus, useOpenFlags, useSources } from "../api/queries";
 import type { ArticleReviewCounts, ExportStatus, ExportSummary, Override } from "../api/schema";
 import { useJobWatch } from "../hooks/useJobsPolling";
 import Hint from "../onboarding/Hint";
 import { useBlockTitles } from "../shell/blockTitles";
 import { AttentionIcon } from "../shell/Icon";
+import { isPipelineJob } from "../shell/jobStep";
 import { openInVerify } from "../shell/openInVerify";
 import { FLAG_CATEGORIES, FLAG_RESOLUTION } from "../verify/labels";
-import { blockingFlagsOf, scopeTerms, toReviewOf } from "../shell/scopeTerms";
+import { blockingFlagsOf, notReadyOf, scopeTerms, toReviewOf } from "../shell/scopeTerms";
 
 /** The server lists at most this many blockers (manuallabor/export/types.py BLOCKER_LIMIT). */
 export const BLOCKER_LIMIT = 20;
@@ -686,9 +687,18 @@ export default function ExportScreen() {
   // design 11 section 20.15: visible review marks are an export option, off on every visit
   const [visibleMarks, setVisibleMarks] = useState(false);
   const st = status.data;
-  const locked = !!st && (st.blockers ?? []).length > 0;
+  // design 11 section 20.17: a document the gate cannot see yet locks the export, and no override helps with it
+  const notReady = notReadyOf(st);
+  // the line names files as the Scope screen does, and says a run is going only while one is (CLAUDE.md "claiming work")
+  const sources = useSources();
+  const active = useActiveJobs();
+  const fileOf = new Map((sources.data ?? []).map((s) => [s.slug, s.filename]));
+  const notReadyNames = notReady.map((s) => fileOf.get(s) ?? s).join(", ");
+  const processing = (active.data ?? []).some(isPipelineJob);
+  const locked = !!st && ((st.blockers ?? []).length > 0 || notReady.length > 0);
+  const overridable = locked && notReady.length === 0;
   // the second column holds the override forms (locked) and the active overrides; it is left out when empty
-  const side = !!st && (locked || (st.overrides ?? []).length > 0);
+  const side = !!st && (overridable || (st.overrides ?? []).length > 0);
   const running = !!job.data && (job.data.status === "queued" || job.data.status === "running");
   const jobDone = job.data?.status === "done";
   // One live region, mounted with the screen, so a result is announced (a status node inserted together with its text
@@ -737,7 +747,7 @@ export default function ExportScreen() {
     } catch (e) {
       if (e instanceof ApiError && e.status === 409 && e.code === "export_locked") {
         // the gate closed since the status was read: show the locked view from the refusal itself
-        const b = (e.body ?? {}) as { open_flags?: number; queued?: number; blockers?: string[]; faith_blockers?: string[] };
+        const b = (e.body ?? {}) as { open_flags?: number; queued?: number; blockers?: string[]; faith_blockers?: string[]; not_ready?: string[] };
         qc.setQueryData<ExportStatus>(qk.exportStatus, (old) => ({
           overrides: [],
           ...old,
@@ -746,6 +756,7 @@ export default function ExportScreen() {
           queued: b.queued ?? old?.queued ?? 0,
           blockers: b.blockers ?? old?.blockers ?? [],
           faith_blockers: b.faith_blockers ?? old?.faith_blockers ?? [],
+          not_ready: b.not_ready ?? old?.not_ready ?? [],
         }));
         // the refusal has no scope partition: read the whole status, so the reasons do not mix old and new counts
         void qc.invalidateQueries({ queryKey: qk.exportStatus });
@@ -783,7 +794,19 @@ export default function ExportScreen() {
             {/* the last export first: after a success the result and its download are what the reader looks for, and
                 the gate below says what a new export needs (each export spends its overrides, design 11 P3) */}
             {st.summary ? <Summary s={st.summary} fresh={jobDone} /> : null}
-            {st.not_ready?.length ? <p role="status" data-testid="export-not-ready" className="max-w-[62ch] text-base text-ink">Not ready to export: {st.not_ready.join(", ")} {st.not_ready.length === 1 ? "has" : "have"} not been scored by this version yet. Run the pipeline from the Scope screen (or <code>labor run</code>), then come back.</p> : locked ? (
+            {notReady.length ? (
+              <p role="status" data-testid="export-not-ready" className="max-w-[62ch] text-base text-ink">
+                Not ready to export: {notReadyNames}{" "}
+                {processing ? (
+                  <>{notReady.length === 1 ? "is" : "are"} being processed. Export opens when the run has finished and its blocks are reviewed.</>
+                ) : (
+                  <>
+                    {notReady.length === 1 ? "has" : "have"} not been through scoring and cleanup with this version yet. Run the pipeline from the Scope screen (or{" "}
+                    <code>labor run</code>), then come back.
+                  </>
+                )}
+              </p>
+            ) : locked ? (
               <Locked st={st} after={st.summary ?? null} />
             ) : (
               <section aria-labelledby="export-ready" data-testid="export-ready" className="space-y-3">
@@ -850,7 +873,7 @@ export default function ExportScreen() {
           </div>
           {side ? (
             <div className="min-w-0 space-y-7" data-testid="export-side">
-              {locked ? (
+              {overridable ? (
                 <>
                   <OverrideForm st={st} onDone={recorded} reason={overrideReason} setReason={setOverrideReason} />
                   <FlagOverrides list={st.flag_blockers ?? []} onDone={flagRecorded} />

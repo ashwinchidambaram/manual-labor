@@ -1,6 +1,6 @@
 import { NavLink } from "react-router-dom";
 import type { ExportStatus } from "../api/schema";
-import { blockingFlagsOf, scopeTerms, toReviewOf } from "../shell/scopeTerms";
+import { blockingFlagsOf, notReadyOf, scopeTerms, toReviewOf } from "../shell/scopeTerms";
 import Hint from "./Hint";
 import type { HintId } from "./hints";
 import type { StepId } from "./guide";
@@ -59,14 +59,19 @@ export function stepStates(path: string, st: ExportStatus | undefined, live: Liv
         else if (overridden > 0) {
           short = `${overridden} overridden`;
           long = `${overridden} overridden, not reviewed`;
-        } else if (!nothing && blockers.length === 0) done = true;
+        } else if (!nothing && blockers.length === 0 && notReadyOf(st).length === 0) done = true;
       }
       if (s.id === "agent" && st.open_flags > 0) short = long = plural(st.open_flags, "open flag");
       if (s.id === "export") {
         const why = [flags > 0 ? plural(flags, "open flag") : "", queued > 0 ? `${queued} to review` : ""].filter(Boolean);
+        const notReady = notReadyOf(st);
         if (live.scoring) {
           short = live.reading ? "after reading" : "after scoring";
           long = `waits for ${live.reading ? "reading" : "scoring"} to finish`;
+        } else if (notReady.length > 0) {
+          // design 11 section 20.17: nothing in such a document can be reviewed or overridden until it has run
+          short = "locked: needs a run";
+          long = `locked: ${plural(notReady.length, "document")} ${notReady.length === 1 ? "needs" : "need"} a run (${notReady.join(", ")})`;
         } else if (blockers.length > 0) {
           short = `locked: ${why[0] ?? plural(blockers.length, "blocker")}`;
           long = `locked: ${why.length ? why.join(", ") : plural(blockers.length, "blocking block")}`;
@@ -104,7 +109,7 @@ export default function StepNav({ path, status, live }: { path: string; status: 
         {STEPS.map((s, i) => {
           const st = states[s.id];
           const here = st.short === "here";
-          const locked = s.id === "export" && !!status && (status.blockers ?? []).length > 0 && !here && !live?.scoring;
+          const locked = s.id === "export" && !!status && ((status.blockers ?? []).length > 0 || notReadyOf(status).length > 0) && !here && !live?.scoring;
           const last = i === STEPS.length - 1;
           return (
             <li key={s.to} className="relative min-w-0 flex-1 wide:flex-none">

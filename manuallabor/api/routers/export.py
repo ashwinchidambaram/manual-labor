@@ -50,6 +50,21 @@ def start_export(ctx: Ctx, body: ExportIn | None = None) -> JobInfo | JSONRespon
         raise not_implemented("module 11")
     marks = body.marks if body is not None else "invisible"
     st = _status(ctx)
+    if st.not_ready:  # design 11 section 20.17: the gate cannot see these documents yet
+        n = len(st.not_ready)
+        return JSONResponse(
+            {
+                "detail": f"export is locked: {n} document{'' if n == 1 else 's'} not scored by "
+                f"this version ({', '.join(st.not_ready)}): run the pipeline first",
+                "code": "export_locked",
+                "open_flags": st.open_flags,
+                "queued": st.queued,
+                "blockers": st.blockers,
+                "faith_blockers": st.faith_blockers,
+                "not_ready": st.not_ready,
+            },
+            status_code=409,
+        )
     if st.blockers:
         return JSONResponse(
             {
