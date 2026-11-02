@@ -155,9 +155,10 @@ def expected_body(
 ) -> tuple[str, list[str]]:
     """(the article text after the frontmatter block's closing line, figure ids in order),
     derived only from the review blocks, groups.json, attach.json and the sidecars. With
-    `with_markers`, every text block's part has its review marker on the line directly above it
-    (design 11 section 20.11; the projects these tests export carry no override); without, the
-    body is the one the section 3.2 grammar produced before section 20."""
+    `with_markers`, every text block's part and every figure line has its review marker on the
+    line directly above it (design 11 sections 20.11 and 20.13; the projects these tests export
+    carry no override); without, the body is the one the section 3.2 grammar produced before
+    section 20."""
     from manuallabor import ids
     from manuallabor.cleanup.types import AttachFile
     from manuallabor.contracts.figure import FigureRecord, parse_figure_file
@@ -233,6 +234,12 @@ def expected_body(
             canon = rec.id if tgt is None else tgt[1]
             path = f"images/{ids.parse_figure_id(canon)[0]}/{canon}.png"
             alt = alt_of(rec.id, rec.caption_original, rec.description_generated)
-            items.append((key, f"![{alt}]({path})", a.figure_id))
+            line = f"![{alt}]({path})"
+            if with_markers:  # section 20.13: who decided to show the figure here (no override)
+                fstatus = blocks[own[a.figure_id]].status
+                person = fstatus in (BlockStatus.approved, BlockStatus.edited) or rule == "human"
+                word = "approved" if person else "auto-approved"
+                line = f"<!-- ml: {word}; block: {a.figure_id} -->\n" + line
+            items.append((key, line, a.figure_id))
     items.sort(key=lambda x: x[0])
     return "\n\n".join(t for _, t, _ in items), [f for _, _, f in items if f is not None]

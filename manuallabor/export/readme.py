@@ -27,15 +27,50 @@ def _by_status(c: ArticleReviewCounts) -> str:
     )
 
 
+def _by_line_status(c: ArticleReviewCounts) -> str:
+    return f"{c.auto_approved} auto-approved, {c.approved} approved, {c.overridden} overridden"
+
+
 def tally_sentence(t: ExportMarkers) -> str:
-    """This export's blocks as paragraphs with a marker plus figure blocks without one (design
-    11 section 20.11). The validator recomputes it from the sidecars (Z8)."""
+    """This export's blocks as paragraphs plus figure blocks, and its markers on paragraphs and
+    figure lines (design 11 sections 20.11 and 20.13). The validator recomputes it from the
+    sidecars (Z8)."""
     p, f = t.paragraphs.total(), t.figures.total()
-    return (
-        f"In this export: {_n(p + f, 'block')} = {_n(p, 'paragraph')} with a marker "
-        f"({_by_status(t.paragraphs)}) + {_n(f, 'figure block')} without one "
-        f"({_by_status(t.figures)})."
+    lines = t.figure_lines or ArticleReviewCounts(
+        auto_approved=0, approved=0, edited=0, overridden=0
     )
+    return (
+        f"In this export: {_n(p + f, 'block')} = {_n(p, 'paragraph')} "
+        f"({_by_status(t.paragraphs)}) + {_n(f, 'figure block')} ({_by_status(t.figures)}). "
+        "Every paragraph has a marker, and so does every figure line: "
+        f"{_n(lines.total(), 'figure line')} ({_by_line_status(lines)}); a figure line's status "
+        "is its placement's (who decided to show the figure there), so figure lines need not "
+        "match figure blocks one for one: a figure can be shown in several articles or in none."
+    )
+
+
+def _marks_section(m: Manifest) -> list[str]:
+    """The visible review marks of design 11 section 20.15, as `manifest.marks` records them."""
+    out = ["## Visible review marks", ""]
+    if m.marks == "visible":
+        out.append(
+            "This export was made with visible review marks (`marks: visible` in "
+            "`manifest.json`): above the comment of every paragraph nobody checked stands a "
+            "one-line tag, `[unchecked]` (auto-approved) or `[overridden]` (exported under an "
+            "override), so a reader of the rendered article sees it. Paragraphs a person "
+            "approved or edited and figure lines have no tag. The tags are not article text: to "
+            "compare an article with its source, delete each tag line and the blank line after "
+            "it (a tag line directly above `<!-- ml: auto-approved; block: b-` or "
+            "`<!-- ml: overridden; block: b-`); the review files' `text` and `text_sha256` never "
+            "include them."
+        )
+    else:
+        out.append(
+            "None (`marks: invisible` in `manifest.json`): the review status is only in the "
+            "comments above and the review files. An export made with visible marks adds an "
+            "`[unchecked]` or `[overridden]` line above each paragraph nobody checked."
+        )
+    return [*out, ""]
 
 
 def render_readme(m: Manifest, markers: ExportMarkers) -> str:
@@ -112,39 +147,50 @@ def render_readme(m: Manifest, markers: ExportMarkers) -> str:
         "",
         "## Review markers",
         "",
-        "Every paragraph of an article starts with an HTML comment on the line directly above "
-        "it, after a blank line, that says who checked it: "
+        "Every paragraph and every figure line of an article starts with an HTML comment on the "
+        "line directly above it, after a blank line, that says who checked it: "
         "`<!-- ml: approved; block: <block-id> -->` (a person approved it), "
         "`<!-- ml: edited; block: <block-id> -->` (a person edited its text or accepted a proposed "
         "edit; the review file's `edited_by` says which), "
         "`<!-- ml: auto-approved; block: <block-id> -->` (the checks passed and nobody looked) "
-        'or `<!-- ml: overridden; block: <block-id>; reason: "..." -->` (exported unreviewed '
+        "or `<!-- ml: overridden; block: <block-id>; reason: r1 -->` (exported unreviewed "
         "under an override; `flag: <flag-id>` is added when the override covered an open "
-        "flag). The comment belongs to the paragraph below it. Every paragraph has exactly one, "
-        "so a paragraph without a marker means the file was changed after the export, never "
-        "that a person checked it. Figure blocks have no marker; the review file lists them. "
+        "flag). On a figure line the comment names the figure, "
+        "`<!-- ml: approved; block: FIG-<doc-slug>-p012-01 -->`, and says who decided to show "
+        "the figure there: `auto-approved` (the checks attached it and passed the figure), "
+        "`approved` (a person approved the figure or attached it by hand) or `overridden`. "
+        "The comment belongs to the line below it. Every paragraph and figure line has exactly "
+        "one, so a missing comment means the file was changed after the export, never that a "
+        "person checked it. "
         "Markdown renderers show nothing for these comments (a renderer that escapes raw HTML "
-        "shows them as text). `grep -rn '^<!-- ml: ' articles/` lists every paragraph with its "
-        "status; `grep -rnE '^<!-- ml: (auto-approved|overridden);' articles/` lists the "
-        "paragraphs nobody checked.",
-        "The reason is a JSON string in which `>`, `<` and a `-` after a `-` are written as "
-        "`\\u003e`, `\\u003c` and `\\u002d`, so the comment never ends early; decode it "
-        "with any JSON parser.",
+        "shows them as text). `grep -rn '^<!-- ml: ' articles/` lists every paragraph and "
+        "figure line with its status; `grep -rnE '^<!-- ml: (auto-approved|overridden);' "
+        "articles/` lists the ones nobody checked.",
+        "`reason: r1` is a reference: the reason itself is in the article's review file under "
+        "`reasons` (`r1`, `r2`, ... numbered in the order the article first uses them), so a "
+        "long reason is written once per article instead of on every paragraph it covers.",
         "`articles/<article-id>.review.json` lists every block of the article in order: "
         "`block_id`, `type`, `page`, `placement` (`paragraph`: a paragraph of the article, with "
-        "its marker; `figure`: a figure block, which has no paragraph and no marker), `text` "
+        "its marker; `figure`: a figure block, which has no paragraph of its own), `text` "
         "(the first 80 characters of the paragraph as written in the article, so you can find "
         "it without counting), `status` (auto_approved, approved, edited, overridden), "
         "`decided_by` (checks, person, override), `at`, the auto-approve `confidence`, the "
-        "override `reason` and `flag_id`, the paragraph's `text_sha256`, and for a figure block "
-        "the articles that show the figure. Manual Labor has no user accounts: `person` means "
-        "whoever reviewed in this project, not a named individual. Its `counts` equal the "
-        "article's frontmatter `review` counts, key for key.",
+        "override `reason`, `reason_id` and `flag_id`, the paragraph's `text_sha256`, for an "
+        "edited paragraph the manual's text before the edit (`original_text`, in full, as the "
+        "parser read it) and when it was edited (`edited_at`), `faithfulness_passed` (the "
+        "machine faithfulness verdict on the text that went out; `false` only where a person "
+        "approved it after reading the change, since no override covers a failed check), and "
+        "for a figure block the "
+        "articles that show the figure. `figure_lines` lists the article's figure lines in "
+        "order: the figure, its block, how it was attached (`rule`) and its status. Manual "
+        "Labor has no user accounts: `person` means whoever reviewed in this project, not a "
+        "named individual. Its `counts` equal the article's frontmatter `review` counts, key "
+        "for key.",
         "Counts: the review files' `counts`, the frontmatter `review` and the Export screen "
-        "count blocks, figure blocks included; markers count paragraphs. For each status, "
-        "blocks = paragraphs with that marker + figure blocks with that status. "
-        + tally_sentence(markers),
+        "count blocks, figure blocks included; markers count paragraphs and figure lines. For "
+        "each status, blocks = paragraphs + figure blocks. " + tally_sentence(markers),
         "",
+        *_marks_section(m),
         "## Overrides",
         "",
     ]

@@ -30,7 +30,7 @@ from manuallabor.contracts.group import (
     GroupsFile,
     UnassignedEntry,
 )
-from manuallabor.contracts.manifest import ManifestLearning
+from manuallabor.contracts.manifest import ExportMarks, ManifestLearning
 from manuallabor.export.assemble import assemble
 from manuallabor.export.types import (
     ActiveOverride,
@@ -322,12 +322,16 @@ def synth_inputs(
     product_model: str | None = None,
     scope_extra: set[str] | None = None,
     decisions: Mapping[str, HumanDecision] | None = None,
+    marks: ExportMarks = "invisible",
 ) -> AssembleInputs:
     blocks = list(blocks)
     if decisions is None:  # a person decided every approved or edited block, at CLOCK
         decisions = {
             b.id: HumanDecision(
-                at=CLOCK, edited_by="person" if b.status == BlockStatus.edited else None
+                at=CLOCK,
+                edited_by="person" if b.status == BlockStatus.edited else None,
+                edited_at=CLOCK if b.status == BlockStatus.edited else None,
+                original_text=b.raw_text if b.status == BlockStatus.edited else None,
             )
             for b in blocks
             if b.status in (BlockStatus.approved, BlockStatus.edited)
@@ -379,6 +383,7 @@ def synth_inputs(
         models={},
         learning=ManifestLearning(),
         tool_version="0.0.0-test",
+        marks=marks,
     )
 
 

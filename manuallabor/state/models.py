@@ -46,7 +46,7 @@ from manuallabor.contracts.config import TaskModels
 from manuallabor.contracts.decision import Decision
 from manuallabor.contracts.enums import BlockStatus, BlockType, DocKind, FlagCategory
 from manuallabor.contracts.group import GroupsFile
-from manuallabor.contracts.manifest import Override
+from manuallabor.contracts.manifest import ExportMarks, Override
 from manuallabor.contracts.selection import ScopeSummary
 
 __all__ = [
@@ -495,6 +495,9 @@ class ExportMarkers(ContractModel):
 
     paragraphs: ArticleReviewCounts
     figures: ArticleReviewCounts
+    # the figure lines of the articles, each with a marker, by the status of its placement
+    # (design 11 section 20.13; `edited` is always 0). None in a summary recorded before then.
+    figure_lines: ArticleReviewCounts | None = None
 
 
 class ExportSummary(ContractModel):
@@ -512,6 +515,9 @@ class ExportSummary(ContractModel):
     zip_sha256: str
     generated_at: UTCDateTime
     markers: ExportMarkers | None = None
+    # the articles' review marks (design 11 section 20.15): "visible" adds a short tag above
+    # each paragraph nobody checked. None in a summary recorded before the option existed.
+    marks: ExportMarks | None = None
 
 
 class ExportScopeCounts(ContractModel):
@@ -533,6 +539,10 @@ class ExportScopeCounts(ContractModel):
     blocking: int = Field(ge=0)
     to_review: int = Field(ge=0)
     flagged: int = Field(ge=0)
+    # of `to_review` (design 11 section 20.16): the blocks whose cleaned text failed the
+    # faithfulness check, which no override covers, so `to_review - faith_failed` is what a
+    # block override may cover; `ExportStatus.faith_blockers` lists every such blocker
+    faith_failed: int = Field(default=0, ge=0)
 
 
 class ExportFlagBlocker(ContractModel):
@@ -557,6 +567,9 @@ class ExportStatus(ContractModel):
     queued: int = 0
     blockers: list[BlockId] = Field(default_factory=list)
     flag_blockers: list[ExportFlagBlocker] = Field(default_factory=list)
+    # every blocker whose cleaned text failed the faithfulness check (no cap; design 11 section
+    # 20.16): a person must approve, edit or reject each one, no override covers it
+    faith_blockers: list[BlockId] = Field(default_factory=list)
     counts: ExportScopeCounts | None = None
     summary: ExportSummary | None = None
     zip_path: str | None = None

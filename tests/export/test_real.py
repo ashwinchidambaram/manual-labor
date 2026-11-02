@@ -15,6 +15,7 @@ from manuallabor.contracts.article import ArticleFrontmatter
 from manuallabor.contracts.enums import BlockStatus, BlockType
 from manuallabor.contracts.figure import FigureRecord
 from manuallabor.contracts.manifest import Manifest
+from manuallabor.export.markers import strip_visible_marks
 from manuallabor.export.pipeline import read_state
 from manuallabor.export.render import FIGURE_LINE_RE
 from manuallabor.export.types import ExportError
@@ -49,7 +50,8 @@ def test_e1_body_is_derived_from_the_blocks_byte_for_byte(
     assert m.articles
     n_figs = 0
     for a in m.articles:
-        text = exported_a.text(a.path)
+        # design 11 section 20.15: visible tags are not article text (none in this export)
+        text = strip_visible_marks(exported_a.text(a.path), m.marks)
         body, figs = expected_body(exported_a.paths, ro_store, a.id)
         want = "\n# " + a.title + "\n" + ("\n" + body + "\n" if body else "")
         assert text[frontmatter_end(text) :] == want, a.id
@@ -68,7 +70,7 @@ def test_e2_numeric_multiset_is_unchanged(exported_a: Exported, ro_store: Store)
     m = manifest_of(exported_a)
     checked = 0
     for a in m.articles:
-        text = exported_a.text(a.path)
+        text = strip_visible_marks(exported_a.text(a.path), m.marks)  # section 20.15
         body = text[frontmatter_end(text) :]
         lines = body.split("\n")[2:]  # the blank line and `# title`
         kept = []
@@ -109,11 +111,14 @@ def test_e3_every_body_line_is_explained(exported_a: Exported, ro_store: Store) 
                     allowed.add("* " + ln[2:])
                 for k in range(2, 7):
                     allowed.add("#" * k + " " + ln)
-        text = exported_a.text(a.path)
+        text = strip_visible_marks(exported_a.text(a.path), m.marks)  # section 20.15
         for ln in text[frontmatter_end(text) :].split("\n"):
             if ln == "" or ln == f"# {a.title}" or FIGURE_LINE_RE.match(ln):
                 continue
             mk = re.match(r"^<!-- ml: (auto-approved|approved|edited); block: (\S+) -->$", ln)
+            if mk is not None and mk.group(2).startswith("FIG-"):  # section 20.13
+                assert mk.group(2) in a.figures and mk.group(1) != "edited"
+                continue
             if mk is not None:  # section 20.11: every paragraph's marker (no override here)
                 bid = mk.group(2)
                 assert bid in a.block_ids

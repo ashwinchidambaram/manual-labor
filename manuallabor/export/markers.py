@@ -1,20 +1,29 @@
-"""Review markers (design 11 sections 20 and 20.11). Pure.
+"""Review markers (design 11 sections 20, 20.11 and 20.13 to 20.15). Pure.
 
-A marker is an HTML comment on a line of its own, the first line of every exported paragraph's
-unit: a blank line above it, the paragraph directly below it. Every text block has one, whatever
-its status (approved, edited, auto-approved, overridden); figure blocks have none. Renderers show
-nothing; `grep '^<!-- ml: '` lists the paragraphs; the block id leads to the review sidecar.
+A marker is an HTML comment on a line of its own, the first line of every exported unit: a
+blank line above it, its paragraph or figure line directly below it. Every text block has one,
+whatever its status (approved, edited, auto-approved, overridden), and so does every figure
+line (auto-approved, approved, overridden: who decided to show the figure there). An override's
+reason is a reference `r<n>` into the article's review file. Renderers show nothing;
+`grep '^<!-- ml: '` lists the units; the id leads to the review sidecar. With `--marks visible`
+a paragraph nobody checked also has a short visible tag paragraph above its marker.
 """
 
 from __future__ import annotations
 
-import json
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, Final
 
-from manuallabor.contracts.article import ArticleReview, ArticleReviewCounts, BlockReview
+from manuallabor.contracts.article import (
+    ArticleReview,
+    ArticleReviewCounts,
+    BlockReview,
+    FigureLineReview,
+)
 from manuallabor.contracts.enums import BlockType
+from manuallabor.contracts.manifest import ExportMarks
 from manuallabor.state.models import ExportMarkers
 
 __all__ = [
@@ -23,12 +32,15 @@ __all__ = [
     "MARKER_RE",
     "SOURCE_MARKER_RE",
     "STATUS_WORD",
+    "TAG",
     "Marker",
-    "encode_reason",
     "marker_line",
     "misplaced_markers",
     "needs_marker",
     "parse_marker",
+    "strip_visible_marks",
+    "tag_link_labels",
+    "tag_of",
     "tally_markers",
 ]
 
@@ -39,11 +51,12 @@ MARKER_PREFIX: Final = "<!-- ml:"
 MARKER_LIKE_RE: Final = re.compile(r"(?<!\\)(?:\\\\)*<!--\s*ml\s*:", re.IGNORECASE)
 # the same in source text, backslashes or not: block text and titles holding it are refused
 SOURCE_MARKER_RE: Final = re.compile(r"<!--\s*ml\s*:", re.IGNORECASE)
+_BLOCK_OR_FIGURE: Final = r"b-[a-z0-9-]+-p\d{3,}-\d{2,}|FIG-[a-z0-9-]+-p\d{3,4}-\d{2,3}"
 MARKER_RE: Final = re.compile(
     r"^<!-- ml: (?P<status>approved|edited|auto-approved|overridden); block: "
-    r"(?P<block>b-[a-z0-9-]+-p\d{3,}-\d{2,})"
+    rf"(?P<block>{_BLOCK_OR_FIGURE})"
     r"(?:; flag: (?P<flag>flag-\d{6}))?"
-    r"(?:; reason: (?P<reason>\"(?:[^\"\\]|\\.)*\"))? -->$"
+    r"(?:; reason: (?P<reason>r[1-9][0-9]*))? -->$"
 )
 STATUS_WORD: Final = {
     "approved": "approved",
@@ -52,65 +65,101 @@ STATUS_WORD: Final = {
     "overridden": "overridden",
 }
 _SIDECAR_STATUS: Final = {w: s for s, w in STATUS_WORD.items()}
-_LINE_BREAKS: Final = {"\u2028", "\u2029", "\x85"}
+# section 20.15: the visible tag of a paragraph nobody checked (none for a person's decision)
+TAG: Final = {"auto_approved": "[unchecked]", "overridden": "[overridden]"}
+_STRIP_RE: Final = re.compile(
+    r"\n\n(?:\[unchecked\]\n\n(?=<!-- ml: auto-approved; block: b-)"
+    r"|\[overridden\]\n\n(?=<!-- ml: overridden; block: b-))"
+)
 
 
 def needs_marker(entry: BlockReview) -> bool:
-    """Every text block (not a figure block), whoever decided it (section 20.11)."""
+    """Every text block (not a figure block), whoever decided it (section 20.11). A figure
+    block's figure lines carry their own markers (section 20.13)."""
     return entry.type != BlockType.figure
 
 
-def tally_markers(reviews: list[ArticleReview]) -> ExportMarkers:
+def tag_of(entry: BlockReview, marks: ExportMarks) -> str | None:
+    """The visible tag above a paragraph's marker (section 20.15): only in a visible export, only
+    on a paragraph nobody checked."""
+    if marks != "visible" or not needs_marker(entry):
+        return None
+    return TAG.get(entry.status)
+
+
+def tag_link_labels(text: str) -> list[str]:
+    """The tags a CommonMark link reference definition in `text` would turn into links, as the
+    parser itself collects them (definitions inside block quotes and list items apply to the
+    whole document, and labels are case- and space-normalized), e.g. `["[unchecked]"]`."""
+    from markdown_it import MarkdownIt
+
+    env: dict[str, Any] = {}
+    MarkdownIt("commonmark").parse(text, env)
+    refs = env.get("references", {})
+    return [t for t in TAG.values() if t[1:-1].upper() in refs]
+
+
+def strip_visible_marks(text: str, marks: ExportMarks) -> str:
+    """The article without its visible tags (section 20.15 c), for every comparison of article
+    text with the source: each `"\n\n" + tag + "\n\n"` directly before a paragraph marker of the
+    matching status becomes `"\n\n"`. Identity on an invisible export. Never removes source
+    text: in a visible export the line directly before `"\n\n"` + such a marker is always its
+    tag, because source text cannot hold a marker (section 20.6)."""
+    if marks != "visible":
+        return text
+    return _STRIP_RE.sub("\n\n", text)
+
+
+def tally_markers(reviews: Sequence[ArticleReview]) -> ExportMarkers:
     """The exported blocks by placement and status, from the review sidecars (section 20.11):
-    paragraphs carry one marker each, figure blocks none."""
+    paragraphs carry one marker each; figure blocks are counted as blocks; figure lines carry
+    one marker each, by the status of their placement (section 20.13)."""
     counts: dict[str, dict[str, int]] = {
         "paragraph": dict.fromkeys(STATUS_WORD, 0),
         "figure": dict.fromkeys(STATUS_WORD, 0),
+        "line": dict.fromkeys(STATUS_WORD, 0),
     }
     for rv in reviews:
         for e in rv.blocks:
             counts[e.placement][e.status] += 1
+        for fl in rv.figure_lines:
+            counts["line"][fl.status] += 1
     return ExportMarkers(
         paragraphs=ArticleReviewCounts(**counts["paragraph"]),
         figures=ArticleReviewCounts(**counts["figure"]),
+        figure_lines=ArticleReviewCounts(**counts["line"]),
     )
 
 
-def encode_reason(reason: str) -> str:
-    """The reason as a JSON string that contains no `--`, no `>`, no `<` and no line break, so
-    no HTML or CommonMark parser can end the comment early. Decode with `json.loads`."""
-    out: list[str] = []
-    for ch in json.dumps(reason, ensure_ascii=False):
-        if ch == ">":
-            out.append("\\u003e")
-        elif ch == "<":
-            out.append("\\u003c")
-        elif ch in _LINE_BREAKS:
-            out.append(f"\\u{ord(ch):04x}")
-        elif ch == "-" and out and out[-1].endswith("-"):
-            out.append("\\u002d")
-        else:
-            out.append(ch)
-    return "".join(out)
-
-
-def marker_line(entry: BlockReview) -> str:
-    if not needs_marker(entry):
-        raise ValueError(f"{entry.block_id}: a {entry.status} {entry.type} block has no marker")
-    s = f"<!-- ml: {STATUS_WORD[entry.status]}; block: {entry.block_id}"
+def marker_line(entry: BlockReview | FigureLineReview) -> str:
+    """`<!-- ml: <status>; block: <id>[; flag: <flag>][; reason: r<n>] -->`: the block id of a
+    paragraph, the figure id of a figure line."""
+    if isinstance(entry, BlockReview):
+        if not needs_marker(entry):
+            raise ValueError(f"{entry.block_id}: a figure block has no marker of its own")
+        ident = entry.block_id
+    else:
+        ident = entry.figure_id
+    s = f"<!-- ml: {STATUS_WORD[entry.status]}; block: {ident}"
     if entry.status == "overridden":
+        if entry.reason_id is None:
+            raise ValueError(f"{ident}: an overridden entry needs its reason id")
         if entry.flag_id is not None:
             s += f"; flag: {entry.flag_id}"
-        s += f"; reason: {encode_reason(entry.reason or '')}"
+        s += f"; reason: {entry.reason_id}"
     return s + " -->"
 
 
 @dataclass(frozen=True)
 class Marker:
     status: str  # sidecar spelling: approved | edited | auto_approved | overridden
-    block_id: str
+    block_id: str  # a block id, or a figure id for a figure line's marker
     flag_id: str | None
-    reason: str | None
+    reason_id: str | None
+
+    @property
+    def is_figure(self) -> bool:
+        return self.block_id.startswith("FIG-")
 
 
 def parse_marker(line: str) -> Marker | None:
@@ -119,19 +168,13 @@ def parse_marker(line: str) -> Marker | None:
     if m is None:
         return None
     status = _SIDECAR_STATUS[m.group("status")]
-    raw = m.group("reason")
-    if (raw is not None) != (status == "overridden"):
+    reason = m.group("reason")
+    if (reason is not None) != (status == "overridden"):
         return None  # a reason only and always on an override
     if status != "overridden" and m.group("flag") is not None:
         return None
-    reason = None
-    if raw is not None:
-        if "--" in raw or ">" in raw or "<" in raw:
-            return None
-        try:
-            reason = json.loads(raw)
-        except ValueError:
-            return None
+    if m.group("block").startswith("FIG-") and status == "edited":
+        return None  # a figure line is never edited
     return Marker(status, m.group("block"), m.group("flag"), reason)
 
 

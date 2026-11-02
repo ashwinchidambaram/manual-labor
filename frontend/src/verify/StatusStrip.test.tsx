@@ -67,7 +67,7 @@ describe("StatusStrip: the gate's partition or the list's own counts", () => {
       open_flags: 1,
       queued: 4,
       overrides: [],
-      counts: { in_scope: 10, auto_approved: 3, approved: 1, edited: 0, rejected: 1, overridden: 2, blocking: 3, to_review: 2, flagged: 1, ...over },
+      counts: { in_scope: 10, auto_approved: 3, approved: 1, edited: 0, rejected: 1, overridden: 2, blocking: 3, to_review: 2, flagged: 1, faith_failed: 0, ...over },
     });
   it("names overridden blocks apart from those waiting when the two reads agree", () => {
     render(<StatusStrip {...props({ scope: gate() })} />);

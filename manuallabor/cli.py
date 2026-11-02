@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sys
+from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any
 
@@ -380,11 +381,25 @@ def _clock(now: str | None) -> Any:
         raise typer.Exit(2) from exc
 
 
+class Marks(StrEnum):
+    """Review marks in the exported articles (design 11 section 20.15)."""
+
+    invisible = "invisible"
+    visible = "visible"
+
+
+_MARKS_HELP = (
+    "Review marks: 'invisible' (default) or 'visible', which also puts a short [unchecked] or "
+    "[overridden] line above each paragraph nobody checked."
+)
+
+
 @app.command()
 def assemble(
     project: Annotated[Path, typer.Argument(help="Project directory.")],
     force: Annotated[bool, typer.Option("--force", help="Rebuild even if up to date.")] = False,
     now: Annotated[str | None, typer.Option("--now", help="Injected UTC clock (ISO).")] = None,
+    marks: Annotated[Marks, typer.Option("--marks", help=_MARKS_HELP)] = Marks.invisible,
 ) -> None:
     """Build the export staging tree (export/assembled/) without zipping it."""
     from manuallabor.export.pipeline import run_assemble
@@ -394,7 +409,7 @@ def assemble(
     clock = _clock(now)
     paths, store, locks = _export_session(project, writer_cmd=" ".join(sys.argv))
     try:
-        run_assemble(paths, store, clock=clock, emit=stdout_emit, force=force)
+        run_assemble(paths, store, clock=clock, emit=stdout_emit, force=force, marks=marks.value)
     except GateLocked as exc:
         print(str(exc), file=sys.stderr)
         raise typer.Exit(2) from exc
@@ -427,6 +442,7 @@ def export(
     now: Annotated[str | None, typer.Option("--now", help="Injected UTC clock (ISO).")] = None,
     force: Annotated[bool, typer.Option("--force", help="Rebuild even if up to date.")] = False,
     as_json: Annotated[bool, typer.Option("--json", help="Machine-readable summary.")] = False,
+    marks: Annotated[Marks, typer.Option("--marks", help=_MARKS_HELP)] = Marks.invisible,
 ) -> None:
     """Assemble, zip and validate the knowledge base. Exit 2 when the gate is locked."""
     from manuallabor.export.pipeline import record_override, run_export
@@ -450,11 +466,14 @@ def export(
             emit=(lambda _o: None) if as_json else stdout_emit,
             force=force,
             out=out,
+            marks=marks.value,
         )
     except GateLocked as exc:
         print(str(exc), file=sys.stderr)
+        faith = set(exc.faith_failed)
         for b in exc.blockers[:20]:
-            print(f"  blocker: {b}", file=sys.stderr)
+            why = " (cleanup changed the text: a person must decide)" if b in faith else ""
+            print(f"  blocker: {b}{why}", file=sys.stderr)
         raise typer.Exit(2) from exc
     except ExportError as exc:
         print(str(exc), file=sys.stderr)

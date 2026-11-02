@@ -10,7 +10,7 @@ from manuallabor.contracts.enums import BlockStatus, BlockType, FlagStatus
 from manuallabor.contracts.flag import Flag
 from manuallabor.export.types import ActiveOverride
 
-__all__ = ["COUNT_KEYS", "Gate", "export_gate"]
+__all__ = ["COUNT_KEYS", "Gate", "export_gate", "faith_failed"]
 
 BLOCKING = (BlockStatus.queued, BlockStatus.flagged)
 HF = (BlockType.header, BlockType.footer)
@@ -27,7 +27,17 @@ COUNT_KEYS = (
     "blocking",
     "to_review",
     "flagged",
+    # of `to_review`, the blocks no override covers: their cleaned text failed the faithfulness
+    # check (section 20.16), so "to review" less this is what a block override may cover
+    "faith_failed",
 )
+PERSON = (BlockStatus.approved, BlockStatus.edited)
+
+
+def faith_failed(b: Block) -> bool:
+    """Its cleaned text failed the faithfulness check (`passed` is False; 0.9 and 0.5 pass,
+    design 03). An edited block carries no machine verdict: the person's text replaced it."""
+    return b.type != BlockType.figure and b.faithfulness is not None and not b.faithfulness.passed
 
 
 @dataclass
@@ -42,6 +52,9 @@ class Gate:
     # every open flag no override covers, with its block, in the blockers' order
     flag_blockers: list[tuple[Flag, str]] = field(default_factory=list)
     counts: dict[str, int] = field(default_factory=dict)  # COUNT_KEYS -> n
+    # blocks whose cleaned text failed the faithfulness check and no person decided: blockers no
+    # override covers (design 11 section 20.16), in the blockers' order
+    faith_blockers: list[str] = field(default_factory=list)
 
     @property
     def allowed(self) -> bool:
@@ -64,6 +77,9 @@ def export_gate(
     targets. A block override covers the block's review state only, never an open flag on it,
     whichever was recorded first: a flag is the reviewer saying "this may be wrong", and only a
     decision that names the flag may export the block anyway.
+
+    A block whose cleaned text failed the faithfulness check, and that no person approved,
+    edited or rejected, blocks and is never covered (design 11 section 20.16, invariant 1).
     """
     block_of_figure = {
         str(b.figure_id): b.id for blocks in blocks_by_doc.values() for b in blocks if b.figure_id
@@ -89,7 +105,14 @@ def export_gate(
         flags_of.setdefault(bid, []).append(f)
 
     queued_ids = {b for b in in_scope if status[b] == BlockStatus.queued}
-    raw = {b for b in in_scope if status[b] in BLOCKING} | set(open_flag_of)
+    # section 20.16 (invariant 1): cleaned text that failed the faithfulness check goes out only
+    # after a person's decision; nothing an override says can stand in for it
+    faith = {
+        b
+        for b in in_scope
+        if faith_failed(by_id[b]) and status[b] not in (*PERSON, BlockStatus.rejected)
+    }
+    raw = {b for b in in_scope if status[b] in BLOCKING} | set(open_flag_of) | faith
 
     ordered = sorted(overrides, key=lambda o: o.action_id)
     covered: dict[str, ActiveOverride] = {}
@@ -108,7 +131,7 @@ def export_gate(
                 ok = False
                 uncovered_flags.setdefault(b, []).append(f)
             used += hits
-        if ok and used:
+        if ok and used and b not in faith:  # section 20.16: never covered
             # the record names the decision about the flag when the block has one: the latest
             # override covering a flag, else the latest covering override (design 11 section 20)
             about_flag = [ov for ov in used if any(_covers_flag(ov, f) for f in bflags)]
@@ -129,6 +152,8 @@ def export_gate(
                 # held by a flag no override covers, else waiting for a person's review
                 held = b in uncovered_flags or status[b] == BlockStatus.flagged
                 counts["flagged" if held else "to_review"] += 1
+                if b in faith and not held:
+                    counts["faith_failed"] += 1
         else:
             counts[status[b].value] += 1
     return Gate(
@@ -141,6 +166,7 @@ def export_gate(
         block_flags={b: [f.id for f in fs] for b, fs in flags_of.items()},
         flag_blockers=flag_blockers,
         counts=counts,
+        faith_blockers=[b for b in blockers if b in faith],
     )
 
 

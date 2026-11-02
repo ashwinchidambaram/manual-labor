@@ -96,12 +96,14 @@ def test_e22_status_shape_and_the_locked_post(unreviewed_env: Env) -> None:
         "queued",
         "blockers",
         "flag_blockers",
+        "faith_blockers",  # design 11 section 20.16
         "counts",
         "summary",
         "zip_path",
     }
     assert s["unlocked"] is False and s["queued"] > 0 and 0 < len(s["blockers"]) <= 20
     assert s["flag_blockers"] == [] and s["counts"]["blocking"] >= len(s["blockers"])
+    assert s["faith_blockers"] == [] and s["counts"]["faith_failed"] == 0
     assert s["summary"] is None and s["zip_path"] is None and s["overrides"] == []
     r = c.post("/api/export")
     assert r.status_code == 409

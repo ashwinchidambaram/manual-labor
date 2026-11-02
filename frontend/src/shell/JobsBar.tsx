@@ -19,9 +19,11 @@ function FailedHelp({ job, onRetried }: { job: JobInfo; onRetried: () => void })
   const canRetry = (job.kind === "run" && typeof plan.to === "string") || job.kind === "export";
   const retry = async (): Promise<void> => {
     try {
+      // an export retries with its own review-marks mode (design 11 section 20.15)
+      const marks = (job.plan as { marks?: unknown }).marks === "visible" ? "visible" : "invisible";
       const next =
         job.kind === "export"
-          ? unwrap(await client.POST("/api/export", { body: { request_id: crypto.randomUUID() } }))
+          ? unwrap(await client.POST("/api/export", { body: { request_id: crypto.randomUUID(), marks } }))
           : unwrap(await client.POST("/api/jobs", { body: job.plan as { to: string; allow_reparse: boolean } }));
       trackJob(qc, next);
       onRetried();

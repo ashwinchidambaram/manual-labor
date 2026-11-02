@@ -3,9 +3,11 @@ the same inputs and clock always produce the same bytes."""
 
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import re
 from collections import Counter
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final, Literal
@@ -20,8 +22,10 @@ from manuallabor.contracts.article import (
     ArticleReview,
     ArticleReviewCounts,
     BlockReview,
+    FigureLineReview,
     FigurePlacement,
     FigureReview,
+    ReviewReason,
     ReviewStatus,
 )
 from manuallabor.contracts.block import Block
@@ -47,12 +51,13 @@ from manuallabor.contracts.manifest import (
     Override,
     ReviewStats,
 )
-from manuallabor.export.gate import export_gate
+from manuallabor.export.gate import PERSON, export_gate, faith_failed
 from manuallabor.export.markers import (
     SOURCE_MARKER_RE,
     marker_line,
     misplaced_markers,
-    needs_marker,
+    tag_link_labels,
+    tag_of,
     tally_markers,
 )
 from manuallabor.export.readme import render_readme
@@ -150,7 +155,12 @@ class _Ctx:
         scope = {s: d.scope for s, d in inp.docs.items()}
         self.gate = export_gate(blocks_by_doc, scope, inp.flags, inp.overrides)
         if self.gate.blockers:
-            raise GateLocked(self.gate.open_flags, self.gate.queued, self.gate.blockers)
+            raise GateLocked(
+                self.gate.open_flags,
+                self.gate.queued,
+                self.gate.blockers,
+                self.gate.faith_blockers,
+            )
         self.status: dict[str, BlockStatus] = {
             b.id: b.status for d in inp.docs.values() for b in d.blocks
         }
@@ -166,9 +176,9 @@ def _figure_parts(
     atts: list[Attachment],
     kept_order: dict[str, int],
     has_part: set[str],
-) -> list[tuple[tuple[int, int, int], BodyPart, str]]:
-    """(sort key, part, figure id) for every attachment of the article (design 3.3)."""
-    out: list[tuple[tuple[int, int, int], BodyPart, str]] = []
+) -> list[tuple[tuple[int, int, int], BodyPart, Attachment]]:
+    """(sort key, part, attachment) for every attachment of the article (design 3.3)."""
+    out: list[tuple[tuple[int, int, int], BodyPart, Attachment]] = []
     fig_block = {str(b.figure_id): b.id for b in d.blocks if b.figure_id is not None}
     for idx, a in enumerate(atts):
         fd = d.figures.get(a.figure_id)
@@ -186,7 +196,7 @@ def _figure_parts(
         path = f"images/{ids.parse_figure_id(canon)[0]}/{canon}.png"
         alt = alt_text(fd.record.id, fd.record.caption_original, fd.record.description_generated)
         part = BodyPart("figure", None, fd.record.id, figure_line(alt, path))
-        out.append((key, part, fd.record.id))
+        out.append((key, part, a))
     return out
 
 
@@ -259,6 +269,14 @@ def _build_doc_articles(ctx: _Ctx, d: DocInput) -> list[BuiltArticle]:
                 ctx.reasons[bid] = "empty"
             elif b.status not in CONTRIBUTING and bid not in ctx.gate.covered:
                 raise ExportError(f"{bid} is {b.status.value} and not covered by an override")
+            elif faith_failed(b) and b.status not in PERSON:
+                # invariant 1 is a hard stop (design 11 section 20.16): cleaned text that failed
+                # the faithfulness check goes out only after a person's decision
+                raise ExportError(
+                    f"{bid}: cleanup changed its text (the faithfulness check failed) and no "
+                    "person approved or edited it; approve it after reading the change, edit it "
+                    "or reject it in Verify"
+                )
             else:
                 kept.append(b)
         if kept:
@@ -276,8 +294,7 @@ def _build_doc_articles(ctx: _Ctx, d: DocInput) -> list[BuiltArticle]:
                 "topic in Scope"
             )
         rendered = {b.id: _render_block(b, levels) for b in kept if b.type != BlockType.figure}
-        entries = [_review_entry(ctx, d, b, placements, rendered.get(b.id)) for b in kept]
-        entry_of = {e.block_id: e for e in entries}
+        decided = {b.id: _decide(ctx, d, b) for b in kept}
         text_parts: list[tuple[tuple[int, int, int], BodyPart]] = []
         for b in kept:
             if b.type == BlockType.figure:
@@ -287,10 +304,13 @@ def _build_doc_articles(ctx: _Ctx, d: DocInput) -> list[BuiltArticle]:
                     f"{b.id}: its text contains an HTML comment opening 'ml:', which would read "
                     "as a review marker (design 11 section 20); edit the block in Verify"
                 )
-            e = entry_of[b.id]
-            # section 20.11: every paragraph's marker on the line directly above it
-            mk = marker_line(e) if needs_marker(e) else None
-            part = BodyPart("block", b.id, None, rendered[b.id], marker=mk)
+            if inp.marks == "visible" and tag_link_labels(rendered[b.id]):
+                raise ExportError(
+                    f"{b.id}: its text defines a Markdown link for [unchecked] or [overridden], "
+                    "which would turn the visible review tags into links (design 11 section "
+                    "20.15); export without visible marks, or edit the block in Verify"
+                )
+            part = BodyPart("block", b.id, None, rendered[b.id])
             text_parts.append(((b.reading_order, 0, 0), part))
         has_part = {p.block_id for _, p in text_parts if p.kind == "block" and p.block_id}
         figs = _figure_parts(d, art_id, attach.get(art_id, []), kept_order, has_part)
@@ -299,7 +319,40 @@ def _build_doc_articles(ctx: _Ctx, d: DocInput) -> list[BuiltArticle]:
             *((k, p) for k, p, _ in figs),
         ]
         merged.sort(key=lambda kp: kp[0])
-        parts = [p for _, p in merged]
+        rule_of = {a.figure_id: a.rule for _, _, a in figs}
+        line_decided = {
+            fid: _decide_line(ctx, d, art_id, fid, rule) for fid, rule in rule_of.items()
+        }
+        # section 20.14: reason ids in order of first use in the body (paragraph and figure-line
+        # markers, top to bottom), then a reason only an overridden figure block uses
+        reason_ids: dict[str, str] = {}
+        body_decisions = [
+            decided[str(p.block_id)] if p.kind == "block" else line_decided[str(p.figure_id)][1]
+            for _, p in merged
+        ]
+        for dec in [*body_decisions, *(decided[b.id] for b in kept)]:
+            if dec.reason is not None and dec.reason not in reason_ids:
+                reason_ids[dec.reason] = f"r{len(reason_ids) + 1}"
+        entries = [
+            _review_entry(b, decided[b.id], placements, rendered.get(b.id), reason_ids)
+            for b in kept
+        ]
+        entry_of = {e.block_id: e for e in entries}
+        parts: list[BodyPart] = []
+        lines: list[FigureLineReview] = []
+        for _, p in merged:
+            if p.kind == "block":
+                e = entry_of[str(p.block_id)]
+                # section 20.11: every paragraph's marker on the line directly above it; 20.15:
+                # its visible tag above the marker when nobody checked it and marks are visible
+                parts.append(
+                    dataclasses.replace(p, marker=marker_line(e), tag=tag_of(e, inp.marks))
+                )
+            else:
+                fid = str(p.figure_id)
+                fl = _line_entry(fid, rule_of[fid], line_decided[fid], reason_ids)
+                lines.append(fl)
+                parts.append(dataclasses.replace(p, marker=marker_line(fl)))  # section 20.13
         fig_ids = [p.figure_id for p in parts if p.kind == "figure" and p.figure_id]
         for fid in fig_ids:
             ctx.referenced_by.setdefault(fid, set()).add(art_id)
@@ -334,6 +387,8 @@ def _build_doc_articles(ctx: _Ctx, d: DocInput) -> list[BuiltArticle]:
             generated_at=ctx.generated_at,
             counts=counts,
             blocks=entries,
+            reasons=[ReviewReason(id=i, reason=r) for r, i in reason_ids.items()],
+            figure_lines=lines,
         )
         for b in kept:
             ctx.assignments[b.id] = art_id
@@ -369,54 +424,126 @@ def _placements(d: DocInput, written: set[str]) -> dict[str, list[FigurePlacemen
     return out
 
 
-def _review_entry(
-    ctx: _Ctx,
-    d: DocInput,
-    b: Block,
-    placements: dict[str, list[FigurePlacement]],
-    part_text: str | None,
-) -> BlockReview:
-    """Who decided that `b` goes out, as the front matter counts it: an override-covered
-    block is `overridden` whatever its status; otherwise the overlay status decides."""
-    fig = None
-    if b.figure_id is not None:
-        fig = FigureReview(figure_id=b.figure_id, placements=placements.get(b.figure_id, []))
-    ov = ctx.gate.covered.get(b.id)
+@dataclass(frozen=True)
+class _Decision:
+    """Who decided that a block (or a figure line) goes out, before reason ids are numbered."""
+
     status: ReviewStatus
     at: datetime | None = None
     confidence: float | None = None
     edited_by: Literal["person", "agent_proposal"] | None = None
+    reason: str | None = None
+    flag_id: str | None = None
+    edited_at: datetime | None = None
+    original_text: str | None = None
+
+
+def _decide(ctx: _Ctx, d: DocInput, b: Block) -> _Decision:
+    """As the front matter counts it: an override-covered block is `overridden` whatever its
+    status; otherwise the overlay status decides."""
+    ov = ctx.gate.covered.get(b.id)
     if ov is not None:
-        status, at = "overridden", ov.ts
-    elif b.status == BlockStatus.auto_approved:
-        status, confidence = "auto_approved", b.confidence
-    elif b.status in (BlockStatus.approved, BlockStatus.edited):
-        status = "approved" if b.status == BlockStatus.approved else "edited"
+        flag_id = _override_flag(ctx, b.id, ov)
+        return _Decision("overridden", at=ov.ts, reason=ov.reason, flag_id=flag_id)
+    if b.status == BlockStatus.auto_approved:
+        return _Decision("auto_approved", confidence=b.confidence)
+    if b.status in (BlockStatus.approved, BlockStatus.edited):
+        status: ReviewStatus = "approved" if b.status == BlockStatus.approved else "edited"
         dec = d.decisions.get(b.id)
         if dec is None:  # the overlay derives approved/edited only from a decision
             raise ExportError(f"{b.id} is {status} but no decision record says who decided it")
-        at = dec.at
-        if status == "edited":
-            edited_by = dec.edited_by or "person"
-    else:  # unreachable: assembly refuses an uncovered non-contributing block first
-        raise ExportError(f"{b.id} is {b.status.value} and not covered by an override")
+        if status == "approved":
+            return _Decision("approved", at=dec.at)
+        if dec.edited_at is None or dec.original_text is None:
+            raise ExportError(f"{b.id} is edited but no edit record holds the text it replaced")
+        return _Decision(
+            "edited",
+            at=dec.at,
+            edited_by=dec.edited_by or "person",
+            edited_at=dec.edited_at,
+            original_text=dec.original_text,
+        )
+    # unreachable: assembly refuses an uncovered non-contributing block first
+    raise ExportError(f"{b.id} is {b.status.value} and not covered by an override")
+
+
+def _review_entry(
+    b: Block,
+    dec: _Decision,
+    placements: dict[str, list[FigurePlacement]],
+    part_text: str | None,
+    reason_ids: dict[str, str],
+) -> BlockReview:
+    fig = None
+    if b.figure_id is not None:
+        fig = FigureReview(figure_id=b.figure_id, placements=placements.get(b.figure_id, []))
     return BlockReview(
         block_id=b.id,
         type=b.type,
         page=b.page,
-        status=status,
-        decided_by=DECIDED_BY[status],
-        at=at,
-        confidence=confidence,
-        edited_by=edited_by,
-        reason=ov.reason if ov is not None else None,
-        flag_id=_override_flag(ctx, b.id, ov) if ov is not None else None,
+        status=dec.status,
+        decided_by=DECIDED_BY[dec.status],
+        at=dec.at,
+        confidence=dec.confidence,
+        edited_by=dec.edited_by,
+        reason=dec.reason,
+        flag_id=dec.flag_id,
         figure=fig,
         text_sha256=(
             hashlib.sha256(part_text.encode("utf-8")).hexdigest() if part_text is not None else None
         ),
         text=part_text[:TEXT_PREFIX] if part_text is not None else None,
         placement="figure" if b.type == BlockType.figure else "paragraph",
+        reason_id=reason_ids[dec.reason] if dec.reason is not None else None,
+        original_text=dec.original_text,
+        edited_at=dec.edited_at,
+        faithfulness_passed=None if b.faithfulness is None else b.faithfulness.passed,
+    )
+
+
+def _decide_line(
+    ctx: _Ctx, d: DocInput, art_id: str, fid: str, rule: AttachRule
+) -> tuple[str, _Decision]:
+    """Who decided to show figure `fid` in this article (design 11 section 20.13): an override
+    covering the figure's block; else a person (the figure block approved or edited in Verify,
+    or attached by hand, rule `human`); else the checks."""
+    blk = next((b for b in d.blocks if b.figure_id is not None and str(b.figure_id) == fid), None)
+    if blk is None:
+        raise ExportError(f"{art_id}: {fid} is attached but has no figure block")
+    ov = ctx.gate.covered.get(blk.id)
+    if ov is not None:
+        flag_id = _override_flag(ctx, blk.id, ov)
+        return blk.id, _Decision("overridden", reason=ov.reason, flag_id=flag_id)
+    if blk.status == BlockStatus.rejected:
+        raise ExportError(
+            f"{art_id}: {fid} is attached but its block {blk.id} was rejected, so nobody "
+            "decided to show it (design 11 section 20.13); detach the figure in Verify"
+        )
+    if blk.status not in CONTRIBUTING:  # unreachable: an attached figure's block is in scope
+        raise ExportError(
+            f"{art_id}: {fid} is shown but its block {blk.id} is {blk.status.value} and not "
+            "covered by an override"
+        )
+    if blk.status in (BlockStatus.approved, BlockStatus.edited) or rule == AttachRule.human:
+        return blk.id, _Decision("approved")
+    return blk.id, _Decision("auto_approved")
+
+
+def _line_entry(
+    fid: str, rule: AttachRule, line: tuple[str, _Decision], reason_ids: dict[str, str]
+) -> FigureLineReview:
+    block_id, dec = line
+    if dec.status == "edited":  # unreachable: `_decide_line` never says edited
+        raise ExportError(f"{fid}: a figure line is never edited")
+    return FigureLineReview(
+        figure_id=fid,
+        block_id=block_id,
+        rule=rule,
+        status=dec.status,
+        decided_by=DECIDED_BY[dec.status],
+        reason=dec.reason,
+        reason_id=reason_ids[dec.reason] if dec.reason is not None else None,
+        flag_id=dec.flag_id,
     )
 
 
@@ -447,7 +574,9 @@ _HOLDER: Final = {
     "inline": "paragraph",
     "text": "line of text",
 }
-_BLOCK_IN_MARKER: Final = re.compile(r"block: (b-[a-z0-9-]+-p\d{3,}-\d{2,})")
+_BLOCK_IN_MARKER: Final = re.compile(
+    r"block: (b-[a-z0-9-]+-p\d{3,}-\d{2,}|FIG-[a-z0-9-]+-p\d{3,4}-\d{2,3})"
+)
 
 
 def _refuse_visible_markers(art_id: str, body: str) -> None:
@@ -463,8 +592,9 @@ def _refuse_visible_markers(art_id: str, body: str) -> None:
     raise ExportError(
         f"{art_id}: the review marker of {block} would render as text{more}: it falls inside a "
         f"{_HOLDER.get(kind, kind)} that an earlier block of the article leaves open (an unclosed "
-        "code fence or raw HTML block in the source text). Every paragraph carries a marker "
-        "(design 11 section 20.11), so edit or reject the block that opens it in Verify."
+        "code fence or raw HTML block in the source text). Every paragraph and figure line "
+        "carries a marker (design 11 sections 20.11 and 20.13), so edit or reject the block "
+        "that opens it in Verify."
     )
 
 
@@ -628,6 +758,7 @@ def _manifest(
                 unassigned_reasons=reasons,  # type: ignore[arg-type]
             ),
             "learning": inp.learning,
+            "marks": inp.marks,
         }
     )
 

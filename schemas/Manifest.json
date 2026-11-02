@@ -572,6 +572,15 @@
     "learning": {
       "$ref": "#/$defs/ManifestLearning"
     },
+    "marks": {
+      "default": "invisible",
+      "enum": [
+        "invisible",
+        "visible"
+      ],
+      "title": "Marks",
+      "type": "string"
+    },
     "models": {
       "additionalProperties": {
         "$ref": "#/$defs/ModelRef"
@@ -620,7 +629,8 @@
     "article_split",
     "overrides",
     "accounting",
-    "learning"
+    "learning",
+    "marks"
   ],
   "title": "Manifest",
   "type": "object"

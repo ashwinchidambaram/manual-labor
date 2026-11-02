@@ -19,6 +19,7 @@ const scope = (over: Partial<NonNullable<ExportStatus["counts"]>> = {}): NonNull
   blocking: 0,
   to_review: 0,
   flagged: 0,
+  faith_failed: 0,
   ...over,
 });
 const gate = (over: Partial<ExportStatus> = {}): ExportStatus => ({
