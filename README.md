@@ -152,7 +152,7 @@ A 200-page born-digital manual parses and scores in a few minutes on a laptop wi
 
 ## Upgrading
 
-After installing a new version, run `labor run P` on each existing project (or press Run on the Scope screen). A version that changes how blocks are scored marks every document "Needs a run": until it has run, Verify and Export treat those documents as not scored yet, and your decisions, flags and selection are kept.
+After installing a new version, run `labor run P` on each existing project (or, in `labor serve`, press Re-run on the Scope screen, then "Confirm scope and go to Verify"). A version that changes how blocks are scored marks every document "Needs a run": `labor status P -v` shows `score` as `STALE` ("scored by scoring version 5; this version is 6"), Verify lists the documents as waiting, and the Export screen says they need a run instead of offering an export. The run re-scores, re-groups and re-cleans each document; your decisions, flags and selection are kept.
 
 The first run after the 2026-10-30 version also re-groups each project once. Topic names and article file names may change that one time (for example `connector-data-2.md` becomes `connector-data-section-5.md`). A block move or figure attachment you made by hand that names an old topic no longer applies: the run reports it ("N stale overrides" in the group step's output, listed under `overrides_stale` in the document's `groups.json` or `attach.json`). Redo it on the renamed topic.
 

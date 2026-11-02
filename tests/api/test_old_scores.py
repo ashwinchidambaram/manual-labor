@@ -9,6 +9,7 @@ broken until a rescore."""
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 
 import pytest
@@ -122,3 +123,44 @@ def test_scores_current_follows_the_file(lp: ProjectPaths) -> None:
     assert not scores_current(lp, "clean")
     p.unlink()
     assert not scores_current(lp, "clean")
+
+
+def test_post_jobs_rescores_an_old_project_and_keeps_decisions(lp: ProjectPaths) -> None:
+    """The Run button after an upgrade (`POST /api/jobs {to: score2}`, the reviewer's
+    `api_upgrade_test.py`): `score` runs first, then group, clean and score2; no stage fails and
+    the decisions, the flag and the selection survive (design 07 section 3.2 revision)."""
+    from tests.jobs.test_upgrade_run import RESCORE, assert_upgraded, record_then_downgrade
+
+    rec = record_then_downgrade(lp)
+    slugs = lp.list_slugs()
+    with serving(lp) as (c, svc):
+        es = c.get("/api/export/status").json()
+        # not "Ready to export": the gate cannot see these documents yet (review D3)
+        assert es["not_ready"] == slugs and es["blockers"] == [], es
+        assert es["counts"]["in_scope"] == 0
+        svc.runner.start()
+        try:
+            r = c.post("/api/jobs", json={"to": "score2"})
+            assert r.status_code == 202, r.text
+            jid = r.json()["id"]
+            deadline = time.monotonic() + 900
+            job = r.json()
+            while job["status"] not in ("done", "failed", "cancelled", "interrupted"):
+                assert time.monotonic() < deadline, job
+                time.sleep(0.2)
+                job = c.get(f"/api/jobs/{jid}").json()
+        finally:
+            svc.runner.stop()
+        assert job["status"] == "done", (job, c.get(f"/api/jobs/{jid}/log?limit=5000").json()[-6:])
+        log = c.get(f"/api/jobs/{jid}/log?limit=5000").json()
+        units = [(o["node"], o["doc"]) for o in log if o.get("event") == "unit_done"]
+        assert units == [(n, s) for n in RESCORE for s in slugs], units
+        assert not [o for o in log if o.get("status") in ("error", "failed", "blocked")]
+        st = c.get("/api/status").json()
+        assert all(n["state"] == "fresh" for d in st["docs"] for n in d["nodes"]), st
+        q = c.get("/api/verify/queue").json()
+        assert {d["doc_id"]: d["state"] for d in q["docs"]} == {s: "ready" for s in slugs}
+        es = c.get("/api/export/status").json()
+        assert es["not_ready"] == [] and es["counts"]["in_scope"] > 0, es
+        assert [f["target_id"] for f in c.get("/api/flags").json()] == [rec.flagged]
+    assert_upgraded(lp, rec)

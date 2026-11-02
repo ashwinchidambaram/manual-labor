@@ -1,0 +1,171 @@
+"""`labor run` after an upgrade re-scores a project whose score files carry an older
+`SCORING_ALGO_VERSION` (design 03 section 2.10a, design 07 section 3.2 revision 2026-11-02).
+
+Before the fix the stage graph called `score` fresh whenever clean.json existed, so the plan
+started at `group`, whose fingerprint carries the algo version; `group` then refused the old
+scores ("scores.json missing or from another algo version"), `stages.json` recorded
+`group: failed` on every run and the export stayed locked. README "Upgrading" promises that
+`labor run <project>` is enough."""
+
+from __future__ import annotations
+
+import json
+import subprocess
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+
+import pytest
+
+from manuallabor.jobs import graph
+from manuallabor.jobs.executor import make_plan
+from manuallabor.jobs.render import render_status
+from manuallabor.project import ProjectPaths
+from manuallabor.scoring.pipeline import scores_current
+from manuallabor.scoring.types import SCORING_ALGO_VERSION
+from manuallabor.state.models import FlagIn, ReviewActionIn, SelectionOp
+from tests.state.helpers import Env
+
+OLD = "5"
+DOC_NODES = ["parse", "figures", "score", "group", "clean", "score2"]
+RESCORE = ["score", "group", "clean", "score2"]
+LABOR = [sys.executable, "-m", "manuallabor"]
+
+
+@pytest.fixture(autouse=True)
+def _home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("MANUALLABOR_HOME", str(tmp_path / "home"))
+
+
+@dataclass(frozen=True)
+class Recorded:
+    """What the reviewer recorded before the upgrade."""
+
+    approved: str
+    flagged: str
+    deselected: str
+    decisions: list[tuple[str, str, str]]
+    flags: list[tuple[str, str, str]]
+    selection: list[str]
+
+
+def _snapshot(env: Env) -> tuple[list[tuple[str, str, str]], list[tuple[str, str, str]], list[str]]:
+    decisions = [
+        (d.decision.block_id, d.decision.action.value, d.raw_sha256) for d in env.store.decisions()
+    ]
+    flags = [(f.id, f.target_id, f.status.value) for f in env.store.flags()]
+    return decisions, flags, sorted(env.data.selection().block_ids)
+
+
+def record_then_downgrade(lp: ProjectPaths) -> Recorded:
+    """A decision, an open flag and a narrowed selection, then every score file rewritten to
+    algo version "5" (a project made before the 2026-10-30 version)."""
+    env = Env(lp)
+    try:
+        page = env.review.queue(None, None, "clean", 5, 0)
+        approved, flagged = page.items[0].block_id, page.items[1].block_id
+        env.act("approve", approved)
+        env.review.act(
+            ReviewActionIn(
+                kind="flag",
+                block_id=flagged,
+                flag=FlagIn(category="wrong_text", note="before the upgrade"),  # type: ignore[arg-type]
+                request_id="t-flag",
+            )
+        )
+        sel = sorted(env.data.selection().block_ids)
+        deselected = next(b for b in sel if b not in (approved, flagged) and "-scanned-" in b)
+        env.scope.apply(SelectionOp(op="deselect", block_ids=[deselected], request_id="t-sel"))
+        decisions, flags, selection = _snapshot(env)
+    finally:
+        env.close()
+    assert deselected not in selection and len(decisions) == 2 and len(flags) == 1
+    downgrade(lp)
+    return Recorded(approved, flagged, deselected, decisions, flags, selection)
+
+
+def downgrade(paths: ProjectPaths) -> None:
+    """Score files of algo "5", and groups.json fingerprints made under it (`group`'s
+    fingerprint carries `SCORING_ALGO_VERSION`, design 04 step 2), as in build/human-test."""
+    for slug in paths.list_slugs():
+        dp = paths.doc(slug)
+        data = json.loads(dp.scores.read_text(encoding="utf-8"))
+        assert data["algo_version"] == SCORING_ALGO_VERSION != OLD
+        data["algo_version"] = OLD
+        dp.scores.write_text(json.dumps(data, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+        groups = json.loads(dp.groups.read_text(encoding="utf-8"))
+        groups["fingerprint"] = "5" * 64  # any value but the current one
+        dp.groups.write_text(json.dumps(groups, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+    assert not any(scores_current(paths, s) for s in paths.list_slugs())
+
+
+def assert_upgraded(lp: ProjectPaths, rec: Recorded) -> None:
+    """Every node fresh and none failed, the scores current, and nothing the reviewer recorded
+    lost: the same decisions (not orphaned), the same open flag, the same selection."""
+    cfg = lp.load_config()
+    for slug in lp.list_slugs():
+        st = {s.node: (s.state, s.reason) for s in graph.doc_node_states(lp, slug, cfg)}
+        assert all(v[0] == "fresh" for v in st.values()), (slug, st)
+        recs = graph.load_stages(lp, slug).nodes
+        assert not [n for n, r in recs.items() if r.status == "failed"], (slug, recs)
+        assert scores_current(lp, slug)
+    env = Env(lp)
+    try:
+        decisions, flags, selection = _snapshot(env)
+        assert decisions == rec.decisions
+        assert flags == rec.flags
+        assert selection == rec.selection and rec.deselected not in selection
+        by_id = {b.id: b for b in env.blocks("clean")}
+        assert by_id[rec.approved].status.value == "approved"
+        st = graph.project_status(lp, None)
+        assert [d.orphaned_decisions for d in st.docs] == [0, 0]
+    finally:
+        env.close()
+
+
+def test_old_scores_make_score_stale_and_say_why(lp: ProjectPaths) -> None:
+    downgrade(lp)
+    cfg = lp.load_config()
+    for slug in lp.list_slugs():
+        st = {s.node: s for s in graph.doc_node_states(lp, slug, cfg)}
+        assert [n for n in DOC_NODES if st[n].state != "fresh"] == RESCORE, st
+        assert st["score"].state == "stale"  # "Needs a run" on the Scope chip, not "Not run yet"
+        assert st["score"].reason is not None and OLD in st["score"].reason
+        assert SCORING_ALGO_VERSION in st["score"].reason
+        assert st["score2"].state == "stale" and OLD in (st["score2"].reason or "")
+    table = render_status(graph.project_status(lp, None), verbose=True)
+    assert "score: stale (scored by scoring version 5" in table, table
+
+
+def test_unreadable_score_file_is_stale_not_fresh(lp: ProjectPaths) -> None:
+    lp.doc("clean").scores.write_text("{not json", encoding="utf-8")
+    st = {s.node: s for s in graph.doc_node_states(lp, "clean", lp.load_config())}
+    assert st["score"].state == "stale" and st["score"].reason == "scores.json unreadable"
+    assert st["score2"].state == "stale"
+
+
+def test_make_plan_starts_at_score_for_old_scores(lp: ProjectPaths) -> None:
+    downgrade(lp)
+    plan = make_plan(lp, lp.load_config(), to="score2")
+    slugs = lp.list_slugs()
+    assert plan.units == [(n, s) for n in RESCORE for s in slugs]
+    # `--to score` (and the Scope screen's Re-run, `to: group`) start there too
+    assert make_plan(lp, lp.load_config(), to="score").units == [("score", s) for s in slugs]
+
+
+def test_labor_run_mock_rescores_an_old_project_and_keeps_decisions(lp: ProjectPaths) -> None:
+    rec = record_then_downgrade(lp)
+    r = subprocess.run(
+        [*LABOR, "run", str(lp.root), "--mock"], capture_output=True, text=True, timeout=900
+    )
+    assert r.returncode == 0, r.stdout[-3000:] + r.stderr[-3000:]
+    lines = [json.loads(x) for x in r.stdout.splitlines() if x.startswith("{")]
+    done = [(o["node"], o["doc"]) for o in lines if o.get("event") == "unit_done"]
+    assert done == [(n, s) for n in RESCORE for s in lp.list_slugs()], done
+    assert all(o["status"] == "done" for o in lines if o.get("event") == "unit_done")
+    assert not [o for o in lines if o.get("status") in ("error", "blocked")]
+    assert_upgraded(lp, rec)
+    status = subprocess.run(
+        [*LABOR, "status", str(lp.root)], capture_output=True, text=True, timeout=120
+    )
+    assert "STALE" not in status.stdout and "FAILED" not in status.stdout, status.stdout

@@ -23,8 +23,8 @@ from manuallabor.grouping.pipeline import group_fingerprint
 from manuallabor.ingest import sha256_file
 from manuallabor.parse.pipeline import parse_is_current
 from manuallabor.project import ProjectPaths
-from manuallabor.scoring.pipeline import score_fingerprint
-from manuallabor.scoring.types import ScoreFile
+from manuallabor.scoring.pipeline import score_fingerprint, scores_current
+from manuallabor.scoring.types import SCORING_ALGO_VERSION, ScoreFile
 from manuallabor.state.interfaces import JobRunnerP
 from manuallabor.state.models import DocLearning, DocStatus, NodeState, ProjectStatus
 
@@ -139,6 +139,11 @@ def _fingerprint_state(paths: ProjectPaths, slug: str, node: str, cfg: ProjectCo
         rep = read_json(dp.figure_report, FigureReport)
         return None if rep.fingerprint == figures_fingerprint(paths, slug) else "inputs changed"
     if node in ("score", "score2"):
+        if not scores_current(paths, slug):
+            # design 03 section 2.10a / 07 section 3.2: a score file of another algo version is
+            # "not scored yet" for `score` as well as `score2`, whatever clean.json says, so the
+            # plan starts at `score` (group refuses such a file, and its fingerprint has moved)
+            return _old_scores_reason(dp.scores)
         sf = read_json(dp.scores, ScoreFile)
         if sf.threshold != cfg.threshold_for(slug):
             return "project threshold changed"
@@ -162,6 +167,17 @@ def _fingerprint_state(paths: ProjectPaths, slug: str, node: str, cfg: ProjectCo
             return "learning layer changed"
         return None
     return None
+
+
+def _old_scores_reason(p: Path) -> str:
+    """Why a scores.json that `scores_current` refuses is stale (shown by `labor status -v`)."""
+    try:
+        version = json.loads(p.read_text(encoding="utf-8")).get("algo_version")
+    except (OSError, ValueError, AttributeError):
+        return "scores.json unreadable"
+    if not isinstance(version, str) or version == SCORING_ALGO_VERSION:
+        return "scores.json unreadable"
+    return f"scored by scoring version {version}; this version is {SCORING_ALGO_VERSION}"
 
 
 def node_state(

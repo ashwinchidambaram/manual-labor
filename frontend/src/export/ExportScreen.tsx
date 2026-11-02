@@ -783,7 +783,7 @@ export default function ExportScreen() {
             {/* the last export first: after a success the result and its download are what the reader looks for, and
                 the gate below says what a new export needs (each export spends its overrides, design 11 P3) */}
             {st.summary ? <Summary s={st.summary} fresh={jobDone} /> : null}
-            {locked ? (
+            {st.not_ready?.length ? <p role="status" data-testid="export-not-ready" className="max-w-[62ch] text-base text-ink">Not ready to export: {st.not_ready.join(", ")} {st.not_ready.length === 1 ? "has" : "have"} not been scored by this version yet. Run the pipeline from the Scope screen (or <code>labor run</code>), then come back.</p> : locked ? (
               <Locked st={st} after={st.summary ?? null} />
             ) : (
               <section aria-labelledby="export-ready" data-testid="export-ready" className="space-y-3">

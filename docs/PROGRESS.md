@@ -658,3 +658,24 @@ tsc clean
 $ npm run e2e -- e2e/override-flow.spec.ts e2e/ux-onboarding.spec.ts e2e/onboarding.spec.ts
 21 passed (3.0m)
 ```
+
+### Upgrade path: old score files make `score` stale (design 07 section 3.2 revision 2026-11-02; final review D1, D3) — PASSED 2026-11-02
+
+Defect: `jobs/graph.py` called `score` fresh whenever clean.json existed, so a project scored by `SCORING_ALGO_VERSION` "5" (build/human-test) planned `group` first; `group` refused the old scores and `stages.json` recorded `group: failed` on every `labor run` and Run press. README "Upgrading" promised `labor run` was enough.
+- **Stage graph.** `score` and `score2` are stale while `scores_current()` is false, whatever clean.json says; the reason names both versions (`scored by scoring version 5; this version is 6`) or `scores.json unreadable`. Stale, not missing, so the Scope chip says "Needs a run" and Re-run appears. `make_plan` now plans score, group, clean, score2.
+- **Export status (D3).** `ExportStatus.not_ready` lists the documents the gate cannot see (no current scores). The Export screen shows "Not ready to export: … Run the pipeline from the Scope screen (or labor run), then come back." in place of "Ready to export" (one line in `ExportScreen.tsx`). OpenAPI and `src/api/types.ts` regenerated.
+- Tests first (red on the old graph with the reviewer's exact error): `tests/jobs/test_upgrade_run.py` (graph states and reason, `labor status -v`, unreadable file, `make_plan`, `labor run --mock` keeps decisions, flag, selection), `tests/api/test_old_scores.py::test_post_jobs_rescores_an_old_project_and_keeps_decisions` (`POST /api/jobs` with the runner started; `not_ready` before and after), vitest `ExportNotReady.test.tsx`.
+- Reviewer scripts on a fresh copy of build/human-test under this code: `cli-old-project.sh` (status shows score STALE with the reason; export refused "stale: …score is stale (scored by scoring version 5; …)", exit 1; `labor run --mock` exit 0, score/group/clean/score2 done for both documents, everything fresh; decisions 7 approve, 1 edit, 1 flag and the one open flag unchanged; export then locked by 98 queued and 1 flag, exit 2), `cli-upgrade-force.sh` (the old workaround still works), `api_upgrade_test.py` (FAILED: []; job done, selection 160 -> 160, flags kept, export in_scope 160 == verify in_scope 160).
+
+```
+$ PYTHONPATH=<worktree> uv run pytest tests/jobs tests/api tests/state tests/scoring/test_pipeline_cli.py -p no:warnings --basetemp=<scratch>/pytest_tmp
+362 passed in 365.18s (0:06:05)
+$ uv run ruff check manuallabor/ tests/ && uv run ruff format --check manuallabor/ tests/ && uv run mypy manuallabor/
+All checks passed! / 413 files already formatted / Success: no issues found in 196 source files
+$ uv run labor schemas export --check && uv run labor openapi export --check
+schemas up to date / openapi up to date
+$ cd frontend && npm run typecheck && npm test -- --run
+tsc clean
+ Test Files  57 passed (57)
+      Tests  478 passed (478)
+```
