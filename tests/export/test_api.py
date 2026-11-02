@@ -232,6 +232,9 @@ def test_a_document_not_scored_by_this_version_locks_the_export(unreviewed_env: 
     clean.unlink()
     s = c.get("/api/export/status").json()
     assert s["not_ready"] == [slug] and s["unlocked"] is False, s
+    r = c.post("/api/export")
+    assert r.status_code == 409 and r.json()["not_ready"] == [slug], r.text
+    assert "not through scoring and cleanup with this version" in r.json()["detail"]
     clean.write_bytes(kept)
     assert c.get("/api/export/status").json()["unlocked"] is True
 

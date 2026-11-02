@@ -8,7 +8,7 @@ import { useJobWatch } from "../hooks/useJobsPolling";
 import Hint from "../onboarding/Hint";
 import { useBlockTitles } from "../shell/blockTitles";
 import { AttentionIcon } from "../shell/Icon";
-import { isPipelineJob } from "../shell/jobStep";
+import { notReadyParts, processingWords, waitingWords } from "../shell/notReady";
 import { openInVerify } from "../shell/openInVerify";
 import { FLAG_CATEGORIES, FLAG_RESOLUTION } from "../verify/labels";
 import { blockingFlagsOf, notReadyOf, scopeTerms, toReviewOf } from "../shell/scopeTerms";
@@ -689,12 +689,11 @@ export default function ExportScreen() {
   const st = status.data;
   // design 11 section 20.17: a document the gate cannot see yet locks the export, and no override helps with it
   const notReady = notReadyOf(st);
-  // the line names files as the Scope screen does, and says a run is going only while one is (CLAUDE.md "claiming work")
+  // the line names files as the Scope screen does, and says a document is being processed only while a job takes it to
+  // score2 (CLAUDE.md "claiming work")
   const sources = useSources();
   const active = useActiveJobs();
-  const fileOf = new Map((sources.data ?? []).map((s) => [s.slug, s.filename]));
-  const notReadyNames = notReady.map((s) => fileOf.get(s) ?? s).join(", ");
-  const processing = (active.data ?? []).some(isPipelineJob);
+  const nr = notReadyParts(st, active.data, sources.data);
   const locked = !!st && ((st.blockers ?? []).length > 0 || notReady.length > 0);
   const overridable = locked && notReady.length === 0;
   // the second column holds the override forms (locked) and the active overrides; it is left out when empty
@@ -796,15 +795,13 @@ export default function ExportScreen() {
             {st.summary ? <Summary s={st.summary} fresh={jobDone} /> : null}
             {notReady.length ? (
               <p role="status" data-testid="export-not-ready" className="max-w-[62ch] text-base text-ink">
-                Not ready to export: {notReadyNames}{" "}
-                {processing ? (
-                  <>{notReady.length === 1 ? "is" : "are"} being processed. Export opens when the run has finished and its blocks are reviewed.</>
-                ) : (
+                Not ready to export:{" "}
+                {nr.waiting.length ? (
                   <>
-                    {notReady.length === 1 ? "has" : "have"} not been through scoring and cleanup with this version yet. Run the pipeline from the Scope screen (or{" "}
-                    <code>labor run</code>), then come back.
+                    {waitingWords(nr)} Run the pipeline from the Scope screen (or <code>labor run</code>), then come back.{" "}
                   </>
-                )}
+                ) : null}
+                {processingWords(nr)}
               </p>
             ) : locked ? (
               <Locked st={st} after={st.summary ?? null} />

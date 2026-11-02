@@ -6,7 +6,8 @@ import type { ExportStatus } from "../api/schema";
 import type { HotkeyId } from "../hotkeys";
 import type { GuideControl } from "../onboarding/useGuideState";
 import type { StepId } from "../onboarding/guide";
-import { blockingFlagsOf, notReadyOf, scopeTerms, toReviewOf } from "./scopeTerms";
+import { notReadyCount, notReadyParts, processingWords, waitingWords, type NotReady } from "./notReady";
+import { blockingFlagsOf, scopeTerms, toReviewOf } from "./scopeTerms";
 
 export interface NextStep {
   /** the sentence; `{hotkeyId}` tokens render as keycaps */
@@ -21,6 +22,8 @@ const plural = (n: number, w: string): string => `${n} ${w}${n === 1 ? "" : "s"}
 export interface NextStepLive {
   scoring: boolean;
   reading?: boolean;
+  /** the documents that need a run, split by whether a job is bringing them in (design 11 section 20.17) */
+  notReady?: NotReady;
 }
 
 /**
@@ -56,15 +59,13 @@ export function defaultNextStep(step: StepId, st: ExportStatus | undefined, live
         : { text: "Nothing is flagged. In Verify, {vFlag} sends a block here when you would rather not fix it by hand." };
     case "export":
       if (!st) return { text: "Export the reviewed knowledge base." };
-      if (notReadyOf(st).length > 0) {
+      {
         // design 11 section 20.17: the gate cannot see these documents until they have run
-        const docs = notReadyOf(st);
-        const one = docs.length === 1;
-        return {
-          text: live.scoring
-            ? `${docs.join(", ")} ${one ? "is" : "are"} being processed. Export opens when the run has finished and its blocks are reviewed.`
-            : `${docs.join(", ")} ${one ? "has" : "have"} not been through scoring and cleanup with this version yet. Run the pipeline from the Scope screen, then come back to export.`,
-        };
+        const nr = live.notReady ?? notReadyParts(st);
+        if (notReadyCount(nr) > 0) {
+          const waiting = nr.waiting.length ? `${waitingWords(nr)} Run the pipeline from the Scope screen, then come back to export.` : "";
+          return { text: [waiting, processingWords(nr)].filter(Boolean).join(" ") };
+        }
       }
       if ((st.blockers ?? []).length === 0) return { text: "Export the knowledge base, then compare the zip's SHA-256 with the one shown." };
       return {

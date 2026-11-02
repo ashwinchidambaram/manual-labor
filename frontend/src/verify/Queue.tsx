@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import type { DocReadiness, ExportStatus, QueueItem, ReviewCounts } from "../api/schema";
 import { Keycap } from "../onboarding/Copy";
 import { keyLabel } from "../onboarding/guide";
-import { blockingFlagsOf, scopeTerms, toReviewOf } from "../shell/scopeTerms";
+import { blockingFlagsOf, notReadyOf, scopeTerms, toReviewOf } from "../shell/scopeTerms";
 import { cardTitle } from "./labels";
 import QueueCard from "./QueueCard";
 
@@ -222,10 +222,14 @@ function EmptyNext({ counts, gate, link }: { counts: ReviewCounts; gate: ExportS
   // blocks held by a flag, not flags: a block with two flags is one block to hand over
   const flagged = gate ? (gate.flag_blockers ? new Set(gate.flag_blockers.map((f) => f.block_id)).size : blockingFlagsOf(gate)) : counts.flagged_open;
   const overridden = scopeTerms(gate)?.overridden ?? 0;
-  const open = !!gate && (gate.blockers ?? []).length === 0;
+  // design 11 section 20.17: a document the gate cannot see yet keeps the export locked
+  const notReady = notReadyOf(gate);
+  const open = !!gate && (gate.blockers ?? []).length === 0 && notReady.length === 0;
   const next = !gate
     ? null
-    : open
+    : notReady.length > 0
+      ? `Next: run the pipeline from the Scope screen. ${plural(notReady.length, "document")} ${notReady.length === 1 ? "has" : "have"} not been through scoring and cleanup with this version yet, so the export stays locked.`
+      : open
       ? `Next: export the knowledge base.${overridden > 0 ? ` ${plural(overridden, "overridden block")} will go out unreviewed, as recorded.` : ""}`
       : flagged > 0 && waiting === 0
         ? `Next: hand the ${plural(flagged, "flagged block")} to the Agent, or export with an override.`

@@ -54,8 +54,9 @@ def start_export(ctx: Ctx, body: ExportIn | None = None) -> JobInfo | JSONRespon
         n = len(st.not_ready)
         return JSONResponse(
             {
-                "detail": f"export is locked: {n} document{'' if n == 1 else 's'} not scored by "
-                f"this version ({', '.join(st.not_ready)}): run the pipeline first",
+                "detail": f"export is locked: {n} document{'' if n == 1 else 's'} not through "
+                f"scoring and cleanup with this version ({', '.join(st.not_ready)}): "
+                "run the pipeline first",
                 "code": "export_locked",
                 "open_flags": st.open_flags,
                 "queued": st.queued,

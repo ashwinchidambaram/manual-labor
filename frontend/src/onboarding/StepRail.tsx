@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef } from "react";
 import { useActiveJobs, useSources } from "../api/queries";
 import { isPipelineJob, isReadingJob } from "../shell/jobStep";
+import { notReadyParts } from "../shell/notReady";
 import type { ExportStatus } from "../api/schema";
 import { defaultNextStep, usePublishedNextStep } from "../shell/nextStep";
 import Copy, { Keycap } from "./Copy";
@@ -32,7 +33,8 @@ export default function StepRail({ path, status, mock }: { path: string; status:
   const pipeline = (active.data ?? []).filter(isPipelineJob);
   const scoring = pipeline.length > 0;
   const reading = scoring && pipeline.every(isReadingJob);
-  const next = published ?? defaultNextStep(step.id, status, { scoring, reading });
+  const notReady = notReadyParts(status, active.data, sources.data);
+  const next = published ?? defaultNextStep(step.id, status, { scoring, reading, notReady });
 
   const ref = useRef<HTMLElement>(null);
   useLayoutEffect(() => {
@@ -87,7 +89,7 @@ export default function StepRail({ path, status, mock }: { path: string; status:
           </dl>
         ) : null}
       </section>
-      <StepNav path={path} status={status} live={{ scoring, reading }} />
+      <StepNav path={path} status={status} live={{ scoring, reading, notReady }} />
       {mock || (scanned && step.id === "verify") ? (
         <div className="mt-auto hidden flex-col gap-1.5 wide:flex">
           {mock ? (

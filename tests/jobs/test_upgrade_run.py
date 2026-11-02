@@ -201,6 +201,24 @@ def test_score_is_stale_when_its_file_does_not_cover_every_block(lp: ProjectPath
     units = make_plan(lp, lp.load_config(), to="score2").units
     assert units[0] == ("score", "clean"), units
     assert [u for u in units if u[1] == "scanned"] == []
+    # the run brings it back: `score` does not take its skip path for a file that misses a block
+    r = subprocess.run(
+        [*LABOR, "run", str(lp.root), "--mock"], capture_output=True, text=True, timeout=900
+    )
+    assert r.returncode == 0, r.stdout[-3000:] + r.stderr[-3000:]
+    st = {s.node: s for s in graph.doc_node_states(lp, "clean", lp.load_config())}
+    assert all(s.state == "fresh" for s in st.values()), st
+    data = json.loads(p.read_text(encoding="utf-8"))
+    assert dropped in {b["block_id"] for b in data["blocks"]}
+
+
+def test_a_failing_check_over_fresh_upstream_keeps_its_error(lp: ProjectPaths) -> None:
+    """When every upstream node is fresh, the node's own error is the reason."""
+    lp.doc("clean").groups.write_text("{not json", encoding="utf-8")
+    st = {s.node: s for s in graph.doc_node_states(lp, "clean", lp.load_config())}
+    assert st["score"].state == "fresh", st["score"]
+    assert st["group"].state == "stale" and "GroupsFile" in (st["group"].reason or "")
+    assert st["clean"].reason == "upstream group is stale", st["clean"]
 
 
 def test_re_run_to_group_starts_at_score_on_an_old_project(lp: ProjectPaths) -> None:

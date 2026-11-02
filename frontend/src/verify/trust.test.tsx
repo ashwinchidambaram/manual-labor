@@ -83,6 +83,16 @@ describe("M12 trust: an empty queue says what comes next", () => {
     expect(await within(empty).findByTestId("queue-next")).toHaveTextContent("Export is still locked: 4 blocks in scope still need review and are not in this list.");
     expect(empty).not.toHaveTextContent("Next: export the knowledge base");
   });
+  it("a document the gate cannot see yet: no 'Next: export' (design 11 section 20.17)", async () => {
+    await mountVerify(0, (f) => (f.counts = counts({ in_scope: 5, auto_approved: 5 })), {
+      exportStatus: { unlocked: false, open_flags: 0, queued: 0, blockers: [], not_ready: ["beta"], overrides: [], summary: null, zip_path: null },
+    }).catch(() => undefined);
+    const empty = await screen.findByTestId("queue-empty");
+    expect(await within(empty).findByTestId("queue-next")).toHaveTextContent(
+      "Next: run the pipeline from the Scope screen. 1 document has not been through scoring and cleanup with this version yet, so the export stays locked.",
+    );
+    expect(empty).not.toHaveTextContent("Next: export the knowledge base");
+  });
   it("export open: Next is export", async () => {
     await mountVerify(0, (f) => (f.counts = counts({ in_scope: 5, auto_approved: 5 }))).catch(() => undefined);
     const empty = await screen.findByTestId("queue-empty");

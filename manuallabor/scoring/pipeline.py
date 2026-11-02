@@ -699,7 +699,10 @@ def _score_doc(
     prior, fp = inp.prior, inp.fp
     thr = config.threshold_for(slug)
     snap = inp.learned.snapshot if inp.learned is not None else "baseline"
-    if not force and prior is not None and prior.fingerprint == fp:
+    # a prior file that misses a block of blocks.json is rescored in full, never skipped: the
+    # stage graph calls `score` stale for it (rule 3, upgrade-fix review); a skip would keep it so
+    covers = prior is not None and {b.id for b in blocks} <= {s.block_id for s in prior.blocks}
+    if not force and prior is not None and prior.fingerprint == fp and covers:
         if prior.threshold != thr:
             # design 6: a threshold change re-runs assign_status on the stored confidences only
             restated = [

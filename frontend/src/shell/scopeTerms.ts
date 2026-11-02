@@ -73,7 +73,6 @@ export function blockingFlagsOf(st: ExportStatus | undefined | null): number {
 
 const plural = (n: number, w: string): string => `${n} ${w}${n === 1 ? "" : "s"}`;
 
-/** "105 overridden blocks (not reviewed)" */
 /**
  * The documents the export gate cannot see yet: no current scores (never run, or scored by an older version). While
  * there is one the export is locked whatever the blockers say, and no override helps (design 11 section 20.17).
@@ -82,6 +81,7 @@ export function notReadyOf(st: ExportStatus | undefined | null): string[] {
   return st?.not_ready ?? [];
 }
 
+/** "105 overridden blocks (not reviewed)" */
 export const overriddenWords = (n: number): string => `${plural(n, "overridden block")} (not reviewed)`;
 
 /** "In scope 173 = 0 to review + 105 overridden + 60 auto-approved + 8 done + 0 flagged + 0 rejected" */

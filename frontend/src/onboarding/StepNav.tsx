@@ -1,5 +1,6 @@
 import { NavLink } from "react-router-dom";
 import type { ExportStatus } from "../api/schema";
+import { notReadyParts, notReadyCount, type NotReady } from "../shell/notReady";
 import { blockingFlagsOf, notReadyOf, scopeTerms, toReviewOf } from "../shell/scopeTerms";
 import Hint from "./Hint";
 import type { HintId } from "./hints";
@@ -28,6 +29,8 @@ export interface LiveState {
   scoring: boolean;
   /** every active pipeline job only reads manuals (an upload, a re-parse): say "reading", not "scoring" */
   reading?: boolean;
+  /** the documents that need a run, with file names (design 11 section 20.17) */
+  notReady?: NotReady;
 }
 
 /**
@@ -64,11 +67,12 @@ export function stepStates(path: string, st: ExportStatus | undefined, live: Liv
       if (s.id === "agent" && st.open_flags > 0) short = long = plural(st.open_flags, "open flag");
       if (s.id === "export") {
         const why = [flags > 0 ? plural(flags, "open flag") : "", queued > 0 ? `${queued} to review` : ""].filter(Boolean);
-        const notReady = notReadyOf(st);
+        const nr = live.notReady ?? notReadyParts(st);
+        const notReady = [...nr.waiting, ...nr.processing];
         if (live.scoring) {
           short = live.reading ? "after reading" : "after scoring";
           long = `waits for ${live.reading ? "reading" : "scoring"} to finish`;
-        } else if (notReady.length > 0) {
+        } else if (notReadyCount(nr) > 0) {
           // design 11 section 20.17: nothing in such a document can be reviewed or overridden until it has run
           short = "locked: needs a run";
           long = `locked: ${plural(notReady.length, "document")} ${notReady.length === 1 ? "needs" : "need"} a run (${notReady.join(", ")})`;

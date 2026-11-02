@@ -1,8 +1,9 @@
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
 import type { ExportStatus } from "../api/schema";
 import { stepStates } from "../onboarding/StepNav";
+import { notReadyParts } from "../shell/notReady";
 import { defaultNextStep } from "../shell/nextStep";
 import { makeJob, makeSources } from "../test/fixtures";
 import { renderApp } from "../test/render";
@@ -93,8 +94,8 @@ describe("the rail while a document needs a run (design 11 section 20.17)", () =
       "clean, scanned have not been through scoring and cleanup with this version yet. Run the pipeline from the Scope screen, then come back to export.",
     );
     // while a run is going: no "run the pipeline", only what the run is doing (CLAUDE.md "claiming work")
-    expect(defaultNextStep("export", notReady({ not_ready: ["scanned"] }), { scoring: true }).text).toBe(
-      "scanned is being processed. Export opens when the run has finished and its blocks are reviewed.",
+    expect(defaultNextStep("export", notReady({ not_ready: ["scanned"] }), { scoring: true, notReady: { waiting: [], processing: ["scanned.pdf"] } }).text).toBe(
+      "scanned.pdf is being processed. Export opens when the run has finished and its blocks are reviewed.",
     );
   });
 });
@@ -113,7 +114,7 @@ describe("the not-ready line names files and knows about a running job (upgrade-
     });
     renderApp("/export");
     const note = await screen.findByTestId("export-not-ready");
-    await screen.findByText(/alpha\.pdf is being processed/);
+    await waitFor(() => expect(note).toHaveTextContent("alpha.pdf is being processed"));
     expect(note).toHaveTextContent("Not ready to export: alpha.pdf is being processed. Export opens when the run has finished and its blocks are reviewed.");
     expect(note).not.toHaveTextContent("Run the pipeline");
   });
@@ -124,5 +125,34 @@ describe("the not-ready line names files and knows about a running job (upgrade-
     // and an export made before the upgrade is not "exported" now
     const summary = { articles: 1 } as unknown as ExportStatus["summary"];
     expect(stepStates("/scope", notReady({ not_ready: ["scanned"], counts: all, summary })).export.short).toBe("locked: needs a run");
+  });
+});
+
+describe("which documents a running job brings in (second review)", () => {
+  const sources = makeSources();
+  it("a job for another document, or one that stops before score2, does not make a document 'being processed'", () => {
+    const st = notReady({ not_ready: ["alpha", "beta"] });
+    expect(notReadyParts(st, [makeJob({ kind: "run", plan: { to: "score2", docs: ["beta"] } })], sources)).toEqual({ waiting: ["alpha.pdf"], processing: ["beta.pdf"] });
+    expect(notReadyParts(st, [makeJob({ kind: "run", plan: { to: "group" } })], sources)).toEqual({ waiting: ["alpha.pdf", "beta.pdf"], processing: [] });
+    expect(notReadyParts(st, [makeJob({ kind: "ingest_run", plan: { to: "group" } })], sources)).toEqual({ waiting: ["alpha.pdf", "beta.pdf"], processing: [] });
+    expect(notReadyParts(st, [makeJob({ kind: "export", plan: { to: "export" } })], sources)).toEqual({ waiting: ["alpha.pdf", "beta.pdf"], processing: [] });
+    expect(notReadyParts(st, [makeJob({ kind: "run", plan: { to: "score2", docs: null } })], null)).toEqual({ waiting: [], processing: ["alpha", "beta"] });
+  });
+  it("the screen splits the two groups", async () => {
+    installFake({
+      exportStatus: notReady({ not_ready: ["alpha", "beta"] }),
+      sources,
+      jobPolls: [[makeJob({ id: "r1", kind: "run", plan: { to: "score2", docs: ["beta"] }, status: "running" })]],
+    });
+    renderApp("/export");
+    const note = await screen.findByTestId("export-not-ready");
+    await waitFor(() => expect(note).toHaveTextContent("beta.pdf is being processed"));
+    expect(note).toHaveTextContent(
+      "Not ready to export: alpha.pdf has not been through scoring and cleanup with this version yet. Run the pipeline from the Scope screen (or labor run), then come back. beta.pdf is being processed.",
+    );
+  });
+  it("the rail names files", () => {
+    const s = stepStates("/scope", notReady({ not_ready: ["alpha"] }), { scoring: false, notReady: { waiting: ["alpha.pdf"], processing: [] } }).export;
+    expect(s.long).toBe("Step 4 of 4. Locked: 1 document needs a run (alpha.pdf).");
   });
 });
