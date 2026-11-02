@@ -157,3 +157,14 @@ describe("which documents a running job brings in (second review)", () => {
     expect(s.long).toBe("Step 4 of 4. Locked: 1 document needs a run (alpha.pdf).");
   });
 });
+
+describe("manuals left out of the export (design 11 section 20.18)", () => {
+  it("names them by file, beside the ready gate, and says how the manifest counts them", async () => {
+    const f = installFake();
+    f.exportStatus = { ...f.exportStatus, left_out: ["beta"] } as typeof f.exportStatus;
+    renderApp("/export");
+    const note = await screen.findByTestId("export-left-out");
+    expect(note).toHaveTextContent("Not in this export: beta.pdf (it is not in your selection). The manifest lists its blocks as not selected.");
+    expect(await screen.findByTestId("export-ready")).toBeInTheDocument();
+  });
+});

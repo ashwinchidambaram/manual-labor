@@ -94,11 +94,15 @@ describe("removing a manual from its card", () => {
     expect(await screen.findByTestId("remove-blocked")).toHaveTextContent("A job is running");
     expect(screen.getByTestId("remove-confirm")).toBeDisabled();
   });
-  it("a 409 from the server is shown, not swallowed", async () => {
+  it("a 409 from the server is shown, not swallowed, and a second try sends the same request id", async () => {
     installFake();
+    const ids: string[] = [];
     server.use(
       http.get("*/api/sources/:slug/removal", () => HttpResponse.json(preview())),
-      http.delete("*/api/sources/:slug", () => HttpResponse.json({ detail: "A job waiting to run will read this manual.", code: "job_active" }, { status: 409 })),
+      http.delete("*/api/sources/:slug", ({ request }) => {
+        ids.push(new URL(request.url).searchParams.get("request_id") ?? "");
+        return HttpResponse.json({ detail: "A job waiting to run will read this manual.", code: "job_active" }, { status: 409 });
+      }),
     );
     const { user } = renderApp("/scope");
     const rows = await screen.findAllByTestId("source-row");
@@ -106,5 +110,9 @@ describe("removing a manual from its card", () => {
     await within(await screen.findByTestId("remove-dialog")).findByText(/3 decisions/);
     await user.click(screen.getByTestId("remove-confirm"));
     expect(await screen.findByTestId("remove-error")).toHaveTextContent("A job waiting to run will read this manual.");
+    await user.click(screen.getByTestId("remove-confirm"));
+    await waitFor(() => expect(ids).toHaveLength(2));
+    expect(ids[0]).not.toBe("");
+    expect(ids[1]).toBe(ids[0]);
   });
 });

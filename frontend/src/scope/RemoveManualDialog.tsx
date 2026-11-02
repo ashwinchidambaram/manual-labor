@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ApiError } from "../api/client";
 import { useRemovalPreview, useRemoveSource } from "../api/queries";
 import type { SourceRemoval } from "../api/schema";
@@ -27,6 +27,7 @@ export function removalSentences(p: SourceRemoval): string[] {
 export default function RemoveManualDialog({ slug, filename, onClose }: { slug: string; filename: string; onClose: (removed: boolean) => void }) {
   const preview = useRemovalPreview(slug);
   const remove = useRemoveSource();
+  const [requestId] = useState(() => crypto.randomUUID());
   const dlg = useRef<HTMLDivElement>(null);
   const keep = useRef<HTMLButtonElement>(null);
   useEffect(() => {
@@ -92,7 +93,7 @@ export default function RemoveManualDialog({ slug, filename, onClose }: { slug: 
             type="button"
             data-testid="remove-confirm"
             disabled={!p || !!blocked || remove.isPending}
-            onClick={() => remove.mutate(slug, { onSuccess: () => onClose(true) })}
+            onClick={() => remove.mutate({ slug, requestId }, { onSuccess: () => onClose(true) })}
             className={`min-h-[2.5rem] rounded-xl bg-act px-4 font-semibold text-act-on hover:bg-act-hover disabled:opacity-50 ${FOCUS} focus-visible:ring-offset-2`}
           >
             Remove manual

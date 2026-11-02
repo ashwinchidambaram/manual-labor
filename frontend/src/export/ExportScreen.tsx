@@ -694,6 +694,9 @@ export default function ExportScreen() {
   const sources = useSources();
   const active = useActiveJobs();
   const nr = notReadyParts(st, active.data, sources.data);
+  // design 11 section 20.18: manuals outside the selection that were left out or could not be read are named, never
+  // dropped silently; the export accounts for their blocks as not selected
+  const leftOut = (st?.left_out ?? []).map((slug) => sources.data?.find((s) => s.slug === slug)?.filename ?? slug);
   const locked = !!st && ((st.blockers ?? []).length > 0 || notReady.length > 0);
   const overridable = locked && notReady.length === 0;
   // the second column holds the override forms (locked) and the active overrides; it is left out when empty
@@ -793,6 +796,12 @@ export default function ExportScreen() {
             {/* the last export first: after a success the result and its download are what the reader looks for, and
                 the gate below says what a new export needs (each export spends its overrides, design 11 P3) */}
             {st.summary ? <Summary s={st.summary} fresh={jobDone} /> : null}
+            {leftOut.length ? (
+              <p role="note" data-testid="export-left-out" className="max-w-[62ch] text-sm text-muted">
+                Not in this export: {leftOut.join(", ")} ({leftOut.length === 1 ? "it is" : "they are"} not in your selection). The
+                manifest lists {leftOut.length === 1 ? "its" : "their"} blocks as not selected.
+              </p>
+            ) : null}
             {notReady.length ? (
               <p role="status" data-testid="export-not-ready" className="max-w-[62ch] text-base text-ink">
                 Not ready to export:{" "}

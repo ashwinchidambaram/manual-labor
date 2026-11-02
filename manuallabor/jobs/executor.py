@@ -338,25 +338,13 @@ def make_plan(
     )
 
 
-SCOPE_NODES = ("ingest", "parse", "figures", "score", "group")
-
-
 def _settled_out(paths: ProjectPaths, slugs: list[str]) -> list[str]:
-    """Documents a plan past `group` leaves out (design 07 section 21): no selected block, and
-    either grouped (the reviewer left it out) or failed on the way to `group` (it cannot be
-    selected until it is read; Scope's Re-run retries it). A manual still being read stays in:
-    grouping will put it in the selection (design 08 section 10)."""
+    """Documents a plan past `group` leaves out (design 07 section 21, `graph.left_out_docs`).
+    The worker has no database: the selection is its projection, selection.json, the file
+    cleanup reads too."""
     from manuallabor.grouping.selection import in_scope_docs
 
-    scope = in_scope_docs(paths)
-    out: list[str] = []
-    for slug in slugs:
-        if slug in scope:
-            continue
-        st = graph.load_stages(paths, slug)
-        if paths.doc(slug).groups.is_file() or any(st.failed(n) for n in SCOPE_NODES):
-            out.append(slug)
-    return out
+    return graph.left_out_docs(paths, in_scope_docs(paths), slugs)
 
 
 def make_project_plan(
@@ -599,12 +587,30 @@ def execute(
               "elapsed_ms": int((time.monotonic() - t0) * 1000)})  # fmt: skip
         if on_unit is not None:
             on_unit(node, slug, status)
-        if not ok and reach is not None:
-            # the failed unit first: its record then carries the plain sentence, not the error
-            rest = [(node, slug), *(u for u in plan.units[i + 1 :] if u[0] not in PROJECT_NODES)]
+        if (
+            not ok
+            and reach is not None
+            and cfg is not None
+            and _needs_model(paths, cfg, node, slug)
+        ):
+            # only a unit that called a model can have failed because its service went away
+            # (review finding 4: a parse or figures error is never hidden behind "not running").
+            # The failed unit first: its record then carries the plain sentence. Documents that
+            # failed earlier in this job keep their own reason.
+            rest = [(node, slug)] + [
+                u
+                for u in plan.units[i + 1 :]
+                if u[0] not in PROJECT_NODES and (u[1] == slug or u[1] not in blocked)
+            ]
             if _unreachable(paths, cfg, rest, reach, res, emit):
                 break
     return res
+
+
+def _needs_model(paths: ProjectPaths, cfg: ProjectConfig, node: str, slug: str) -> bool:
+    from manuallabor.jobs.preflight import plan_tasks
+
+    return bool(plan_tasks(paths, cfg, [(node, slug)]))
 
 
 def check_units(

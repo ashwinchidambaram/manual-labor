@@ -31,7 +31,24 @@ from manuallabor.state.models import ActionKind
 from manuallabor.state.review import Derived, load_review_overlay
 from manuallabor.state.store import Store, sha_text
 
-__all__ = ["active_overrides", "doc_ready", "last_models", "load_inputs"]
+__all__ = ["active_overrides", "doc_ready", "export_scope", "last_models", "load_inputs"]
+
+
+def export_scope(paths: ProjectPaths, store: Store | None = None) -> set[str]:
+    """The documents with a selected block, from the database's selection (the truth; the
+    projection selection.json may lag it, review finding 2). Without a store, a read-only one is
+    opened when project.db exists; with neither, the projection (a CLI project never served)."""
+    from manuallabor.grouping.selection import in_scope_docs
+
+    if store is not None:
+        return scope_docs(ProjectData(paths, store).selection())
+    if not paths.db.is_file():
+        return in_scope_docs(paths)
+    ro = Store.open(paths, readonly=True)
+    try:
+        return scope_docs(ProjectData(paths, ro).selection())
+    finally:
+        ro.close()
 
 
 def doc_ready(paths: ProjectPaths, slug: str) -> bool:
@@ -151,10 +168,12 @@ def load_inputs(
     docs: dict[str, DocInput] = {}
     left_out: dict[str, Document] = {}
     learn_docs: dict[str, ManifestDocLearning] = {}
-    scope = scope_docs(sel)
+    from manuallabor.jobs.graph import left_out_docs
+
+    left = set(left_out_docs(paths, scope_docs(sel)))
     for slug in paths.list_slugs():
         if not doc_ready(paths, slug):
-            if slug not in scope:
+            if slug in left:
                 # design 11 section 20.18: outside the selection and never processed (it could
                 # not be read): its parsed blocks are accounted as not selected
                 left_out[slug] = paths.load_document(slug)

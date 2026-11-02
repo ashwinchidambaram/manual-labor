@@ -150,19 +150,20 @@ def _sha_file(p: Path) -> str:
     return hashlib.sha256(p.read_bytes()).hexdigest() if p.is_file() else ""
 
 
-def _check_fresh(paths: ProjectPaths) -> None:
-    """Every document in the selection is processed and current. A document outside it cannot
-    hold the export up (design 11 section 20.18): it is exported as left out."""
-    from manuallabor.grouping.selection import in_scope_docs
+def _check_fresh(paths: ProjectPaths, store: Store | None = None) -> None:
+    """Every document the export takes is processed and current. A document left out (outside
+    the selection, and grouped or failed on the way, `graph.left_out_docs`) cannot hold the
+    export up (design 11 section 20.18). The selection is the database's (review finding 2)."""
+    from manuallabor.export.load import export_scope
     from manuallabor.jobs import graph
 
     cfg = paths.load_config()
     slugs = paths.list_slugs()
     if not slugs:
         raise ExportError("stale: the project has no documents")
-    scope = in_scope_docs(paths)
+    left = set(graph.left_out_docs(paths, export_scope(paths, store), slugs))
     for slug in slugs:
-        if slug not in scope:
+        if slug in left:
             continue
         for st in graph.doc_node_states(paths, slug, cfg):
             if st.state != "fresh":
@@ -317,12 +318,13 @@ def export_status(
     # selection count: one the reviewer left out, or that could not be read and so was never
     # selected, is exported as left out (section 20.18)
     from manuallabor.grouping.selection import scope_docs
+    from manuallabor.jobs.graph import left_out_docs
 
-    scope = scope_docs(review.data.selection())
+    left = left_out_docs(paths, scope_docs(review.data.selection()))
     not_ready = [
         s
         for s in paths.list_slugs()
-        if s in scope and not (doc_ready(paths, s) and review.data.scored(s))
+        if s not in left and not (doc_ready(paths, s) and review.data.scored(s))
     ]
     return ExportStatus(
         unlocked=g.unlocked and not not_ready,
@@ -331,6 +333,7 @@ def export_status(
         queued=g.queued,
         blockers=g.blockers[:BLOCKER_LIMIT],
         not_ready=not_ready,
+        left_out=left,
         flag_blockers=[
             ExportFlagBlocker(flag_id=f.id, block_id=b, category=f.category, note=f.note)
             for f, b in g.flag_blockers
@@ -458,7 +461,7 @@ def run_assemble(
 ) -> str:
     """Build the staging tree `export/assembled/`. Returns "built" or "skip". `marks` adds
     visible review tags (design 11 section 20.15); a tree built in another mode is rebuilt."""
-    _check_fresh(paths)
+    _check_fresh(paths, store)
     st = store if store is not None else _open_readonly(paths)
     try:
         state = read_state(paths)
@@ -616,7 +619,7 @@ def node_states(paths: ProjectPaths, store: Store | None = None) -> list[NodeSta
     state = read_state(paths)
     out: list[NodeState] = []
     try:
-        _check_fresh(paths)
+        _check_fresh(paths, store)
     except ExportError as exc:
         why = str(exc)
         return [NodeState(node="assemble", state="stale", reason=why),

@@ -96,6 +96,7 @@ def test_e22_status_shape_and_the_locked_post(unreviewed_env: Env) -> None:
         "queued",
         "blockers",
         "not_ready",  # design 07 section 3.2 revision 2026-11-02, design 11 section 20.17
+        "left_out",  # design 11 section 20.18
         "flag_blockers",
         "faith_blockers",  # design 11 section 20.16
         "counts",

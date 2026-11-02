@@ -2201,7 +2201,7 @@
       },
       "ExportStatus": {
         "additionalProperties": false,
-        "description": "`unlocked` is the raw gate (no open flag, no queued in-scope block, and `not_ready`\nempty); `blockers` are the first blocks (reading order, at most 20) an active override does\nnot cover: an export is possible iff `blockers` and `not_ready` are both empty.\n`flag_blockers` lists every uncovered open flag (no cap); `counts` partitions the scope\n(None from a store that is not a project store).\n`not_ready` lists the documents the gate cannot see yet, because they have no current\nscores (never run to score2, or scored by another `SCORING_ALGO_VERSION`, design 03 section\n2.10a): none of their blocks is in any count, so while it is non-empty the project needs a\nrun before an export and `unlocked` is false (review D3, design 11 section 20.17). Only\ndocuments that contribute a selected block are listed: one outside the selection (left out\nby the reviewer, or never read so never selected) cannot lock the export; it is exported as\nleft out (design 11 section 20.18).",
+        "description": "`unlocked` is the raw gate (no open flag, no queued in-scope block, and `not_ready`\nempty); `blockers` are the first blocks (reading order, at most 20) an active override does\nnot cover: an export is possible iff `blockers` and `not_ready` are both empty.\n`flag_blockers` lists every uncovered open flag (no cap); `counts` partitions the scope\n(None from a store that is not a project store).\n`not_ready` lists the documents the gate cannot see yet, because they have no current\nscores (never run to score2, or scored by another `SCORING_ALGO_VERSION`, design 03 section\n2.10a): none of their blocks is in any count, so while it is non-empty the project needs a\nrun before an export and `unlocked` is false (review D3, design 11 section 20.17). A\ndocument outside the selection that was grouped (the reviewer left it out) or failed on the\nway to grouping cannot lock the export: it is exported as left out (design 11 section\n20.18). `left_out` names those documents (outside the selection\nand grouped, or failed on the way to grouping); a manual still being read is never left out,\nit is in `not_ready` until it is grouped and confirmed.",
         "properties": {
           "blockers": {
             "items": {
@@ -2234,6 +2234,15 @@
               "$ref": "#/components/schemas/ExportFlagBlocker"
             },
             "title": "Flag Blockers",
+            "type": "array"
+          },
+          "left_out": {
+            "items": {
+              "maxLength": 48,
+              "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+              "type": "string"
+            },
+            "title": "Left Out",
             "type": "array"
           },
           "not_ready": {

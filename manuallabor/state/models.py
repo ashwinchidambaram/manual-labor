@@ -603,10 +603,12 @@ class ExportStatus(ContractModel):
     `not_ready` lists the documents the gate cannot see yet, because they have no current
     scores (never run to score2, or scored by another `SCORING_ALGO_VERSION`, design 03 section
     2.10a): none of their blocks is in any count, so while it is non-empty the project needs a
-    run before an export and `unlocked` is false (review D3, design 11 section 20.17). Only
-    documents that contribute a selected block are listed: one outside the selection (left out
-    by the reviewer, or never read so never selected) cannot lock the export; it is exported as
-    left out (design 11 section 20.18)."""
+    run before an export and `unlocked` is false (review D3, design 11 section 20.17). A
+    document outside the selection that was grouped (the reviewer left it out) or failed on the
+    way to grouping cannot lock the export: it is exported as left out (design 11 section
+    20.18). `left_out` names those documents (outside the selection
+    and grouped, or failed on the way to grouping); a manual still being read is never left out,
+    it is in `not_ready` until it is grouped and confirmed."""
 
     unlocked: bool
     open_flags: int
@@ -614,6 +616,7 @@ class ExportStatus(ContractModel):
     queued: int = 0
     blockers: list[BlockId] = Field(default_factory=list)
     not_ready: list[DocSlug] = Field(default_factory=list)
+    left_out: list[DocSlug] = Field(default_factory=list)
     flag_blockers: list[ExportFlagBlocker] = Field(default_factory=list)
     # every blocker whose cleaned text failed the faithfulness check (no cap; design 11 section
     # 20.16): a person must approve, edit or reject each one, no override covers it

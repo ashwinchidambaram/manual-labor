@@ -252,3 +252,49 @@ def test_an_agent_job_checks_the_agent_model(lp: ProjectPaths) -> None:
     assert reach is not None
     u = preflight.check_agent(cfg, get=rec)
     assert u is not None and u.tasks == ("agent",)
+
+
+def test_a_failure_that_needs_no_model_is_not_blamed_on_the_service(lp: ProjectPaths) -> None:
+    """Review finding 4: a figures failure (no model) with Ollama also down keeps its own error;
+    the job is not stopped as "not running" and nothing is stamped on the failed manual."""
+    lp.doc("clean").blocks.unlink()
+    u = preflight.Unreachable(
+        "http://127.0.0.1:11435", ("embeddings",), sentence("http://127.0.0.1:11435")
+    )
+    asked: list[list[tuple[str, str]]] = []
+
+    def reach(units: list[tuple[str, str]]) -> preflight.Unreachable | None:
+        asked.append(units)
+        return u
+
+    good = _providers(lp)
+    res = execute(
+        lp, Plan(units=[("figures", "clean"), ("group", "scanned")], to="group", force=["group"]),
+        emit=lambda _o: None, providers=lambda: good, reach=reach, precheck=False,
+    )  # fmt: skip
+    assert res.unreachable is None and asked == []
+    assert res.errors and "figures clean" in res.errors[0] and "Ollama" not in res.errors[0]
+    assert graph.load_stages(lp, "clean").nodes["figures"].code is None
+    assert "group" not in graph.load_stages(lp, "clean").nodes or (
+        graph.load_stages(lp, "clean").nodes["group"].code is None
+    )
+
+
+def test_the_check_ignores_proxy_settings(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Review nit: a proxy from the environment would carry the check to a host that is not the
+    configured one."""
+    import httpx
+
+    seen: list[dict[str, Any]] = []
+
+    def fake_get(url: str, **kw: Any) -> Any:
+        seen.append({"url": url, **kw})
+        raise httpx.ConnectError("refused")
+
+    monkeypatch.setattr(httpx, "get", fake_get)
+    assert preflight.http_get("http://127.0.0.1:11435/api/tags", 2.0) is False
+    assert (
+        seen
+        and seen[0]["trust_env"] is False
+        and seen[0]["url"] == "http://127.0.0.1:11435/api/tags"
+    )

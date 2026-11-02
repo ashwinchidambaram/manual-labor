@@ -50,7 +50,8 @@ def http_get(url: str, timeout: float) -> bool:
     try:
         import httpx
 
-        return httpx.get(url, timeout=timeout).is_success
+        # never through a proxy from the environment: only the configured host is asked
+        return httpx.get(url, timeout=timeout, trust_env=False).is_success
     except Exception:
         return False
 

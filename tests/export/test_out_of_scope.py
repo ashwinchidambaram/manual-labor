@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 
 from manuallabor.export.pipeline import export_status, resolve_clock, run_export
+from manuallabor.export.types import ExportError
 from manuallabor.export.validate import validate_zip
 from manuallabor.ingest import ingest_files
 from manuallabor.jobs import graph
@@ -122,3 +123,48 @@ def test_a_manual_still_being_read_stays_in_a_score2_plan(stuck: ProjectPaths) -
 def test_labor_run_to_score2_succeeds_beside_a_failed_manual(stuck: ProjectPaths) -> None:
     labor_run(stuck.root, "--to", "score2")
     assert graph.load_stages(stuck, STUCK).nodes["group"].status == "failed"
+
+
+# -- review finding 1: only a manual that was read (grouped) or failed on the way can be left out --
+
+
+def test_a_manual_never_read_is_not_left_out(stuck: ProjectPaths) -> None:
+    """Ingested and never run (no groups.json, no failure): grouping would put it in the
+    selection, so the export waits for it instead of recording it as not selected."""
+    st = graph.load_stages(stuck, STUCK)
+    del st.nodes["group"]
+    graph.save_stages(stuck, STUCK, st)
+    store = Store.open(stuck)
+    try:
+        status = export_status(stuck, store)
+        assert status.not_ready == [STUCK] and status.unlocked is False
+        assert status.left_out == []
+        with pytest.raises(ExportError, match="stale"):
+            run_export(stuck, store, clock=resolve_clock(CLOCK), emit=lambda _o: None)
+    finally:
+        store.close()
+
+
+def test_the_status_names_the_manuals_left_out(stuck: ProjectPaths) -> None:
+    store = Store.open(stuck)
+    try:
+        assert export_status(stuck, store).left_out == [STUCK]
+    finally:
+        store.close()
+
+
+def test_freshness_reads_the_database_selection_not_its_projection(stuck: ProjectPaths) -> None:
+    """Review finding 2: a stale or missing selection.json must not let a selected manual skip
+    the freshness check."""
+    from manuallabor.export.pipeline import _check_fresh
+
+    st = graph.load_stages(stuck, "clean")
+    st.record("clean", "failed", None, "boom")
+    graph.save_stages(stuck, "clean", st)
+    stuck.selection.write_text('{"block_ids": [], "known_docs": ["clean", "figures"]}')
+    store = Store.open(stuck)
+    try:
+        with pytest.raises(ExportError, match="clean"):
+            _check_fresh(stuck, store)
+    finally:
+        store.close()

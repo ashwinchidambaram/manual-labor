@@ -132,10 +132,9 @@ export const SOURCES_CHANGED = "ml:sources-changed";
 export function useRemoveSource() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (slug: string): Promise<SourceRemoval> =>
-      unwrap(
-        await client.DELETE("/api/sources/{slug}", { params: { path: { slug }, query: { request_id: crypto.randomUUID() } } }),
-      ),
+    // one request id per confirmation: a retry after a lost answer replays it instead of meeting a 404
+    mutationFn: async ({ slug, requestId }: { slug: string; requestId: string }): Promise<SourceRemoval> =>
+      unwrap(await client.DELETE("/api/sources/{slug}", { params: { path: { slug }, query: { request_id: requestId } } })),
     onSuccess: () => {
       // every screen that counts blocks, manuals or flags (design 08 section 11)
       invalidateAfterJob(qc);

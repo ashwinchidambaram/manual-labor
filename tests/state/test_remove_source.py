@@ -255,3 +255,91 @@ def test_a_removed_manual_leaves_no_leftover_after_a_crash_mid_delete(lp: Projec
     finally:
         env.close()
     assert not stray.exists()
+
+
+# -- review findings 3, 5, 7 ------------------------------------------------------------------
+
+
+def test_a_legacy_selection_learns_the_known_manuals_on_removal(lp: ProjectPaths) -> None:
+    """Finding 7: a selection saved before `known_docs` gets it with the removal, so the same
+    manual added again arrives selected (design 08 section 10)."""
+    env, _a, _f = reviewed(lp)
+    try:
+        raw = env.data.raw_selection()
+        assert raw is not None
+        legacy = raw.model_copy(update={"known_docs": None})
+        with env.store.tx():
+            aid = env.store.next_action_id()
+            env.store.append_action(
+                ActionKind.import_, "cli", payload={"what": "selection"}, action_id=aid
+            )
+            env.store.set_selection_json(legacy.model_dump_json(), aid)
+        remove_source(lp, env.store, GONE, "t-remove")
+        after = env.data.raw_selection()
+        assert after is not None and after.known_docs == ["clean"]
+    finally:
+        env.close()
+
+
+def test_a_failed_index_rebuild_still_finishes_the_removal(
+    lp: ProjectPaths, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Finding 3: the source file goes before the rebuild, and a rebuild error is left to the
+    next figures run (which rebuilds the index) instead of a half-done removal."""
+    import manuallabor.figures.pipeline as fp
+
+    def boom(*_a: object, **_k: object) -> None:
+        raise fp.FiguresError("index target missing")
+
+    monkeypatch.setattr(fp, "rebuild_index", boom)
+    env, _a, _f = reviewed(lp)
+    try:
+        filename = lp.load_document(GONE).filename
+        out = remove_source(lp, env.store, GONE, "t-remove")
+        assert out.removed and GONE not in lp.list_slugs()
+        assert not lp.source(filename).exists()
+    finally:
+        env.close()
+
+
+def test_removing_again_tidies_what_a_crash_left(lp: ProjectPaths) -> None:
+    """Finding 3: a removed manual whose figures directory or source file survived a crash is
+    tidied by the next removal request, which still answers not found."""
+    env, _a, _f = reviewed(lp)
+    try:
+        filename = lp.load_document(GONE).filename
+        remove_source(lp, env.store, GONE, "t-remove")
+        (lp.figure_dir(GONE)).mkdir(parents=True)
+        lp.source(filename).write_bytes(b"%PDF-1.4 left behind")
+        with pytest.raises(NotFound):
+            remove_source(lp, env.store, GONE, "t-remove-again")
+        assert not lp.figure_dir(GONE).exists() and not lp.source(filename).exists()
+    finally:
+        env.close()
+
+
+def test_a_job_queued_after_the_preview_still_refuses_inside_the_transaction(
+    lp: ProjectPaths, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Finding 5: the refusal is checked again inside the write transaction."""
+    import manuallabor.state.sources as src
+    from manuallabor.state.models import RunPlanIn
+
+    env, _a, _f = reviewed(lp)
+    try:
+        real = src.removal
+
+        def late_job(paths: ProjectPaths, store: Store, slug: str):  # type: ignore[no-untyped-def]
+            p = real(paths, store, slug)
+            store.add_job(
+                kind="run", plan=RunPlanIn(to="group", docs=[slug]).model_dump(mode="json")
+            )
+            return p
+
+        monkeypatch.setattr(src, "removal", late_job)
+        with pytest.raises(Conflict):
+            remove_source(lp, env.store, GONE, "t-remove")
+        assert GONE in lp.list_slugs()
+        assert not [a for a in env.store.iter_actions() if a.kind == ActionKind.remove_source]
+    finally:
+        env.close()

@@ -9,6 +9,7 @@ and a `remove_source` action records it. One service behind `DELETE /api/sources
 from __future__ import annotations
 
 import json
+import logging
 import secrets
 import shutil
 from collections.abc import Callable, Iterator
@@ -19,6 +20,7 @@ from manuallabor import ids
 from manuallabor.agent.data import target_slug
 from manuallabor.contracts.enums import FlagStatus
 from manuallabor.contracts.selection import Selection
+from manuallabor.grouping import selection as sel_ops
 from manuallabor.project import ProjectPaths
 from manuallabor.state import projections
 from manuallabor.state import selection_log as sel_log
@@ -28,6 +30,8 @@ from manuallabor.state.models import ActionKind, RemovedDoc, SourceRemoval
 from manuallabor.state.store import Store
 
 __all__ = ["removal", "remove_source", "removed_docs"]
+
+log = logging.getLogger(__name__)
 
 RUNNING = "A job is running. Remove the manual when it has finished."
 QUEUED = "A job waiting to run will read this manual. Remove it when that job has finished."
@@ -120,6 +124,9 @@ def remove_source(
         prev = store.action_by_request(request_id, (ActionKind.remove_source,))
         if prev is not None:
             return SourceRemoval.model_validate(prev.payload["_outcome"])
+        if slug not in paths.list_slugs():
+            _tidy_removed(paths, store, slug)
+            raise NotFound(slug)
         preview = removal(paths, store, slug)
         if preview.blocked_by is not None:
             raise Conflict("job_active", preview.blocked_by)
@@ -139,6 +146,11 @@ def _remove(
     out = preview.model_copy(update={"removed": True, "blocked_by": None})
     # 1. the log and the selection, one transaction
     with store.tx():
+        # a job queued since the preview (enqueues do not wait for the runner's lock) refuses
+        # here, before anything is written (review finding 5)
+        late = _blocked_by(store, slug)
+        if late is not None:
+            raise Conflict("job_active", late)
         stored = (
             Selection.model_validate_json(body) if (body := store.get_selection_json()) else None
         )
@@ -148,9 +160,17 @@ def _remove(
                 {
                     **stored.model_dump(mode="json"),
                     "block_ids": [b for b in stored.block_ids if ids.parse_block_id(b)[0] != slug],
-                    "known_docs": None
-                    if stored.known_docs is None
-                    else [d for d in stored.known_docs if d != slug],
+                    # a selection saved before known_docs learns it here, as any selection write
+                    # does (`mark_known`), so the manual added again arrives selected (finding 7)
+                    "known_docs": sorted(
+                        d
+                        for d in (
+                            stored.known_docs
+                            if stored.known_docs is not None
+                            else sel_ops.load_groups(paths)
+                        )
+                        if d != slug
+                    ),
                 }
             )
         aid = store.next_action_id()
@@ -170,9 +190,10 @@ def _remove(
         if new is not None:
             store.set_selection_json(json.dumps(new.model_dump(mode="json"), sort_keys=True), aid)
             store.after_commit(lambda: projections.project_selection(store, paths))
-        _drop_job_rows(paths, store, slug, doc.filename)
+        dropped = _drop_job_rows(paths, store, slug, doc.filename)
     # 2. the files: the document's directory leaves list_slugs at once (an atomic rename),
-    # then everything derived from it, the figure index, and last the source file
+    # then everything derived from it and the source file; job logs only after the commit
+    _remove_job_files(paths, dropped)
     _purge_leftovers(paths)
     dp = paths.doc(slug)
     if dp.root.is_dir():
@@ -180,11 +201,36 @@ def _remove(
         dp.root.rename(gone)
         shutil.rmtree(gone, ignore_errors=True)
     shutil.rmtree(paths.figure_dir(slug), ignore_errors=True)
+    paths.source(doc.filename).unlink(missing_ok=True)
+    _rebuild_index(paths)
+    return out
+
+
+def _rebuild_index(paths: ProjectPaths) -> None:
+    """The figure index without the removed manual. A failure here is not the removal's: every
+    figures run rebuilds the index, and the removal is complete without it (review finding 3)."""
     from manuallabor.figures.pipeline import rebuild_index
 
-    rebuild_index(paths, set(), lambda _o: None)
-    paths.source(doc.filename).unlink(missing_ok=True)
-    return out
+    try:
+        rebuild_index(paths, set(), lambda _o: None)
+    except Exception as exc:
+        log.warning("figure index not rebuilt after a removal (the next figures run does): %s", exc)
+
+
+def _tidy_removed(paths: ProjectPaths, store: Store, slug: str) -> None:
+    """A manual already removed, whose files a crash left behind: finish the job (design 07
+    section 22, review finding 3). Only when a `remove_source` action names it."""
+    prior = [a for a in store.actions_of((ActionKind.remove_source,)) if a.doc_id == slug]
+    if not prior:
+        return
+    filename = str(prior[-1].payload.get("filename", ""))
+    live_names = {d.filename for d in paths.list_documents()}
+    with _worker_lock(paths, slug):
+        _purge_leftovers(paths)
+        shutil.rmtree(paths.figure_dir(slug), ignore_errors=True)
+        if filename and filename not in live_names:
+            paths.source(filename).unlink(missing_ok=True)
+        _rebuild_index(paths)
 
 
 def _purge_leftovers(paths: ProjectPaths) -> None:
@@ -195,7 +241,7 @@ def _purge_leftovers(paths: ProjectPaths) -> None:
                 shutil.rmtree(p, ignore_errors=True)
 
 
-def _drop_job_rows(paths: ProjectPaths, store: Store, slug: str, filename: str) -> None:
+def _drop_job_rows(paths: ProjectPaths, store: Store, slug: str, filename: str) -> list[str]:
     """Finished job rows whose plan names only this manual, and their logs. A project-wide row
     is history of the other manuals too and stays."""
     drop: list[str] = []
@@ -215,10 +261,13 @@ def _drop_job_rows(paths: ProjectPaths, store: Store, slug: str, filename: str) 
             only_mine = files == [filename]
         if only_mine:
             drop.append(job_id)
-    if not drop:
-        return
-    store.delete_jobs(drop)
-    for job_id in drop:
+    if drop:
+        store.delete_jobs(drop)
+    return drop
+
+
+def _remove_job_files(paths: ProjectPaths, job_ids: list[str]) -> None:
+    for job_id in job_ids:
         for p in (paths.job_log(job_id), paths.job_plan(job_id)):
             p.unlink(missing_ok=True)
         paths.job_log(job_id).with_suffix(".stderr").unlink(missing_ok=True)

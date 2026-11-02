@@ -37,6 +37,7 @@ __all__ = [
     "NODES",
     "Stages",
     "doc_node_states",
+    "left_out_docs",
     "load_stages",
     "node_state",
     "project_node_states",
@@ -253,6 +254,30 @@ def node_state(
                         )
                         break
     memo[node] = out
+    return out
+
+
+# -- documents outside the selection (design 07 section 21) -------------------------------------
+
+READ_NODES: Final[tuple[str, ...]] = ("ingest", "parse", "figures", "score", "group")
+
+
+def left_out_docs(
+    paths: ProjectPaths, scope: set[str], slugs: list[str] | None = None
+) -> list[str]:
+    """The documents that can be left out of cleanup, the second scoring pass and the export:
+    no selected block, and either grouped (the reviewer left it out) or failed on the way to
+    `group` (it cannot be selected until it is read; Scope's Re-run retries it). A manual still
+    being read (no groups.json, no failure) is not one of them: grouping will put it in the
+    selection (design 08 section 10), so it is planned and the export waits for it. The one
+    rule for the planner and the export (review finding 1)."""
+    out: list[str] = []
+    for slug in paths.list_slugs() if slugs is None else slugs:
+        if slug in scope:
+            continue
+        st = load_stages(paths, slug)
+        if paths.doc(slug).groups.is_file() or any(st.failed(n) for n in READ_NODES):
+            out.append(slug)
     return out
 
 
