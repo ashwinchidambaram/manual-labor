@@ -278,10 +278,12 @@ def test_e7_blanket_override_exports_machine_text_with_an_invisible_marker() -> 
     # section 20.11 (amends P2): each part starts with its HTML-comment marker
     assert all_parts(a.text) == [
         f"<!-- ml: approved; block: {bid(1)} -->\nok",
-        f'<!-- ml: overridden; block: {bid(2)}; reason: "customer waived review" -->\nclean q',
-        f"<!-- ml: overridden; block: {bid(3)}; flag: flag-000001; "
-        'reason: "customer waived review" -->\nraw f',
+        f"<!-- ml: overridden; block: {bid(2)}; reason: r1 -->\nclean q",
+        f"<!-- ml: overridden; block: {bid(3)}; flag: flag-000001; reason: r1 -->\nraw f",
     ]
+    # section 20.14: the reason is in the review file, once
+    assert [(r.id, r.reason) for r in a.review.reasons] == [("r1", "customer waived review")]
+    assert "customer waived review" not in a.text
     assert a.frontmatter.review == ArticleReviewCounts(
         auto_approved=0, approved=1, edited=0, overridden=2
     )
@@ -364,6 +366,7 @@ def test_gate_counts_partition_the_scope_and_skip_page_headers() -> None:
         # design 11 section 17: blocking splits into what waits for a person and what a flag holds
         "to_review": 1,
         "flagged": 1,
+        "faith_failed": 0,  # design 11 section 20.16: a cross-cut of blocking
     }
     assert g.blockers == [bid(2), bid(5)] and g.queued == 2 and g.open_flags == 1
 
@@ -461,23 +464,35 @@ def test_e9_fallback_is_the_end_of_the_article() -> None:
     blocks = [
         blk(1, "Anchor, rejected.", status=BlockStatus.rejected),
         blk(2, "Body."),
-        fig_block(10, status=BlockStatus.rejected),
+        fig_block(10),
         fig_block(11),
     ]
     figs = [figure_data(10), figure_data(11)]
     attach = {
         ART: [
-            att(fid(10), AttachRule.proximity, anchor=bid(10)),  # figure block rejected: end
+            att(fid(10), AttachRule.proximity, anchor=bid(10)),  # figure block not in it: end
             att(fid(11), AttachRule.caption_ref, anchor=bid(1)),  # anchor excluded: end
         ]
     }
-    (a,) = run(synth_inputs(blocks, figures=figs, attach=attach)).articles
+    selected = {bid(1), bid(2), bid(11)}  # block 10 unselected: it is in no article
+    (a,) = run(
+        synth_inputs(blocks, figures=figs, attach=attach, selected=selected, scope_extra={bid(10)})
+    ).articles
     out = parts(a.text)
     assert (
         out[0] == "Body."
         and out[1].startswith(f"![{fid(10)} ")
         and out[2].startswith(f"![{fid(11)} ")
     )
+
+
+def test_e9_a_figure_whose_block_was_rejected_is_refused_not_shown_under_a_status() -> None:
+    """Design 11 section 20.13 (b): a figure line says who decided to show the figure; a
+    rejected figure block has no such decision (no review action produces `rejected` today)."""
+    blocks = [blk(1, "Body."), fig_block(10, status=BlockStatus.rejected)]
+    attach = {ART: [att(fid(10), AttachRule.proximity, anchor=bid(10))]}
+    with pytest.raises(ExportError, match=f"{fid(10)}.*rejected"):
+        run(synth_inputs(blocks, figures=[figure_data(10)], attach=attach))
 
 
 def test_e9_a_caption_ref_figure_whose_own_block_is_unselected_is_exported() -> None:

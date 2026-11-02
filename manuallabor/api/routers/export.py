@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse, JSONResponse
 
 from manuallabor.api.deps import Ctx
 from manuallabor.api.errors import ApiError, not_implemented
-from manuallabor.api.models import ApiErrorBody, OverrideIn, RequestIn
+from manuallabor.api.models import ApiErrorBody, ExportIn, OverrideIn
 from manuallabor.state.models import ExportStatus, JobInfo, RunPlanIn
 from manuallabor.state.store import Store
 
@@ -45,9 +45,10 @@ def get_export_status(ctx: Ctx) -> ExportStatus:
     response_model=JobInfo,
     responses={409: {"model": ApiErrorBody}, 501: {"model": ApiErrorBody}},
 )
-def start_export(ctx: Ctx, body: RequestIn | None = None) -> JobInfo | JSONResponse:
+def start_export(ctx: Ctx, body: ExportIn | None = None) -> JobInfo | JSONResponse:
     if _store(ctx) is None:
         raise not_implemented("module 11")
+    marks = body.marks if body is not None else "invisible"
     st = _status(ctx)
     if st.blockers:
         return JSONResponse(
@@ -58,13 +59,18 @@ def start_export(ctx: Ctx, body: RequestIn | None = None) -> JobInfo | JSONRespo
                 "open_flags": st.open_flags,
                 "queued": st.queued,
                 "blockers": st.blockers,
+                # design 11 section 20.16: blockers no override covers, a person must decide
+                "faith_blockers": st.faith_blockers,
             },
             status_code=409,
         )
+    # one export job per review-marks mode (design 11 section 20.15): the same request while one
+    # is queued or running returns it; the other mode is queued after it
     for job in ctx.runner.list({"queued", "running"}):
-        if job.kind == "export":
+        if job.kind == "export" and job.plan.get("marks", "invisible") == marks:
             return job
-    return ctx.runner.enqueue(RunPlanIn(to="export"), kind="export")
+    plan = {**RunPlanIn(to="export").model_dump(mode="json"), "marks": marks}
+    return ctx.runner.enqueue_raw(plan, kind="export")
 
 
 @router.post(

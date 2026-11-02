@@ -150,12 +150,13 @@ generated_at: 2026-10-28T18:00:00Z
 <!-- ml: auto-approved; block: b-acme-x200-service-p042-02 -->
 To adjust belt tension, loosen the four M8 bolts on the motor mount …
 
+<!-- ml: auto-approved; block: FIG-acme-x200-service-p042-01 -->
 ![FIG-acme-x200-service-p042-01 — Belt tension adjustment points](images/acme-x200-service/FIG-acme-x200-service-p042-01.png)
 
 <!-- ml: edited; block: b-acme-x200-service-p042-04 -->
 Tighten bolts to 35 N·m in a cross pattern.
 ```
-`review` counts the article's blocks (figure blocks included) in the categories of its review file `articles/<id>.review.json`: `auto_approved` (the checks passed, nobody looked), `approved` and `edited` (a person), `overridden` (exported unreviewed under an override); they sum to `blocks`. Every paragraph starts with an invisible review marker on the line above it, `<!-- ml: <status>; block: <id>[; flag: …][; reason: …] -->`, with status `approved`, `edited`, `auto-approved` or `overridden` (amended 2026-10-31, design 11 section 20.11).
+`review` counts the article's blocks (figure blocks included) in the categories of its review file `articles/<id>.review.json`: `auto_approved` (the checks passed, nobody looked), `approved` and `edited` (a person), `overridden` (exported unreviewed under an override); they sum to `blocks`. Every paragraph starts with an invisible review marker on the line above it, `<!-- ml: <status>; block: <id>[; flag: …][; reason: r<n>] -->`, with status `approved`, `edited`, `auto-approved` or `overridden` (amended 2026-10-31, design 11 section 20.11); every figure line has one too, naming the figure, and `reason: r<n>` refers to the reason in the article's review file (amended 2026-11-02, design 11 sections 20.13 and 20.14). An export made with `--marks visible` also puts an `[unchecked]` or `[overridden]` line above the marker of each paragraph nobody checked (section 20.15).
 The alt text always begins with the figure ID, followed by ` — ` and the caption (original if present, else generated). This keeps the reference useful in plain-text contexts and lets an agent map image → manifest record with one regex.
 
 ### 6.3 Figure sidecar (`images/<docslug>/<FIG-ID>.json`)

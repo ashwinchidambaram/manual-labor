@@ -24,6 +24,7 @@ from manuallabor.contracts import (
 from manuallabor.contracts._base import ArticleId, BlockId, DocSlug, FlagId, Unit
 from manuallabor.contracts.enums import BlockStatus, BlockType, DocKind
 from manuallabor.contracts.figure import FigureRecord
+from manuallabor.contracts.manifest import ExportMarks
 from manuallabor.state.models import (
     EditConflict,
     FigureAttachment,
@@ -51,6 +52,13 @@ class RequestIn(ContractModel):
     """Body of mutations that carry nothing but an idempotency key."""
 
     request_id: str = Field(default_factory=_rid, min_length=1)
+
+
+class ExportIn(RequestIn):
+    """Body of `POST /api/export` (design 11 section 20.15): `marks: "visible"` adds a short
+    visible tag above each paragraph nobody checked; the invisible markers are always there."""
+
+    marks: ExportMarks = "invisible"
 
 
 class ProjectInfo(ContractModel):

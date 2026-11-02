@@ -224,12 +224,21 @@ def _run_stages(
         if rp.get("to") in PROJECT_NODES
         else make_plan(paths, cfg, to=rp.get("to", "score2"), **kwargs)
     )
+    marks = rp.get("marks", "invisible")
+    if marks not in ("invisible", "visible"):  # design 11 section 20.15
+        raise ValueError(f"plan marks must be 'invisible' or 'visible', got {marks!r}")
     steps = StepLog(log, plan.units)
     steps({"event": "job_start", "units": len(plan.units)})
     prev = progress.set_reporter(steps.step)
     try:
         res = execute(
-            paths, plan, emit=steps, providers=providers, cancelled=cancel.is_set, heartbeat=hb
+            paths,
+            plan,
+            emit=steps,
+            providers=providers,
+            cancelled=cancel.is_set,
+            heartbeat=hb,
+            extra={"marks": marks},
         )
     finally:
         progress.set_reporter(prev)

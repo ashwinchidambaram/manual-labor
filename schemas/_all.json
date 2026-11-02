@@ -138,10 +138,24 @@
         "counts": {
           "$ref": "#/$defs/ArticleReviewCounts"
         },
+        "figure_lines": {
+          "items": {
+            "$ref": "#/$defs/FigureLineReview"
+          },
+          "title": "Figure Lines",
+          "type": "array"
+        },
         "generated_at": {
           "format": "date-time",
           "title": "Generated At",
           "type": "string"
+        },
+        "reasons": {
+          "items": {
+            "$ref": "#/$defs/ReviewReason"
+          },
+          "title": "Reasons",
+          "type": "array"
         },
         "schema_version": {
           "const": "1.0",
@@ -156,7 +170,9 @@
         "article",
         "generated_at",
         "counts",
-        "blocks"
+        "blocks",
+        "reasons",
+        "figure_lines"
       ],
       "title": "ArticleReview",
       "type": "object"
@@ -524,6 +540,18 @@
           "title": "Decided By",
           "type": "string"
         },
+        "edited_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Edited At"
+        },
         "edited_by": {
           "anyOf": [
             {
@@ -538,6 +566,17 @@
             }
           ],
           "title": "Edited By"
+        },
+        "faithfulness_passed": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Faithfulness Passed"
         },
         "figure": {
           "anyOf": [
@@ -560,6 +599,17 @@
             }
           ],
           "title": "Flag Id"
+        },
+        "original_text": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Original Text"
         },
         "page": {
           "minimum": 1,
@@ -584,6 +634,18 @@
             }
           ],
           "title": "Reason"
+        },
+        "reason_id": {
+          "anyOf": [
+            {
+              "pattern": "^r[1-9][0-9]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Reason Id"
         },
         "status": {
           "enum": [
@@ -636,7 +698,11 @@
         "figure",
         "text_sha256",
         "text",
-        "placement"
+        "placement",
+        "reason_id",
+        "original_text",
+        "edited_at",
+        "faithfulness_passed"
       ],
       "title": "BlockReview",
       "type": "object"
@@ -1249,6 +1315,90 @@
         "clean"
       ],
       "title": "FaithfulnessViolation",
+      "type": "object"
+    },
+    "FigureLineReview": {
+      "additionalProperties": false,
+      "description": "One figure line of the article (design 11 section 20.13): who decided to show the figure\nhere. `block_id` is the figure's own block, wherever it is accounted (it may be in another\narticle, or unassigned when a caption reference pulled the figure in).",
+      "properties": {
+        "block_id": {
+          "pattern": "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$",
+          "title": "Block Id",
+          "type": "string"
+        },
+        "decided_by": {
+          "enum": [
+            "checks",
+            "person",
+            "override"
+          ],
+          "title": "Decided By",
+          "type": "string"
+        },
+        "figure_id": {
+          "pattern": "^FIG-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$",
+          "title": "Figure Id",
+          "type": "string"
+        },
+        "flag_id": {
+          "anyOf": [
+            {
+              "pattern": "^flag-\\d{6}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Flag Id"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Reason"
+        },
+        "reason_id": {
+          "anyOf": [
+            {
+              "pattern": "^r[1-9][0-9]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Reason Id"
+        },
+        "rule": {
+          "$ref": "#/$defs/AttachRule"
+        },
+        "status": {
+          "enum": [
+            "auto_approved",
+            "approved",
+            "overridden"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "figure_id",
+        "block_id",
+        "rule",
+        "status",
+        "decided_by",
+        "reason",
+        "reason_id",
+        "flag_id"
+      ],
+      "title": "FigureLineReview",
       "type": "object"
     },
     "FigurePlacement": {
@@ -2263,6 +2413,15 @@
         "learning": {
           "$ref": "#/$defs/ManifestLearning"
         },
+        "marks": {
+          "default": "invisible",
+          "enum": [
+            "invisible",
+            "visible"
+          ],
+          "title": "Marks",
+          "type": "string"
+        },
         "models": {
           "additionalProperties": {
             "$ref": "#/$defs/ModelRef"
@@ -2311,7 +2470,8 @@
         "article_split",
         "overrides",
         "accounting",
-        "learning"
+        "learning",
+        "marks"
       ],
       "title": "Manifest",
       "type": "object"
@@ -3408,6 +3568,27 @@
         "threshold"
       ],
       "title": "ReviewLoad",
+      "type": "object"
+    },
+    "ReviewReason": {
+      "additionalProperties": false,
+      "description": "One row of an article's reason table: `id` is what its markers carry (section 20.14).",
+      "properties": {
+        "id": {
+          "pattern": "^r[1-9][0-9]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "reason"
+      ],
+      "title": "ReviewReason",
       "type": "object"
     },
     "ReviewStats": {

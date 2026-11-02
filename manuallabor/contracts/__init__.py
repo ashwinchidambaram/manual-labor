@@ -18,8 +18,10 @@ from manuallabor.contracts.article import (
     ArticleReview,
     ArticleReviewCounts,
     BlockReview,
+    FigureLineReview,
     FigurePlacement,
     FigureReview,
+    ReviewReason,
 )
 from manuallabor.contracts.block import (
     Block,
@@ -176,8 +178,10 @@ __all__ = [
     "ArticleReview",
     "ArticleReviewCounts",
     "BlockReview",
+    "FigureLineReview",
     "FigurePlacement",
     "FigureReview",
+    "ReviewReason",
     "ArticleSplit",
     "AttachRule",
     "BBox",

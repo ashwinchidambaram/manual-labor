@@ -186,7 +186,9 @@ export interface ArticleReview {
   article_id: string;
   blocks: BlockReview[];
   counts: ArticleReviewCounts;
+  figure_lines: FigureLineReview[];
   generated_at: string;
+  reasons: ReviewReason[];
   schema_version: '1.0';
 }
 /**
@@ -201,12 +203,16 @@ export interface BlockReview {
   block_id: string;
   confidence: number | null;
   decided_by: 'checks' | 'person' | 'override';
+  edited_at: string | null;
   edited_by: ('person' | 'agent_proposal') | null;
+  faithfulness_passed: boolean | null;
   figure: FigureReview | null;
   flag_id: string | null;
+  original_text: string | null;
   page: number;
   placement: 'paragraph' | 'figure';
   reason: string | null;
+  reason_id: string | null;
   status: 'auto_approved' | 'approved' | 'edited' | 'overridden';
   text: string | null;
   text_sha256: string | null;
@@ -230,6 +236,34 @@ export interface FigurePlacement {
   article_id: string;
   confidence: number;
   rule: AttachRule;
+}
+/**
+ * One figure line of the article (design 11 section 20.13): who decided to show the figure
+ * here. `block_id` is the figure's own block, wherever it is accounted (it may be in another
+ * article, or unassigned when a caption reference pulled the figure in).
+ *
+ * This interface was referenced by `_All`'s JSON-Schema
+ * via the `definition` "FigureLineReview".
+ */
+export interface FigureLineReview {
+  block_id: string;
+  decided_by: 'checks' | 'person' | 'override';
+  figure_id: string;
+  flag_id: string | null;
+  reason: string | null;
+  reason_id: string | null;
+  rule: AttachRule;
+  status: 'auto_approved' | 'approved' | 'overridden';
+}
+/**
+ * One row of an article's reason table: `id` is what its markers carry (section 20.14).
+ *
+ * This interface was referenced by `_All`'s JSON-Schema
+ * via the `definition` "ReviewReason".
+ */
+export interface ReviewReason {
+  id: string;
+  reason: string;
 }
 /**
  * This interface was referenced by `_All`'s JSON-Schema
@@ -682,6 +716,7 @@ export interface Manifest {
   docs: Document[];
   figures: ManifestFigure[];
   learning: ManifestLearning;
+  marks: 'invisible' | 'visible';
   models: {
     [k: string]: ModelRef | undefined;
   };

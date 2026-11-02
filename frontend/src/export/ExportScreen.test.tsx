@@ -272,7 +272,7 @@ describe("U10c override the remaining blocks in one decision", () => {
         queued: ids.length - 1,
         blockers: blocking.slice(0, BLOCKER_LIMIT),
         flag_blockers: [flag],
-        counts: { in_scope: 60, auto_approved: 14, approved: 0, edited: 0, rejected: 0, overridden: covered.size, blocking: blocking.length, to_review: toReview, flagged: 1 },
+        counts: { in_scope: 60, auto_approved: 14, approved: 0, edited: 0, rejected: 0, overridden: covered.size, blocking: blocking.length, to_review: toReview, flagged: 1, faith_failed: 0 },
       });
     };
     const f = installFake({ exportStatus: statusNow() });
@@ -343,7 +343,7 @@ describe("U10d the one-click run says when it could not finish", () => {
       // a flagged block stays, so the form (and its message) stays on screen after the run
       const ids = [id(1), id(2), id(3)].filter((b) => !covered.has(b) && !approved.has(b));
       const flag = { flag_id: "flag-000001", block_id: id(9), category: "wrong_text" as const, note: null };
-      return locked({ open_flags: 1, queued: ids.length, blockers: [...ids, id(9)], flag_blockers: [flag], counts: { in_scope: 11, auto_approved: 7, approved: approved.size, edited: 0, rejected: 0, overridden: covered.size, blocking: ids.length + 1, to_review: ids.length, flagged: 1 } });
+      return locked({ open_flags: 1, queued: ids.length, blockers: [...ids, id(9)], flag_blockers: [flag], counts: { in_scope: 11, auto_approved: 7, approved: approved.size, edited: 0, rejected: 0, overridden: covered.size, blocking: ids.length + 1, to_review: ids.length, flagged: 1, faith_failed: 0 } });
     };
     installFake({ exportStatus: statusNow() });
     server.use(
@@ -369,7 +369,7 @@ describe("U10d the one-click run says when it could not finish", () => {
       queued: 5,
       blockers: all.slice(0, BLOCKER_LIMIT),
       flag_blockers: flags,
-      counts: { in_scope: 40, auto_approved: 14, approved: 0, edited: 0, rejected: 0, overridden: 0, blocking: 26, to_review: 5, flagged: 21 },
+      counts: { in_scope: 40, auto_approved: 14, approved: 0, edited: 0, rejected: 0, overridden: 0, blocking: 26, to_review: 5, flagged: 21, faith_failed: 0 },
     });
     installFake({ exportStatus: st });
     const posted: string[] = [];
@@ -386,7 +386,7 @@ describe("U10d the one-click run says when it could not finish", () => {
     let extra = false;
     const statusNow = (): ExportStatus => {
       const ids = [id(1), id(2), id(3), ...(extra ? [id(4)] : [])].filter((b) => !covered.has(b));
-      return locked({ open_flags: 0, queued: 3, blockers: ids, flag_blockers: [], counts: { in_scope: 10, auto_approved: 7 - (extra ? 1 : 0), approved: 0, edited: 0, rejected: 0, overridden: covered.size, blocking: ids.length, to_review: ids.length, flagged: 0 } });
+      return locked({ open_flags: 0, queued: 3, blockers: ids, flag_blockers: [], counts: { in_scope: 10, auto_approved: 7 - (extra ? 1 : 0), approved: 0, edited: 0, rejected: 0, overridden: covered.size, blocking: ids.length, to_review: ids.length, flagged: 0, faith_failed: 0 } });
     };
     installFake({ exportStatus: statusNow() });
     const posted: string[] = [];
@@ -414,7 +414,7 @@ describe("U10d the one-click run says when it could not finish", () => {
 // Browser-run findings of 2026-10-30 (design 11 section 14): a batch of block overrides never includes a flagged block,
 // every count reconciles on screen, and after an export the result is on top.
 describe("U10b export: flags need their own decision, counts reconcile, the last export on top", () => {
-  const counts = { in_scope: 160, auto_approved: 51, approved: 7, edited: 1, rejected: 0, overridden: 80, blocking: 21, to_review: 20, flagged: 1 };
+  const counts = { in_scope: 160, auto_approved: 51, approved: 7, edited: 1, rejected: 0, overridden: 80, blocking: 21, to_review: 20, flagged: 1, faith_failed: 0 };
   const flagged = { flag_id: "flag-000001", block_id: "b-doc-p001-02", category: "wrong_text" as const, note: "digit unclear" };
   const doneSummary: ExportSummary = {
     ...summary,
@@ -576,7 +576,7 @@ describe("U20 export: markers described only when the export has them; the reaso
   });
 
   it("the reason survives the form closing, and an export clears it, as the label says", async () => {
-    const counts = { in_scope: 4, auto_approved: 2, approved: 0, edited: 0, rejected: 0, overridden: 0, blocking: 2, to_review: 2, flagged: 0 };
+    const counts = { in_scope: 4, auto_approved: 2, approved: 0, edited: 0, rejected: 0, overridden: 0, blocking: 2, to_review: 2, flagged: 0, faith_failed: 0 };
     const covered = { ...counts, overridden: 2, blocking: 0, to_review: 0 };
     const f = installFake({ exportStatus: locked({ open_flags: 0, queued: 2, counts }) });
     server.use(
@@ -608,5 +608,145 @@ describe("U20 export: markers described only when the export has them; the reaso
     await user.click(await screen.findByTestId("export-start"));
     await screen.findByTestId("export-fresh");
     expect(await screen.findByTestId("override-reason")).toHaveValue("");
+  });
+});
+
+// Fourth first-use report (design 11 sections 20.13 to 20.15): visible review marks are an export option, off by
+// default; the "Last export" box describes the figure lines' markers, the reason references and the marks mode.
+describe("U21 export: visible review marks option, figure-line markers and reason references", () => {
+  const review = { blocks: 160, auto_approved: 51, approved: 7, edited: 1, overrides: 101, numbers_verified: 7, total_blocks: 184, left_out: { header_footer: 24 } };
+  const markers = {
+    paragraphs: { auto_approved: 47, approved: 6, edited: 1, overridden: 101 },
+    figures: { auto_approved: 4, approved: 1, edited: 0, overridden: 0 },
+    figure_lines: { auto_approved: 4, approved: 2, edited: 0, overridden: 0 },
+  };
+  const s: ExportSummary = { ...summary, review, markers, marks: "invisible" };
+  const ready = { ...locked({ blockers: [], open_flags: 0, queued: 0 }), unlocked: true };
+
+  it.each([
+    [false, "invisible"],
+    [true, "visible"],
+  ])("the checkbox is off by default and the export sends its state (checked: %s)", async (check, want) => {
+    installFake({ exportStatus: { ...ready, summary: s } });
+    const bodies: unknown[] = [];
+    server.use(
+      http.post("*/api/export", async ({ request }) => (bodies.push(await request.json()), HttpResponse.json(makeJob({ id: "exp9", kind: "export", status: "queued" }), { status: 202 }))),
+    );
+    const { user } = renderApp("/export");
+    const box = await screen.findByRole("checkbox", { name: "Show review marks in the articles" });
+    expect(box).not.toBeChecked();
+    expect(screen.getByTestId("export-ready")).toHaveTextContent("[unchecked]");
+    if (check) await user.click(box);
+    await user.click(screen.getByTestId("export-start"));
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).toMatchObject({ marks: want });
+  });
+
+  it("an export with figure-line markers: the figure lines and the reason references are described", async () => {
+    installFake({ exportStatus: { ...ready, summary: s } });
+    renderApp("/export");
+    const line = await screen.findByTestId("summary-markers");
+    expect(line).toHaveTextContent(
+      "In the articles, each of the 155 paragraphs starts with an invisible ml: comment on the line above it naming who checked it: 47 auto-approved, 6 approved, 1 edited, 101 overridden.",
+    );
+    expect(line).toHaveTextContent("Each of the 6 figure lines has one too, naming who decided to show the figure there: 4 auto-approved, 2 approved, 0 overridden.");
+    expect(line).toHaveTextContent("an overridden marker names its reason by a short reference (r1, r2, ...) into that file");
+    // blocks still reconcile as paragraphs + figure blocks
+    expect(screen.getByTestId("summary-markers-sum")).toHaveTextContent("51 auto-approved = 47 + 4");
+    expect(screen.getByTestId("summary-marks")).toHaveTextContent("Review marks are invisible in this export");
+    expect(within(screen.getByTestId("export-summary")).queryByRole("alert")).toBeNull();
+  });
+
+  it("a visible export says which paragraphs carry a tag", async () => {
+    installFake({ exportStatus: { ...ready, summary: { ...s, marks: "visible" } } });
+    renderApp("/export");
+    expect(await screen.findByTestId("summary-marks")).toHaveTextContent(
+      "Visible review marks: an [unchecked] line stands above each of the 47 auto-approved paragraphs and an [overridden] line above each of the 101 overridden ones; paragraphs a person checked have none.",
+    );
+  });
+
+  it("a summary recorded before figure-line markers keeps the earlier sentence and says nothing about marks", async () => {
+    const { figure_lines: _gone, ...older } = markers;
+    installFake({ exportStatus: { ...ready, summary: { ...summary, review, markers: older } } });
+    renderApp("/export");
+    const line = await screen.findByTestId("summary-markers");
+    expect(line).toHaveTextContent("The 5 figure blocks have none (4 auto-approved, 1 approved, 0 edited, 0 overridden)");
+    expect(screen.queryByTestId("summary-marks")).toBeNull();
+  });
+});
+
+// Final review (design 11 section 20.16): a block whose cleaned text failed the faithfulness check is never covered
+// by an override. The locked view lists it in its own group, each one opening in Verify, and the one-click override
+// leaves it out.
+describe("U22 export: cleanup changed the text, a person must decide", () => {
+  const counts = { in_scope: 10, auto_approved: 5, approved: 0, edited: 0, rejected: 0, overridden: 0, blocking: 5, to_review: 4, flagged: 1, faith_failed: 1 };
+  const faithStatus = (): ExportStatus =>
+    locked({
+      open_flags: 1,
+      queued: 4,
+      blockers: ["b-doc-p001-01", "b-doc-p001-02", "b-doc-p001-03", "b-doc-p001-04", "b-doc-p001-05"],
+      flag_blockers: [{ flag_id: "flag-000001", block_id: "b-doc-p001-05", category: "wrong_text", note: null }],
+      faith_blockers: ["b-doc-p001-02", "b-doc-p001-05"],
+      counts,
+    });
+
+  it("lists the blocks in their own group, each opening in Verify", async () => {
+    installFake({ exportStatus: faithStatus() });
+    renderApp("/export");
+    const item = await screen.findByTestId("reason-faith");
+    // said as part of the blocking blocks, so nobody adds it to "still to review" (review minor 4)
+    expect(item).toHaveTextContent("2 of the 5 blocking blocks: cleanup changed the text, a person must decide.");
+    expect(item).toHaveTextContent("No override covers them");
+    const links = within(item).getAllByTestId("faith-link");
+    expect(links.map((a) => a.textContent)).toEqual(["b-doc-p001-02", "b-doc-p001-05"]);
+    expect(links[0]).toHaveAccessibleName("Open b-doc-p001-02 in Verify to read the change");
+  });
+
+  it("the one-click override leaves them out and never sends one", async () => {
+    const f = installFake({ exportStatus: faithStatus() });
+    const sent: string[] = [];
+    server.use(
+      http.post("*/api/export/override", async ({ request }) => {
+        const b = (await request.json()) as { target_id: string };
+        sent.push(b.target_id);
+        return HttpResponse.json(f.exportStatus);
+      }),
+    );
+    const { user } = renderApp("/export");
+    const form = await screen.findByTestId("override-form");
+    // 4 to review, of which 1 cleanup changed: 3 can be overridden
+    expect(within(form).getByRole("button", { name: "Override the remaining 3 with this reason" })).toBeInTheDocument();
+    expect(within(form).getByTestId("override-left-out-faith")).toHaveTextContent("1 block where cleanup changed the text is left out");
+    await user.type(within(form).getByTestId("override-reason"), "pilot");
+    await user.click(within(form).getByTestId("override-submit"));
+    await waitFor(() => expect(sent).toHaveLength(3));
+    expect(sent).not.toContain("b-doc-p001-02");
+    expect(sent).not.toContain("b-doc-p001-05");
+  });
+
+  it("a first page of blockers that cleanup changed is named as the reason nothing more can be listed", async () => {
+    const page = Array.from({ length: 20 }, (_, i) => `b-doc-p001-${String(i + 1).padStart(2, "0")}`);
+    const many = { in_scope: 40, auto_approved: 15, approved: 0, edited: 0, rejected: 0, overridden: 0, blocking: 25, to_review: 25, flagged: 0, faith_failed: 20 };
+    const f = installFake({ exportStatus: locked({ open_flags: 0, queued: 25, blockers: page, faith_blockers: page, counts: many }) });
+    server.use(http.post("*/api/export/override", () => HttpResponse.json(f.exportStatus)));
+    const { user } = renderApp("/export");
+    const form = await screen.findByTestId("override-form");
+    await user.type(within(form).getByTestId("override-reason"), "pilot");
+    await user.click(within(form).getByTestId("override-submit"));
+    expect(await within(form).findByRole("alert")).toHaveTextContent("where cleanup changed the text");
+  });
+
+  it("a refusal of the export names the blocks cleanup changed", async () => {
+    const f = installFake({ exportStatus: { ...locked({ blockers: [], open_flags: 0, queued: 0 }), unlocked: true } });
+    server.use(
+      http.post("*/api/export", () => {
+        // the gate closed since the screen read it: the server's status says so too
+        f.exportStatus = locked({ open_flags: 0, queued: 1, blockers: ["b-doc-p001-02"], faith_blockers: ["b-doc-p001-02"] });
+        return HttpResponse.json({ detail: "export is locked", code: "export_locked", open_flags: 0, queued: 1, blockers: ["b-doc-p001-02"], faith_blockers: ["b-doc-p001-02"] }, { status: 409 });
+      }),
+    );
+    const { user } = renderApp("/export");
+    await user.click(await screen.findByTestId("export-start"));
+    expect(await screen.findByTestId("reason-faith")).toHaveTextContent("b-doc-p001-02");
   });
 });

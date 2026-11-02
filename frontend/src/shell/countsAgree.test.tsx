@@ -68,7 +68,7 @@ async function readAll(c: Counts) {
 
 describe("one count of what waits for a person", () => {
   it("after every unflagged block was overridden: 0 to review everywhere, the overrides named as such", async () => {
-    const c: Counts = { in_scope: 173, auto_approved: 60, approved: 7, edited: 1, rejected: 0, overridden: 104, to_review: 0, flagged: 1, blocking: 1 };
+    const c: Counts = { in_scope: 173, auto_approved: 60, approved: 7, edited: 1, rejected: 0, overridden: 104, to_review: 0, flagged: 1, blocking: 1, faith_failed: 0 };
     const s = await readAll(c);
     expect(waiting(s.rail)).toBe(0);
     expect(waiting(s.card)).toBe(0);
@@ -83,7 +83,7 @@ describe("one count of what waits for a person", () => {
   });
 
   it("part way through the overrides: the same numbers on the rail, the card and the strip", async () => {
-    const c: Counts = { in_scope: 173, auto_approved: 60, approved: 7, edited: 1, rejected: 0, overridden: 40, to_review: 64, flagged: 1, blocking: 65 };
+    const c: Counts = { in_scope: 173, auto_approved: 60, approved: 7, edited: 1, rejected: 0, overridden: 40, to_review: 64, flagged: 1, blocking: 65, faith_failed: 0 };
     const s = await readAll(c);
     expect(waiting(s.rail)).toBe(64);
     expect(waiting(s.card)).toBe(64);
@@ -96,7 +96,7 @@ describe("one count of what waits for a person", () => {
   });
 
   it("an empty, filtered Verify list after the overrides: the next step names the flag, never blocks 'to review'", async () => {
-    const c: Counts = { in_scope: 173, auto_approved: 60, approved: 7, edited: 1, rejected: 0, overridden: 104, to_review: 0, flagged: 1, blocking: 1 };
+    const c: Counts = { in_scope: 173, auto_approved: 60, approved: 7, edited: 1, rejected: 0, overridden: 104, to_review: 0, flagged: 1, blocking: 1, faith_failed: 0 };
     installFake({ exportStatus: status(c) });
     installVerifyFake({ counts: reviewCountsOf(c) }); // the document filter leaves nothing in this list
     renderApp("/verify");
@@ -109,7 +109,7 @@ describe("one count of what waits for a person", () => {
   it("while scoring runs, blocks are being scored: nothing is called waiting before the list has it", async () => {
     // the gate already counts a document the Verify list has not read yet (two reads, one document finished between them)
     const f = installFake({
-      exportStatus: status({ in_scope: 60, auto_approved: 0, approved: 0, edited: 0, rejected: 0, overridden: 0, to_review: 60, flagged: 0, blocking: 60 }),
+      exportStatus: status({ in_scope: 60, auto_approved: 0, approved: 0, edited: 0, rejected: 0, overridden: 0, to_review: 60, flagged: 0, blocking: 60, faith_failed: 0 }),
     });
     f.jobPolls = [[makeJob({ id: "r", kind: "run", plan: { to: "score2" }, node: "clean", doc: "x200-manual", units_done: 1, units_total: 6 })]];
     installVerifyFake({ counts: counts(), docs: [{ ...ready("pump"), state: "pending", waiting_for: "clean" }] });

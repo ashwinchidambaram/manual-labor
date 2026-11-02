@@ -96,3 +96,18 @@ describe("JobsBar: a burst of identical jobs is one bar (design 07 section 18)",
     await waitFor(() => expect(screen.queryByTestId("job-row")).toBeNull(), { timeout: 5000 });
   }, 15000);
 });
+
+describe("JobsBar: retrying an export keeps its review-marks mode (design 11 section 20.15)", () => {
+  it("Retry re-posts the export with the failed job's marks", async () => {
+    const f = installFake();
+    f.jobPolls = [[makeJob({ id: "e9", kind: "export" })], []];
+    f.jobById = { e9: makeJob({ id: "e9", kind: "export", status: "failed", error: "zip rejected", plan: { to: "export", marks: "visible" } }) };
+    const posted: unknown[] = [];
+    server.use(http.post("*/api/export", async ({ request }) => (posted.push(await request.json()), HttpResponse.json(makeJob({ id: "e10", kind: "export" }), { status: 202 }))));
+    const { user } = renderApp("/export");
+    const alert = await screen.findByTestId("job-failed", undefined, { timeout: 5000 });
+    await user.click(within(alert).getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(posted).toHaveLength(1));
+    expect(posted[0]).toMatchObject({ marks: "visible" });
+  }, 15000);
+});

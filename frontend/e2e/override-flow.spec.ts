@@ -96,6 +96,8 @@ test("OV1 one click overrides every unflagged block with one reason; nothing ove
   // design 11 section 20.11: the export marks every paragraph and ships a review file per article; the screen says how
   // the exported blocks reconcile with the markers (figure blocks have none), from the server's own tally
   await expect(page.getByTestId("export-ready")).toContainText("a review file names who checked each paragraph");
+  // design 11 section 20.15: visible review marks are an option, off by default
+  await expect(page.getByRole("checkbox", { name: "Show review marks in the articles" })).not.toBeChecked();
   await page.getByTestId("export-start").click();
   const summary = page.getByTestId("export-summary");
   await expect(summary).toBeVisible({ timeout: 120_000 });
@@ -114,6 +116,10 @@ test("OV1 one click overrides every unflagged block with one reason; nothing ove
   const figureBlocks = mk!.figures.auto_approved + mk!.figures.approved + mk!.figures.edited + mk!.figures.overridden;
   if (figureBlocks) await expect(page.getByTestId("summary-markers-sum")).toContainText(`${r.auto_approved} auto-approved = ${mk!.paragraphs.auto_approved} + ${mk!.figures.auto_approved}`);
   else await expect(page.getByTestId("summary-markers")).toContainText("There are no figure blocks");
+  // design 11 sections 20.13 and 20.15: figure lines carry markers too; this export's marks are invisible
+  expect(mk!.figure_lines).toBeTruthy();
+  expect(done.summary?.marks).toBe("invisible");
+  await expect(page.getByTestId("summary-marks")).toContainText("Review marks are invisible in this export");
   await expect(summary.getByRole("alert")).toHaveCount(0);
   // the export used the overrides up: the reason box, back with the new lock, is empty as its label says
   await expect(page.getByTestId("export-locked")).toBeVisible();

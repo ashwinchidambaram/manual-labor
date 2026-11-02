@@ -135,6 +135,10 @@ def article_review_dict() -> dict[str, Any]:
             "text_sha256": "d" * 64,
             "text": "Loosen the four M8 bolts.",
             "placement": "paragraph",
+            "reason_id": None,
+            "original_text": None,
+            "edited_at": None,
+            "faithfulness_passed": None,
         }
         d.update(over)
         return d
@@ -155,12 +159,19 @@ def article_review_dict() -> dict[str, Any]:
                 confidence=0.97,
             ),
             row(1),
-            row(2, status="edited", edited_by="agent_proposal"),
+            row(
+                2,
+                status="edited",
+                edited_by="agent_proposal",
+                original_text="Loosen the four M8 bolts on the mo-\ntor mount.",
+                edited_at=TS,
+            ),
             row(
                 3,
                 status="overridden",
                 decided_by="override",
                 reason="paper -- ok",
+                reason_id="r1",
                 flag_id="flag-000001",
             ),
             row(
@@ -178,5 +189,19 @@ def article_review_dict() -> dict[str, Any]:
                     "placements": [{"article_id": art, "rule": "caption_ref", "confidence": 0.96}],
                 },
             ),
+        ],
+        # design 11 sections 20.13 and 20.14
+        "reasons": [{"id": "r1", "reason": "paper -- ok"}],
+        "figure_lines": [
+            {
+                "figure_id": f"FIG-{SLUG}-p042-01",
+                "block_id": b[4],
+                "rule": "caption_ref",
+                "status": "auto_approved",
+                "decided_by": "checks",
+                "reason": None,
+                "reason_id": None,
+                "flag_id": None,
+            }
         ],
     }

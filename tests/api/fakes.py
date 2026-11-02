@@ -654,6 +654,14 @@ class FakeRunner:
             threading.Thread(target=self._run, args=(job.id,), daemon=True).start()
         return job
 
+    def enqueue_raw(self, plan: dict[str, Any], kind: str) -> JobInfo:
+        self.st.job_n += 1
+        job = JobInfo(
+            id=f"job-{self.st.job_n:06d}", kind=kind, plan=plan, status="queued", created_at=NOW
+        )
+        self.st.jobs[job.id] = job
+        return job
+
     def _run(self, job_id: str) -> None:
         self.st.jobs[job_id] = self.st.jobs[job_id].model_copy(update={"status": "running"})
         time.sleep(self.st.job_delay)  # a blocking "stage" in a worker thread

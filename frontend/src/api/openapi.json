@@ -2020,10 +2020,42 @@
         "title": "ExportFlagBlocker",
         "type": "object"
       },
+      "ExportIn": {
+        "additionalProperties": false,
+        "description": "Body of `POST /api/export` (design 11 section 20.15): `marks: \"visible\"` adds a short\nvisible tag above each paragraph nobody checked; the invisible markers are always there.",
+        "properties": {
+          "marks": {
+            "default": "invisible",
+            "enum": [
+              "invisible",
+              "visible"
+            ],
+            "title": "Marks",
+            "type": "string"
+          },
+          "request_id": {
+            "minLength": 1,
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "title": "ExportIn",
+        "type": "object"
+      },
       "ExportMarkers": {
         "additionalProperties": false,
         "description": "The exported blocks by where they went (design 11 section 20.11), tallied from the\nreview sidecars of the export: `paragraphs` are the text blocks, each with one marker in its\narticle; `figures` are the figure blocks, which have none. For each status, `paragraphs` +\n`figures` equals that bucket of `ExportReviewSummary` (overridden = `overrides`).",
         "properties": {
+          "figure_lines": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ArticleReviewCounts"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "figures": {
             "$ref": "#/components/schemas/ArticleReviewCounts"
           },
@@ -2121,6 +2153,12 @@
             "title": "Edited",
             "type": "integer"
           },
+          "faith_failed": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Faith Failed",
+            "type": "integer"
+          },
           "flagged": {
             "minimum": 0.0,
             "title": "Flagged",
@@ -2182,6 +2220,14 @@
                 "type": "null"
               }
             ]
+          },
+          "faith_blockers": {
+            "items": {
+              "pattern": "^b-(?:[a-z0-9]+(?:-[a-z0-9]+)*)-p(?:(?:\\d{3}|[1-9]\\d{3,}))-(?:(?:\\d{2}|[1-9]\\d{2,}))$",
+              "type": "string"
+            },
+            "title": "Faith Blockers",
+            "type": "array"
           },
           "flag_blockers": {
             "items": {
@@ -2272,6 +2318,21 @@
                 "type": "null"
               }
             ]
+          },
+          "marks": {
+            "anyOf": [
+              {
+                "enum": [
+                  "invisible",
+                  "visible"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marks"
           },
           "pages_covered": {
             "minimum": 0.0,
@@ -7871,7 +7932,7 @@
               "schema": {
                 "anyOf": [
                   {
-                    "$ref": "#/components/schemas/RequestIn"
+                    "$ref": "#/components/schemas/ExportIn"
                   },
                   {
                     "type": "null"

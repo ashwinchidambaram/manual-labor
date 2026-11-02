@@ -611,3 +611,50 @@ tsc clean
 $ npm run e2e -- e2e/override-flow.spec.ts e2e/ux-onboarding.spec.ts e2e/onboarding.spec.ts
 21 passed (2.6m)
 ```
+
+## Export follow-ups: original text, figure-line markers, reason references, visible marks, no override over a faithfulness failure — PASSED 2026-11-02
+
+Dana's fourth report ("What I'd change next") and the final reviewer's invariant 1 finding. Each item has a dated design subsection (design 11 sections 20.12 to 20.16, P3 amended) and failing tests first (`tests/export/test_followups.py` F1 to F4 and RF1 to RF5, `tests/export/test_faith_gate.py` G1 to G5, `tests/contracts` C21 to C24, vitest U21, U22 and a JobsBar retry test).
+- **20.12 Original text.** Each `edited` review entry carries `original_text` and `edited_at`. `original_text` is the block's raw text, in full, proven by the edit decision's `raw_sha256`. The contract requires both fields on an edited entry and forbids them on any other, and requires `edited_at <= at`.
+- **20.13 Figure-line markers.** Every figure line has a marker directly above it, `<!-- ml: <status>; block: FIG-… -->`. Its status comes from who decided to show the figure there:
+  - `overridden` when the figure's block is covered;
+  - `approved` when a person approved that block or attached the figure by hand;
+  - `auto-approved` otherwise.
+  The sidecar gains `figure_lines`. Z9 checks each figure line for exactly one marker naming it, and checks its status against the figure's block across articles. The README and Export screen reconciliation keeps blocks = paragraphs + figure blocks and adds the figure lines' own tally (`ExportMarkers.figure_lines`). An attached figure whose block was rejected now refuses the export.
+- **20.14 Reason references.** Markers carry `reason: r1`. Each sidecar gains a `reasons` table numbered by first use in the body, then by the reasons only figure blocks use. The quoted reason and its escape (`encode_reason`) are gone from articles.
+- **20.15 Visible marks.** `labor export|assemble --marks visible`, `POST /api/export {"marks"}` (`ExportIn`), and the "Show review marks in the articles" checkbox (off by default) add a one-line `[unchecked]` or `[overridden]` paragraph above the marker of each unchecked paragraph. The mode is recorded in `Manifest.marks`, `ExportSummary.marks` and the assemble fingerprint. `strip_visible_marks` returns the invisible bytes. Z9 checks that tags appear exactly where the markers say. Tag link definitions are refused, using the parser's reference list.
+- **20.16 Faithfulness.** No override (blanket, block or flag) covers a block whose cleaned text failed the faithfulness check:
+  - the gate lists these blocks as `faith_blockers`, and `counts.faith_failed` counts them within `to_review`;
+  - `record_override` refuses an override for such a block (422), `POST /api/export` answers 409 with the ids, and `labor export --override` exits 2 naming them;
+  - assembly refuses one that no person approved or edited;
+  - `faithfulness_passed` in the sidecar may be `false` only on approved or edited entries;
+  - the Export screen lists these blocks in their own group, and the one-click override leaves them out.
+  The reviewer's repro script (blanket override over a changed `clean.json`) now exits 2 and writes no zip.
+- `EXPORT_ALGO_VERSION` is "4". Schemas, OpenAPI, TS types and USER_GUIDE were regenerated. The repo README's "What you get", SPEC 6.2 and the guide text were updated.
+
+A fresh Opus reviewer worked on a frozen snapshot worktree. It found no blocker or major issue. Fixed, failing tests first:
+- a valid export with a flag-overridden figure shown from no article was rejected;
+- tag link definitions inside block quotes and lists got past the check;
+- a removed tag passed when the paragraph above ended in `[unchecked]`;
+- the Export screen's faith-blocker numbers and its "not listed" message were wrong.
+
+Its nits were also fixed: the 409 field name, the worker's `marks` check order, the README marks mode (Z8), the order of reasons used only by figure blocks, and the README naming `faithfulness_passed`. The reviewer also found that the shared `.venv` gets the editable package re-installed by other sessions' worktrees, so each gate run below printed the `manuallabor` import path before and after: `/Users/ashwinchidambaram/dev/projects/doc-to-KB/manuallabor/__init__.py` every time.
+
+```
+$ uv run pytest tests/export tests/contracts tests/api -p no:warnings --basetemp=.pytest_tmp_fu
+550 passed, 1 skipped, 2 deselected in 333.22s (0:05:33)
+$ uv run pytest tests/export -m slow -p no:warnings --basetemp=.pytest_tmp_fu
+2 passed, 289 deselected in 179.66s (0:02:59)
+$ uv run ruff check manuallabor/ tests/ && uv run ruff format --check manuallabor/ tests/ && uv run mypy manuallabor/
+All checks passed! / 414 files already formatted / Success: no issues found in 196 source files
+$ uv run labor schemas export --check && uv run labor openapi export --check
+schemas up to date / openapi up to date
+$ cd frontend && npm run gen-types && npm run gen-api && npm run gen-guide && npm run check-types-fresh && npm run check-api-fresh
+no drift
+$ npm run typecheck && npm test -- --run
+tsc clean
+ Test Files  56 passed (56)
+      Tests  486 passed (486)
+$ npm run e2e -- e2e/override-flow.spec.ts e2e/ux-onboarding.spec.ts e2e/onboarding.spec.ts
+21 passed (3.0m)
+```

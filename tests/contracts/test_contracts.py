@@ -866,6 +866,94 @@ def test_c19_article_review_contract() -> None:
     c.ArticleReview.model_validate(mut(1, text=""))
 
 
+def test_c21_an_edited_entry_keeps_the_original_text() -> None:
+    """Design 11 section 20.12: `original_text` and `edited_at` iff edited, edited no later than
+    the effective decision."""
+    base = article_review_dict()
+    m = c.ArticleReview.model_validate(base)
+    assert m.blocks[2].original_text == "Loosen the four M8 bolts on the mo-\ntor mount."
+
+    def mut(i: int, **over: Any) -> dict[str, Any]:
+        d = deepcopy(base)
+        d["blocks"][i].update(over)
+        return d
+
+    bad(c.ArticleReview, mut(2, original_text=None), "original_text")
+    bad(c.ArticleReview, mut(2, edited_at=None), "edited_at")
+    bad(c.ArticleReview, mut(1, original_text="x"), "original_text")
+    bad(c.ArticleReview, mut(0, edited_at=TS), "edited_at")
+    bad(c.ArticleReview, mut(2, edited_at="2030-01-01T00:00:00Z"), "edited_at")
+    c.ArticleReview.model_validate(mut(2, original_text=""))  # an empty source text is kept
+
+
+def test_c22_reason_references_and_figure_lines() -> None:
+    """Design 11 sections 20.13 and 20.14."""
+    base = article_review_dict()
+    m = c.ArticleReview.model_validate(base)
+    assert [(r.id, r.reason) for r in m.reasons] == [("r1", "paper -- ok")]
+    assert m.figure_lines[0].status == "auto_approved"
+
+    def mut(fn: Any) -> dict[str, Any]:
+        d = deepcopy(base)
+        fn(d)
+        return d
+
+    # reason_id iff overridden, and it names the entry's own reason
+    bad(c.ArticleReview, mut(lambda d: d["blocks"][3].update(reason_id=None)), "reason_id")
+    bad(c.ArticleReview, mut(lambda d: d["blocks"][1].update(reason_id="r1")), "reason_id")
+    bad(c.ArticleReview, mut(lambda d: d["blocks"][3].update(reason_id="r2")), "r2")
+    bad(c.ArticleReview, mut(lambda d: d["reasons"][0].update(reason="other")), "reason")
+    bad(c.ArticleReview, mut(lambda d: d["blocks"][3].update(reason_id="x1")), "reason_id")
+    # the table: r1..rN in order, distinct reasons, every row used
+    bad(c.ArticleReview, mut(lambda d: d["reasons"].append({"id": "r2", "reason": "x"})), "r2")
+    bad(c.ArticleReview, mut(lambda d: d["reasons"][0].update(id="r2")), "r1")
+    bad(
+        c.ArticleReview,
+        mut(lambda d: d["reasons"].append({"id": "r2", "reason": "paper -- ok"})),
+        "",
+    )
+    # a figure line: status fixes decided_by, never edited, attached by a rule, its own document
+    fl = lambda **o: mut(lambda d: d["figure_lines"][0].update(o))  # noqa: E731
+    bad(c.ArticleReview, fl(decided_by="person"), "decided_by")
+    bad(c.ArticleReview, fl(status="edited", decided_by="person"), "status")
+    bad(c.ArticleReview, fl(rule="none"), "rule")
+    bad(c.ArticleReview, fl(reason="x"), "reason")
+    bad(c.ArticleReview, fl(flag_id="flag-000001"), "flag_id")
+    bad(c.ArticleReview, fl(figure_id="FIG-other-p042-01"), "document")
+    bad(c.ArticleReview, fl(block_id="b-other-p042-05"), "document")
+    two = mut(lambda d: d["figure_lines"].append(dict(d["figure_lines"][0])))
+    bad(c.ArticleReview, two, "figure_lines")
+    over = fl(status="overridden", decided_by="override", reason="paper -- ok", reason_id="r1")
+    c.ArticleReview.model_validate(over)
+    bad(c.ArticleReview, fl(status="overridden", decided_by="override", reason="new"), "reason_id")
+
+
+def test_c24_a_faith_failed_entry_went_out_only_after_a_person() -> None:
+    """Design 11 section 20.16: `faithfulness_passed` False only on approved or edited."""
+    base = article_review_dict()
+
+    def mut(i: int, **over: Any) -> dict[str, Any]:
+        d = deepcopy(base)
+        d["blocks"][i].update(over)
+        return d
+
+    c.ArticleReview.model_validate(mut(1, faithfulness_passed=False))  # approved
+    c.ArticleReview.model_validate(mut(0, faithfulness_passed=True))
+    bad(c.ArticleReview, mut(0, faithfulness_passed=False), "faithfulness")  # auto-approved
+    bad(c.ArticleReview, mut(3, faithfulness_passed=False), "faithfulness")  # overridden
+
+
+def test_c23_manifest_marks_and_the_export_request() -> None:
+    """Design 11 section 20.15: the manifest records the marks mode (default invisible); the
+    export request takes it."""
+    from manuallabor.api.models import ExportIn
+
+    assert c.Manifest.model_fields["marks"].default == "invisible"
+    assert ExportIn().marks == "invisible" and ExportIn(marks="visible").marks == "visible"
+    with pytest.raises(ValidationError):
+        ExportIn(marks="loud")  # type: ignore[arg-type]
+
+
 def test_c20_front_matter_review_sums_to_blocks() -> None:
     """Section 20.11: one block, one category; the four counts add up to `blocks`."""
     fm = {

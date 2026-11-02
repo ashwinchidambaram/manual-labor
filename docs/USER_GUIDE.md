@@ -71,13 +71,14 @@ Export unlocks when no flag is open and nothing in scope is still waiting for re
 What to do:
 
 1. Resolve the listed blocks in Verify or on the Agent screen.
-2. Or export anyway: an override needs a reason, and every overridden block is listed in manifest.json.
+2. Or export anyway: an override needs a reason, and every overridden block is listed in manifest.json. A block where cleanup changed the text is the exception: no override covers it, a person must approve, edit or reject it in Verify.
 3. Download the zip and compare its SHA-256 with the one shown.
 
 Why you can trust this:
 
 - The export contains only text a person or the checks accepted, plus any blocks you overrode with a recorded reason.
-- In each exported article, every paragraph starts with an invisible ml: comment on the line above it naming who checked it (approved, edited, auto-approved or overridden), and articles/<name>.review.json lists every block with who decided it, when, and the start of its text.
+- In each exported article, every paragraph and every figure line starts with an invisible ml: comment on the line above it naming who checked it (approved, edited, auto-approved or overridden; an override's reason is a short reference such as r1), and articles/<name>.review.json lists every block with who decided it, when, the start of its text, the reasons, and for an edited paragraph the manual's original text.
+- Tick Show review marks in the articles to also put a visible [unchecked] or [overridden] line above each paragraph nobody checked, for people who read the rendered articles.
 
 ## How it works
 

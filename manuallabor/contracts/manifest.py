@@ -24,6 +24,9 @@ from manuallabor.contracts.document import Document
 from manuallabor.contracts.enums import ArticleSplit, Task
 from manuallabor.contracts.figure import parse_figure_file
 
+# design 11 section 20.15: invisible markers only (the default), or markers plus visible tags
+ExportMarks = Literal["invisible", "visible"]
+
 
 def _sorted_by(key: str, v: Any) -> Any:
     if isinstance(v, list):
@@ -139,6 +142,9 @@ class Manifest(ContractModel):
     overrides: list[Override]
     accounting: BlockAccounting
     learning: ManifestLearning = Field(default_factory=ManifestLearning)
+    # whether the articles carry visible review tags besides the invisible markers (design 11
+    # section 20.15); the default keeps a manifest written before the option readable
+    marks: ExportMarks = "invisible"
 
     @field_validator("docs", mode="before")
     @classmethod

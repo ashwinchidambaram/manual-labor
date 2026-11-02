@@ -22,7 +22,6 @@ from hypothesis import strategies as st
 from manuallabor.contracts.article import ArticleReview
 from manuallabor.contracts.enums import BlockStatus, BlockType
 from manuallabor.contracts.manifest import Manifest
-from manuallabor.export.markers import encode_reason
 from manuallabor.export.types import ExportError, Problem
 from manuallabor.export.validate import split_article, validate_zip
 from manuallabor.export.zip import write_zip
@@ -41,12 +40,12 @@ from tests.export.synth import (
 
 ART = "doc--main"
 REASON = "paper -- rev B > A"
-ENC = r'"paper -\u002d rev B \u003e A"'
-# the grammar of design 11 section 20.2, written out again here (not imported)
+ENC = "r1"  # section 20.14: the marker carries a reference into the review file's `reasons`
+# the grammar of design 11 sections 20.2, 20.13 and 20.14, written out again here (not imported)
 MARKER_RE = re.compile(
     r"^<!-- ml: (?P<status>approved|edited|auto-approved|overridden); "
-    r"block: (?P<block>b-[a-z0-9-]+-p\d{3,}-\d{2,})"
-    r"(?:; flag: (?P<flag>flag-\d{6}))?(?:; reason: (?P<reason>\"(?:[^\"\\]|\\.)*\"))? -->$"
+    r"block: (?P<block>b-[a-z0-9-]+-p\d{3,}-\d{2,}|FIG-[a-z0-9-]+-p\d{3,4}-\d{2,3})"
+    r"(?:; flag: (?P<flag>flag-\d{6}))?(?:; reason: (?P<reason>r[1-9]\d*))? -->$"
 )
 # section 20.11: a marker is the first line of its unit, right after a blank line
 _STRIP_RE = re.compile(r"(?<=\n\n)<!-- ml: [^\n]* -->\n")
@@ -130,50 +129,57 @@ def every_status() -> Any:
     )
 
 
-# -- M1 reason escaping ------------------------------------------------------------------------
+# -- M1 reasons never reach the article (amended by section 20.14) -----------------------------
+
+TRICKY = [
+    "",
+    "plain",
+    "a -- b",
+    "---",
+    "----",
+    "end -->",
+    "<!-- nested -->",
+    "<!-- ml: auto-approved; block: b-doc-p001-01 -->",
+    "x > y < z",
+    'quote " and back\\slash',
+    "line\nbreak\r\n",
+    "sep\u2028and\u2029nel\x85",
+    "naïve – en dash — em dash",
+    "-",
+    "--!>",
+]
 
 
-@pytest.mark.parametrize(
-    "reason",
-    [
-        "",
-        "plain",
-        "a -- b",
-        "---",
-        "----",
-        "end -->",
-        "<!-- nested -->",
-        "x > y < z",
-        'quote " and back\\slash',
-        "line\nbreak\r\n",
-        "sep\u2028and\u2029nel\x85",
-        "naïve – en dash — em dash",
-        "-",
-        "--!>",
-    ],
-)
-def test_m1_reason_escaping_round_trips_and_never_ends_the_comment(reason: str) -> None:
-    enc = encode_reason(reason)
-    assert json.loads(enc) == reason
-    assert "--" not in enc and ">" not in enc and "<" not in enc
-    assert len(enc.splitlines()) == 1 and "\n" not in enc
-    line = f"<!-- ml: overridden; block: b-doc-p001-01; reason: {enc} -->"
-    m = MARKER_RE.match(line)
-    assert m is not None and json.loads(m.group("reason")) == reason
-    assert "--" not in line[4:-3]
+def _overridden_with(reason: str) -> Any:
+    blocks = [
+        blk(1, "Queued.", status=BlockStatus.queued),
+        blk(2, "Ok.", status=BlockStatus.approved),
+    ]
+    return run(synth_inputs(blocks, overrides=[override(5, reason)]))
 
 
-@settings(max_examples=300, deadline=None)
+@pytest.mark.parametrize("reason", TRICKY)
+def test_m1_any_reason_is_a_reference_in_the_article_and_verbatim_in_the_review_file(
+    reason: str,
+) -> None:
+    res = _overridden_with(reason)
+    (a,) = res.articles
+    mk = marker_lines(a.text)[0]
+    assert mk.group(0) == f"<!-- ml: overridden; block: {bid(1)}; reason: r1 -->"
+    rv = json.loads(str(res.files[f"articles/{ART}.review.json"]))
+    assert rv["reasons"] == [{"id": "r1", "reason": reason}]
+    assert rv["blocks"][0]["reason"] == reason and rv["blocks"][0]["reason_id"] == "r1"
+    assert len(marker_lines(a.text)) == 2  # a reason holding a marker adds none
+
+
+@settings(max_examples=150, deadline=None)
 @given(st.text())
-def test_m1_reason_escaping_property(reason: str) -> None:
-    enc = encode_reason(reason)
-    assert json.loads(enc) == reason
-    assert "--" not in enc and ">" not in enc and "<" not in enc
-    assert len(enc.splitlines()) == 1
-
-
-def test_m1_the_worked_example_reason() -> None:
-    assert encode_reason(REASON) == ENC
+def test_m1_reason_property(reason: str) -> None:
+    res = _overridden_with(reason)
+    (a,) = res.articles
+    assert [m.group("reason") for m in marker_lines(a.text)] == ["r1", None]
+    rv = ArticleReview.model_validate_json(str(res.files[f"articles/{ART}.review.json"]))
+    assert rv.reasons[0].reason == reason
 
 
 # -- M2 markers and sidecar on every status ----------------------------------------------------
@@ -191,7 +197,9 @@ def test_m2_n1_every_paragraph_starts_with_its_marker() -> None:
     m5 = f"<!-- ml: overridden; block: {bid(5)}; reason: {ENC} -->"
     m6 = f"<!-- ml: overridden; block: {bid(6)}; flag: flag-000001; reason: {ENC} -->"
     m8 = f"<!-- ml: auto-approved; block: {bid(8)} -->"
-    fig = next(p for p in parts(a.text) if p.startswith("![FIG-"))
+    fig = next(p for p in parts(a.text) if "\n![FIG-" in p)
+    # section 20.13: the figure line has its marker too (the checks attached it)
+    assert fig.startswith(f"<!-- ml: auto-approved; block: {fid(7)} -->\n![FIG-")
     assert parts(a.text) == [
         m1 + "\n## 1 Intro",
         m2 + "\nApproved text.",
@@ -199,11 +207,13 @@ def test_m2_n1_every_paragraph_starts_with_its_marker() -> None:
         m4 + "\n* one\n* two",
         m5 + "\nQueued text.",
         m6 + "\nFlagged text.",
-        fig,  # a figure block has no marker
+        fig,  # a figure block has no paragraph; its figure line has its own marker
         m8 + "\nLast.",
     ]
     assert [m.group("block") for m in marker_lines(a.text)] == [
-        bid(n) for n in (1, 2, 3, 4, 5, 6, 8)
+        *(bid(n) for n in (1, 2, 3, 4, 5, 6)),
+        fid(7),
+        bid(8),
     ]
     assert "\n# Main topic\n\n" + m1 + "\n## 1 Intro\n" in a.text  # the title, a blank line
 
@@ -243,6 +253,10 @@ def test_m2_the_sidecar_lists_every_block_with_who_decided_it() -> None:
         "text_sha256": sha("## 1 Intro"),
         "text": "## 1 Intro",
         "placement": "paragraph",
+        "reason_id": None,
+        "original_text": None,
+        "edited_at": None,
+        "faithfulness_passed": None,
     }
     assert (row(2)["status"], row(2)["decided_by"], row(2)["at"]) == (
         "approved",
@@ -260,6 +274,7 @@ def test_m2_the_sidecar_lists_every_block_with_who_decided_it() -> None:
         "person",
         "person",
     )
+    assert (row(4)["original_text"], row(4)["edited_at"]) == ("raw list", "2026-10-29T12:00:00Z")
     assert row(5) == {
         "block_id": bid(5),
         "type": "paragraph",
@@ -275,6 +290,10 @@ def test_m2_the_sidecar_lists_every_block_with_who_decided_it() -> None:
         "text_sha256": sha("Queued text."),
         "text": "Queued text.",
         "placement": "paragraph",
+        "reason_id": "r1",
+        "original_text": None,
+        "edited_at": None,
+        "faithfulness_passed": None,
     }
     assert (row(6)["status"], row(6)["flag_id"], row(6)["reason"]) == (
         "overridden",
@@ -339,7 +358,7 @@ def test_m2_a_covered_approved_block_with_an_open_flag_is_overridden() -> None:
     )
     assert (
         parts(a.text)[-1]
-        == f'<!-- ml: overridden; block: {bid(2)}; flag: flag-000003; reason: "ok" -->\nB.'
+        == f"<!-- ml: overridden; block: {bid(2)}; flag: flag-000003; reason: r1 -->\nB."
     )
 
 
@@ -550,7 +569,10 @@ def test_m6_a_marker_swallowed_by_a_fence_fails(tmp_path: Path) -> None:
 
 def test_m6_a_changed_reason_fails(tmp_path: Path) -> None:
     def fn(f: Files) -> None:
-        edit_article(f, lambda t: t.replace(ENC, '"something else"', 1))
+        edit_article(
+            f,
+            lambda t: t.replace(f"block: {bid(4)}; reason: r1", f"block: {bid(4)}; reason: r2", 1),
+        )
 
     msgs = z9(check(tmp_path, fn))
     assert any(bid(4) in m and "reason" in m for m in msgs), msgs
@@ -658,12 +680,13 @@ def _check_markers_and_sidecars(zf: zipfile.ZipFile) -> dict[str, int]:
     validate.py. Returns tallies for the caller's assertions."""
     m = Manifest.model_validate_json(zf.read("manifest.json"))
     names = set(zf.namelist())
-    seen = {"auto": 0, "person": 0, "override": 0, "figure": 0, "markers": 0}
+    seen = {"auto": 0, "person": 0, "override": 0, "figure": 0, "markers": 0, "figure_markers": 0}
     by_place: dict[tuple[str, str], int] = {}
     overrides = {o.target_id: o for o in m.overrides}
     for a in m.articles:
         assert a.review_sidecar == f"articles/{a.id}.review.json" and a.review_sidecar in names
         rv = ArticleReview.model_validate_json(zf.read(a.review_sidecar))
+        table = {r.id: r.reason for r in rv.reasons}
         assert [b.block_id for b in rv.blocks] == a.block_ids
         text = zf.read(a.path).decode("utf-8")
         fm, _ = split_article(text)
@@ -686,22 +709,33 @@ def _check_markers_and_sidecars(zf: zipfile.ZipFile) -> dict[str, int]:
             elif b.status in ("approved", "edited"):
                 seen["person"] += 1
                 assert b.at is not None and b.decided_by == "person"
+                assert (b.original_text is not None) == (b.status == "edited")
             else:
                 seen["override"] += 1
                 o = overrides[b.block_id]
                 assert (o.reason, o.flag_id, o.at) == (b.reason, b.flag_id, b.at)
+                assert b.reason_id is not None and table[b.reason_id] == b.reason
             if b.type != BlockType.figure:  # every paragraph has a marker (20.11)
                 want.append(b)
-        got = marker_lines(text)
+        allm = marker_lines(text)
+        got = [g for g in allm if g.group("block").startswith("b-")]
+        figm = [g for g in allm if g.group("block").startswith("FIG-")]
         seen["markers"] += len(got)
+        seen["figure_markers"] += len(figm)
         assert [g.group("block") for g in got] == [b.block_id for b in want], a.id
         for g, b in zip(got, want, strict=True):
             assert g.group("status") == b.status.replace("_", "-")
             assert g.group("flag") == b.flag_id
-            assert (json.loads(g.group("reason")) if g.group("reason") else None) == b.reason
+            assert g.group("reason") == b.reason_id
             # on its own line after a blank line, its paragraph's first characters right below
             assert b.text is not None and len(b.text) <= 80
             assert "\n\n" + g.group(0) + "\n" + b.text in text, b.block_id
+        # section 20.13: every figure line has its marker directly above it, as figure_lines says
+        assert [g.group("block") for g in figm] == [f.figure_id for f in rv.figure_lines], a.id
+        assert [g.group("block") for g in figm] == a.figures
+        for g, fl in zip(figm, rv.figure_lines, strict=True):
+            assert g.group("status") == fl.status.replace("_", "-")
+            assert re.search(re.escape(g.group(0)) + r"\n!\[" + fl.figure_id + " — ", text)
         assert visible(body_of(text)) == visible(body_of(strip_markers(text))), a.id
         assert "ml:" not in visible(body_of(text))
     for (place, status), n in by_place.items():
@@ -781,19 +815,25 @@ def test_export_markers_on_scanned_pdf(requires_docling: None, tmp_path: Path) -
     with zipfile.ZipFile(zp) as zf:
         seen = _check_markers_and_sidecars(zf)
         m = Manifest.model_validate_json(zf.read("manifest.json"))
-        bodies = "\n".join(zf.read(a.path).decode() for a in m.articles)
+        bodies_by = {a.id: zf.read(a.path).decode() for a in m.articles}
+        bodies = "\n".join(bodies_by.values())
         reviews = [ArticleReview.model_validate_json(zf.read(a.review_sidecar)) for a in m.articles]
     assert seen["override"] >= 1 and seen["person"] >= 1
     entry = next(b for r in reviews for b in r.blocks if b.block_id == approved)
     assert entry.status == "approved" and entry.at is not None
     assert f"\n\n<!-- ml: approved; block: {approved} -->\n" in bodies
-    decoded = [
-        json.loads(mm.group("reason"))
-        for ln in bodies.split("\n")
-        if (mm := MARKER_RE.match(ln)) and mm.group("status") == "overridden"
-    ]
+    # section 20.14: each overridden marker refers to its article's reason table
+    decoded = []
+    for art, rv in zip(m.articles, reviews, strict=True):
+        table = {r.id: r.reason for r in rv.reasons}
+        body = bodies_by[art.id]
+        decoded += [
+            table[mm.group("reason")]
+            for ln in body.split("\n")
+            if (mm := MARKER_RE.match(ln)) and mm.group("status") == "overridden"
+        ]
     assert decoded and set(decoded) == {reason}
-    assert "-- rev B" not in bodies  # the reason never appears unescaped in a comment
+    assert "rev B" not in bodies  # the reason is only in the review files
 
 
 # -- review fixes (fresh reviewer, 2026-10-31) -------------------------------------------------
@@ -901,9 +941,9 @@ def test_r3_a_caption_that_looks_like_a_marker_is_escaped_not_blamed_on_a_block(
         synth_inputs(blocks, figures=[figure_data(2, caption=cap)], attach={ART: [att(fid(2))]})
     )
     (a,) = res.articles
-    line = next(p for p in parts(a.text) if p.startswith("![FIG-"))
-    assert "\\<!-- ml:" in line
-    assert [m.group("block") for m in marker_lines(a.text)] == [bid(1)]
+    line = unmarked(next(p for p in parts(a.text) if "\n![FIG-" in p))
+    assert line.startswith("![FIG-") and "\\<!-- ml:" in line
+    assert [m.group("block") for m in marker_lines(a.text)] == [bid(1), fid(2)]
     assert res.manifest.articles[0].figures == [fid(2)]
 
 
@@ -1159,12 +1199,13 @@ def test_n4_every_entry_says_where_its_block_went_and_the_readme_reconciles() ->
     # 8 blocks: 7 paragraphs (3 auto-approved, 1 approved, 1 edited, 2 overridden) + 1 figure
     readme = res.readme
     assert (
-        "In this export: 8 blocks = 7 paragraphs with a marker (3 auto-approved, 1 approved, "
-        "1 edited, 2 overridden) + 1 figure block without one (1 auto-approved, 0 approved, "
-        "0 edited, 0 overridden)." in readme
+        "In this export: 8 blocks = 7 paragraphs (3 auto-approved, 1 approved, 1 edited, "
+        "2 overridden) + 1 figure block (1 auto-approved, 0 approved, 0 edited, 0 overridden). "
+        "Every paragraph has a marker, and so does every figure line: 1 figure line "
+        "(1 auto-approved, 0 approved, 0 overridden)" in readme
     )
     assert "no user accounts" in readme and "`person`" in readme
-    assert "blocks = paragraphs with that marker + figure blocks with that status" in readme
+    assert "For each status, blocks = paragraphs + figure blocks." in readme
     assert "grep -rnE '^<!-- ml: (auto-approved|overridden);' articles/" in readme
 
 
@@ -1207,7 +1248,12 @@ def test_n4_the_export_summary_counts_markers_and_figure_blocks(exported_a: Any)
     assert total_markers == seen["markers"] and seen["figure"] > 0
     figs_total = sum(s.markers.figures.model_dump().values())
     assert f"In this export: {r.blocks} blocks = {total_markers} paragraphs" in readme
-    assert f"+ {figs_total} figure blocks without one" in readme
+    assert f"+ {figs_total} figure blocks (" in readme
+    # section 20.13: the figure lines' markers, by the status of their placement
+    assert s.markers.figure_lines is not None
+    lines_total = sum(s.markers.figure_lines.model_dump().values())
+    assert lines_total == seen["figure_markers"] > 0
+    assert f"so does every figure line: {lines_total} figure lines (" in readme
 
 
 # -- review fixes of 20.11 (fresh Opus reviewer, 2026-10-31) -----------------------------------
@@ -1234,7 +1280,18 @@ def test_rv1_a_paragraph_whose_text_is_the_figure_line_before_it_validates(tmp_p
         )
     )
     (a,) = res.articles
-    assert "\n\n" + line + "\n\n<!-- ml: approved; block: " + bid(3) + " -->\n" + line in a.text
+    fig_marker = f"<!-- ml: approved; block: {fid(2)} -->"  # section 20.13
+    assert (
+        "\n\n"
+        + fig_marker
+        + "\n"
+        + line
+        + "\n\n<!-- ml: approved; block: "
+        + bid(3)
+        + " -->\n"
+        + line
+        in a.text
+    )
     files = {n: v.encode() if isinstance(v, str) else b"" for n, v in res.files.items()}
     write_zip(files, tmp_path / "f.zip")
     assert z9(validate_zip(tmp_path / "f.zip")) == []

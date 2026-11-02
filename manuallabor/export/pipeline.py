@@ -14,11 +14,11 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict
 
 from manuallabor.contracts.article import ArticleReview
-from manuallabor.contracts.enums import FlagStatus
+from manuallabor.contracts.enums import BlockStatus, FlagStatus
 from manuallabor.contracts.io import canonical_json, read_json, write_json
-from manuallabor.contracts.manifest import Manifest, Override
+from manuallabor.contracts.manifest import ExportMarks, Manifest, Override
 from manuallabor.export.assemble import assemble, truncate_clock
-from manuallabor.export.gate import Gate, export_gate
+from manuallabor.export.gate import PERSON, Gate, export_gate, faith_failed
 from manuallabor.export.load import doc_ready, load_inputs
 from manuallabor.export.markers import tally_markers
 from manuallabor.export.types import (
@@ -76,6 +76,8 @@ class AssembleRecord(_Rec):
     # the exported blocks by bucket (design 11 section 14); None in a record written before it,
     # which is then rebuilt rather than skipped
     review: ExportReviewSummary | None = None
+    # the articles' review marks (design 11 section 20.15); part of the fingerprint as well
+    marks: ExportMarks = "invisible"
 
 
 class ExportRecord(_Rec):
@@ -164,10 +166,11 @@ def _check_fresh(paths: ProjectPaths) -> None:
             raise ExportError(f"stale: {slug}: not processed to score2")
 
 
-def fingerprint(paths: ProjectPaths, store: Store) -> str:
+def fingerprint(paths: ProjectPaths, store: Store, marks: ExportMarks = "invisible") -> str:
     """Everything an assemble depends on except the clock (a new clock is a skip) and the
     overrides, which `_assemble_fresh` compares separately so that the export that spends
-    them does not make its own output stale."""
+    them does not make its own output stale. `marks` is the requested review-marks mode
+    (design 11 section 20.15): another mode is another staging tree."""
     from manuallabor.export.load import last_models
 
     cfg = paths.load_config()
@@ -197,6 +200,7 @@ def fingerprint(paths: ProjectPaths, store: Store) -> str:
         }
     payload = {
         "algo": EXPORT_ALGO_VERSION,
+        "marks": marks,
         "docs": docs,
         "figures_index": _sha_file(paths.figures_index),
         "selection": store.get_selection_json() or "",
@@ -313,6 +317,7 @@ def export_status(
             for f, b in g.flag_blockers
         ],
         counts=ExportScopeCounts(**g.counts),
+        faith_blockers=list(g.faith_blockers),
         summary=summary,
         zip_path=zip_path,
     )
@@ -337,8 +342,9 @@ def record_override(
     prev = store.action_by_request(request_id)
     if prev is not None:
         return prev.id
-    if target_id is not None:
-        block_of: dict[str, str] = {}  # block or figure id -> block id
+    unfaithful: set[str] = set()  # design 11 section 20.16
+    block_of: dict[str, str] = {}  # block or figure id -> block id
+    if target_id is not None or flag_id is not None:
         for slug in paths.list_slugs():
             if doc_ready(paths, slug):
                 blocks = (
@@ -350,8 +356,13 @@ def record_override(
                     block_of[b.id] = b.id
                     if b.figure_id is not None:
                         block_of[str(b.figure_id)] = b.id
+                    if faith_failed(b) and b.status not in (*PERSON, BlockStatus.rejected):
+                        unfaithful.add(b.id)
+    if target_id is not None:
         if target_id not in block_of:
             raise InvalidOp(f"unknown block or figure: {target_id}")
+        if block_of[target_id] in unfaithful:
+            raise InvalidOp(_unfaithful(block_of[target_id]))
         if flag_id is None:
             # design 11 section 14: a block override never covers a flag, so recording one on a
             # flagged block would look like a decision about the flag and change nothing
@@ -365,8 +376,13 @@ def record_override(
                     f"{target_id} has an open flag ({', '.join(open_ids)}): a block override "
                     "does not cover a flag; resolve the flag, or override it by its flag id"
                 )
-    if flag_id is not None and store.get_flag(flag_id) is None:
-        raise InvalidOp(f"unknown flag: {flag_id}")
+    if flag_id is not None:
+        fl = store.get_flag(flag_id)
+        if fl is None:
+            raise InvalidOp(f"unknown flag: {flag_id}")
+        held = block_of.get(fl.target_id, fl.target_id)
+        if held in unfaithful:
+            raise InvalidOp(_unfaithful(held))
     with store.tx():
         return store.append_action(
             ActionKind.export_override,
@@ -375,6 +391,14 @@ def record_override(
             payload={"reason": reason, "target_id": target_id, "flag_id": flag_id},
             request_id=request_id,
         )
+
+
+def _unfaithful(block_id: str) -> str:
+    return (
+        f"{block_id}: cleanup changed its text (the faithfulness check failed), so no override "
+        "can cover it; a person must approve it after reading the change, edit it or reject it "
+        "in Verify (design 11 section 20.16)"
+    )
 
 
 # -- assemble ----------------------------------------------------------------------------------
@@ -411,8 +435,10 @@ def run_assemble(
     clock: datetime | None = None,
     emit: Emit = lambda _o: None,
     force: bool = False,
+    marks: ExportMarks = "invisible",
 ) -> str:
-    """Build the staging tree `export/assembled/`. Returns "built" or "skip"."""
+    """Build the staging tree `export/assembled/`. Returns "built" or "skip". `marks` adds
+    visible review tags (design 11 section 20.15); a tree built in another mode is rebuilt."""
     _check_fresh(paths)
     st = store if store is not None else _open_readonly(paths)
     try:
@@ -421,8 +447,8 @@ def run_assemble(
         # the gate first, also before a skip: a spent override never re-covers anything
         gate = _gate(paths, st, cutoff)
         if not gate.allowed:
-            raise GateLocked(gate.open_flags, gate.queued, gate.blockers)
-        fp = fingerprint(paths, st)
+            raise GateLocked(gate.open_flags, gate.queued, gate.blockers, gate.faith_blockers)
+        fp = fingerprint(paths, st, marks)
         active = _active_ids(st, cutoff)
         staged = paths.assembled / "manifest.json"
         if (
@@ -434,7 +460,7 @@ def run_assemble(
         ):
             emit({"stage": "assemble", "status": "skip", "doc": ""})
             return "skip"
-        inputs = load_inputs(paths, st, cutoff)
+        inputs = load_inputs(paths, st, cutoff, marks)
         asm = assemble(inputs, clock if clock is not None else resolve_clock())
         _verify_files(asm)
         tmp = paths.export_dir / ".assembled.tmp"
@@ -443,7 +469,9 @@ def run_assemble(
         shutil.rmtree(paths.assembled, ignore_errors=True)
         os.replace(tmp, paths.assembled)
         state = read_state(paths)
-        state.assemble = AssembleRecord(fingerprint=fp, override_ids=active, review=asm.review)
+        state.assemble = AssembleRecord(
+            fingerprint=fp, override_ids=active, review=asm.review, marks=marks
+        )
         _write_state(paths, state)
         emit(
             {
@@ -485,6 +513,7 @@ def summarize(
         zip_sha256=zip_sha256,
         generated_at=m.project.generated_at,
         markers=tally_markers(reviews),
+        marks=m.marks,
     )
 
 
@@ -496,10 +525,11 @@ def run_export(
     emit: Emit = lambda _o: None,
     force: bool = False,
     out: Path | None = None,
+    marks: ExportMarks = "invisible",
 ) -> ExportRecord:
     """Assemble (if needed), zip the staging tree, validate the zip and record the export. A
     zip that does not validate is left as `<zip>.rejected` and raises ExportError."""
-    run_assemble(paths, store, clock=clock, emit=emit, force=force)
+    run_assemble(paths, store, clock=clock, emit=emit, force=force, marks=marks)
     state = read_state(paths)
     assert state.assemble is not None and state.assemble.review is not None
     tree_fp = _tree_hash(paths.assembled)
@@ -582,7 +612,10 @@ def node_states(paths: ProjectPaths, store: Store | None = None) -> list[NodeSta
         else:
             cutoff = export_cutoff(st)
             fresh = _assemble_fresh(
-                state.assemble, fingerprint(paths, st), _active_ids(st, cutoff), cutoff
+                state.assemble,
+                fingerprint(paths, st, state.assemble.marks),
+                _active_ids(st, cutoff),
+                cutoff,
             )
             out.append(
                 NodeState(node="assemble", state="fresh")

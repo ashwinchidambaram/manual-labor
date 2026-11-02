@@ -12,7 +12,7 @@ from manuallabor.contracts.block import Block
 from manuallabor.contracts.enums import BlockStatus, Task
 from manuallabor.contracts.figure import FigureRecord, parse_figure_file
 from manuallabor.contracts.io import read_json
-from manuallabor.contracts.manifest import ManifestDocLearning, ManifestLearning
+from manuallabor.contracts.manifest import ExportMarks, ManifestDocLearning, ManifestLearning
 from manuallabor.export.types import (
     ActiveOverride,
     AssembleInputs,
@@ -27,7 +27,7 @@ from manuallabor.scoring.pipeline import scores_current
 from manuallabor.state.data import ProjectData
 from manuallabor.state.models import ActionKind
 from manuallabor.state.review import Derived, load_review_overlay
-from manuallabor.state.store import Store
+from manuallabor.state.store import Store, sha_text
 
 __all__ = ["active_overrides", "doc_ready", "last_models", "load_inputs"]
 
@@ -81,16 +81,33 @@ def last_models(paths: ProjectPaths) -> dict[str, tuple[str, str]]:
 
 def human_decisions(overlay: list[tuple[Block, Derived]]) -> dict[str, HumanDecision]:
     """Block id -> the decision behind every approved or edited block: its time, and for an
-    edited block whether a person wrote the text or accepted an agent proposal (section 20)."""
+    edited block whether a person wrote the text or accepted an agent proposal (section 20),
+    when the edit was made and the raw text it replaced (section 20.12). The decision log holds
+    the sha256 of the raw text each decision was made on; an edit whose hash is not the block's
+    raw text is no proof of what it replaced, and the export refuses rather than guess."""
     out: dict[str, HumanDecision] = {}
     for b, r in overlay:
         if b.status not in (BlockStatus.approved, BlockStatus.edited) or r.decision is None:
             continue
         edited_by: Literal["person", "agent_proposal"] | None = None
+        edited_at = None
+        original = None
         if b.status == BlockStatus.edited:
-            src = r.edit.source if r.edit is not None else r.decision.source
-            edited_by = "agent_proposal" if src == "agent" else "person"
-        out[b.id] = HumanDecision(at=r.decision.decision.timestamp, edited_by=edited_by)
+            edit = r.edit if r.edit is not None else r.decision
+            edited_by = "agent_proposal" if edit.source == "agent" else "person"
+            if edit.raw_sha256 != sha_text(b.raw_text):
+                raise ExportError(
+                    f"{b.id}: its edit was made on other source text than the block's raw text "
+                    "(the decision log's raw_sha256 differs); re-review the block in Verify"
+                )
+            edited_at = edit.decision.timestamp
+            original = b.raw_text
+        out[b.id] = HumanDecision(
+            at=r.decision.decision.timestamp,
+            edited_by=edited_by,
+            edited_at=edited_at,
+            original_text=original,
+        )
     return out
 
 
@@ -119,7 +136,12 @@ def _load_figures(paths: ProjectPaths, slug: str) -> dict[str, FigureData]:
     return out
 
 
-def load_inputs(paths: ProjectPaths, store: Store, after_action_id: int = 0) -> AssembleInputs:
+def load_inputs(
+    paths: ProjectPaths,
+    store: Store,
+    after_action_id: int = 0,
+    marks: ExportMarks = "invisible",
+) -> AssembleInputs:
     cfg = paths.load_config()
     data = ProjectData(paths, store)
     sel = data.selection()
@@ -156,4 +178,5 @@ def load_inputs(paths: ProjectPaths, store: Store, after_action_id: int = 0) -> 
         models=last_models(paths),
         learning=ManifestLearning(enabled=cfg.learning.enabled, docs=learn_docs),
         tool_version=manuallabor.__version__,
+        marks=marks,
     )

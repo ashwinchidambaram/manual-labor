@@ -66,6 +66,7 @@ function Locked({ st, after }: { st: ExportStatus; after: ExportSummary | null }
   const [opening, setOpening] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const blockers = st.blockers ?? [];
+  const faith = st.faith_blockers ?? [];
   // design 11 section 17: "to review" never counts a block an override covers; a flag counts while it holds the export
   const queued = toReviewOf(st);
   const flags = blockingFlagsOf(st);
@@ -115,6 +116,37 @@ function Locked({ st, after }: { st: ExportStatus; after: ExportSummary | null }
         </div>
       </div>
       <ul className="space-y-2 text-base" data-testid="export-reasons">
+        {faith.length > 0 ? (
+          // design 11 section 20.16: no override covers these; the change is read and decided in Verify
+          <li data-testid="reason-faith" className="space-y-2 rounded-xl bg-needs-wash px-4 py-3">
+            <p>
+              <span className="font-semibold tabular-nums">
+                {st.counts ? `${faith.length} of the ${plural(st.counts.blocking, "blocking block")}` : plural(faith.length, "block")}
+              </span>
+              : cleanup changed the text, a person must decide. No
+              override covers {faith.length === 1 ? "it" : "them"}: open each in Verify to read the change against the source, then approve, edit or
+              reject it.
+            </p>
+            <span className="flex flex-wrap gap-1.5">
+              {faith.map((id) => (
+                <a
+                  key={id}
+                  href="/verify"
+                  data-testid="faith-link"
+                  aria-label={`Open ${id} in Verify to read the change`}
+                  aria-busy={opening === id}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    void open(id);
+                  }}
+                  className={`inline-flex min-h-[1.75rem] items-center rounded-md bg-raised px-2 font-mono text-2xs text-ink ring-1 ring-inset ring-line hover:bg-act-wash hover:ring-act-line ${FOCUS}`}
+                >
+                  {id}
+                </a>
+              ))}
+            </span>
+          </li>
+        ) : null}
         {flags > 0 ? (
           <li data-testid="reason-flags" className="rounded-xl bg-raised px-4 py-3 ring-1 ring-inset ring-line">
             <span className="font-semibold tabular-nums">{plural(flags, "open flag")}</span>. {FLAG_RESOLUTION}{" "}
@@ -192,6 +224,28 @@ function Locked({ st, after }: { st: ExportStatus; after: ExportSummary | null }
   );
 }
 
+/** The listed blockers a block override may cover: not held by an uncovered flag, and not a block whose cleaned text
+ * failed the faithfulness check (design 11 section 20.16), which only a person's decision lifts. */
+function overridable(x: ExportStatus): string[] {
+  const held = new Set([...(x.flag_blockers ?? []).map((f) => f.block_id), ...(x.faith_blockers ?? [])]);
+  return (x.blockers ?? []).filter((id) => !held.has(id));
+}
+
+/** Why the listed blockers cannot be overridden by the one-click run: flags, blocks cleanup changed, or both. */
+function notListedWhy(x: ExportStatus): string {
+  const faith = (x.faith_blockers ?? []).length > 0;
+  const flags = (x.flag_blockers ?? []).length > 0;
+  if (faith && flags) return "the first ones are flagged or are blocks where cleanup changed the text. Decide on the flags below and on the changed text in Verify";
+  if (faith) return "the first ones are blocks where cleanup changed the text. A person must decide on each in Verify";
+  return "the first ones are flagged. Decide on the flags below";
+}
+
+/** Every blocker a block override may cover, from the partition: to review, less those cleanup changed (the server
+ * counts those within "to review", so the difference is exact). */
+function toOverride(x: ExportStatus): number {
+  return Math.max(0, (scopeTerms(x)?.toReview ?? 0) - (x.counts?.faith_failed ?? 0));
+}
+
 /**
  * Export before review is finished: one decision, one reason, every unflagged blocker (design 11 section 18). The
  * server lists at most BLOCKER_LIMIT blockers at a time (a rule of the status, which is polled after every approve);
@@ -218,11 +272,13 @@ function OverrideForm({
   setReason: (r: string) => void;
 }) {
   const flagged = new Set((st.flag_blockers ?? []).map((f) => f.block_id));
-  const listed = (st.blockers ?? []).filter((id) => !flagged.has(id));
+  const listed = overridable(st);
   // every unflagged blocker, not only the listed ones; an older server without the partition: what is listed
   const terms = scopeTerms(st);
-  const remaining = terms ? terms.toReview : listed.length;
-  const leftOut = terms ? terms.flagged : (st.blockers ?? []).length - listed.length;
+  const remaining = terms ? toOverride(st) : listed.length;
+  const leftOut = terms ? terms.flagged : (st.blockers ?? []).filter((id) => flagged.has(id)).length;
+  // design 11 section 20.16: blocks whose text cleanup changed wait for a person, never for an override
+  const faithLeftOut = st.counts?.faith_failed ?? (st.faith_blockers ?? []).filter((id) => !flagged.has(id)).length;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<{ done: number; of: number; final: boolean } | null>(null);
@@ -243,12 +299,9 @@ function OverrideForm({
       setBusy(false);
       return;
     }
-    const unflagged = (x: ExportStatus): string[] => {
-      const held = new Set((x.flag_blockers ?? []).map((f) => f.block_id));
-      return (x.blockers ?? []).filter((id) => !held.has(id));
-    };
+    const unflagged = overridable;
     // never more than the button named when it was pressed, nor more than the server says are left now
-    const of = Math.min(n, scopeTerms(latest)?.toReview ?? unflagged(latest).length);
+    const of = Math.min(n, scopeTerms(latest) ? toOverride(latest) : unflagged(latest).length);
     let recorded = 0;
     const tried = new Set<string>();
     const rejected: string[] = [];
@@ -283,7 +336,7 @@ function OverrideForm({
     setProgress({ done: recorded, of, final: true });
     const tally = `Recorded ${recorded} of ${of}.`;
     // what still waits after the run, said rather than left for the reader to find (design 11 section 18)
-    const left = scopeTerms(latest)?.toReview ?? unflagged(latest).length;
+    const left = scopeTerms(latest) ? toOverride(latest) : unflagged(latest).length;
     const isAre = (n: number): string => (n === 1 ? "is" : "are");
     if (stopped) setError(`${stopped} ${tally} Press the button again to record the rest.`);
     else if (rejected.length) setError(`Override refused for ${rejected.join(", ")}. ${tally}`);
@@ -293,7 +346,7 @@ function OverrideForm({
       );
     else if (left > 0)
       setError(
-        `${tally} ${plural(left, "block")} still to review ${isAre(left)} not listed yet: the server lists blockers ${BLOCKER_LIMIT} at a time and the first ones are flagged. Decide on the flags below, then press the button again.`,
+        `${tally} ${plural(left, "block")} still to review ${isAre(left)} not listed yet: the server lists blockers ${BLOCKER_LIMIT} at a time and ${notListedWhy(latest)}, then press the button again.`,
       );
     else {
       // done; blocks reviewed elsewhere during the run needed no override, and the tally says why it is short
@@ -314,6 +367,14 @@ function OverrideForm({
         exported unreviewed, with its machine-cleaned text, and listed in manifest.json. Each covers its block as it is now: a flag raised on it after
         you record the override blocks the export again, and a block that starts blocking later is not covered.
       </p>
+      {faithLeftOut ? (
+        <p className="max-w-[68ch] rounded-xl bg-needs-wash px-3 py-2 text-sm text-ink" data-testid="override-left-out-faith">
+          <span className="font-semibold">
+            {faithLeftOut === 1 ? "1 block where cleanup changed the text is left out" : `${faithLeftOut} blocks where cleanup changed the text are left out`}
+          </span>
+          : no override covers a change to the source text; a person must approve, edit or reject each one in Verify.
+        </p>
+      ) : null}
       {leftOut ? (
         <p className="max-w-[68ch] rounded-xl bg-needs-wash px-3 py-2 text-sm text-ink" data-testid="override-left-out">
           <span className="font-semibold">{leftOut === 1 ? "1 flagged block is left out" : `${leftOut} flagged blocks are left out`}</span>: a block
@@ -506,6 +567,8 @@ function Summary({ s, fresh }: { s: ExportSummary; fresh: boolean }) {
   // design 11 section 20.11: per status, the exported blocks are the paragraphs (one marker each) plus the figure
   // blocks (none); `markers` is absent from a summary recorded before markers were described here
   const m = s.markers ?? null;
+  // absent from a summary recorded before figure lines were marked (design 11 section 20.13)
+  const lines = m?.figure_lines ?? null;
   const byStatus = (c: ArticleReviewCounts): string => `${c.auto_approved} auto-approved, ${c.approved} approved, ${c.edited} edited, ${c.overridden} overridden`;
   const total = (c: ArticleReviewCounts): number => c.auto_approved + c.approved + c.edited + c.overridden;
   const markersAdd =
@@ -544,7 +607,20 @@ function Summary({ s, fresh }: { s: ExportSummary; fresh: boolean }) {
           The {plural(r.overrides, "overridden block")} went out unreviewed, with machine-cleaned text; manifest.json lists each one with its reason.
         </p>
       ) : null}
-      {m ? (
+      {m && lines ? (
+        // design 11 sections 20.13 and 20.14: figure lines carry markers too; an override's reason is a short reference
+        <p className="text-sm tabular-nums text-muted" data-testid="summary-markers">
+          In the articles, each of the {plural(total(m.paragraphs), "paragraph")} starts with an invisible <code>ml:</code> comment on the line above it
+          naming who checked it: {byStatus(m.paragraphs)}.{" "}
+          {total(lines)
+            ? `Each of the ${plural(total(lines), "figure line")} has one too, naming who decided to show the figure there: ${lines.auto_approved} auto-approved, ${lines.approved} approved, ${lines.overridden} overridden. `
+            : total(m.figures)
+              ? "There are no figure lines. "
+              : "There are no figure blocks or figure lines. "}
+          Each article&apos;s review file lists every block with the start of its text; an overridden marker names its reason by a short reference
+          (r1, r2, ...) into that file.
+        </p>
+      ) : m ? (
         <p className="text-sm tabular-nums text-muted" data-testid="summary-markers">
           In the articles, each of the {plural(total(m.paragraphs), "paragraph")} starts with an invisible <code>ml:</code> comment on the line above it
           naming who checked it: {byStatus(m.paragraphs)}.{" "}
@@ -552,6 +628,16 @@ function Summary({ s, fresh }: { s: ExportSummary; fresh: boolean }) {
             ? `The ${plural(total(m.figures), "figure block")} ${total(m.figures) === 1 ? "has" : "have"} none (${byStatus(m.figures)}); `
             : "There are no figure blocks; "}
           each article&apos;s review file lists every block with the start of its text.
+        </p>
+      ) : null}
+      {m && s.marks === "visible" ? (
+        <p className="text-sm tabular-nums text-muted" data-testid="summary-marks">
+          Visible review marks: an [unchecked] line stands above each of the {m.paragraphs.auto_approved} auto-approved paragraphs and an [overridden]
+          line above each of the {m.paragraphs.overridden} overridden ones; paragraphs a person checked have none.
+        </p>
+      ) : m && s.marks === "invisible" ? (
+        <p className="text-sm text-muted" data-testid="summary-marks">
+          Review marks are invisible in this export: someone reading the rendered articles sees no difference between checked and unchecked paragraphs.
         </p>
       ) : null}
       {m && total(m.figures) ? (
@@ -597,6 +683,8 @@ export default function ExportScreen() {
   const job = useJobWatch(jobId);
   // the block-override reason (design 11 section 20.11): kept while the form closes, cleared by an export
   const [overrideReason, setOverrideReason] = useState("");
+  // design 11 section 20.15: visible review marks are an export option, off on every visit
+  const [visibleMarks, setVisibleMarks] = useState(false);
   const st = status.data;
   const locked = !!st && (st.blockers ?? []).length > 0;
   // the second column holds the override forms (locked) and the active overrides; it is left out when empty
@@ -642,13 +730,14 @@ export default function ExportScreen() {
     setStarting(true);
     setStartError(null);
     try {
-      const j = unwrap(await client.POST("/api/export", { body: { request_id: crypto.randomUUID() } }));
+      const marks = visibleMarks ? "visible" : "invisible";
+      const j = unwrap(await client.POST("/api/export", { body: { request_id: crypto.randomUUID(), marks } }));
       trackJob(qc, j);
       setJobId(j.id);
     } catch (e) {
       if (e instanceof ApiError && e.status === 409 && e.code === "export_locked") {
         // the gate closed since the status was read: show the locked view from the refusal itself
-        const b = (e.body ?? {}) as { open_flags?: number; queued?: number; blockers?: string[] };
+        const b = (e.body ?? {}) as { open_flags?: number; queued?: number; blockers?: string[]; faith_blockers?: string[] };
         qc.setQueryData<ExportStatus>(qk.exportStatus, (old) => ({
           overrides: [],
           ...old,
@@ -656,6 +745,7 @@ export default function ExportScreen() {
           open_flags: b.open_flags ?? old?.open_flags ?? 0,
           queued: b.queued ?? old?.queued ?? 0,
           blockers: b.blockers ?? old?.blockers ?? [],
+          faith_blockers: b.faith_blockers ?? old?.faith_blockers ?? [],
         }));
         // the refusal has no scope partition: read the whole status, so the reasons do not mix old and new counts
         void qc.invalidateQueries({ queryKey: qk.exportStatus });
@@ -707,8 +797,27 @@ export default function ExportScreen() {
                   {st.unlocked
                     ? "No flag is open and nothing in scope is waiting for review."
                     : "Overrides cover every remaining block; they will be exported unreviewed and listed in manifest.json."}{" "}
-                  The zip contains the articles, their figures, manifest.json and a README; next to each article, a review file names who checked each paragraph (a person, the checks or an override).
+                  The zip contains the articles, their figures, manifest.json and a README; next to each article, a review file names who checked each paragraph and
+                  figure line (a person, the checks or an override).
                 </p>
+                <div className="max-w-[62ch] space-y-1">
+                  <label className="flex items-center gap-2 text-base text-ink">
+                    <input
+                      type="checkbox"
+                      checked={visibleMarks}
+                      onChange={(e) => setVisibleMarks(e.target.checked)}
+                      disabled={starting || running}
+                      aria-describedby="marks-help"
+                      data-testid="export-marks"
+                      className={`h-4 w-4 ${FOCUS}`}
+                    />
+                    Show review marks in the articles
+                  </label>
+                  <p id="marks-help" className="pl-6 text-sm text-muted">
+                    Puts a short [unchecked] or [overridden] line above each paragraph nobody checked, so people who read the rendered articles see it. The
+                    invisible ml: comments and the review files are there either way.
+                  </p>
+                </div>
                 <Hint id="exportButton">
                   <button
                     type="button"

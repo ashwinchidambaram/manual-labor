@@ -16,12 +16,14 @@ from manuallabor.contracts.enums import ArticleSplit
 from manuallabor.contracts.figure import FigureRecord
 from manuallabor.contracts.flag import Flag
 from manuallabor.contracts.group import GroupsFile
-from manuallabor.contracts.manifest import Manifest, ManifestLearning
+from manuallabor.contracts.manifest import ExportMarks, Manifest, ManifestLearning
 from manuallabor.state.models import ExportReviewSummary
 
 # 2: review markers and sidecars (section 20); 3: a marker before every paragraph, front matter
-# counts in the sidecar's categories, sidecar `text` and `placement` (section 20.11)
-EXPORT_ALGO_VERSION: Final = "3"
+# counts in the sidecar's categories, sidecar `text` and `placement` (section 20.11); 4: the
+# original text of edited blocks, figure-line markers, reason references and the visible marks
+# option (sections 20.12 to 20.15)
+EXPORT_ALGO_VERSION: Final = "4"
 MAX_ARTICLE_BYTES: Final = 500_000
 BLOCKER_LIMIT: Final = 20
 NO_CAPTION: Final = "(no caption)"
@@ -35,15 +37,31 @@ class ExportError(Exception):
 class GateLocked(ExportError):
     """The export gate is closed: open flags or queued in-scope blocks without an override."""
 
-    def __init__(self, open_flags: int, queued: int, blockers: list[str]) -> None:
+    def __init__(
+        self,
+        open_flags: int,
+        queued: int,
+        blockers: list[str],
+        faith_failed: list[str] | None = None,
+    ) -> None:
         self.open_flags = open_flags
         self.queued = queued
         self.blockers = blockers
+        self.faith_failed = list(faith_failed or [])
         shown = ", ".join(blockers[:BLOCKER_LIMIT])
         more = f" (+{len(blockers) - BLOCKER_LIMIT} more)" if len(blockers) > BLOCKER_LIMIT else ""
+        why = ""
+        if self.faith_failed:
+            # design 11 section 20.16: said by name, because no override can lift these
+            ff = ", ".join(self.faith_failed[:BLOCKER_LIMIT])
+            why = (
+                f"; {len(self.faith_failed)} block(s) where cleanup changed the text (the "
+                f"faithfulness check failed) need a person, no override covers them: {ff}; "
+                "approve each after reading the change, edit it or reject it in Verify"
+            )
         super().__init__(
             f"export is locked: {open_flags} open flag(s), {queued} queued block(s); "
-            f"{len(blockers)} blocker(s): {shown}{more}"
+            f"{len(blockers)} blocker(s): {shown}{more}{why}"
         )
 
 
@@ -85,6 +103,10 @@ class HumanDecision:
 
     at: datetime  # the effective decision's timestamp
     edited_by: Literal["person", "agent_proposal"] | None  # for an edited block: who wrote it
+    # for an edited block (section 20.12): when the effective edit was made, and the raw text it
+    # replaced (the block's `raw_text`, proven by the edit decision's `raw_sha256`)
+    edited_at: datetime | None = None
+    original_text: str | None = None
 
 
 @dataclass
@@ -110,6 +132,7 @@ class AssembleInputs:
     models: dict[str, tuple[str, str]]  # task -> (provider, model)
     learning: ManifestLearning
     tool_version: str
+    marks: ExportMarks = "invisible"  # visible review tags too (section 20.15)
 
 
 @dataclass(frozen=True)
@@ -118,12 +141,15 @@ class BodyPart:
     block_id: str | None  # the source block of a "block" part
     figure_id: str | None
     text: str  # the block's part as rendered (what `text_sha256` hashes), or the figure line
-    marker: str | None = None  # a "block" part's review marker (design 11 section 20.11)
+    marker: str | None = None  # the part's review marker (design 11 sections 20.11, 20.13)
+    tag: str | None = None  # its visible review tag, `--marks visible` only (section 20.15)
 
     @property
     def unit(self) -> str:
-        """What the article holds: the marker line directly above the part."""
-        return self.text if self.marker is None else self.marker + "\n" + self.text
+        """What the article holds: the marker line directly above the part, and in a visible
+        export the tag paragraph above the marker of a paragraph nobody checked."""
+        u = self.text if self.marker is None else self.marker + "\n" + self.text
+        return u if self.tag is None else self.tag + "\n\n" + u
 
 
 @dataclass

@@ -1665,6 +1665,21 @@ export interface components {
             note?: string | null;
         };
         /**
+         * ExportIn
+         * @description Body of `POST /api/export` (design 11 section 20.15): `marks: "visible"` adds a short
+         *     visible tag above each paragraph nobody checked; the invisible markers are always there.
+         */
+        ExportIn: {
+            /**
+             * Marks
+             * @default invisible
+             * @enum {string}
+             */
+            marks: "invisible" | "visible";
+            /** Request Id */
+            request_id?: string;
+        };
+        /**
          * ExportMarkers
          * @description The exported blocks by where they went (design 11 section 20.11), tallied from the
          *     review sidecars of the export: `paragraphs` are the text blocks, each with one marker in its
@@ -1672,6 +1687,7 @@ export interface components {
          *     `figures` equals that bucket of `ExportReviewSummary` (overridden = `overrides`).
          */
         ExportMarkers: {
+            figure_lines?: components["schemas"]["ArticleReviewCounts"] | null;
             figures: components["schemas"]["ArticleReviewCounts"];
             paragraphs: components["schemas"]["ArticleReviewCounts"];
         };
@@ -1724,6 +1740,11 @@ export interface components {
             blocking: number;
             /** Edited */
             edited: number;
+            /**
+             * Faith Failed
+             * @default 0
+             */
+            faith_failed: number;
             /** Flagged */
             flagged: number;
             /** In Scope */
@@ -1746,6 +1767,8 @@ export interface components {
             /** Blockers */
             blockers?: string[];
             counts?: components["schemas"]["ExportScopeCounts"] | null;
+            /** Faith Blockers */
+            faith_blockers?: string[];
             /** Flag Blockers */
             flag_blockers?: components["schemas"]["ExportFlagBlocker"][];
             /** Open Flags */
@@ -1782,6 +1805,8 @@ export interface components {
              */
             generated_at: string;
             markers?: components["schemas"]["ExportMarkers"] | null;
+            /** Marks */
+            marks?: ("invisible" | "visible") | null;
             /** Pages Covered */
             pages_covered: number;
             review: components["schemas"]["ExportReviewSummary"];
@@ -3995,7 +4020,7 @@ export interface operations {
         };
         requestBody?: {
             content: {
-                "application/json": components["schemas"]["RequestIn"] | null;
+                "application/json": components["schemas"]["ExportIn"] | null;
             };
         };
         responses: {

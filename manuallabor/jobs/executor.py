@@ -417,16 +417,19 @@ def _project_unit(
         res.blocked.setdefault(node, []).append("")
         status = "blocked"
     else:
+        from manuallabor.contracts.manifest import ExportMarks
         from manuallabor.export import pipeline as ep
         from manuallabor.export.types import GateLocked
 
         clock = extra.get("clock") or ep.resolve_clock()
         force = node in plan.force
+        # design 11 section 20.15: the export job's plan carries the review-marks mode
+        marks: ExportMarks = "visible" if extra.get("marks") == "visible" else "invisible"
         try:
             if node == "assemble":
-                ep.run_assemble(paths, None, clock=clock, emit=tagged, force=force)
+                ep.run_assemble(paths, None, clock=clock, emit=tagged, force=force, marks=marks)
             else:
-                ep.run_export(paths, None, clock=clock, emit=tagged, force=force)
+                ep.run_export(paths, None, clock=clock, emit=tagged, force=force, marks=marks)
             res.units_done += 1
             status = "done"
         except Cancelled:
