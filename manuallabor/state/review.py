@@ -20,6 +20,7 @@ from manuallabor.contracts.enums import (
     DecisionAction,
     DocKind,
     FaithViolationKind,
+    FlagCategory,
     FlagStatus,
     ProposalStatus,
 )
@@ -742,6 +743,11 @@ class ReviewService:
             target = a.flag.target_id or machine.id
             if target not in (machine.id, machine.figure_id):
                 raise InvalidOp("flag target does not belong to the block")
+            if a.flag.category == FlagCategory.table_structure and machine.type != BlockType.table:
+                # design 08 section 12: the agent can only restructure a block with table cells
+                raise InvalidOp(
+                    "Table structure applies to table blocks. Flag this block as Wrong text."
+                )
             return self._write(a, slug, machine, action, flag=a.flag, target=target)
         if action == DecisionAction.approve and r.edit is not None:
             # K then A: the approval applies to the human edit, which stays the text source

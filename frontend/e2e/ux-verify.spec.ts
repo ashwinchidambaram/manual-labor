@@ -653,8 +653,10 @@ test("T7 edit mode: letters are text, Esc cancels, Ctrl/Cmd+Enter saves", async 
 
 // ===============================================================================================================
 test("T8 flag dialog: chips 1-5, note, Enter submits, Esc cancels", async ({ page, request }) => {
-  const a = await findQueued(request, (d) => d.block.type !== "figure");
-  const b = await findQueued(request, (d) => d.block.type !== "figure", { skip: new Set([a.item.block_id]) });
+  // "Table structure" (5) is offered only for a table block (design 08 section 12), so `a` is neither a figure nor a
+  // table and shows four chips; `b`, when the project has a queued table block, takes category 5
+  const a = await findQueued(request, (d) => d.block.type !== "figure" && d.block.type !== "table");
+  const b = await findQueued(request, (d) => d.block.type === "table", { skip: new Set([a.item.block_id]) }).catch(() => null);
   await putCursor(request, a.item.block_id);
   await page.goto("/verify");
   await expect(card(page, a.item.block_id)).toBeFocused();
@@ -665,14 +667,17 @@ test("T8 flag dialog: chips 1-5, note, Enter submits, Esc cancels", async ({ pag
   await expect(dlg).toBeVisible();
   await expect(dlg).toHaveAttribute("aria-modal", "true");
   await expect(page.getByRole("radiogroup")).toBeFocused();
-  await expect(dlg.getByRole("radio")).toHaveCount(5);
-  const cats = ["wrong_text", "missing_figure", "wrong_grouping", "bad_crop", "table_structure"];
-  const labels = ["Wrong text", "Missing figure", "Wrong grouping", "Bad crop", "Table structure"];
-  for (let n = 1; n <= 5; n++) {
+  await expect(dlg.getByRole("radio")).toHaveCount(4);
+  await expect(page.getByTestId("flag-cat-table_structure")).toHaveCount(0);
+  const cats = ["wrong_text", "missing_figure", "wrong_grouping", "bad_crop"];
+  const labels = ["Wrong text", "Missing figure", "Wrong grouping", "Bad crop"];
+  for (let n = 1; n <= 4; n++) {
     await key(page, String(n));
-    for (let k = 1; k <= 5; k++) await expect(page.getByTestId(`flag-cat-${cats[k - 1]}`)).toHaveAttribute("aria-checked", k === n ? "true" : "false");
+    for (let k = 1; k <= 4; k++) await expect(page.getByTestId(`flag-cat-${cats[k - 1]}`)).toHaveAttribute("aria-checked", k === n ? "true" : "false");
     await expect(page.getByTestId(`flag-cat-${cats[n - 1]}`)).toContainText(labels[n - 1]);
   }
+  await key(page, "5"); // not offered for this block: the choice stays on 4
+  await expect(page.getByTestId("flag-cat-bad_crop")).toHaveAttribute("aria-checked", "true");
   expect(page.url(), "digits 1-5 did not navigate screens").toContain("/verify");
   await shot(page, "08-flag-dialog");
   // Enter with no category: message, no flag
@@ -709,15 +714,18 @@ test("T8 flag dialog: chips 1-5, note, Enter submits, Esc cancels", async ({ pag
   expect((await getQueue(request)).counts.flagged_open).toBeGreaterThan(0);
   const nextId = (await getCursor(request)).current_block_id!;
   await expect(card(page, nextId)).toBeFocused();
-  // each category reaches the server (second block, category 5 with Ctrl/Cmd+Enter, no note)
-  await putCursor(request, b.item.block_id);
-  await page.reload();
-  await expect(card(page, b.item.block_id)).toBeFocused();
-  await key(page, "f");
-  await expect(page.getByRole("radiogroup")).toBeFocused();
-  await key(page, "5");
-  await key(page, "ControlOrMeta+Enter");
-  await expect.poll(async () => (await getFlags(request)).find((x) => x.target_id === b.item.block_id)?.category).toBe("table_structure");
+  // category 5 reaches the server for a table block (Ctrl/Cmd+Enter, no note)
+  if (b) {
+    await putCursor(request, b.item.block_id);
+    await page.reload();
+    await expect(card(page, b.item.block_id)).toBeFocused();
+    await key(page, "f");
+    await expect(page.getByRole("radiogroup")).toBeFocused();
+    await expect(page.getByRole("dialog", { name: "Flag block" }).getByRole("radio")).toHaveCount(5);
+    await key(page, "5");
+    await key(page, "ControlOrMeta+Enter");
+    await expect.poll(async () => (await getFlags(request)).find((x) => x.target_id === b.item.block_id)?.category).toBe("table_structure");
+  }
   // figure block: bad_crop targets the figure
   const fig = (await getQueue(request)).items.find((i) => i.type === "figure");
   if (fig) {

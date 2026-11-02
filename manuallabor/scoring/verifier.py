@@ -19,7 +19,13 @@ from manuallabor.contracts.config import ModelRef, ProjectConfig
 from manuallabor.contracts.enums import BlockType, SignalName, Task
 from manuallabor.contracts.llm import Message
 from manuallabor.parse.text import collapse_ws
-from manuallabor.providers.base import RAW_CLOSE, RAW_OPEN, ProviderError, ProviderSet
+from manuallabor.providers.base import (
+    RAW_CLOSE,
+    RAW_OPEN,
+    ProviderError,
+    ProviderSet,
+    ProviderUnavailable,
+)
 from manuallabor.scoring.faithfulness import GFM_SEP_RE, MappedText, canonicalize, loose
 from manuallabor.scoring.types import (
     DETAIL_MAX,
@@ -374,6 +380,8 @@ def llm_verifier(
         return "skip_unchanged", None
     try:
         res = plan.providers().get(Task.verifier).chat(Task.verifier, verifier_messages(raw, clean))
+    except ProviderUnavailable:
+        raise  # a stopped service is not the model's answer (design 07 section 19)
     except ProviderError:
         return "verifier_errors", None
     return validate_answer(res.text, raw, clean, pair=pair)

@@ -11,7 +11,7 @@ import time
 from collections.abc import Callable, Collection
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from manuallabor import faults
 from manuallabor.contracts.config import ProjectConfig
@@ -20,6 +20,9 @@ from manuallabor.jobs import graph
 from manuallabor.jobs.providers import ProviderMode
 from manuallabor.project import ProjectPaths
 from manuallabor.providers.base import LogSink, ProviderSet
+
+if TYPE_CHECKING:
+    from manuallabor.jobs.preflight import Unreachable
 
 __all__ = [
     "Cancelled",
@@ -55,6 +58,8 @@ class Plan:
     allow_reparse: bool = False
     provider_mode: ProviderMode = "config"
     refused: list[tuple[str, str]] = field(default_factory=list)  # (slug, reason)
+    # documents left out because they are outside the selection (design 07 section 21)
+    out_of_scope: list[str] = field(default_factory=list)
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -64,6 +69,7 @@ class Plan:
             "mode": self.provider_mode,
             "units": [list(u) for u in self.units],
             "refused": [list(r) for r in self.refused],
+            "out_of_scope": list(self.out_of_scope),
         }
 
     @classmethod
@@ -75,6 +81,7 @@ class Plan:
             allow_reparse=bool(d.get("allow_reparse", False)),
             provider_mode=d.get("mode", "config"),
             refused=[(str(a), str(b)) for a, b in d.get("refused", [])],
+            out_of_scope=[str(s) for s in d.get("out_of_scope", [])],
         )
 
 
@@ -85,13 +92,24 @@ class ExecResult:
     refused: list[tuple[str, str]] = field(default_factory=list)
     units_done: int = 0
     errors: list[str] = field(default_factory=list)  # "<node> <slug>: <message>" per failure
+    # a model service the plan needs did not answer: the job stopped there (design 07 section 20)
+    unreachable: Unreachable | None = None
 
     @property
     def ok(self) -> bool:
-        return not self.failed and not self.refused and not self.blocked
+        return (
+            not self.failed and not self.refused and not self.blocked and self.unreachable is None
+        )
+
+    @property
+    def error_code(self) -> str | None:
+        return "provider_unreachable" if self.unreachable is not None else None
 
     def error_message(self, limit: int = 500) -> str | None:
-        """The first failure's actual message (for the job row), at most `limit` chars."""
+        """The first failure's actual message (for the job row), at most `limit` chars. A
+        service that could not be reached is the reason, whatever failed on the way to it."""
+        if self.unreachable is not None:
+            return self.unreachable.message[:limit]
         if self.errors:
             return self.errors[0][:limit]
         if self.refused:
@@ -249,7 +267,12 @@ def reparse_unknown(exc: BaseException) -> str:
 
 def _reparse_guard(paths: ProjectPaths, slug: str) -> str | None:
     """None when a re-parse of `slug` orphans nothing; otherwise the refusal message. Fails
-    closed: an unreadable database refuses (design 07 section 14.4)."""
+    closed: an unreadable database refuses (design 07 section 14.4). A first parse (no
+    blocks.json) replaces no blocks: decisions of a manual removed and added again under the same
+    slug are already orphaned, and the parse can only bring back the unchanged ones (design 07
+    section 22)."""
+    if not paths.doc(slug).blocks.is_file():
+        return None
     try:
         n = _decision_count(paths, slug)
     except Exception as exc:
@@ -282,7 +305,10 @@ def make_plan(
     last = EXEC_NODES.index(to)
     per_doc: dict[str, list[str]] = {}
     refused: list[tuple[str, str]] = []
+    out_of_scope = _settled_out(paths, slugs) if last >= EXEC_NODES.index("clean") else []
     for slug in slugs:
+        if slug in out_of_scope:
+            continue
         states = {s.node: s for s in graph.doc_node_states(paths, slug, cfg)}
         chosen: list[str] = []
         planning = include_fresh
@@ -308,7 +334,29 @@ def make_plan(
         allow_reparse=allow_reparse,
         provider_mode=provider_mode,
         refused=refused,
+        out_of_scope=out_of_scope,
     )
+
+
+SCOPE_NODES = ("ingest", "parse", "figures", "score", "group")
+
+
+def _settled_out(paths: ProjectPaths, slugs: list[str]) -> list[str]:
+    """Documents a plan past `group` leaves out (design 07 section 21): no selected block, and
+    either grouped (the reviewer left it out) or failed on the way to `group` (it cannot be
+    selected until it is read; Scope's Re-run retries it). A manual still being read stays in:
+    grouping will put it in the selection (design 08 section 10)."""
+    from manuallabor.grouping.selection import in_scope_docs
+
+    scope = in_scope_docs(paths)
+    out: list[str] = []
+    for slug in slugs:
+        if slug in scope:
+            continue
+        st = graph.load_stages(paths, slug)
+        if paths.doc(slug).groups.is_file() or any(st.failed(n) for n in SCOPE_NODES):
+            out.append(slug)
+    return out
 
 
 def make_project_plan(
@@ -345,6 +393,7 @@ def make_project_plan(
         allow_reparse=allow_reparse,
         provider_mode=provider_mode,
         refused=base.refused,
+        out_of_scope=base.out_of_scope,
     )
 
 
@@ -460,17 +509,27 @@ def execute(
     on_unit: Callable[[str, str, str], None] | None = None,
     tag_node: bool = True,
     extra: dict[str, Any] | None = None,
+    reach: Callable[[list[tuple[str, str]]], Unreachable | None] | None = None,
+    precheck: bool = True,
 ) -> ExecResult:
-    """Run the plan. The caller holds the worker lock (and the project lock where it must)."""
+    """Run the plan. The caller holds the worker lock (and the project lock where it must).
+
+    `reach` (design 07 section 20) checks that the model services the given units need answer:
+    it is asked before the first unit and again after any unit fails; an unreachable service
+    stops the job there, recorded on each remaining document's first unit that needs it."""
     extra = extra or {}
     cfg = paths.load_config() if paths.config.is_file() else None
     res = ExecResult(refused=list(plan.refused))
     for slug, why in plan.refused:
         emit({"doc": slug, "stage": "plan", "status": "error", "detail": why})
+    for slug in plan.out_of_scope:
+        emit({"doc": slug, "stage": "plan", "status": "skip", "detail": "not in your selection"})
     clean_stray_tmp(paths)
+    if precheck and reach is not None and check_units(paths, plan, reach, res, emit):
+        return res
     stages: dict[str, graph.Stages] = {}
     blocked: set[str] = set()
-    for node, slug in plan.units:
+    for i, (node, slug) in enumerate(plan.units):
         if cancelled():
             raise Cancelled()
         if heartbeat is not None:
@@ -499,10 +558,14 @@ def execute(
         was_fresh = (
             cfg is not None and graph.node_state(paths, slug, node, cfg, st).state == "fresh"
         )
+        # design 07 section 19 rule 3: a node whose last attempt failed is re-executed, never
+        # re-checked, so no stage's own skip accepts what the failed attempt left behind. Parse
+        # keeps its page-level resume (its currency check never accepts an incomplete parse).
+        force = node in plan.force or (node != "parse" and st.failed(node))
         t0 = time.monotonic()
         faults.delay(f"node.before:{node}:{slug}")
         try:
-            ok = _stage(paths, node, slug, node in plan.force, tagged, providers, extra)
+            ok = _stage(paths, node, slug, force, tagged, providers, extra)
         except Cancelled:
             raise
         except Exception as exc:  # a stage that raises outright fails its doc
@@ -521,27 +584,77 @@ def execute(
         )
         # a node that verified itself current without doing anything leaves stages.json alone,
         # otherwise every no-op `labor parse` would mark everything downstream stale
-        if not ok or node in plan.force or did_work or not was_fresh:
-            st.record(node, "done" if ok else "failed", None, None if ok else "stage failed")
+        msg = _failure_detail(unit_lines) if not ok else None
+        if not ok or force or did_work or not was_fresh:
+            st.record(node, "done" if ok else "failed", None, None if ok else msg)
             graph.save_stages(paths, slug, st)
         if ok:
             res.units_done += 1
         else:
             res.failed.setdefault(node, []).append(slug)
             blocked.add(slug)
-            details = [
-                str(o["detail"])
-                for o in unit_lines
-                if o.get("status") == "error" and o.get("detail") is not None
-            ]
-            msg = details[-1] if details else "stage failed"
             res.errors.append(f"{node} {slug}: {msg}")
         status = "done" if ok else "failed"
         emit({"event": "unit_done", "node": node, "doc": slug, "status": status,
               "elapsed_ms": int((time.monotonic() - t0) * 1000)})  # fmt: skip
         if on_unit is not None:
             on_unit(node, slug, status)
+        if not ok and reach is not None:
+            # the failed unit first: its record then carries the plain sentence, not the error
+            rest = [(node, slug), *(u for u in plan.units[i + 1 :] if u[0] not in PROJECT_NODES)]
+            if _unreachable(paths, cfg, rest, reach, res, emit):
+                break
     return res
+
+
+def check_units(
+    paths: ProjectPaths,
+    plan: Plan,
+    reach: Callable[[list[tuple[str, str]]], Unreachable | None],
+    res: ExecResult,
+    emit: Emit,
+) -> bool:
+    """The check before the first unit (design 07 section 20): True when a service the plan
+    needs is down; then it is recorded on the documents and `res.unreachable` says which."""
+    cfg = paths.load_config() if paths.config.is_file() else None
+    return _unreachable(paths, cfg, list(plan.units), reach, res, emit)
+
+
+def _unreachable(
+    paths: ProjectPaths,
+    cfg: ProjectConfig | None,
+    units: list[tuple[str, str]],
+    reach: Callable[[list[tuple[str, str]]], Unreachable | None],
+    res: ExecResult,
+    emit: Emit,
+) -> bool:
+    """Ask `reach` about `units`; when a service is down, record it and tell the log."""
+    if cfg is None or not units:
+        return False
+    u = reach(units)
+    if u is None:
+        return False
+    from manuallabor.jobs.preflight import record_unreachable
+
+    docs = record_unreachable(paths, cfg, units, u)
+    res.unreachable = u
+    emit({"stage": "preflight", "status": "error", "detail": u.message, "host": u.host,
+          "tasks": list(u.tasks), "docs": docs})  # fmt: skip
+    return True
+
+
+FAILURE_STATUSES = ("error", "topic_failed")
+
+
+def _failure_detail(lines: list[dict[str, Any]], limit: int = 500) -> str:
+    """The unit's own reason for failing: the last error-like line's detail (design 07 section
+    19 rule 4). `group` reports a topic failure as `topic_failed`, not `error`."""
+    details = [
+        str(o["detail"])
+        for o in lines
+        if o.get("status") in FAILURE_STATUSES and o.get("detail") is not None
+    ]
+    return (details[-1] if details else "stage failed")[:limit]
 
 
 def run_node(

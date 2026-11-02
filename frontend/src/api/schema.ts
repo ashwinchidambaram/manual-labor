@@ -23,6 +23,7 @@ export type SuggestionTable = S["SuggestionTable"];
 export type TierOption = S["TierOption"];
 export type JobInfo = S["JobInfo"];
 export type NodeState = S["NodeState"];
+export type SourceRemoval = S["SourceRemoval"];
 export type ApplyTierOut = S["ApplyTierOut"];
 export type ProbeOut = S["ProbeOut"];
 export type Tier = S["ApplyTierIn"]["tier"];

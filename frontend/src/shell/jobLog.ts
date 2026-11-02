@@ -15,6 +15,7 @@ const NODE: Record<string, string> = {
   agent: "Agent pass",
   assemble: "Assembling articles",
   export: "Building the export",
+  preflight: "Checking the model service",
 };
 
 const str = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v.trim() : typeof v === "number" ? String(v) : null);
@@ -70,3 +71,17 @@ export function jobLogLine(r: Row): string | null {
 }
 
 export const jobLogLines = (rows: Row[]): string[] => rows.map(jobLogLine).filter((l): l is string => l !== null);
+
+/**
+ * A server message without its command-line advice (design 08 section 12: no command lines inside the product). Stage
+ * errors are shared with the CLI and end in hints such as "(run `labor score`)"; on a screen the button to press is
+ * named instead. Everything else in the message is kept as written.
+ */
+export function withoutCommandHints(text: string): string {
+  return text
+    .replace(/\s*\((?:re-)?run `labor [^`]*`\)/g, "")
+    .replace(/;\s*re-run `labor [^`]*`/g, "")
+    .replace(/\s*Use --[a-z-]+ to [^.]*(?:\.|$)/g, "")
+    .replace(/\s+\./g, ".")
+    .trim();
+}

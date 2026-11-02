@@ -26,6 +26,7 @@ from manuallabor.providers.base import (
     LogSink,
     ProviderError,
     ProviderOutputError,
+    ProviderUnavailable,
     RawChat,
     RawEmbed,
     utc_now,
@@ -66,6 +67,18 @@ _RETRIABLE_NAMES = frozenset(
         "RateLimitError",
         "BadGatewayError",
     }
+)
+# a failure to reach the service at all (design 07 section 19): matched on the exception text,
+# because LiteLLM wraps every Ollama transport error in APIConnectionError, some of which are not
+# connection failures (a malformed reply is one too)
+_UNREACHABLE = re.compile(
+    r"Connection refused|Errno (?:61|111|65|113|51|101)\b|Failed to establish a new connection"
+    r"|All connection attempts failed|Name or service not known|nodename nor servname"
+    r"|No route to host|Network is unreachable|Cannot connect to host|ConnectError",
+    re.IGNORECASE,
+)
+_CONNECT_NAMES = frozenset(
+    {"APIConnectionError", "ConnectError", "ConnectionError", "ConnectionRefusedError"}
 )
 _SECRET_PATTERNS = (re.compile(r"sk-[A-Za-z0-9_\-]{6,}"), re.compile(r"Bearer\s+\S+"))
 
@@ -372,6 +385,10 @@ class LiteLLMProvider(BaseProvider):
         ):
             msg += f" (run: ollama pull {self.ref.model})"
             retriable = False
+        if name in _CONNECT_NAMES and _UNREACHABLE.search(str(exc)):
+            return ProviderUnavailable(
+                msg, provider=self.ref.provider, model=self.ref.model, retriable=True
+            )
         return ProviderError(
             msg, provider=self.ref.provider, model=self.ref.model, retriable=retriable
         )

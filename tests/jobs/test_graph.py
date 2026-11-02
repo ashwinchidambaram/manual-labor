@@ -236,7 +236,8 @@ def test_stages_json_has_no_timestamps(lp: ProjectPaths) -> None:
     st = json.loads(lp.doc("clean").stages.read_text())
     assert set(st) == {"counter", "nodes"}
     for rec in st["nodes"].values():
-        assert set(rec) == {"seq", "status", "fingerprint", "error"}
+        # `code` names a failure the screens word apart (design 07 section 20); no timestamp
+        assert set(rec) == {"seq", "status", "fingerprint", "error", "code"}
     assert graph.load_stages(lp, "clean").seq("score2") > graph.load_stages(lp, "clean").seq(
         "clean"
     )

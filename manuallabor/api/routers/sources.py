@@ -6,7 +6,7 @@ import hashlib
 import os
 import tempfile
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, File, Query, Request, UploadFile
 from fastapi.responses import FileResponse
@@ -20,7 +20,7 @@ from manuallabor.contracts.enums import BlockStatus, BlockType
 from manuallabor.contracts.figure import FigureRecord
 from manuallabor.contracts.io import PART_SUFFIX, read_json, read_json_list
 from manuallabor.project import DocPaths, ProjectPaths
-from manuallabor.state.models import FigureAttachment, JobInfo, RunPlanIn
+from manuallabor.state.models import FigureAttachment, JobInfo, RunPlanIn, SourceRemoval
 
 router = APIRouter(prefix="/api", tags=["sources"])
 
@@ -94,6 +94,44 @@ def upload_sources(
     limit = int(getattr(request.app.state, "max_body_bytes", DEFAULT_MAX_BODY_BYTES))
     saved = [_save_upload(ctx.paths.uploads, f, limit) for f in files]
     return ctx.runner.enqueue(RunPlanIn(to="group"), kind="ingest_run", files=saved)
+
+
+def _store(ctx: Ctx) -> Any:
+    from manuallabor.state.store import Store
+
+    if not isinstance(ctx.store, Store):  # the API fakes have no database
+        raise ApiError(501, "not_implemented", "removing a manual needs the project database")
+    return ctx.store
+
+
+@router.get(
+    "/sources/{slug}/removal",
+    response_model=SourceRemoval,
+    responses={404: {"model": ApiErrorBody}},
+)
+def removal_preview(slug: str, ctx: Ctx) -> SourceRemoval:
+    """What removing this manual deletes and orphans, and why it cannot be done now (design 07
+    section 22). Read-only."""
+    from manuallabor.state.sources import removal
+
+    _known_slug(ctx.paths, slug)
+    return removal(ctx.paths, _store(ctx), slug)
+
+
+@router.delete(
+    "/sources/{slug}",
+    response_model=SourceRemoval,
+    responses={404: {"model": ApiErrorBody}, 409: {"model": ApiErrorBody}},
+)
+def remove_manual(
+    slug: str, ctx: Ctx, request_id: Annotated[str, Query(min_length=1, max_length=200)]
+) -> SourceRemoval:
+    """Remove a manual: its source file and everything read from it, its blocks from the
+    selection. Decisions and flags on its blocks stay in the log, orphaned. 409 `job_active`
+    while a job could touch it. Idempotent per `request_id` (design 07 section 22)."""
+    from manuallabor.state.sources import remove_source
+
+    return remove_source(ctx.paths, _store(ctx), slug, request_id, hold=ctx.runner.hold)
 
 
 @router.get("/docs/{slug}/source", response_class=FileResponse)

@@ -26,7 +26,7 @@ from manuallabor.project import ProjectPaths
 from manuallabor.scoring.pipeline import score_fingerprint, scores_current
 from manuallabor.scoring.types import SCORING_ALGO_VERSION, ScoreFile
 from manuallabor.state.interfaces import JobRunnerP
-from manuallabor.state.models import DocLearning, DocStatus, NodeState, ProjectStatus
+from manuallabor.state.models import DocLearning, DocStatus, NodeState, ProjectStatus, RemovedDoc
 
 if TYPE_CHECKING:
     from manuallabor.contracts.document import Document
@@ -65,6 +65,7 @@ class NodeRecord(BaseModel):
     status: Literal["done", "failed"]
     fingerprint: str | None = None
     error: str | None = None
+    code: str | None = None  # "provider_unreachable" (design 07 section 20)
 
 
 class Stages(BaseModel):
@@ -75,10 +76,21 @@ class Stages(BaseModel):
     nodes: dict[str, NodeRecord] = {}
 
     def record(
-        self, node: str, status: Literal["done", "failed"], fp: str | None, error: str | None
+        self,
+        node: str,
+        status: Literal["done", "failed"],
+        fp: str | None,
+        error: str | None,
+        code: str | None = None,
     ) -> None:
         self.counter += 1
-        self.nodes[node] = NodeRecord(seq=self.counter, status=status, fingerprint=fp, error=error)
+        self.nodes[node] = NodeRecord(
+            seq=self.counter, status=status, fingerprint=fp, error=error, code=code
+        )
+
+    def failed(self, node: str) -> bool:
+        r = self.nodes.get(node)
+        return r is not None and r.status == "failed"
 
     def seq(self, node: str) -> int:
         r = self.nodes.get(node)
@@ -159,6 +171,8 @@ def _fingerprint_state(paths: ProjectPaths, slug: str, node: str, cfg: ProjectCo
         from manuallabor.contracts.group import GroupsFile
 
         gf = read_json(dp.groups, GroupsFile)
+        if gf.topic_status != "ok":  # written by a failed attempt (design 07 section 19)
+            return "topics failed"
         return None if gf.fingerprint == group_fingerprint(paths, slug, cfg) else "inputs changed"
     if node == "clean":
         fp_clean, fp_attach, fp_desc = clean_fingerprints(paths, slug, cfg)
@@ -199,7 +213,13 @@ def node_state(
     rec = stages.nodes.get(node)
     out: NodeState
     if rec is not None and rec.status == "failed":
-        out = NodeState(node=node, state="failed", reason=rec.error)
+        unreachable = rec.code == "provider_unreachable"
+        out = NodeState(
+            node=node,
+            state="failed",
+            reason=rec.error,
+            code="provider_unreachable" if unreachable else None,
+        )
     elif not _exists(paths, slug, node):
         out = NodeState(node=node, state="missing")
     else:
@@ -375,8 +395,13 @@ def project_status(paths: ProjectPaths, runner: JobRunnerP | None) -> ProjectSta
     cfg = paths.load_config() if paths.config.is_file() else ProjectConfig(name=paths.root.name)
     docs: list[DocStatus] = []
     names: set[str] = set()
+    removed: list[RemovedDoc] = []
     store, own = _status_store(paths, runner)
     try:
+        if store is not None:
+            from manuallabor.state.sources import removed_docs
+
+            removed = removed_docs(paths, store)
         for slug in paths.list_slugs():
             doc: Document = _memo(
                 paths,
@@ -406,5 +431,9 @@ def project_status(paths: ProjectPaths, runner: JobRunnerP | None) -> ProjectSta
     )
     running = runner.list({"running", "queued"}) if runner is not None else []
     return ProjectStatus(
-        project=cfg.name, docs=docs, unregistered_sources=unreg, jobs_running=running
+        project=cfg.name,
+        docs=docs,
+        unregistered_sources=unreg,
+        jobs_running=running,
+        removed=removed,
     )

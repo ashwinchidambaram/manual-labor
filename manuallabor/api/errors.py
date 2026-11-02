@@ -12,6 +12,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from manuallabor.agent.errors import AgentConflict
 from manuallabor.state.errors import (
+    Conflict,
     EditConflictError,
     InvalidOp,
     LockHeld,
@@ -59,6 +60,10 @@ def install_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(AgentConflict)
     async def _agent(_: Request, exc: AgentConflict) -> JSONResponse:
+        return _json(409, exc.code, exc.detail)
+
+    @app.exception_handler(Conflict)
+    async def _busy(_: Request, exc: Conflict) -> JSONResponse:
         return _json(409, exc.code, exc.detail)
 
     @app.exception_handler(LockHeld)

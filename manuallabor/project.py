@@ -260,7 +260,13 @@ class ProjectPaths:
     def list_slugs(self) -> list[str]:
         if not self.docs.is_dir():
             return []
-        return sorted(p.name for p in self.docs.iterdir() if (p / "document.json").is_file())
+        # a dot-named directory is never a document: `.removed-<slug>-<hex>` is one being deleted
+        # (design 07 section 22)
+        return sorted(
+            p.name
+            for p in self.docs.iterdir()
+            if not p.name.startswith(".") and (p / "document.json").is_file()
+        )
 
     def load_config(self) -> ProjectConfig:
         return read_json(self.config, ProjectConfig)

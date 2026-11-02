@@ -98,6 +98,7 @@ describe("next-step and welcome copy says only what the counts say", () => {
   const base = {
     manuals: 3,
     ready: 3,
+    failed: [],
     names: ["clean.pdf", "scanned.pdf", "manual.docx"],
     pages: 32,
     blocks: 364,
@@ -131,5 +132,14 @@ describe("next-step and welcome copy says only what the counts say", () => {
     expect(welcomeCopy({ ...base, ready: 2 }).title).toBe("Welcome. 2 of your 3 manuals are ready; one is still being read.");
     expect(welcomeCopy({ ...base, ready: 1 }).title).toBe("Welcome. 1 of your 3 manuals is ready; 2 are still being read.");
     expect(welcomeCopy(base).manuals).toBe("clean.pdf, scanned.pdf and manual.docx");
+  });
+  it("names a manual that could not be read and never calls the set read and ready (design 08 section 12)", () => {
+    // first-time user run 5: the headline flipped back to "read and ready" while two manuals were failed
+    const two = { ...base, ready: 1, failed: ["pump-service-tables.pdf", "x200-two-column.pdf"] };
+    expect(welcomeCopy(two).title).toBe("Welcome. 1 of your 3 manuals is ready; pump-service-tables.pdf and x200-two-column.pdf could not be read.");
+    const mixed = { ...base, ready: 1, failed: ["clean.pdf"] };
+    expect(welcomeCopy(mixed).title).toBe("Welcome. 1 of your 3 manuals is ready; clean.pdf could not be read; one is still being read.");
+    expect(welcomeCopy({ ...base, manuals: 1, ready: 0, names: ["a.pdf"], failed: ["a.pdf"] }).title).toBe("Welcome. a.pdf could not be read.");
+    for (const f of [two, mixed]) expect(welcomeCopy(f).title).not.toContain("read and ready");
   });
 });

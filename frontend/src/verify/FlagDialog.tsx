@@ -1,14 +1,25 @@
 import { useEffect, useRef, useState } from "react";
-import type { FlagCategory } from "../api/schema";
+import type { BlockType, FlagCategory } from "../api/schema";
 import { useHotkeys } from "../hooks/useHotkeys";
 import { FLAG_CATEGORIES, FLAG_RESOLUTION, FOCUS } from "./labels";
 
 interface Props {
   onSubmit: (category: FlagCategory, note: string | null) => void;
   onCancel: () => void;
+  /** the flagged block's type; null while it loads (then every category but table structure is offered) */
+  blockType?: BlockType | null;
 }
 
-export default function FlagDialog({ onSubmit, onCancel }: Props) {
+/**
+ * The categories a block can be flagged with (design 08 section 12): "Table structure" only for a table block, the
+ * one kind the agent can restructure. Each keeps its digit, so 5 always means table structure.
+ */
+export function flagCategoriesFor(blockType: BlockType | null | undefined): { id: FlagCategory; label: string; key: number }[] {
+  return FLAG_CATEGORIES.map((c, i) => ({ ...c, key: i + 1 })).filter((c) => c.id !== "table_structure" || blockType === "table");
+}
+
+export default function FlagDialog({ onSubmit, onCancel, blockType = null }: Props) {
+  const shown = flagCategoriesFor(blockType);
   const [cat, setCat] = useState<FlagCategory | null>(null);
   const [note, setNote] = useState("");
   const [msg, setMsg] = useState("");
@@ -27,7 +38,9 @@ export default function FlagDialog({ onSubmit, onCancel }: Props) {
     onSubmit(cat, note.trim() === "" ? null : note.trim());
   };
   const pick = (i: number) => () => {
-    setCat(FLAG_CATEGORIES[i].id);
+    const c = FLAG_CATEGORIES[i];
+    if (!shown.some((x) => x.id === c.id)) return; // not offered for this block
+    setCat(c.id);
     setMsg("");
   };
   useHotkeys({
@@ -75,7 +88,7 @@ export default function FlagDialog({ onSubmit, onCancel }: Props) {
           It goes to the Agent screen, where a model proposes a fix for you to accept or reject. {FLAG_RESOLUTION}
         </p>
         <div ref={group} role="radiogroup" aria-label="Category" tabIndex={0} className={`flex flex-wrap gap-2 rounded p-1 ${FOCUS}`}>
-          {FLAG_CATEGORIES.map((c, i) => (
+          {shown.map((c) => (
             <button
               key={c.id}
               type="button"
@@ -84,12 +97,12 @@ export default function FlagDialog({ onSubmit, onCancel }: Props) {
               tabIndex={-1}
               data-testid={`flag-cat-${c.id}`}
               onClick={() => {
-                pick(i)();
+                pick(c.key - 1)();
                 group.current?.focus();
               }}
               className={`min-h-[2.25rem] rounded-lg px-2.5 text-sm ring-1 ring-inset ${cat === c.id ? "bg-ink font-semibold text-raised ring-ink" : "bg-raised text-ink ring-line-strong hover:bg-sunk"}`}
             >
-              <kbd className="mr-1 font-mono text-xs">{i + 1}</kbd>
+              <kbd className="mr-1 font-mono text-xs">{c.key}</kbd>
               {c.label}
             </button>
           ))}

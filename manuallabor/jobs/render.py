@@ -26,6 +26,12 @@ def render_status(st: ProjectStatus, *, verbose: bool = False) -> str:
             for n in d.nodes:
                 if n.state != "fresh" and n.reason:
                     lines.append(f"{'':<{width}}    {n.node}: {n.state} ({n.reason})")
+    for r in st.removed:  # design 07 section 22: kept in the log, orphaned
+        flags = f"{r.open_flags} open flag{'s' * (r.open_flags != 1)}"
+        lines.append(
+            f"removed: {r.filename} ({r.doc_id}): {r.orphaned_decisions} orphaned "
+            f"decision{'s' * (r.orphaned_decisions != 1)}, {flags}"
+        )
     if st.unregistered_sources:
         lines.append("unregistered sources: " + ", ".join(st.unregistered_sources))
     for j in st.jobs_running:

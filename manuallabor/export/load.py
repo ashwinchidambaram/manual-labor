@@ -9,6 +9,7 @@ import manuallabor
 from manuallabor import ids
 from manuallabor.cleanup.types import AttachFile
 from manuallabor.contracts.block import Block
+from manuallabor.contracts.document import Document
 from manuallabor.contracts.enums import BlockStatus, Task
 from manuallabor.contracts.figure import FigureRecord, parse_figure_file
 from manuallabor.contracts.io import read_json
@@ -22,6 +23,7 @@ from manuallabor.export.types import (
     HumanDecision,
 )
 from manuallabor.figures.types import FigureReport
+from manuallabor.grouping.selection import scope_docs
 from manuallabor.project import ProjectPaths
 from manuallabor.scoring.pipeline import scores_current
 from manuallabor.state.data import ProjectData
@@ -147,9 +149,16 @@ def load_inputs(
     sel = data.selection()
     selected_all = set(sel.block_ids)
     docs: dict[str, DocInput] = {}
+    left_out: dict[str, Document] = {}
     learn_docs: dict[str, ManifestDocLearning] = {}
+    scope = scope_docs(sel)
     for slug in paths.list_slugs():
         if not doc_ready(paths, slug):
+            if slug not in scope:
+                # design 11 section 20.18: outside the selection and never processed (it could
+                # not be read): its parsed blocks are accounted as not selected
+                left_out[slug] = paths.load_document(slug)
+                continue
             raise ExportError(f"stale: {slug}: not processed to score2 (run `labor run`)")
         gf = data.groups(slug)
         af: AttachFile | None = data.attach(slug)
@@ -173,6 +182,7 @@ def load_inputs(
         config=cfg,
         split=sel.article_split,
         docs=docs,
+        left_out=left_out,
         flags=store.flags(),
         overrides=active_overrides(store, after_action_id),
         models=last_models(paths),

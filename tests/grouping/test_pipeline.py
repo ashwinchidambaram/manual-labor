@@ -217,8 +217,12 @@ def test_topic_failure_keeps_structure_and_exits_nonzero(
     ps = provider_set(sink, embeddings=FailingEmbedder(sink=sink))
     failed, lines = run_and_collect(scored_copy, only="clean", providers=ps)
     assert failed == ["clean"] and lines[-1]["status"] == "topic_failed"
-    gf = read_json(scored_copy.doc("clean").groups, GroupsFile)
+    assert "embedding failed" in lines[-1]["detail"]
+    # design 04 section 3.6 step 8 (amended 2026-11-02): nothing is persisted on a topic failure;
+    # the pure builder still returns the structure view with every body block in t000
+    assert not scored_copy.doc("clean").groups.exists()
     blocks = [b for b in _blocks(scored_copy, "clean")]
+    gf = group_document(scored_copy.load_document("clean"), blocks, ps)
     assert gf.topic_status == "failed" and gf.topic_error and gf.embedding_dim == 0
     assert len(gf.structure) == 18 and [t.id for t in gf.topics] == ["g-clean-t000"]
     body = {b.id for b in blocks if b.type not in (BlockType.header, BlockType.footer)}

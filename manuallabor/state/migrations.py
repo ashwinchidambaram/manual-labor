@@ -182,4 +182,10 @@ ALTER TABLE jobs ADD COLUMN merged_into TEXT;
 CREATE INDEX jobs_merged ON jobs(merged_into) WHERE merged_into IS NOT NULL;
 """
 
-MIGRATIONS: list[str] = [MIGRATION_1, MIGRATION_2, MIGRATION_3, MIGRATION_4]
+# design 07 section 20: why a job failed when a screen words it apart (a model service that
+# could not be reached), so the banner can say what to start and offer Retry
+MIGRATION_5 = """
+ALTER TABLE jobs ADD COLUMN error_code TEXT;
+"""
+
+MIGRATIONS: list[str] = [MIGRATION_1, MIGRATION_2, MIGRATION_3, MIGRATION_4, MIGRATION_5]

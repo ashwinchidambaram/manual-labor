@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
-import { client, unwrap } from "../api/client";
-import { invalidateAfterJob, useActiveJobs } from "../api/queries";
+import { ApiError, client, unwrap } from "../api/client";
+import { SOURCES_CHANGED, invalidateAfterJob, useActiveJobs } from "../api/queries";
 import type { JobInfo } from "../api/schema";
 
 export interface JobsPolling {
@@ -13,7 +13,10 @@ export interface JobsPolling {
 
 /**
  * Polls only while a job runs (useActiveJobs.refetchInterval). When a job leaves the active list its record is
- * read once: `done` reconciles the caches (invalidateAfterJob plus `extra`), anything else is reported in `failed`.
+ * read once and the caches are reconciled (invalidateAfterJob plus `extra`) whatever its outcome: a failed job
+ * changed things too (a manual it added, a stage it marked failed), and a screen must not stay stale under its
+ * banner (design 07 section 20). Anything but `done` is reported in `failed`. When the manuals change (one was
+ * removed), each failed job is read again and one whose row is gone (it was about that manual only) is dropped.
  */
 export function useJobsPolling(extra: readonly QueryKey[] = []): JobsPolling {
   const qc = useQueryClient();
@@ -33,8 +36,9 @@ export function useJobsPolling(extra: readonly QueryKey[] = []): JobsPolling {
       void (async () => {
         try {
           const j = unwrap(await client.GET("/api/jobs/{job_id}", { params: { path: { job_id: id } } }));
-          if (j.status === "done") invalidateAfterJob(qc, extraRef.current);
-          else if (j.status === "failed" || j.status === "interrupted" || j.status === "cancelled")
+          if (j.status === "done" || j.status === "failed" || j.status === "interrupted" || j.status === "cancelled")
+            invalidateAfterJob(qc, extraRef.current);
+          if (j.status === "failed" || j.status === "interrupted" || j.status === "cancelled")
             setFailed((f) => [...f.filter((x) => x.id !== j.id), j]);
         } catch {
           /* job record unreadable: nothing to reconcile */
@@ -42,6 +46,23 @@ export function useJobsPolling(extra: readonly QueryKey[] = []): JobsPolling {
       })();
     }
   }, [data, qc]);
+
+  const failedRef = useRef<JobInfo[]>(failed);
+  failedRef.current = failed;
+  useEffect(() => {
+    const recheck = (): void => {
+      for (const j of failedRef.current)
+        void (async () => {
+          try {
+            unwrap(await client.GET("/api/jobs/{job_id}", { params: { path: { job_id: j.id } } }));
+          } catch (e) {
+            if (e instanceof ApiError && e.status === 404) setFailed((f) => f.filter((x) => x.id !== j.id));
+          }
+        })();
+    };
+    window.addEventListener(SOURCES_CHANGED, recheck);
+    return () => window.removeEventListener(SOURCES_CHANGED, recheck);
+  }, []);
 
   return { jobs, failed, dismiss: (id) => setFailed((f) => f.filter((x) => x.id !== id)) };
 }

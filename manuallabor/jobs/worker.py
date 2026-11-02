@@ -19,12 +19,14 @@ from typing import Any
 
 from manuallabor import faults
 from manuallabor.contracts.enums import Task
-from manuallabor.jobs import progress
+from manuallabor.jobs import preflight, progress
 from manuallabor.jobs.executor import (
     PROJECT_NODES,
     Cancelled,
+    ExecResult,
     Heartbeat,
     Plan,
+    check_units,
     execute,
     make_plan,
     make_project_plan,
@@ -164,18 +166,26 @@ def run_job(root: Path, job_id: str) -> int:
     threading.Thread(target=pulse, daemon=True).start()
     hb = Heartbeat(JsonlSink(paths.llm_log), on_beat=beat, cancelled=cancel.is_set)
     providers = provider_set_factory(paths, cfg, mode, hb)
-    status, error = "done", None
+    status, error, error_code = "done", None, None
     failed: dict[str, Any] = {}
     try:
         rp = spec["plan"]
         if spec.get("kind") == "agent":
             from manuallabor.agent.pipeline import run_agent_plan
 
-            n_err = run_agent_plan(paths, rp, providers, log, cancel.is_set)
-            if n_err:
-                status, error = "failed", f"{n_err} agent item(s) ended in an error"
+            u = preflight.check_agent(cfg) if mode != "mock" else None
+            if u is not None:
+                log({"stage": "preflight", "status": "error", "detail": u.message,
+                     "host": u.host, "tasks": list(u.tasks), "docs": []})  # fmt: skip
+                status, error, error_code = "failed", u.message, preflight.CODE
+            else:
+                n_err = run_agent_plan(paths, rp, providers, log, cancel.is_set)
+                if n_err:
+                    status, error = "failed", f"{n_err} agent item(s) ended in an error"
         else:
-            status, failed, error = _run_stages(paths, spec, rp, mode, providers, log, hb, cancel)
+            status, failed, res = _run_stages(paths, spec, rp, mode, providers, log, hb, cancel)
+            if failed:
+                error, error_code = res.error_message(), res.error_code
     except Cancelled:
         status = "cancelled"
     except Exception as exc:
@@ -183,7 +193,11 @@ def run_job(root: Path, job_id: str) -> int:
     finally:
         stop.set()
         _close_pools()
-        log({"event": "job_end", "status": status, "failed": failed, "error": error})
+        end: dict[str, Any] = {"event": "job_end", "status": status, "failed": failed}
+        end["error"] = error
+        if error_code is not None:
+            end["error_code"] = error_code
+        log(end)
         log.close()
         wlock.release()
     return 0 if status == "done" else (130 if status == "cancelled" else 1)
@@ -198,7 +212,7 @@ def _run_stages(
     log: JobLog,
     hb: Heartbeat,
     cancel: threading.Event,
-) -> tuple[str, dict[str, Any], str | None]:
+) -> tuple[str, dict[str, Any], ExecResult]:
     """The stage-graph job body (`run` and `ingest_run`)."""
     status = "done"
     failed: dict[str, Any] = {}
@@ -227,6 +241,11 @@ def _run_stages(
     marks = rp.get("marks", "invisible")
     if marks not in ("invisible", "visible"):  # design 11 section 20.15
         raise ValueError(f"plan marks must be 'invisible' or 'visible', got {marks!r}")
+    # design 07 section 20: a model service the plan needs is asked before any unit runs
+    reach = preflight.reacher(paths, cfg, mode)
+    res = ExecResult(refused=list(plan.refused))
+    if reach is not None and check_units(paths, plan, reach, res, log):
+        return "failed", {"preflight": sorted({s for _, s in plan.units if s})}, res
     steps = StepLog(log, plan.units)
     steps({"event": "job_start", "units": len(plan.units)})
     prev = progress.set_reporter(steps.step)
@@ -239,13 +258,17 @@ def _run_stages(
             cancelled=cancel.is_set,
             heartbeat=hb,
             extra={"marks": marks},
+            reach=reach,
+            precheck=False,
         )
     finally:
         progress.set_reporter(prev)
     failed = {**res.failed, **({"plan": [s for s, _ in res.refused]} if res.refused else {})}
+    if res.unreachable is not None:
+        failed.setdefault("preflight", [])
     if failed:
         status = "failed"
-    return status, failed, res.error_message() if failed else None
+    return status, failed, res
 
 
 def _close_pools() -> None:

@@ -106,7 +106,9 @@ describe("C7 SplitModeControl", () => {
 
 describe("C8 ModelPanel", () => {
   it("shows tasks, hardware, the suggested tier and its pull commands", async () => {
-    installFake();
+    const f = installFake();
+    // the pull commands are advice only while Ollama answers (design 07 section 20)
+    (f.models.probe as unknown as { ollama: { reachable: boolean } }).ollama.reachable = true;
     await loaded();
     const panel = await screen.findByTestId("model-panel");
     for (const t of ["cleanup", "grouping", "vision", "verifier", "embeddings"]) expect(within(panel).getByTestId(`model-${t}`)).toBeInTheDocument();

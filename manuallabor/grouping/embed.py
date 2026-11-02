@@ -9,7 +9,7 @@ import numpy as np
 
 from manuallabor.contracts.enums import Task
 from manuallabor.grouping.types import TopicFailure
-from manuallabor.providers.base import Provider, ProviderError
+from manuallabor.providers.base import Provider, ProviderError, ProviderUnavailable
 
 
 def embed_blocks(
@@ -31,6 +31,8 @@ def embed_blocks(
         chunk = [prefix + t for t in texts[i : i + batch]]
         try:
             vecs = provider.embed(Task.embeddings, chunk)
+        except ProviderUnavailable:
+            raise  # the document fails; nothing is written (design 07 section 19)
         except ProviderError as exc:
             raise TopicFailure(f"embedding failed: {exc}") from exc
         if len(vecs) != len(chunk):

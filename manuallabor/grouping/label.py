@@ -19,7 +19,12 @@ from manuallabor.contracts.enums import Task, TitleSource
 from manuallabor.contracts.llm import Message
 from manuallabor.grouping.types import NAME_TOKENS, TITLE_MAX, TOPIC_SLUG_MAX
 from manuallabor.parse.text import collapse_ws
-from manuallabor.providers.base import Provider, ProviderError, ProviderOutputError
+from manuallabor.providers.base import (
+    Provider,
+    ProviderError,
+    ProviderOutputError,
+    ProviderUnavailable,
+)
 
 NAME_SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -171,6 +176,8 @@ def name_topic(
             return NamedTopic(title, slug, TitleSource.llm)
         except ProviderOutputError as exc:
             reason = str(exc)
+        except ProviderUnavailable:
+            raise  # a stopped service is not an answer to fall back from (design 07 section 19)
         except ProviderError:
             break
         except ValueError as exc:
@@ -382,6 +389,8 @@ def review_stragglers(
             return validate_assignments(res.parsed, batch)
         except ProviderOutputError as exc:
             reason = str(exc)
+        except ProviderUnavailable:
+            raise  # a stopped service is not an answer to fall back from (design 07 section 19)
         except ProviderError:
             return None
         except ValueError as exc:

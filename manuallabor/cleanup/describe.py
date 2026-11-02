@@ -10,7 +10,12 @@ from typing import Any, Final
 from manuallabor.cleanup.types import DESC_MAX, DESCRIBE_PROMPT_VERSION, TAGS_MAX, DescribeOutcome
 from manuallabor.contracts.enums import Task
 from manuallabor.parse.text import collapse_ws
-from manuallabor.providers.base import Provider, ProviderError, ProviderOutputError
+from manuallabor.providers.base import (
+    Provider,
+    ProviderError,
+    ProviderOutputError,
+    ProviderUnavailable,
+)
 
 DESCRIBE_SCHEMA: Final[dict[str, Any]] = {
     "type": "object",
@@ -67,7 +72,8 @@ class Described:
 
 def describe_figure(provider: Provider, png: bytes, caption: str | None) -> Described:
     """One call, one retry (with a rejection note, so a new input hash) on invalid output;
-    ``invalid`` after that. A provider failure is ``error``. Never raises ProviderError."""
+    ``invalid`` after that. A provider failure is ``error``. Raises only ProviderUnavailable:
+    a stopped service is not an answer (design 07 section 19)."""
     note: str | None = None
     calls = 0
     for _ in range(2):
@@ -79,6 +85,8 @@ def describe_figure(provider: Provider, png: bytes, caption: str | None) -> Desc
         except ProviderOutputError as exc:
             note = str(exc)[:NOTE_MAX]
             continue
+        except ProviderUnavailable:
+            raise
         except ProviderError:
             return Described("error", None, [], calls)
         err = validate_description(res.parsed)

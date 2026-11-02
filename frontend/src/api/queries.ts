@@ -2,7 +2,7 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient, type QueryKey } from "@tanstack/react-query";
 import { client, unwrap } from "./client";
 import { selSync } from "./selectionSync";
-import type { ApplyTierOut, JobInfo, ProbeOut, SelectionOut, Tier } from "./schema";
+import type { ApplyTierOut, JobInfo, ProbeOut, SelectionOut, SourceRemoval, Tier } from "./schema";
 
 export const qk = {
   project: ["project"] as const,
@@ -113,6 +113,34 @@ export function useRerun() {
   return useMutation({
     mutationFn: async () => unwrap(await client.POST("/api/jobs", { body: { to: "group", allow_reparse: false } })),
     onSuccess: (job) => trackJob(qc, job),
+  });
+}
+
+/** What removing a manual deletes and orphans, read when the confirmation opens (design 08 section 11). */
+export const useRemovalPreview = (slug: string | null) =>
+  useQuery({
+    queryKey: ["sources", "removal", slug] as const,
+    enabled: slug !== null,
+    staleTime: 0,
+    queryFn: async (): Promise<SourceRemoval> =>
+      unwrap(await client.GET("/api/sources/{slug}/removal", { params: { path: { slug: slug! } } })),
+  });
+
+/** Event the jobs bar listens to: the set of manuals changed, so a failed job about a removed one may be gone. */
+export const SOURCES_CHANGED = "ml:sources-changed";
+
+export function useRemoveSource() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (slug: string): Promise<SourceRemoval> =>
+      unwrap(
+        await client.DELETE("/api/sources/{slug}", { params: { path: { slug }, query: { request_id: crypto.randomUUID() } } }),
+      ),
+    onSuccess: () => {
+      // every screen that counts blocks, manuals or flags (design 08 section 11)
+      invalidateAfterJob(qc);
+      window.dispatchEvent(new Event(SOURCES_CHANGED));
+    },
   });
 }
 

@@ -288,9 +288,11 @@ def _group_doc(
     doc = paths.load_document(slug)
     overrides = load_overrides(dp.group_overrides)
     prior = _load_prior(dp.groups)
-    if not force and prior is not None and prior.fingerprint == fp:
+    # a file written by a failed attempt (before 2026-11-02 a topic failure was persisted under
+    # the current fingerprint) is never "up to date" (design 07 section 19)
+    if not force and prior is not None and prior.fingerprint == fp and prior.topic_status == "ok":
         emit(_progress(slug, "skip", prior, None, t0, "up to date"))
-        return prior.topic_status == "ok"
+        return True
     gf, stats = group_document_ex(
         doc,
         blocks,
@@ -304,10 +306,12 @@ def _group_doc(
     if problems:
         shown = "; ".join(problems[:5])
         raise GroupingError(f"partition check failed ({len(problems)} problems): {shown}")
-    write_json(dp.groups, gf)
     if gf.topic_status == "failed":
+        # nothing is written: a degraded file under the current fingerprint would be accepted as
+        # this document's grouping by every later run (design 04 section 3.6 step 8, amended)
         emit(_progress(slug, "topic_failed", gf, stats, t0, gf.topic_error))
         return False
+    write_json(dp.groups, gf)
     stale = f"{len(gf.overrides_stale)} stale overrides" if gf.overrides_stale else None
     emit(_progress(slug, "done", gf, stats, t0, stale))
     return True

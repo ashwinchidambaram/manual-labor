@@ -798,7 +798,7 @@ export default function ExportScreen() {
                 Not ready to export:{" "}
                 {nr.waiting.length ? (
                   <>
-                    {waitingWords(nr)} Run the pipeline from the Scope screen (or <code>labor run</code>), then come back.{" "}
+                    {waitingWords(nr)} Run the pipeline from the Scope screen, then come back.{" "}
                   </>
                 ) : null}
                 {processingWords(nr)}

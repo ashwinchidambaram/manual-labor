@@ -18,7 +18,7 @@ import subprocess
 import sys
 import threading
 import time
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterator, Sequence
 from datetime import timedelta
 from pathlib import Path
 from typing import Any
@@ -47,8 +47,8 @@ _MIRRORED = (
 )  # fmt: skip
 # what a merged row takes from its survivor when that one ends (stored, same transaction)
 _SETTLED = (
-    "status", "finished_at", "error", "progress", "units_done", "units_total", "node", "doc",
-    "message",
+    "status", "finished_at", "error", "error_code", "progress", "units_done", "units_total",
+    "node", "doc", "message",
 )  # fmt: skip
 # Finished job rows are pruned (at start and hourly) once they are older than PRUNE_AFTER, beyond
 # the newest PRUNE_KEEP of them. A finished row is read for three things: the idempotency of a
@@ -82,6 +82,7 @@ def job_info(row: Any) -> JobInfo:
         finished_at=None if row["finished_at"] is None else parse_ts(row["finished_at"]),
         pid=row["pid"],
         error=row["error"],
+        error_code=row["error_code"] if row["error_code"] == "provider_unreachable" else None,
         resumed_from=row["resumed_from"],
         merged_into=row["merged_into"],
     )
@@ -178,6 +179,13 @@ class JobRunner:
         record_export_run(self.store, payload, request_id=f"{job_id}:export_run")
 
     # -- public API (JobRunnerP) ------------------------------------------------------------
+
+    @contextlib.contextmanager
+    def hold(self) -> Iterator[None]:
+        """No job starts or ends while this is held (the supervision tick waits): a manual is
+        removed under it (design 07 section 22). Keep it short; enqueues are not blocked."""
+        with self._lock:
+            yield
 
     def enqueue(
         self,
@@ -587,17 +595,22 @@ class JobRunner:
         self._update_progress(job_id, tail)
         row = self.store.job_row(job_id)
         assert row is not None
+        code = None
         if tail.end is not None:
             status = str(tail.end.get("status", "failed"))
             error = tail.end.get("error")
             error = None if error is None else str(error)[:500]
+            code = tail.end.get("error_code") if status == "failed" else None
             if status == "failed" and not error and tail.end.get("failed"):
                 error = f"failed: {json.dumps(tail.end['failed'], sort_keys=True)}"
         elif row["cancel_requested"]:
             status, error = "cancelled", None
         else:
             status, error = "interrupted", "worker exited without a job_end line"
-        fields: dict[str, Any] = {"status": status, "finished_at": self.store.now(), "error": error}
+        fields: dict[str, Any] = {
+            "status": status, "finished_at": self.store.now(), "error": error,
+            "error_code": code if code == "provider_unreachable" else None,
+        }  # fmt: skip
         if exit_code is not None:
             fields["exit_code"] = exit_code
         if status == "done":

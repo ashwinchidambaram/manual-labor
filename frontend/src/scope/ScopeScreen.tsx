@@ -291,10 +291,12 @@ export default function ScopeScreen() {
     for (const d of blockIndex.data) for (const b of d.blocks) if (eng.ids.has(b.id)) t[b.type] = (t[b.type] ?? 0) + 1;
     return t;
   }, [blockIndex.data, eng.ids]);
-  const readyManuals = (sources.data ?? []).filter((s) => groupedSlugs.has(s.slug)).length;
+  // a manual with a failed stage is neither ready nor still being read: the welcome names it (design 08 section 12)
+  const failedManuals = (sources.data ?? []).filter((s) => s.nodes.some((n) => n.state === "failed"));
+  const readyManuals = (sources.data ?? []).filter((s) => groupedSlugs.has(s.slug) && !failedManuals.includes(s)).length;
   const welcome =
     guide?.open && summary && sources.data?.length
-      ? welcomeFacts(sources.data, summary, eng.ids.size > 0 && eng.ids.size === index.selectable.size, { ready: readyManuals, types: welcomeTypes })
+      ? welcomeFacts(sources.data, summary, eng.ids.size > 0 && eng.ids.size === index.selectable.size, { ready: readyManuals, types: welcomeTypes, failed: failedManuals.map((s) => s.filename) })
       : null;
   const noSources = sources.isSuccess && sources.data.length === 0 && eng.docs.length === 0;
   // the welcome is due (the guide flag says so) but its counts are still loading: keep its space so it does not push

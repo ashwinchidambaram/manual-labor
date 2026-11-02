@@ -1,5 +1,5 @@
 """Exceptions of the state layer. B maps them to HTTP: NotFound 404, OutOfScope 422,
-EditConflictError 409, LockHeld 409, InvalidOp 422."""
+EditConflictError 409, LockHeld 409, Conflict 409, InvalidOp 422."""
 
 from __future__ import annotations
 
@@ -32,6 +32,16 @@ class EditConflictError(Exception):
     def __init__(self, conflict: EditConflict) -> None:
         super().__init__("edit changes content; confirm_content_change=true to store it")
         self.conflict = conflict
+
+
+class Conflict(Exception):
+    """The request cannot be done now (HTTP 409 with `code`), e.g. removing a manual while a job
+    could touch it (design 07 section 22)."""
+
+    def __init__(self, code: str, detail: str) -> None:
+        super().__init__(detail)
+        self.code = code
+        self.detail = detail
 
 
 class LockHeld(Exception):

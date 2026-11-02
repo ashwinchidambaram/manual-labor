@@ -2201,7 +2201,7 @@
       },
       "ExportStatus": {
         "additionalProperties": false,
-        "description": "`unlocked` is the raw gate (no open flag, no queued in-scope block, and `not_ready`\nempty); `blockers` are the first blocks (reading order, at most 20) an active override does\nnot cover: an export is possible iff `blockers` and `not_ready` are both empty.\n`flag_blockers` lists every uncovered open flag (no cap); `counts` partitions the scope\n(None from a store that is not a project store).\n`not_ready` lists the documents the gate cannot see yet, because they have no current\nscores (never run to score2, or scored by another `SCORING_ALGO_VERSION`, design 03 section\n2.10a): none of their blocks is in any count, so while it is non-empty the project needs a\nrun before an export and `unlocked` is false (review D3, design 11 section 20.17).",
+        "description": "`unlocked` is the raw gate (no open flag, no queued in-scope block, and `not_ready`\nempty); `blockers` are the first blocks (reading order, at most 20) an active override does\nnot cover: an export is possible iff `blockers` and `not_ready` are both empty.\n`flag_blockers` lists every uncovered open flag (no cap); `counts` partitions the scope\n(None from a store that is not a project store).\n`not_ready` lists the documents the gate cannot see yet, because they have no current\nscores (never run to score2, or scored by another `SCORING_ALGO_VERSION`, design 03 section\n2.10a): none of their blocks is in any count, so while it is non-empty the project needs a\nrun before an export and `unlocked` is false (review D3, design 11 section 20.17). Only\ndocuments that contribute a selected block are listed: one outside the selection (left out\nby the reviewer, or never read so never selected) cannot lock the export; it is exported as\nleft out (design 11 section 20.18).",
         "properties": {
           "blockers": {
             "items": {
@@ -3584,6 +3584,18 @@
             ],
             "title": "Error"
           },
+          "error_code": {
+            "anyOf": [
+              {
+                "const": "provider_unreachable",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
           "files": {
             "items": {
               "type": "string"
@@ -4036,6 +4048,18 @@
       "NodeState": {
         "additionalProperties": false,
         "properties": {
+          "code": {
+            "anyOf": [
+              {
+                "const": "provider_unreachable",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
           "node": {
             "title": "Node",
             "type": "string"
@@ -4787,6 +4811,13 @@
             "title": "Project",
             "type": "string"
           },
+          "removed": {
+            "items": {
+              "$ref": "#/components/schemas/RemovedDoc"
+            },
+            "title": "Removed",
+            "type": "array"
+          },
           "unregistered_sources": {
             "items": {
               "type": "string"
@@ -5458,6 +5489,38 @@
           "job"
         ],
         "title": "RegroupOut",
+        "type": "object"
+      },
+      "RemovedDoc": {
+        "additionalProperties": false,
+        "description": "A manual removed from the project (design 07 section 22). Its decisions and flags stay in\nthe log; they are orphaned while no document of that slug exists, counted live.",
+        "properties": {
+          "doc_id": {
+            "maxLength": 48,
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "title": "Doc Id",
+            "type": "string"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "open_flags": {
+            "default": 0,
+            "title": "Open Flags",
+            "type": "integer"
+          },
+          "orphaned_decisions": {
+            "default": 0,
+            "title": "Orphaned Decisions",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "doc_id",
+          "filename"
+        ],
+        "title": "RemovedDoc",
         "type": "object"
       },
       "RequestIn": {
@@ -6337,6 +6400,80 @@
           "nodes"
         ],
         "title": "SourceInfo",
+        "type": "object"
+      },
+      "SourceRemoval": {
+        "additionalProperties": false,
+        "description": "What removing a manual deletes and orphans (design 07 section 22). The preview\n(`GET /api/sources/{slug}/removal`) has `removed` false and says in `blocked_by` why it\ncannot be done now; the answer of `DELETE /api/sources/{slug}` has `removed` true. Counts\nare the server's: `blocks` parsed, `selected_blocks` in the selection, the `decisions`,\n`flags` (`open_flags` of them still open) and agent `proposals` on its blocks, which stay\nin the log, orphaned.",
+        "properties": {
+          "blocked_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blocked By"
+          },
+          "blocks": {
+            "minimum": 0.0,
+            "title": "Blocks",
+            "type": "integer"
+          },
+          "decisions": {
+            "minimum": 0.0,
+            "title": "Decisions",
+            "type": "integer"
+          },
+          "doc_id": {
+            "maxLength": 48,
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "title": "Doc Id",
+            "type": "string"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "flags": {
+            "minimum": 0.0,
+            "title": "Flags",
+            "type": "integer"
+          },
+          "open_flags": {
+            "minimum": 0.0,
+            "title": "Open Flags",
+            "type": "integer"
+          },
+          "proposals": {
+            "minimum": 0.0,
+            "title": "Proposals",
+            "type": "integer"
+          },
+          "removed": {
+            "default": false,
+            "title": "Removed",
+            "type": "boolean"
+          },
+          "selected_blocks": {
+            "minimum": 0.0,
+            "title": "Selected Blocks",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "doc_id",
+          "filename",
+          "blocks",
+          "selected_blocks",
+          "decisions",
+          "flags",
+          "open_flags",
+          "proposals"
+        ],
+        "title": "SourceRemoval",
         "type": "object"
       },
       "StragglerRecord": {
@@ -9491,6 +9628,133 @@
           }
         },
         "summary": "Upload Sources",
+        "tags": [
+          "sources"
+        ]
+      }
+    },
+    "/api/sources/{slug}": {
+      "delete": {
+        "description": "Remove a manual: its source file and everything read from it, its blocks from the\nselection. Decisions and flags on its blocks stay in the log, orphaned. 409 `job_active`\nwhile a job could touch it. Idempotent per `request_id` (design 07 section 22).",
+        "operationId": "remove_manual",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "title": "Request Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceRemoval"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Manual",
+        "tags": [
+          "sources"
+        ]
+      }
+    },
+    "/api/sources/{slug}/removal": {
+      "get": {
+        "description": "What removing this manual deletes and orphans, and why it cannot be done now (design 07\nsection 22). Read-only.",
+        "operationId": "removal_preview",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceRemoval"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Removal Preview",
         "tags": [
           "sources"
         ]

@@ -5,8 +5,10 @@ const plural = (n: number, w: string): string => `${n} ${w}${n === 1 ? "" : "s"}
 
 export interface WelcomeFacts {
   manuals: number;
-  /** manuals whose blocks are grouped and listed on Scope; the others are still being read */
+  /** manuals whose blocks are grouped and listed on Scope with no failed stage */
   ready: number;
+  /** file names of manuals with a failed stage; the rest that are not ready are still being read */
+  failed: string[];
   /** every manual's file name, in the server's order */
   names: string[];
   pages: number;
@@ -24,11 +26,12 @@ export function welcomeFacts(
   sources: readonly SourceInfo[],
   summary: ScopeSummary,
   everything: boolean,
-  extra: { ready: number; types: Record<string, number> | null } = { ready: sources.length, types: null },
+  extra: { ready: number; types: Record<string, number> | null; failed?: string[] } = { ready: sources.length, types: null },
 ): WelcomeFacts {
   return {
     manuals: sources.length,
     ready: extra.ready,
+    failed: extra.failed ?? [],
     names: sources.map((s) => s.filename),
     pages: sources.reduce((n, s) => n + s.pages, 0),
     blocks: summary.blocks,
@@ -80,11 +83,17 @@ export function welcomeCopy(f: WelcomeFacts): { title: string; body: string; man
         : f.numericQueued > 0
           ? `${f.numericQueued} of them contain numbers, which a person always checks.`
           : "None of them contain numbers; each scored under the auto-approve line.";
-  const reading = f.manuals - f.ready;
+  // a failed manual is named, never counted as read or as still being read (design 08 section 12)
+  const failed = f.failed.length;
+  const reading = f.manuals - f.ready - failed;
+  const failedPart = failed ? `${list(f.failed)} could not be read` : "";
+  const readingPart = reading > 0 ? `${reading === 1 ? "one is" : `${reading} are`} still being read` : "";
   const title =
-    reading <= 0
+    reading <= 0 && failed === 0
       ? `Welcome. Your ${f.manuals === 1 ? "manual is" : `${f.manuals} manuals are`} read and ready.`
-      : `Welcome. ${f.ready} of your ${f.manuals} manuals ${f.ready === 1 ? "is" : "are"} ready; ${reading === 1 ? "one is" : `${reading} are`} still being read.`;
+      : f.ready === 0 && reading <= 0
+        ? `Welcome. ${failedPart}.`
+        : `Welcome. ${f.ready} of your ${f.manuals} manuals ${f.ready === 1 ? "is" : "are"} ready; ${[failedPart, readingPart].filter(Boolean).join("; ")}.`;
   return {
     title,
     body: `${found} You decide what goes into the knowledge base. Anything the checks cannot vouch for comes to you, next to the page it came from.`,

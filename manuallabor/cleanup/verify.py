@@ -37,7 +37,7 @@ from manuallabor.contracts.block import (
     NumericVariant,
 )
 from manuallabor.contracts.enums import Task
-from manuallabor.providers.base import Provider, ProviderError
+from manuallabor.providers.base import Provider, ProviderError, ProviderUnavailable
 from manuallabor.scoring.faithfulness import FaithOutcome, check_faithfulness_ex
 from manuallabor.scoring.pipeline import faith_kwargs
 from manuallabor.scoring.types import BlockContext
@@ -143,6 +143,8 @@ def clean_block(
         called = True
         try:
             res = provider.chat(Task.cleanup, build_messages(x, examples))
+        except ProviderUnavailable:
+            raise  # a stopped service is not the model's answer (design 07 section 19)
         except ProviderError as exc:
             llm = LlmOutcome(outcome="error", reason=str(exc)[:ERROR_MAX])
         else:

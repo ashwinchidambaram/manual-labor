@@ -31,7 +31,8 @@ describe("ExportScreen, documents not scored yet", () => {
     renderApp("/export");
     const note = await screen.findByTestId("export-not-ready");
     expect(note).toHaveTextContent("Not ready to export: clean, scanned have not been through scoring and cleanup with this version yet.");
-    expect(note).toHaveTextContent("Run the pipeline from the Scope screen (or labor run), then come back.");
+    expect(note).toHaveTextContent("Run the pipeline from the Scope screen, then come back.");
+    expect(note).not.toHaveTextContent("labor"); // no command line inside the product (design 08 section 12)
     expect(screen.queryByTestId("export-ready")).toBeNull();
     expect(screen.queryByTestId("export-start")).toBeNull();
   });
@@ -148,7 +149,7 @@ describe("which documents a running job brings in (second review)", () => {
     const note = await screen.findByTestId("export-not-ready");
     await waitFor(() => expect(note).toHaveTextContent("beta.pdf is being processed"));
     expect(note).toHaveTextContent(
-      "Not ready to export: alpha.pdf has not been through scoring and cleanup with this version yet. Run the pipeline from the Scope screen (or labor run), then come back. beta.pdf is being processed.",
+      "Not ready to export: alpha.pdf has not been through scoring and cleanup with this version yet. Run the pipeline from the Scope screen, then come back. beta.pdf is being processed.",
     );
   });
   it("the rail names files", () => {

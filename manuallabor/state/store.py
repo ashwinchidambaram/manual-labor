@@ -799,12 +799,23 @@ class Store:
                 )
         return len(old)
 
+    def delete_jobs(self, job_ids: Collection[str]) -> None:
+        """Delete finished job rows (a removed manual's own jobs, design 07 section 22)."""
+        ns = [int(j.split("-", 1)[1]) for j in job_ids]
+        for i in range(0, len(ns), 500):
+            chunk = ns[i : i + 500]
+            self.x(
+                f"DELETE FROM jobs WHERE n IN ({','.join('?' for _ in chunk)}) "  # noqa: S608
+                "AND status NOT IN ('queued', 'running', 'merged')",
+                tuple(chunk),
+            )
+
     def update_job(self, job_id: str, **fields: Any) -> None:
         n = int(job_id.split("-", 1)[1])
         allowed = {
             "status", "progress", "units_done", "units_total", "node", "doc", "message",
             "started_at", "finished_at", "pid", "log_path", "exit_code", "error",
-            "cancel_requested", "plan", "merged_into",
+            "cancel_requested", "plan", "merged_into", "error_code",
         }  # fmt: skip
         sets = []
         args: list[Any] = []

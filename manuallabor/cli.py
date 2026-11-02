@@ -277,6 +277,71 @@ def status(
         sys.stdout.write(render_status(st, verbose=verbose))
 
 
+def _removal_words(r: object) -> str:
+    from manuallabor.state.models import SourceRemoval
+
+    assert isinstance(r, SourceRemoval)
+
+    def n(k: int, w: str) -> str:
+        return f"{k} {w}{'s' * (k != 1)}"
+
+    return (
+        f"{r.filename} ({r.doc_id}): {n(r.blocks, 'block')}, {r.selected_blocks} selected; "
+        f"{n(r.decisions, 'decision')} and {n(r.open_flags, 'open flag')} on its blocks stay in "
+        "the decision log, orphaned"
+    )
+
+
+@app.command()
+def remove(
+    project: Annotated[Path, typer.Argument(help="Project directory.")],
+    slug: Annotated[str, typer.Argument(help="The manual's document slug (see `labor status`).")],
+    yes: Annotated[
+        bool, typer.Option("--yes", help="Remove it (without: only show what goes).")
+    ] = False,
+) -> None:
+    """Remove a manual: its source file and everything read from it. Decisions and flags on its
+    blocks stay in the decision log, orphaned (design 07 section 22)."""
+    import uuid
+
+    from manuallabor.project import ProjectPaths
+    from manuallabor.state.errors import Conflict, LockHeld, NotFound
+    from manuallabor.state.lock import ProjectLock
+    from manuallabor.state.sources import removal, remove_source
+    from manuallabor.state.store import Store
+
+    if not project.is_dir():
+        print(f"project directory not found: {project}", file=sys.stderr)
+        raise typer.Exit(2)
+    paths = ProjectPaths(project)
+    plock = ProjectLock(paths.lock, cmd=" ".join(sys.argv))
+    try:
+        plock.acquire()
+    except LockHeld as exc:
+        print(f"{exc}", file=sys.stderr)
+        raise typer.Exit(3) from exc
+    try:
+        store = Store.open(paths)
+        try:
+            preview = removal(paths, store, slug)
+            if not yes:
+                print(f"would remove {_removal_words(preview)}")
+                print("run again with --yes to remove it")
+                raise typer.Exit(2)
+            out = remove_source(paths, store, slug, f"cli-remove-{uuid.uuid4().hex}", screen="cli")
+            print(f"removed {_removal_words(out)}")
+        except NotFound as exc:
+            print(f"unknown manual: {slug}", file=sys.stderr)
+            raise typer.Exit(1) from exc
+        except Conflict as exc:
+            print(exc.detail, file=sys.stderr)
+            raise typer.Exit(3) from exc
+        finally:
+            store.close()
+    finally:
+        plock.release()
+
+
 @app.command()
 def run(
     project: Annotated[Path, typer.Argument(help="Project directory.")],
@@ -341,6 +406,8 @@ def run(
         wlock.release()
         plock.release()
     if not res.ok:
+        if res.unreachable is not None:  # design 07 section 20: say what to do, plainly
+            print(res.unreachable.message, file=sys.stderr)
         raise typer.Exit(1)
 
 

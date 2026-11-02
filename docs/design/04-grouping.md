@@ -160,6 +160,7 @@ Deterministic: the inputs are the model's titles (temperature 0, cached), the me
 6. Topic `Group` fields: `level = 0`, `parent_id = None`, `section_ids` = sorted structure ids of members, `page_ranges`, `figure_count`, `cohesion` (§3.3).
 7. **t000** "Unassigned blocks", slug `unassigned`, `is_unassigned = True`, `cohesion = None`; it holds `no_text` and `low_similarity` blocks. Header/footer blocks are **not** in t000; they appear only as `UnassignedEntry(view=topic, reason=header_footer)`, exactly mirroring the structure view, so t000 contains only selectable blocks.
 8. **Topic failure** (embeddings failed): `topics = [t000 with every body block]`, each with reason `topic_failed`. The structure view is still written, and the doc's exit status is 1. The UI keeps working in structure view.
+   *Amended 2026-11-02 (design 07 section 19):* nothing is written on a topic failure. The degraded file carried the current fingerprint, so the stage's own skip check accepted it on every later run and the document could never be re-grouped once the embeddings came back (first-time user run 5). The document fails with the embedding error, a `groups.json` from an earlier good run is left as it was, and the Scope screen shows the manual as failed with its reason and a Re-run. `group_document_ex` still builds the degraded `GroupsFile` (it is pure and its partition is still checked); only `run_group` declines to persist it. A transport failure (`ProviderUnavailable`) in naming or straggler review is not a fallback either: it fails the document (design 07 section 19 rule 2).
 
 ## 4. Coverage mapping (`coverage.py`)
 
@@ -267,7 +268,7 @@ Fixtures: lift `figproj_scoring`/`scoredproj`/`scored_copy` from `tests/scoring/
 | 29 | fingerprint invalidation | `scored_copy` | changing blocks.json, the embeddings ModelRef, an override, or `learning.enabled` → re-run; re-scoring with a new threshold → skip |
 | 30 | fully mocked run | `build_provider_set` with all-mock config and **no** canned responses | completes all 6 docs, no `ProviderError`; `llm_calls.jsonl` has `grouping` and `embeddings` entries |
 | 31 | mock digest stable | fresh interpreter with/without importing `manuallabor.grouping.pipeline` | `MockProvider.cache_namespace` equal |
-| 32 | topic failure | embeddings provider raising `ProviderError` | groups.json written with structure view, t000 = all body blocks `topic_failed`, partition holds, exit 1 |
+| 32 | topic failure | embeddings provider raising `ProviderError` | `group_document` returns the structure view with t000 = all body blocks `topic_failed` and the partition holds; `run_group` writes no groups.json (amended 2026-11-02, §3.6 step 8), exit 1 |
 | 33 | overrides | move to existing slug; move to vanished slug; rename | applied / listed stale and not applied / title changed, slug unchanged |
 | 34 | learning off = baseline | learned state present, `learning.enabled = False` | `learning_snapshot == "baseline"`, bytes equal to a run with no learned state |
 | 35 | performance | synthetic 3,000 blocks, mock | `group_document` < 5 s |

@@ -151,13 +151,19 @@ def _sha_file(p: Path) -> str:
 
 
 def _check_fresh(paths: ProjectPaths) -> None:
+    """Every document in the selection is processed and current. A document outside it cannot
+    hold the export up (design 11 section 20.18): it is exported as left out."""
+    from manuallabor.grouping.selection import in_scope_docs
     from manuallabor.jobs import graph
 
     cfg = paths.load_config()
     slugs = paths.list_slugs()
     if not slugs:
         raise ExportError("stale: the project has no documents")
+    scope = in_scope_docs(paths)
     for slug in slugs:
+        if slug not in scope:
+            continue
         for st in graph.doc_node_states(paths, slug, cfg):
             if st.state != "fresh":
                 why = f" ({st.reason})" if st.reason else ""
@@ -307,9 +313,16 @@ def export_status(
     if st.export is not None and Path(st.export.zip_path).is_file():
         zip_path, summary = st.export.zip_path, st.export.summary
     # the documents `_gate` skips (review D3): a gate that cannot see one of them is not open
-    # (design 11 section 20.17), whatever the ready documents say
+    # (design 11 section 20.17), whatever the ready documents say. Only documents in the
+    # selection count: one the reviewer left out, or that could not be read and so was never
+    # selected, is exported as left out (section 20.18)
+    from manuallabor.grouping.selection import scope_docs
+
+    scope = scope_docs(review.data.selection())
     not_ready = [
-        s for s in paths.list_slugs() if not (doc_ready(paths, s) and review.data.scored(s))
+        s
+        for s in paths.list_slugs()
+        if s in scope and not (doc_ready(paths, s) and review.data.scored(s))
     ]
     return ExportStatus(
         unlocked=g.unlocked and not not_ready,

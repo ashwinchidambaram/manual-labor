@@ -42,6 +42,7 @@ SELECTION_KINDS = (
     ActionKind.deselect_group,
     ActionKind.set_view,
     ActionKind.set_split,
+    ActionKind.remove_source,  # drops the manual's ids and its known_docs entry (07 section 22)
 )
 
 # a selection that was never written, as a delta base: no ids, every other field its default

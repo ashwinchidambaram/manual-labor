@@ -127,6 +127,7 @@ class ActionKind(StrEnum):
     export_run = "export_run"
     import_ = "import"
     agent_run = "agent_run"
+    remove_source = "remove_source"
 
 
 Screen = Literal["scope", "verify", "agent", "export", "settings", "cli"]
@@ -338,10 +339,16 @@ class RegroupIn(ContractModel):
     request_id: str = Field(min_length=1)
 
 
+ErrorCode = Literal["provider_unreachable"]
+"""Why a node or job failed, when a screen words it differently from other failures: a model
+service that could not be reached (design 07 section 20)."""
+
+
 class NodeState(ContractModel):
     node: str
     state: NodeStateName
     reason: str | None = None
+    code: ErrorCode | None = None
 
 
 class DocLearning(ContractModel):
@@ -388,6 +395,7 @@ class JobInfo(ContractModel):
     finished_at: UTCDateTime | None = None
     pid: int | None = None
     error: str | None = None
+    error_code: ErrorCode | None = None
     resumed_from: str | None = None
     merged_into: str | None = None
 
@@ -401,11 +409,42 @@ class DocStatus(ContractModel):
     orphaned_decisions: int = 0
 
 
+class RemovedDoc(ContractModel):
+    """A manual removed from the project (design 07 section 22). Its decisions and flags stay in
+    the log; they are orphaned while no document of that slug exists, counted live."""
+
+    doc_id: DocSlug
+    filename: str
+    orphaned_decisions: int = 0
+    open_flags: int = 0
+
+
+class SourceRemoval(ContractModel):
+    """What removing a manual deletes and orphans (design 07 section 22). The preview
+    (`GET /api/sources/{slug}/removal`) has `removed` false and says in `blocked_by` why it
+    cannot be done now; the answer of `DELETE /api/sources/{slug}` has `removed` true. Counts
+    are the server's: `blocks` parsed, `selected_blocks` in the selection, the `decisions`,
+    `flags` (`open_flags` of them still open) and agent `proposals` on its blocks, which stay
+    in the log, orphaned."""
+
+    doc_id: DocSlug
+    filename: str
+    blocks: int = Field(ge=0)
+    selected_blocks: int = Field(ge=0)
+    decisions: int = Field(ge=0)
+    flags: int = Field(ge=0)
+    open_flags: int = Field(ge=0)
+    proposals: int = Field(ge=0)
+    blocked_by: str | None = None
+    removed: bool = False
+
+
 class ProjectStatus(ContractModel):
     project: str
     docs: list[DocStatus]
     unregistered_sources: list[str] = Field(default_factory=list)
     jobs_running: list[JobInfo] = Field(default_factory=list)
+    removed: list[RemovedDoc] = Field(default_factory=list)
 
 
 class SnapshotInfo(ContractModel):
@@ -564,7 +603,10 @@ class ExportStatus(ContractModel):
     `not_ready` lists the documents the gate cannot see yet, because they have no current
     scores (never run to score2, or scored by another `SCORING_ALGO_VERSION`, design 03 section
     2.10a): none of their blocks is in any count, so while it is non-empty the project needs a
-    run before an export and `unlocked` is false (review D3, design 11 section 20.17)."""
+    run before an export and `unlocked` is false (review D3, design 11 section 20.17). Only
+    documents that contribute a selected block are listed: one outside the selection (left out
+    by the reviewer, or never read so never selected) cannot lock the export; it is exported as
+    left out (design 11 section 20.18)."""
 
     unlocked: bool
     open_flags: int

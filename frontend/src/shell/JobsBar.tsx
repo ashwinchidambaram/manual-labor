@@ -4,7 +4,7 @@ import { client, unwrap } from "../api/client";
 import { trackJob, useCancelJob, useSources } from "../api/queries";
 import type { JobInfo } from "../api/schema";
 import { useJobsPolling } from "../hooks/useJobsPolling";
-import { jobLogLines } from "./jobLog";
+import { jobLogLines, withoutCommandHints } from "./jobLog";
 import { stepSentence, type FileOf } from "./jobStep";
 import { usePublishedHeight } from "./publishHeight";
 
@@ -16,7 +16,8 @@ function FailedHelp({ job, onRetried }: { job: JobInfo; onRetried: () => void })
   const [log, setLog] = useState<string[] | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const plan = job.plan as { to?: unknown };
-  const canRetry = (job.kind === "run" && typeof plan.to === "string") || job.kind === "export";
+  // an ingest has registered its files before anything can fail (design 07 section 20): its Retry is Scope's Re-run
+  const canRetry = ((job.kind === "run" || job.kind === "ingest_run") && typeof plan.to === "string") || job.kind === "export";
   const retry = async (): Promise<void> => {
     try {
       // an export retries with its own review-marks mode (design 11 section 20.15)
@@ -24,7 +25,9 @@ function FailedHelp({ job, onRetried }: { job: JobInfo; onRetried: () => void })
       const next =
         job.kind === "export"
           ? unwrap(await client.POST("/api/export", { body: { request_id: crypto.randomUUID(), marks } }))
-          : unwrap(await client.POST("/api/jobs", { body: job.plan as { to: string; allow_reparse: boolean } }));
+          : job.kind === "ingest_run"
+            ? unwrap(await client.POST("/api/jobs", { body: { to: plan.to as string, allow_reparse: false } }))
+            : unwrap(await client.POST("/api/jobs", { body: job.plan as { to: string; allow_reparse: boolean } }));
       trackJob(qc, next);
       onRetried();
     } catch (e) {
@@ -139,7 +142,7 @@ function Bar({ jobs, failed, dismiss }: ReturnType<typeof useJobsPolling>) {
       {failed.map((j) => (
         <div key={j.id} role="alert" className="flex flex-wrap items-center gap-2 rounded-lg bg-fail-wash px-3 py-1.5 text-ink" data-testid="job-failed">
           <span>
-            {jobWords(j).what} {j.status}: {j.error ?? j.message ?? "no details were reported"}
+            {jobWords(j).what} {j.status}: {withoutCommandHints(j.error ?? j.message ?? "no details were reported")}
           </span>
           <FailedHelp job={j} onRetried={() => dismiss(j.id)} />
           <button type="button" className={BTN} onClick={() => dismiss(j.id)}>

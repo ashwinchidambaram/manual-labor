@@ -158,6 +158,18 @@ def load_selection(paths: ProjectPaths) -> tuple[Selection, list[str]]:
     return normalize_to(sel, selectable_ids(groups))
 
 
+def scope_docs(sel: Selection) -> set[str]:
+    """The documents that contribute a selected block (design 07 section 21): only these can
+    hold up cleanup, the second scoring pass and the export."""
+    return {ids.parse_block_id(b)[0] for b in sel.block_ids}
+
+
+def in_scope_docs(paths: ProjectPaths) -> set[str]:
+    """`scope_docs` of the selection the worker reads (`selection.json`, the projection of the
+    database row, with documents grouped since it was written added)."""
+    return scope_docs(load_selection(paths)[0])
+
+
 def save_selection(
     paths: ProjectPaths, sel: Selection, groups: Mapping[str, GroupsFile] | None = None
 ) -> tuple[Selection, list[str]]:

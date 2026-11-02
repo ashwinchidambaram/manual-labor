@@ -497,7 +497,14 @@ def run_figures(
                     "detail": f"{type(exc).__name__}: {exc}",
                 }
             )
-    # project-wide dedupe over every document that has a finished report
+    rebuild_index(paths, set(failed), emit)
+    return failed
+
+
+def rebuild_index(paths: ProjectPaths, failed: set[str], emit: Emit) -> None:
+    """The project-wide dedupe over every document that has a finished report: `index.json` and
+    the sidecars' duplicate links. Also run when a manual is removed (design 07 section 22), so
+    no figure is left pointing at a removed one. The caller holds the worker lock."""
     reports: dict[str, FigureReport] = {}
     for slug in paths.list_slugs():
         if slug in failed:
@@ -544,4 +551,3 @@ def run_figures(
             "near": sum(1 for e in entries if e.kind == "near"),
         }
     )
-    return failed

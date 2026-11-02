@@ -541,9 +541,10 @@ describe("VC7 FlagDialog", () => {
     await r.user.keyboard("{Enter}");
     expect(screen.getByTestId("flag-msg")).toHaveTextContent("Choose a category");
     expect(f.actions).toHaveLength(0);
-    await r.user.keyboard("5{Enter}");
+    // 5 (table structure) is offered only for a table block (design 08 section 12); this one is not
+    await r.user.keyboard("4{Enter}");
     await waitFor(() => expect(f.actions).toHaveLength(1));
-    expect(f.actions[0].flag).toEqual({ category: "table_structure", note: null, target_id: null });
+    expect(f.actions[0].flag).toEqual({ category: "bad_crop", note: null, target_id: null });
   });
 
   it("Esc cancels and the dialog traps Tab", async () => {

@@ -1,8 +1,10 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { useRerun, useUploadSources } from "../api/queries";
 import type { JobInfo, ProjectStatus, SourceInfo } from "../api/schema";
 import Hint from "../onboarding/Hint";
+import { withoutCommandHints } from "../shell/jobLog";
 import { STAGE_WORDS, stepCount } from "../shell/jobStep";
+import RemoveManualDialog from "./RemoveManualDialog";
 
 /** The stages Scope is responsible for. `clean` and `score2` run when the scope is confirmed, so on
  *  this screen they are legitimately missing after an upload and are not "open" here. */
@@ -16,12 +18,20 @@ export function jobCovers(j: JobInfo, slug: string): boolean {
   return true; // no document filter: a project-wide plan
 }
 
+/** The server's reason for the first failed stage, shown under the card so the cause is never hidden (design 08 section 12). */
+export function failureReason(s: SourceInfo): string | null {
+  const r = s.nodes.find((n) => n.state === "failed" && !!n.reason)?.reason;
+  return r ? withoutCommandHints(r) : null;
+}
+
 export function openScopeStage(s: SourceInfo): { node: string; state: string } | undefined {
   return s.nodes.find((n) => SCOPE_STAGES.has(n.node) && (n.state === "stale" || n.state === "missing"));
 }
 
 export function sourceChip(s: SourceInfo, jobs: readonly JobInfo[]): { text: string; tone: "ok" | "busy" | "bad" } {
   const failed = s.nodes.find((n) => n.state === "failed");
+  // the model service was down: say that, not that a stage of this manual is broken (design 07 section 20)
+  if (failed?.code === "provider_unreachable") return { text: "Model service not running", tone: "bad" };
   if (failed) return { text: `Failed: ${failed.node}`, tone: "bad" };
   const open = openScopeStage(s);
   // the step a running job is on for this manual, with the worker's own count when it reports one (design 07 4.1)
@@ -96,6 +106,7 @@ export default function SourcesList({
   onGoTo: (slug: string) => void;
 }) {
   const rerun = useRerun();
+  const [removing, setRemoving] = useState<SourceInfo | null>(null);
   // The button posts a plan up to `group`, so only Scope's stages can make it appear (§9 of design 08).
   const needsRerun = sources.some((s) => s.nodes.some((n) => SCOPE_STAGES.has(n.node) && (n.state === "stale" || n.state === "failed")));
   // Ingested from the CLI and never run: the stages are "missing" and no job exists. Offer to run it.
@@ -145,6 +156,11 @@ export default function SourcesList({
                   {s.pages} page{s.pages === 1 ? "" : "s"}
                 </span>
               </button>
+              {failureReason(s) ? (
+                <p role="note" className="mx-4 mb-2 text-xs leading-snug text-fail" data-testid="source-failure">
+                  {failureReason(s)}
+                </p>
+              ) : null}
               {s.ocr_warning ? (
                 <p role="note" className="mx-4 mb-3 flex gap-2 text-xs leading-snug text-ink" data-testid="ocr-warning">
                   <span aria-hidden="true" className="text-act-ink">
@@ -155,6 +171,17 @@ export default function SourcesList({
                   </span>
                 </p>
               ) : null}
+              <div className="mx-3 mb-2 mt-auto">
+                <button
+                  type="button"
+                  data-testid="source-remove"
+                  aria-label={`Remove ${s.filename}`}
+                  onClick={() => setRemoving(s)}
+                  className={`min-h-[1.75rem] rounded-md px-1.5 text-xs text-muted underline-offset-2 hover:text-ink hover:underline ${FOCUS}`}
+                >
+                  Remove
+                </button>
+              </div>
             </li>
           );
         })}
@@ -174,6 +201,7 @@ export default function SourcesList({
           {needsRerun ? "Re-run" : "Run"}
         </button>
       ) : null}
+      {removing ? <RemoveManualDialog slug={removing.slug} filename={removing.filename} onClose={() => setRemoving(null)} /> : null}
     </section>
   );
 }

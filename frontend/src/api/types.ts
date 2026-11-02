@@ -834,6 +834,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/sources/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove Manual
+         * @description Remove a manual: its source file and everything read from it, its blocks from the
+         *     selection. Decisions and flags on its blocks stay in the log, orphaned. 409 `job_active`
+         *     while a job could touch it. Idempotent per `request_id` (design 07 section 22).
+         */
+        delete: operations["remove_manual"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sources/{slug}/removal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Removal Preview
+         * @description What removing this manual deletes and orphans, and why it cannot be done now (design 07
+         *     section 22). Read-only.
+         */
+        get: operations["removal_preview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/status": {
         parameters: {
             query?: never;
@@ -1766,7 +1809,10 @@ export interface components {
          *     `not_ready` lists the documents the gate cannot see yet, because they have no current
          *     scores (never run to score2, or scored by another `SCORING_ALGO_VERSION`, design 03 section
          *     2.10a): none of their blocks is in any count, so while it is non-empty the project needs a
-         *     run before an export and `unlocked` is false (review D3, design 11 section 20.17).
+         *     run before an export and `unlocked` is false (review D3, design 11 section 20.17). Only
+         *     documents that contribute a selected block are listed: one outside the selection (left out
+         *     by the reviewer, or never read so never selected) cannot lock the export; it is exported as
+         *     left out (design 11 section 20.18).
          */
         ExportStatus: {
             /** Blockers */
@@ -2203,6 +2249,8 @@ export interface components {
             doc?: string | null;
             /** Error */
             error?: string | null;
+            /** Error Code */
+            error_code?: "provider_unreachable" | null;
             /** Files */
             files?: string[];
             /** Finished At */
@@ -2372,6 +2420,8 @@ export interface components {
         };
         /** NodeState */
         NodeState: {
+            /** Code */
+            code?: "provider_unreachable" | null;
             /** Node */
             node: string;
             /** Reason */
@@ -2636,6 +2686,8 @@ export interface components {
             jobs_running?: components["schemas"]["JobInfo"][];
             /** Project */
             project: string;
+            /** Removed */
+            removed?: components["schemas"]["RemovedDoc"][];
             /** Unregistered Sources */
             unregistered_sources?: string[];
         };
@@ -2838,6 +2890,27 @@ export interface components {
         RegroupOut: {
             job: components["schemas"]["JobInfo"];
             override: components["schemas"]["GroupOverride"];
+        };
+        /**
+         * RemovedDoc
+         * @description A manual removed from the project (design 07 section 22). Its decisions and flags stay in
+         *     the log; they are orphaned while no document of that slug exists, counted live.
+         */
+        RemovedDoc: {
+            /** Doc Id */
+            doc_id: string;
+            /** Filename */
+            filename: string;
+            /**
+             * Open Flags
+             * @default 0
+             */
+            open_flags: number;
+            /**
+             * Orphaned Decisions
+             * @default 0
+             */
+            orphaned_decisions: number;
         };
         /**
          * RequestIn
@@ -3153,6 +3226,40 @@ export interface components {
             pages: number;
             /** Slug */
             slug: string;
+        };
+        /**
+         * SourceRemoval
+         * @description What removing a manual deletes and orphans (design 07 section 22). The preview
+         *     (`GET /api/sources/{slug}/removal`) has `removed` false and says in `blocked_by` why it
+         *     cannot be done now; the answer of `DELETE /api/sources/{slug}` has `removed` true. Counts
+         *     are the server's: `blocks` parsed, `selected_blocks` in the selection, the `decisions`,
+         *     `flags` (`open_flags` of them still open) and agent `proposals` on its blocks, which stay
+         *     in the log, orphaned.
+         */
+        SourceRemoval: {
+            /** Blocked By */
+            blocked_by?: string | null;
+            /** Blocks */
+            blocks: number;
+            /** Decisions */
+            decisions: number;
+            /** Doc Id */
+            doc_id: string;
+            /** Filename */
+            filename: string;
+            /** Flags */
+            flags: number;
+            /** Open Flags */
+            open_flags: number;
+            /** Proposals */
+            proposals: number;
+            /**
+             * Removed
+             * @default false
+             */
+            removed: boolean;
+            /** Selected Blocks */
+            selected_blocks: number;
         };
         /** StragglerRecord */
         StragglerRecord: {
@@ -5131,6 +5238,97 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobInfo"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_manual: {
+        parameters: {
+            query: {
+                request_id: string;
+            };
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceRemoval"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    removal_preview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceRemoval"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
             /** @description Validation Error */

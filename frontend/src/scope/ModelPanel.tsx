@@ -28,7 +28,9 @@ export default function ModelPanel({ data }: { data: ScopeModels }) {
     setPicked(next);
     requestAnimationFrame(() => group.querySelector<HTMLElement>(`[data-tier="${next}"]`)?.focus());
   };
-  const cmds = sug?.pull_commands?.[tier] ?? [];
+  // the service is stopped, so "Pulled: no" says nothing about the models: no download advice then (design 07 section 20)
+  const stopped = !!p && p.ollama.installed && !p.ollama.reachable;
+  const cmds = stopped ? [] : (sug?.pull_commands?.[tier] ?? []);
   return (
     <section aria-label="Models" data-zone="models" data-testid="model-panel" className="flex flex-col gap-3 text-ink">
       <div>
@@ -57,12 +59,30 @@ export default function ModelPanel({ data }: { data: ScopeModels }) {
       </table>
 
       {p ? (
-        <p className="text-xs text-muted" data-testid="hardware">
-          Hardware: {p.ram_gb} GB RAM
-          {p.gpu ? `, GPU ${p.gpu.name ?? p.gpu.vendor}${p.gpu.vram_gb ? ` (${p.gpu.vram_gb} GB)` : ""}` : ", no GPU"}; about{" "}
-          {p.effective_model_memory_gb} GB usable for models. Ollama:{" "}
-          {p.ollama.reachable ? `reachable (${p.ollama.models.length} models)` : p.ollama.installed ? "installed, not running" : "not installed"}.
-        </p>
+        <div>
+          <p className="text-xs text-muted" data-testid="hardware">
+            Hardware: {p.ram_gb} GB RAM
+            {p.gpu ? `, GPU ${p.gpu.name ?? p.gpu.vendor}${p.gpu.vram_gb ? ` (${p.gpu.vram_gb} GB)` : ""}` : ", no GPU"}; about{" "}
+            {p.effective_model_memory_gb} GB usable for models. Ollama:{" "}
+            {p.ollama.reachable ? `reachable (${p.ollama.models.length} models)` : p.ollama.installed ? "installed, not running" : "not installed"}.
+          </p>
+          {stopped ? (
+            <p role="note" className="mt-1 text-xs text-ink" data-testid="ollama-stopped">
+              Ollama is installed but not running at {p.ollama.host}. Start it (<code>ollama serve</code>), then press Run again. Whether the
+              models are downloaded shows once it runs.
+            </p>
+          ) : null}
+          <button
+            type="button"
+            data-testid="probe-again"
+            onClick={() => probe.mutate()}
+            disabled={probe.isPending}
+            className={`mt-1.5 min-h-[2rem] rounded-lg border border-line bg-raised px-2.5 text-xs font-medium hover:bg-sunk disabled:opacity-50 ${FOCUS}`}
+          >
+            {probe.isPending ? "Checking…" : "Run again"}
+          </button>
+          {probe.isError ? <p role="alert" className="text-xs text-fail">{probe.error.message}</p> : null}
+        </div>
       ) : (
         <div>
           <p className="mb-1 text-xs text-muted">No hardware probe yet.</p>
@@ -122,7 +142,7 @@ export default function ModelPanel({ data }: { data: ScopeModels }) {
                     <td className="break-all pr-1 font-mono text-2xs">{o.model}</td>
                     <td className="pr-1">{o.fits ? "yes" : "no"}</td>
                     <td className="pr-1">{o.speed_class}</td>
-                    <td>{o.present ? "yes" : "no"}</td>
+                    <td>{stopped ? "unknown" : o.present ? "yes" : "no"}</td>
                   </tr>
                 );
               })}

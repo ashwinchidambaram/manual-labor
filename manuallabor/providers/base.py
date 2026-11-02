@@ -49,6 +49,13 @@ class ProviderError(Exception):
         self.retriable = retriable
 
 
+class ProviderUnavailable(ProviderError):
+    """The model service could not be reached (connection refused, host unreachable, name not
+    resolved): a transport failure, never a model's answer. Code that turns a provider error
+    into a fallback re-raises this one, so a stage never records a fallback made only because
+    the service was down (design 07 section 19)."""
+
+
 class ProviderOutputError(ProviderError):
     def __init__(self, message: str, *, raw_text: str, **kw: Any) -> None:
         super().__init__(message, **kw)

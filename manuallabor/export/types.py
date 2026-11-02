@@ -133,6 +133,9 @@ class AssembleInputs:
     learning: ManifestLearning
     tool_version: str
     marks: ExportMarks = "invisible"  # visible review tags too (section 20.15)
+    # documents outside the selection that were never processed (section 20.18): listed in the
+    # manifest, every parsed block accounted as not selected, nothing else read from them
+    left_out: dict[str, Document] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

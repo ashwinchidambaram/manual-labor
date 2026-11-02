@@ -661,7 +661,8 @@ def _manifest(
     figures: list[BuiltFigure],
 ) -> Manifest:
     inp = ctx.inp
-    docs: list[Document] = [d.doc for _, d in sorted(inp.docs.items())]
+    every = {**{s: d.doc for s, d in inp.docs.items()}, **inp.left_out}
+    docs: list[Document] = [every[s] for s in sorted(every)]
     block_status: Counter[str] = Counter()
     numbers_verified: list[str] = []
     for d in inp.docs.values():
@@ -669,6 +670,10 @@ def _manifest(
             block_status[b.status.value] += 1
             if b.numbers_verified:
                 numbers_verified.append(b.id)
+    # design 11 section 20.18: a left-out document's blocks were never through scoring and
+    # cleanup with this version, so nothing has cleared them: `queued` (unreviewed), as the
+    # contract's review_stats count every parsed block
+    block_status[BlockStatus.queued.value] += sum(len(d.block_ids) for d in inp.left_out.values())
     fixed_reason: dict[str, str] = {}
     types: dict[str, BlockType] = {}
     for d in inp.docs.values():
@@ -691,6 +696,12 @@ def _manifest(
             if why is None:  # selected, yet in no article and without a reason
                 raise ExportError(f"{bid} is selected but was placed in no article")
             reasons[bid] = why
+    # design 11 section 20.18: a document outside the selection that was never processed; its
+    # parsed blocks are accounted for (invariant 3) and have no review status
+    for doc in inp.left_out.values():
+        for bid in doc.block_ids:
+            assignments[bid] = ids.UNASSIGNED
+            reasons[bid] = "not_selected"
     overrides: list[Override] = []
     for a in articles:
         for bid in a.block_ids:

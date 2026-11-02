@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from manuallabor.contracts.enums import Task
+from manuallabor.jobs import preflight
 from manuallabor.jobs.executor import Cancelled, ExecResult, Heartbeat, execute, make_plan
 from manuallabor.jobs.providers import ProviderMode, provider_set_factory
 from manuallabor.project import ProjectPaths
@@ -34,7 +35,7 @@ def run_inline(
     providers = provider_set_factory(paths, cfg, mode, hb)
     job_id = store.add_job(kind="run", plan={**plan_in.model_dump(mode="json"), "origin": "cli"})
     store.update_job(job_id, status="running", pid=os.getpid(), started_at=store.now())
-    status, error = "done", None
+    status, error, error_code = "done", None, None
     res = ExecResult()
     try:
         if files:
@@ -66,19 +67,27 @@ def run_inline(
                 doc=doc,
             )
 
-        res = execute(paths, plan, emit=emit, providers=providers, heartbeat=hb, on_unit=on_unit)
+        # design 07 section 20: a model service the plan needs is asked before any unit runs
+        reach = preflight.reacher(paths, paths.load_config(), mode)
+        res = execute(
+            paths, plan, emit=emit, providers=providers, heartbeat=hb, on_unit=on_unit,
+            reach=reach,
+        )  # fmt: skip
         if not res.ok:
             status = "failed"
             error = res.error_message() or (
                 "failed: " + ", ".join(f"{n}={s}" for n, s in sorted(res.failed.items()))
             )
+            error_code = res.error_code
     except Cancelled:
         status = "cancelled"
     except Exception as exc:
         status, error = "failed", f"{type(exc).__name__}: {exc}"[:500]
         raise
     finally:
-        fields: dict[str, Any] = {"status": status, "finished_at": store.now(), "error": error}
+        fields: dict[str, Any] = {
+            "status": status, "finished_at": store.now(), "error": error, "error_code": error_code,
+        }  # fmt: skip
         if status == "done":
             fields["progress"] = 1.0
         store.update_job(job_id, **fields)

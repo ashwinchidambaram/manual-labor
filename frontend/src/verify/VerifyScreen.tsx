@@ -465,7 +465,7 @@ export default function VerifyScreen() {
       <p role="status" aria-live="polite" className="sr-only" data-testid="live">
         {state.notice ?? live}
       </p>
-      {flagOpen ? <FlagDialog onSubmit={(c, n) => void submitFlag(c, n)} onCancel={() => { setFlagOpen(false); focusCard(); }} /> : null}
+      {flagOpen ? <FlagDialog blockType={ownDetail?.block.type ?? null} onSubmit={(c, n) => void submitFlag(c, n)} onCancel={() => { setFlagOpen(false); focusCard(); }} /> : null}
     </main>
   );
 }

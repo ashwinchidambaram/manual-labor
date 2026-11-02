@@ -124,7 +124,8 @@ test("VE1 twenty blocks keyboard-only (gate) @AC4", async ({ page, request }) =>
       case "FLAG5":
         await key(page, "f");
         await expect(page.getByRole("radiogroup")).toBeFocused();
-        await key(page, "5");
+        // 5 (table structure) is offered only for a table block (design 08 section 12); another block takes 4
+        await key(page, details[i].block.type === "table" ? "5" : "4");
         await key(page, "Enter");
         await nextFocused(i);
         break;

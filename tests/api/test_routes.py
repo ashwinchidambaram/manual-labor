@@ -49,6 +49,10 @@ CASES: dict[tuple[str, str], tuple[str, dict[str, Any], int]] = {
         {"files": [("files", ("a.pdf", b"%PDF-1", "application/pdf"))]},
         202,
     ),
+    # removing a manual needs the project database (the fakes have none): exercised on the real
+    # services in tests/api/test_remove_source.py
+    ("GET", "/api/sources/{slug}/removal"): ("/api/sources/doc/removal", {}, 501),
+    ("DELETE", "/api/sources/{slug}"): ("/api/sources/doc?request_id=t-1", {}, 501),
     ("GET", "/api/docs/{slug}/source"): ("/api/docs/doc/source", {}, 200),
     ("GET", "/api/docs/{slug}/pages/{page}.png"): ("/api/docs/doc/pages/1.png?dpi=100", {}, 200),
     ("GET", "/api/docs/{slug}/pages/{page}/blocks"): ("/api/docs/doc/pages/1/blocks", {}, 200),
