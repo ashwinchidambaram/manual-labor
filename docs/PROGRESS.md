@@ -679,3 +679,38 @@ tsc clean
  Test Files  57 passed (57)
       Tests  478 passed (478)
 ```
+
+## Integration 2026-11-02: export-followups and upgrade-fix merged into main — PASSED 2026-11-02
+
+- **Merges.** `git merge --no-ff export-followups` (e8d4d9b) applied cleanly. `git merge --no-ff upgrade-fix` (0c4b370) conflicted only in this file (both sections kept). `frontend/src/api/openapi.json`, `src/api/types.ts`, `ExportScreen.tsx`, `state/models.py`, `export/pipeline.py` and `README.md` merged on their own. Schemas, OpenAPI, TS types and USER_GUIDE were regenerated after each merge with no drift. A follow-ups test (`test_e22_status_shape_and_the_locked_post`) pinned the status keys and needed `not_ready` added.
+- **Leftover from the upgrade fix (design 11 section 20.17, b607f3d).** With some documents not ready, `/api/export/status` said `unlocked: true`. It now says `unlocked = gate.unlocked and not not_ready`. `POST /api/export` answers 409 `export_locked` with `not_ready`. The step rail, next-step card, Export screen and Verify's empty queue say a run is needed, and no override form is shown. Tests came first: `tests/export/test_api.py::test_a_document_not_scored_by_this_version_locks_the_export` (red: `unlocked` True) and `ExportNotReady.test.tsx`.
+- **Fresh Opus review of upgrade-fix (design 07 section 3.2) and a second review of the fix (9b460c7).** No blocker.
+  - Fixed: the rail ignored `not_ready`.
+  - Fixed: `score` was fresh over a current scores.json missing a block. The graph now calls it stale, and the scoring skip path rescores it (red before: score `skip`, group `failed`).
+  - Fixed: `labor status -v` showed the raw `CleanupError` on `clean`. A non-fresh upstream is now the reason.
+  - Fixed: the not-ready wording, file names, and "being processed" only for documents a score2 job covers.
+  - Fixed: the 409 wording.
+  - Test gaps closed: Re-run `to: group`, recorded `group: failed`, missing scores beside clean.json, the `_old_scores_reason` branches, and a document without clean.json.
+  - Declined: deriving `not_ready` from all nodes being fresh, because the export job re-runs stale stages itself.
+
+Every run below printed `manuallabor` from `/Users/ashwinchidambaram/dev/projects/doc-to-KB/manuallabor/__init__.py` (before and after).
+
+```
+$ uv run ruff check manuallabor/ tests/ scripts/ && uv run ruff format --check manuallabor/ tests/ scripts/
+All checks passed! / 417 files already formatted
+$ uv run mypy manuallabor/
+Success: no issues found in 196 source files
+$ uv run labor schemas export --check && uv run labor openapi export --check
+schemas up to date / openapi up to date
+$ cd frontend && npm run check-types-fresh && npm run check-api-fresh && npm run typecheck && npm test -- --run
+no drift / tsc clean
+ Test Files  57 passed (57)
+      Tests  500 passed (500)
+$ uv run pytest -p no:warnings -o addopts="-m 'not slow' --basetemp=.pytest_tmp_int"
+2090 passed, 73 skipped, 4 deselected in 920.83s (0:15:20)
+$ uv run pytest -m slow -p no:warnings -o addopts="--basetemp=.pytest_tmp_int"
+4 passed, 2163 deselected in 438.76s (0:07:18)
+$ cd frontend && npm run e2e
+  1 skipped (UCR reader's pass screenshots, opt-in)
+  100 passed (6.2m)
+```
