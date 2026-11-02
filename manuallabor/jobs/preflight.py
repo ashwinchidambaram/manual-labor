@@ -16,6 +16,7 @@ from manuallabor.contracts.config import ProjectConfig
 from manuallabor.contracts.enums import Task
 from manuallabor.jobs import graph
 from manuallabor.project import ProjectPaths
+from manuallabor.providers.reach import http_ok
 
 __all__ = [
     "CODE",
@@ -45,15 +46,8 @@ def message(host: str) -> str:
     return f"Ollama is not running at {host}. Start it (`ollama serve`) and press Retry."
 
 
-def http_get(url: str, timeout: float) -> bool:
-    """True when the server answered 2xx. Any error (refused, timeout, offline guard) is False."""
-    try:
-        import httpx
-
-        # never through a proxy from the environment: only the configured host is asked
-        return httpx.get(url, timeout=timeout, trust_env=False).is_success
-    except Exception:
-        return False
+# the one network call, kept under providers/ (invariant 6; tests/providers/test_offline.py)
+http_get: Get = http_ok
 
 
 def _node_tasks(paths: ProjectPaths, cfg: ProjectConfig, node: str, slug: str) -> list[Task]:

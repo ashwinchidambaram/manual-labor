@@ -778,3 +778,23 @@ $ cd frontend && npm run e2e
   1 skipped (UCR reader's pass screenshots, opt-in)
   102 passed (5.0m)
 ```
+
+## Integration 2026-11-02 (second): outage-recovery merged into main — PASSED 2026-11-02
+
+Fast-forward of `outage-recovery` onto main (648b3cd to 2c6b840). The full pytest on the merged tree found one failure the branch gate's subset did not run: `tests/providers/test_offline.py::test_t5_network_imports_are_confined`, because `manuallabor/jobs/preflight.py` imported `httpx`. Invariant 6 confines network imports to `providers/`, so the one call moved to `manuallabor/providers/reach.py` (`http_ok`, `trust_env=False`) and `preflight.http_get` now names it. No behaviour change; the proxy test still patches `httpx.get` and passes.
+
+```
+$ uv run pytest -p no:warnings --basetemp=.pytest_tmp_final -o addopts= -q
+1 failed, 2147 passed, 73 skipped in 1649.39s (0:27:29)   # before the move
+$ uv run pytest tests/providers/test_offline.py tests/jobs/test_preflight.py -p no:warnings -o addopts= -q
+16 passed in 90.34s                                       # after the move
+$ uv run ruff check manuallabor/ tests/ && uv run ruff format --check manuallabor/ tests/ && uv run mypy manuallabor/
+All checks passed! / 424 files already formatted / Success: no issues found in 199 source files
+$ uv run labor schemas export --check && uv run labor openapi export --check
+schemas up to date / openapi up to date
+$ cd frontend && npm run typecheck && npm run check-types-fresh && npm run check-api-fresh && npm test -- --run
+tsc clean / no drift
+ Test Files  59 passed (59)
+      Tests  515 passed (515)
+```
+Playwright: the branch's full run (102 passed, 1 skipped) stands; the move touches no frontend code.
